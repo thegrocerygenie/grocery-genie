@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd backend && ruff check *)",
+      "Bash(cd backend && ruff format --check *)",
+      "Bash(cd backend && pytest *)",
+      "Bash(cd backend && alembic *)",
+      "Bash(cd mobile && npx tsc --noEmit)",
+      "Bash(cd mobile && npx eslint *)",
+      "Bash(cd mobile && npm test *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit.*backend.*\\.py|Write.*backend.*\\.py",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd backend && ruff check --quiet . 2>&1 || true"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit.*mobile.*\\.(ts|tsx)|Write.*mobile.*\\.(ts|tsx)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd mobile && npx tsc --noEmit 2>&1 | head -20 || true"
+          }
+        ]
+      }
+    ]
+  }
+}

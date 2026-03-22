@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / React Native
+node_modules/
+.expo/
+ios/
+android/
+*.jks
+*.keystore
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+*.sqlite3
+
+# Uploads (local receipt storage)
+backend/uploads/
+
+# Claude Code user-local files
+.claude/settings.local.json
+.claude/plans/
+.claude/memory/
+
+# Misc
+*.log
+*.pid
