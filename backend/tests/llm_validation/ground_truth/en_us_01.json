@@ -1,0 +1,84 @@
+{
+  "receipt_id": "en_us_01",
+  "store_name": "Whole Foods Market",
+  "date": "2026-02-10",
+  "currency": "USD",
+  "items": [
+    {
+      "name": "Organic Bananas",
+      "quantity": 1.105,
+      "unit_price": 0.69,
+      "total_price": 0.76
+    },
+    {
+      "name": "Whole Milk 1 Gal",
+      "quantity": 1,
+      "unit_price": 4.99,
+      "total_price": 4.99
+    },
+    {
+      "name": "Sourdough Bread",
+      "quantity": 1,
+      "unit_price": 5.49,
+      "total_price": 5.49
+    },
+    {
+      "name": "Cage Free Eggs Dz",
+      "quantity": 1,
+      "unit_price": 6.99,
+      "total_price": 6.99
+    },
+    {
+      "name": "Baby Spinach 5oz",
+      "quantity": 2,
+      "unit_price": 3.49,
+      "total_price": 6.98
+    },
+    {
+      "name": "Chicken Breast Lb",
+      "quantity": 2.31,
+      "unit_price": 8.99,
+      "total_price": 20.77
+    },
+    {
+      "name": "Greek Yogurt 32oz",
+      "quantity": 1,
+      "unit_price": 6.49,
+      "total_price": 6.49
+    },
+    {
+      "name": "Avocados 4ct",
+      "quantity": 1,
+      "unit_price": 4.99,
+      "total_price": 4.99
+    },
+    {
+      "name": "Paper Towels 6pk",
+      "quantity": 1,
+      "unit_price": 8.99,
+      "total_price": 8.99
+    },
+    {
+      "name": "Dish Soap 22oz",
+      "quantity": 1,
+      "unit_price": 3.49,
+      "total_price": 3.49
+    },
+    {
+      "name": "Sparkling Water 12pk",
+      "quantity": 1,
+      "unit_price": 5.99,
+      "total_price": 5.99
+    },
+    {
+      "name": "Dark Chocolate Bar",
+      "quantity": 1,
+      "unit_price": 3.29,
+      "total_price": 3.29
+    }
+  ],
+  "subtotal": 81.22,
+  "tax": 2.15,
+  "total": 83.37,
+  "notes": "Receipt uses period as decimal separator. 12 line items. US English format."
+}
