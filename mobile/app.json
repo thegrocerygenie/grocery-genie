@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Grocery Genie",
+    "slug": "grocery-genie",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["ios"],
+    "scheme": "grocery-genie",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.grocerygenie.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Grocery Genie uses the camera to scan receipts.",
+        "NSPhotoLibraryUsageDescription": "Grocery Genie accesses your photo library to import receipt images."
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      "expo-image-manipulator",
+      "expo-image-picker",
+      "expo-haptics",
+      "react-native-reanimated"
+    ]
+  }
+}
