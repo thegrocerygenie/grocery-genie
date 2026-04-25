@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     max_receipt_submissions_per_hour: int = 50
     max_reads_per_minute: int = 300
 
+    # Budget alert thresholds (BC-03: configurable at 50%, 80%, 100%).
+    budget_alert_thresholds: list[int] = [50, 80, 100]
+
 
 @lru_cache
 def get_settings() -> Settings:

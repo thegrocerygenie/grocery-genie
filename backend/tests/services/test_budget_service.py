@@ -259,6 +259,35 @@ async def test_check_thresholds_at_100(
     breaches = await service.check_thresholds(user_id, date(2026, 3, 10))
     assert any(b.threshold_percent == 100 for b in breaches)
     assert any(b.threshold_percent == 80 for b in breaches)
+    # BC-03: 50% threshold also configured by default
+    assert any(b.threshold_percent == 50 for b in breaches)
+
+
+@pytest.mark.asyncio
+async def test_check_thresholds_at_50(
+    service, user_id, default_categories, db_session
+):
+    """BC-03: 50% breach fires before 80% — overview promises configurable 50/80/100."""
+    cat = default_categories[0]
+    await _create_confirmed_receipt(
+        db_session,
+        user_id,
+        date(2026, 3, 10),
+        [("Mid order", 55.0, cat.id)],
+    )
+    request = BudgetCreateRequest(
+        category_id=None,
+        amount=100.0,
+        period_type="monthly",
+        period_start="2026-03-01",
+    )
+    await service.create_budget(user_id, request)
+
+    breaches = await service.check_thresholds(user_id, date(2026, 3, 10))
+    # 55% of 100 → 50% threshold breached, 80% and 100% not
+    assert any(b.threshold_percent == 50 for b in breaches)
+    assert not any(b.threshold_percent == 80 for b in breaches)
+    assert not any(b.threshold_percent == 100 for b in breaches)
 
 
 @pytest.mark.asyncio

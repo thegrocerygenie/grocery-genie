@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.events.types import BudgetThresholdBreached
 from app.models.database import Budget, Category, LineItem, Receipt
 from app.models.schemas import (
@@ -16,8 +17,6 @@ from app.models.schemas import (
     DashboardTopItem,
     DashboardTrendMonth,
 )
-
-DEFAULT_THRESHOLDS = [80, 100]
 
 
 class BudgetService:
@@ -376,7 +375,7 @@ class BudgetService:
             percent = current_spend / budget_amount * 100
             remaining = budget_amount - current_spend
 
-            for threshold in DEFAULT_THRESHOLDS:
+            for threshold in get_settings().budget_alert_thresholds:
                 if percent >= threshold:
                     breaches.append(
                         BudgetThresholdBreached(
