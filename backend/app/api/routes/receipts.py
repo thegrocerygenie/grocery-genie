@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from sqlalchemy import select as sa_select
@@ -85,6 +86,24 @@ async def scan_receipt(
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> ReceiptScanResponse:
     analytics.emit("receipt_scan_started", {"source": "upload"}, user.id)
+
+    # Free-tier quota: reject scans that would exceed the monthly limit
+    settings = get_settings()
+    if settings.free_tier_receipts_per_month > 0:
+        quota_service = ReceiptService(db=db)
+        scanned_this_month = await quota_service.count_receipts_in_month(
+            user.id, datetime.now(UTC)
+        )
+        if scanned_this_month >= settings.free_tier_receipts_per_month:
+            limit = settings.free_tier_receipts_per_month
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    f"Monthly receipt quota exceeded "
+                    f"({limit} receipts/month on Free tier)."
+                ),
+            )
+
     # Validate content type
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(

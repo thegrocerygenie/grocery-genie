@@ -47,6 +47,25 @@ class ReceiptService:
         self.analytics = analytics
         self.store_service = StoreService(db)
 
+    async def count_receipts_in_month(
+        self, user_id: uuid.UUID, reference: datetime
+    ) -> int:
+        """Count this user's receipts scanned in the calendar month of `reference`."""
+        month_start = datetime(reference.year, reference.month, 1, tzinfo=UTC)
+        if reference.month == 12:
+            next_month = datetime(reference.year + 1, 1, 1, tzinfo=UTC)
+        else:
+            next_month = datetime(reference.year, reference.month + 1, 1, tzinfo=UTC)
+
+        result = await self.db.execute(
+            select(func.count(Receipt.id)).where(
+                Receipt.user_id == user_id,
+                Receipt.created_at >= month_start,
+                Receipt.created_at < next_month,
+            )
+        )
+        return int(result.scalar() or 0)
+
     async def process_receipt(
         self,
         user_id: uuid.UUID,
