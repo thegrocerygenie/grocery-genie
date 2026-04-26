@@ -1,31 +1,51 @@
+/**
+ * Scan — Receipt capture screen.
+ *
+ * Drop-in for `app/(tabs)/scan.tsx`. Uses:
+ *   expo-camera        — live preview + capture
+ *   expo-haptics       — capture confirmation
+ *   expo-symbols       — SF Symbols (iOS)
+ *   expo-router        — navigation to /review
+ *
+ * On tap of the shutter:
+ *   1. Haptic fires (notification success — leads the visual)
+ *   2. Photo is captured
+ *   3. We push to /review with the URI
+ *
+ * For real edge detection / multi-page document scanning, swap
+ * <CameraView> for VisionCamera + a frame processor, OR use the
+ * VNDocumentCameraViewController bridge from `expo-document-scanner`.
+ * That is a one-screen native modal — recommended path for v1.
+ */
+
 import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+  Linking,
+} from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
+import { colors, type, radii, spacing } from './theme';
 
-import { colors, radii, spacing, type } from '@/constants/theme';
-import { useReceiptScan } from '@/features/receipt-capture/hooks/useReceiptScan';
-import { useReceiptStore } from '@/store/receiptStore';
-import { useAnalytics } from '@/hooks/useAnalytics';
+type ScanState = 'idle' | 'detected' | 'capturing' | 'processing' | 'low-quality';
 
-type ScanFlowState = 'detected' | 'capturing' | 'processing' | 'low-quality';
-
-export default function ScanScreen() {
+export default function Scan() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
-  const [flowState, setFlowState] = useState<ScanFlowState>('detected');
+  const [scanState, setScanState] = useState<ScanState>('detected'); // mock: assume detected
   const cameraRef = useRef<CameraView>(null);
 
-  const scanMutation = useReceiptScan();
-  const { setCapturedImageUri, setActiveScanResponse } = useReceiptStore();
-  const analytics = useAnalytics();
-
+  // Permission states ──────────────────────────────────────
   if (!permission) {
     return (
       <View style={styles.permissionRoot}>
-        <ActivityIndicator color={colors.tint} />
+        <ActivityIndicator />
       </View>
     );
   }
@@ -34,40 +54,29 @@ export default function ScanScreen() {
     return <PermissionScreen denied={!permission.canAskAgain} onRequest={requestPermission} />;
   }
 
+  // Capture handler ────────────────────────────────────────
   const onShutter = async () => {
-    if (flowState === 'capturing' || flowState === 'processing') return;
+    if (scanState === 'capturing' || scanState === 'processing') return;
 
+    // Haptic FIRST — research-backed, feels faster than haptic-after-photo
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    analytics.emit('receipt_scan_started', { source: 'camera' });
 
-    setFlowState('capturing');
+    setScanState('capturing');
     try {
       const photo = await cameraRef.current?.takePictureAsync({
         quality: 0.8,
         skipProcessing: false,
       });
       if (!photo?.uri) {
-        setFlowState('low-quality');
+        setScanState('low-quality');
         return;
       }
-
-      setFlowState('processing');
-      scanMutation.mutate(
-        { imageUri: photo.uri, mimeType: 'image/jpeg' },
-        {
-          onSuccess: (response) => {
-            setCapturedImageUri(photo.uri);
-            setActiveScanResponse(response);
-            setFlowState('detected');
-            router.push('/review');
-          },
-          onError: () => {
-            setFlowState('low-quality');
-          },
-        },
-      );
-    } catch {
-      setFlowState('low-quality');
+      setScanState('processing');
+      // Simulate OCR — replace with your real call
+      // const ocr = await runOcr(photo.uri);
+      router.push({ pathname: '/review', params: { uri: photo.uri } });
+    } catch (e) {
+      setScanState('low-quality');
     }
   };
 
@@ -77,23 +86,27 @@ export default function ScanScreen() {
       <View style={styles.root}>
         <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
 
+        {/* Detection brackets — corner marks only */}
         <Brackets />
 
+        {/* Top hint pill */}
         <View style={styles.topHintRow}>
-          <HintPill state={flowState} />
+          <HintPill state={scanState} />
         </View>
 
+        {/* Bottom controls */}
         <View style={styles.bottomBar}>
-          <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button">
+          <Pressable onPress={() => router.back()} hitSlop={12}>
             <Text style={styles.cancelLabel}>Cancel</Text>
           </Pressable>
 
           <Pressable
             onPress={onShutter}
-            disabled={flowState === 'capturing' || flowState === 'processing'}
-            style={({ pressed }) => [styles.shutter, pressed && { transform: [{ scale: 0.94 }] }]}
-            accessibilityRole="button"
-            accessibilityLabel="Capture receipt"
+            disabled={scanState === 'capturing' || scanState === 'processing'}
+            style={({ pressed }) => [
+              styles.shutter,
+              pressed && { transform: [{ scale: 0.94 }] },
+            ]}
           >
             <View style={styles.shutterInner} />
           </Pressable>
@@ -105,16 +118,22 @@ export default function ScanScreen() {
   );
 }
 
-interface PermissionScreenProps {
+// ─── Permission screen ───────────────────────────────────
+function PermissionScreen({
+  denied,
+  onRequest,
+}: {
   denied: boolean;
   onRequest: () => void;
-}
-
-function PermissionScreen({ denied, onRequest }: PermissionScreenProps) {
+}) {
   return (
     <View style={styles.permissionRoot}>
       <View style={styles.permissionIcon}>
-        <SymbolView name="camera.fill" size={28} tintColor={denied ? colors.red : colors.tint} />
+        <SymbolView
+          name="camera.fill"
+          size={28}
+          tintColor={denied ? colors.red : colors.tint}
+        />
       </View>
       <Text style={[type.title2, { textAlign: 'center' }]}>
         {denied ? 'Camera access is off' : 'Allow Camera Access'}
@@ -122,12 +141,7 @@ function PermissionScreen({ denied, onRequest }: PermissionScreenProps) {
       <Text
         style={[
           type.subheadline,
-          {
-            color: colors.iosLabel2 as string,
-            textAlign: 'center',
-            maxWidth: 260,
-            lineHeight: 22,
-          },
+          { color: colors.iosLabel2, textAlign: 'center', maxWidth: 260, lineHeight: 22 },
         ]}
       >
         {denied
@@ -137,98 +151,72 @@ function PermissionScreen({ denied, onRequest }: PermissionScreenProps) {
       <Pressable
         style={styles.primaryBtn}
         onPress={denied ? () => Linking.openSettings() : onRequest}
-        accessibilityRole="button"
       >
-        <Text style={styles.primaryBtnLabel}>{denied ? 'Open Settings' : 'Continue'}</Text>
+        <Text style={styles.primaryBtnLabel}>
+          {denied ? 'Open Settings' : 'Continue'}
+        </Text>
       </Pressable>
     </View>
   );
 }
 
-interface BracketDef {
-  top?: number;
-  bottom?: number;
-  left?: number;
-  right?: number;
-  borderTopWidth: number;
-  borderBottomWidth: number;
-  borderLeftWidth: number;
-  borderRightWidth: number;
-}
-
+// ─── Bracket overlay ─────────────────────────────────────
 function Brackets() {
+  // Four corner marks, fixed for now — when wiring to a real document
+  // detector, animate these to the detected quad in a frame processor.
   const inset = 24;
   const len = 24;
   const stroke = 2;
-  const corners: BracketDef[] = [
-    {
-      top: inset,
-      left: inset,
-      borderTopWidth: stroke,
-      borderLeftWidth: stroke,
-      borderBottomWidth: 0,
-      borderRightWidth: 0,
-    },
-    {
-      top: inset,
-      right: inset,
-      borderTopWidth: stroke,
-      borderRightWidth: stroke,
-      borderBottomWidth: 0,
-      borderLeftWidth: 0,
-    },
-    {
-      bottom: inset + 100,
-      left: inset,
-      borderBottomWidth: stroke,
-      borderLeftWidth: stroke,
-      borderTopWidth: 0,
-      borderRightWidth: 0,
-    },
-    {
-      bottom: inset + 100,
-      right: inset,
-      borderBottomWidth: stroke,
-      borderRightWidth: stroke,
-      borderTopWidth: 0,
-      borderLeftWidth: 0,
-    },
-  ];
+  const corners = [
+    { top: inset, left: inset, top2: true, left2: true },
+    { top: inset, right: inset, top2: true, right2: true },
+    { bottom: inset + 100, left: inset, bottom2: true, left2: true },
+    { bottom: inset + 100, right: inset, bottom2: true, right2: true },
+  ] as const;
   return (
     <>
       {corners.map((c, i) => (
         <View
           key={i}
           pointerEvents="none"
-          style={[styles.bracket, { width: len, height: len }, c]}
+          style={[
+            styles.bracket,
+            {
+              top: c.top,
+              bottom: c.bottom,
+              left: c.left,
+              right: c.right,
+              borderTopWidth: c.top2 ? stroke : 0,
+              borderBottomWidth: c.bottom2 ? stroke : 0,
+              borderLeftWidth: c.left2 ? stroke : 0,
+              borderRightWidth: c.right2 ? stroke : 0,
+              width: len,
+              height: len,
+            },
+          ]}
         />
       ))}
     </>
   );
 }
 
-interface HintPillProps {
-  state: ScanFlowState;
-}
-
-function HintPill({ state }: HintPillProps) {
+// ─── Hint pill ───────────────────────────────────────────
+function HintPill({ state }: { state: ScanState }) {
   if (state === 'low-quality') {
     return (
       <View style={[styles.pill, { backgroundColor: colors.orange }]}>
         <SymbolView name="exclamationmark.triangle.fill" size={14} tintColor="#fff" />
         <Text style={[type.footnote, { color: '#fff', fontWeight: '600' }]}>
-          Couldn&apos;t read that — try again
+          Image looks blurry — hold steady
         </Text>
       </View>
     );
   }
-  if (state === 'processing' || state === 'capturing') {
+  if (state === 'processing') {
     return (
       <View style={[styles.pill, styles.pillGlass]}>
         <ActivityIndicator size="small" color="#fff" />
-        <Text style={[type.footnote, { color: '#fff' }]}>
-          {state === 'processing' ? 'Reading receipt…' : 'Capturing…'}
-        </Text>
+        <Text style={[type.footnote, { color: '#fff' }]}>Reading receipt…</Text>
       </View>
     );
   }
@@ -239,6 +227,7 @@ function HintPill({ state }: HintPillProps) {
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
 
@@ -259,6 +248,7 @@ const styles = StyleSheet.create({
   },
   pillGlass: {
     backgroundColor: 'rgba(255,255,255,0.18)',
+    // RN doesn't have backdrop-filter; use expo-blur for true glass
   },
 
   bracket: {
@@ -292,9 +282,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
 
+  // Permission screen ────────────────────────────────────
   permissionRoot: {
     flex: 1,
-    backgroundColor: colors.iosBg as string,
+    backgroundColor: colors.iosBg,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,

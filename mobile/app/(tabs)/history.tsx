@@ -1,5 +1,4 @@
-import { router } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -7,274 +6,283 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Stack, useRouter } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
+import SegmentedControl from '@react-native-segmented-control/segmented-control';
 
-import { strings } from '@/constants/strings';
-import { borderRadius, colors, spacing, typography } from '@/constants/theme';
-import { ReceiptHistoryItem } from '@/features/receipt-capture/components/ReceiptHistoryItem';
+import { colors, radii, spacing, type } from '@/constants/theme';
+import { getCategoryMeta } from '@/constants/categories';
 import { useReceipts } from '@/features/receipt-capture/hooks/useReceipts';
 import type { ReceiptResponse } from '@/features/receipt-capture/types';
 
-type DateFilter = 'thisWeek' | 'thisMonth' | 'lastMonth' | 'allTime';
+type FilterIndex = 0 | 1 | 2;
 
-const FILTER_CHIPS: { key: DateFilter; label: string }[] = [
-  { key: 'allTime', label: strings.history.allTime },
-  { key: 'thisWeek', label: strings.history.thisWeek },
-  { key: 'thisMonth', label: strings.history.thisMonth },
-  { key: 'lastMonth', label: strings.history.lastMonth },
-];
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function getDateRange(filter: DateFilter): { from_date?: string; to_date?: string } {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-
-  switch (filter) {
-    case 'thisWeek': {
-      const day = now.getDay();
-      const start = new Date(now);
-      start.setDate(now.getDate() - day);
-      return { from_date: formatISO(start) };
-    }
-    case 'thisMonth':
-      return { from_date: `${year}-${pad(month + 1)}-01` };
-    case 'lastMonth': {
-      const lmYear = month === 0 ? year - 1 : year;
-      const lmMonth = month === 0 ? 12 : month;
-      const lastDay = new Date(year, month, 0).getDate();
-      return {
-        from_date: `${lmYear}-${pad(lmMonth)}-01`,
-        to_date: `${lmYear}-${pad(lmMonth)}-${pad(lastDay)}`,
-      };
-    }
-    default:
-      return {};
-  }
+function pad(n: number): string {
+  return n < 10 ? `0${n}` : String(n);
 }
 
 function formatISO(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function pad(n: number): string {
-  return n < 10 ? `0${n}` : String(n);
+function getDateRange(filter: FilterIndex): { from_date?: string; to_date?: string } {
+  const now = new Date();
+  if (filter === 0) {
+    const day = now.getDay();
+    const start = new Date(now);
+    start.setDate(now.getDate() - day);
+    return { from_date: formatISO(start) };
+  }
+  if (filter === 1) {
+    return { from_date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01` };
+  }
+  return {};
+}
+
+function formatShortDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  return `${MONTH_SHORT[m - 1]} ${d}`;
+}
+
+interface ReceiptRowProps {
+  receipt: ReceiptResponse;
+  showDivider: boolean;
+  onPress: () => void;
+}
+
+function ReceiptRow({ receipt, showDivider, onPress }: ReceiptRowProps) {
+  const firstCategory = receipt.items.find((item) => item.category_id)?.category_id ?? null;
+  const meta = getCategoryMeta(firstCategory);
+  const pendingSync = receipt.status === 'pending';
+  const itemCount = receipt.items.length;
+  const total = receipt.total ?? 0;
+  const sub = pendingSync ? 'Pending sync' : `${formatShortDate(receipt.date)} · ${itemCount} items`;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        showDivider && styles.rowDivider,
+        pressed && { backgroundColor: colors.iosFill3 },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`${receipt.store_name ?? 'Receipt'}, ${sub}, $${total.toFixed(2)}`}
+    >
+      <View style={[styles.catCircle, { backgroundColor: meta.color }]}>
+        <SymbolView
+          name={meta.symbol as Parameters<typeof SymbolView>[0]['name']}
+          size={14}
+          tintColor="#fff"
+        />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={type.headline} numberOfLines={1}>
+          {receipt.store_name ?? 'Unknown store'}
+        </Text>
+        <Text
+          style={[
+            type.caption1,
+            {
+              color: pendingSync ? colors.orange : (colors.iosLabel2 as string),
+              marginTop: 1,
+            },
+          ]}
+        >
+          {sub}
+        </Text>
+      </View>
+      <Text style={[type.money, { fontSize: 15 }]}>${total.toFixed(2)}</Text>
+      <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3 as string} />
+    </Pressable>
+  );
+}
+
+interface EmptyStateProps {
+  hasQuery: boolean;
+}
+
+function EmptyState({ hasQuery }: EmptyStateProps) {
+  return (
+    <View style={styles.empty}>
+      <View style={styles.emptyIcon}>
+        <SymbolView
+          name={hasQuery ? 'magnifyingglass' : 'clock.fill'}
+          size={26}
+          tintColor={colors.iosLabel2 as string}
+        />
+      </View>
+      <Text style={type.headline}>{hasQuery ? 'No matches' : 'No receipts yet'}</Text>
+      <Text
+        style={[
+          type.footnote,
+          {
+            color: colors.iosLabel2 as string,
+            textAlign: 'center',
+            maxWidth: 220,
+            lineHeight: 19,
+          },
+        ]}
+      >
+        {hasQuery ? 'Try a different store name.' : 'Scanned receipts appear here, sorted by date.'}
+      </Text>
+    </View>
+  );
 }
 
 export default function HistoryScreen() {
-  const [searchText, setSearchText] = useState('');
-  const [activeFilter, setActiveFilter] = useState<DateFilter>('allTime');
+  const router = useRouter();
+  const [filter, setFilter] = useState<FilterIndex>(1);
+  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
 
-  const dateRange = useMemo(() => getDateRange(activeFilter), [activeFilter]);
-
+  const dateRange = useMemo(() => getDateRange(filter), [filter]);
   const queryParams = useMemo(
     () => ({
       page,
       per_page: 20,
-      store: searchText.trim() || undefined,
+      store: search.trim() || undefined,
       ...dateRange,
     }),
-    [page, searchText, dateRange],
+    [page, search, dateRange],
   );
 
   const { data, isLoading, isRefetching, refetch } = useReceipts(queryParams);
-
   const receipts = data?.items ?? [];
 
-  const handleReceiptPress = useCallback((receipt: ReceiptResponse) => {
-    router.push({ pathname: '/review', params: { receiptId: receipt.id } });
-  }, []);
-
-  const handleFilterChange = useCallback((filter: DateFilter) => {
-    setActiveFilter(filter);
-    setPage(1);
-  }, []);
-
-  const handleEndReached = useCallback(() => {
+  const handleEndReached = () => {
     if (data && receipts.length < data.total) {
       setPage((p) => p + 1);
     }
-  }, [data, receipts.length]);
-
-  const renderItem = useCallback(
-    ({ item }: { item: ReceiptResponse }) => (
-      <ReceiptHistoryItem
-        storeName={item.store_name}
-        date={item.date}
-        total={item.total}
-        itemCount={item.items.length}
-        onPress={() => handleReceiptPress(item)}
-      />
-    ),
-    [handleReceiptPress],
-  );
-
-  const renderEmpty = () => {
-    if (isLoading) return null;
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyIcon}>🧾</Text>
-        <Text style={styles.emptyText}>{strings.history.empty}</Text>
-      </View>
-    );
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <Text style={styles.title}>{strings.history.title}</Text>
-
-      {/* Search bar */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder={strings.history.search}
-          placeholderTextColor={colors.light.textSecondary}
-          value={searchText}
-          onChangeText={(text) => {
-            setSearchText(text);
-            setPage(1);
-          }}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-          accessibilityLabel="Search receipts by store name"
-        />
-      </View>
-
-      {/* Date filter chips */}
-      <View style={styles.chipRow}>
-        {FILTER_CHIPS.map((chip) => (
-          <Pressable
-            key={chip.key}
-            style={[
-              styles.chip,
-              activeFilter === chip.key && styles.chipActive,
-            ]}
-            onPress={() => handleFilterChange(chip.key)}
-            accessibilityLabel={`Filter by ${chip.label}`}
-            accessibilityRole="button"
-            accessibilityState={{ selected: activeFilter === chip.key }}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                activeFilter === chip.key && styles.chipTextActive,
-              ]}
-            >
-              {chip.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {/* Loading indicator */}
-      {isLoading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.light.primary} />
-        </View>
-      )}
-
-      {/* Receipt list */}
-      {!isLoading && (
-        <FlatList
-          data={receipts}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          ListEmptyComponent={renderEmpty}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetch}
-              tintColor={colors.light.primary}
+    <>
+      <Stack.Screen
+        options={{
+          title: 'History',
+          headerLargeTitle: true,
+          headerTransparent: true,
+          headerBlurEffect: 'systemChromeMaterial',
+          headerSearchBarOptions: {
+            placeholder: 'Search by store',
+            onChangeText: (e) => {
+              setSearch(e.nativeEvent.text);
+              setPage(1);
+            },
+          },
+        }}
+      />
+      <FlatList
+        style={styles.root}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.listContent}
+        data={receipts}
+        keyExtractor={(r) => r.id}
+        ListHeaderComponent={
+          <View style={{ marginBottom: spacing.md }}>
+            <SegmentedControl
+              values={['Week', 'Month', 'All']}
+              selectedIndex={filter}
+              onChange={(e) => {
+                setFilter(e.nativeEvent.selectedSegmentIndex as FilterIndex);
+                setPage(1);
+              }}
             />
-          }
-          onEndReached={handleEndReached}
-          onEndReachedThreshold={0.3}
-        />
-      )}
-    </SafeAreaView>
+          </View>
+        }
+        ListEmptyComponent={
+          isLoading ? (
+            <View style={styles.loading}>
+              <ActivityIndicator color={colors.tint} />
+            </View>
+          ) : (
+            <EmptyState hasQuery={!!search.trim()} />
+          )
+        }
+        renderItem={({ item, index }) => (
+          <View
+            style={[
+              styles.listCard,
+              index === 0 && styles.listCardFirst,
+              index === receipts.length - 1 && styles.listCardLast,
+            ]}
+          >
+            <ReceiptRow
+              receipt={item}
+              showDivider={index > 0}
+              onPress={() => router.push({ pathname: '/review', params: { receiptId: item.id } })}
+            />
+          </View>
+        )}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.tint} />
+        }
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.3}
+      />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.light.background,
+  root: { flex: 1, backgroundColor: colors.iosBg as string },
+  listContent: {
+    padding: spacing.lg,
+    paddingBottom: 120,
   },
-  title: {
-    ...typography.display,
-    color: colors.light.textPrimary,
-    paddingHorizontal: spacing.base,
-    paddingTop: spacing.base,
-    paddingBottom: spacing.sm,
+  listCard: {
+    backgroundColor: colors.iosBg2,
+    overflow: 'hidden',
   },
-  searchContainer: {
-    paddingHorizontal: spacing.base,
-    marginBottom: spacing.md,
+  listCardFirst: {
+    borderTopLeftRadius: radii.list,
+    borderTopRightRadius: radii.list,
   },
-  searchInput: {
-    ...typography.body,
-    backgroundColor: colors.light.surface,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.base,
-    paddingVertical: spacing.md,
-    color: colors.light.textPrimary,
-    borderWidth: 1,
-    borderColor: colors.light.border,
+  listCardLast: {
+    borderBottomLeftRadius: radii.list,
+    borderBottomRightRadius: radii.list,
   },
-  chipRow: {
+  row: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.base,
-    marginBottom: spacing.base,
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  rowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.iosSeparator,
+  },
+  catCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  empty: {
+    minHeight: 480,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.sm,
   },
-  chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.light.surface,
-    borderWidth: 1,
-    borderColor: colors.light.border,
-  },
-  chipActive: {
-    backgroundColor: colors.light.primary,
-    borderColor: colors.light.primary,
-  },
-  chipText: {
-    ...typography.caption,
-    color: colors.light.textSecondary,
-    fontWeight: '500',
-  },
-  chipTextActive: {
-    color: '#FFFFFF',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listContent: {
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.xxl,
-    flexGrow: 1,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xxl,
-  },
   emptyIcon: {
-    fontSize: 48,
-    marginBottom: spacing.base,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.iosFill3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
   },
-  emptyText: {
-    ...typography.body,
-    color: colors.light.textSecondary,
-    textAlign: 'center',
+  loading: {
+    paddingTop: 80,
+    alignItems: 'center',
   },
 });

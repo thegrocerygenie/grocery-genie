@@ -1,5 +1,4 @@
-import { router } from 'expo-router';
-import { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -7,53 +6,71 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { borderRadius, colors, shadows, spacing, touchTarget, typography } from '@/constants/theme';
-import { strings } from '@/constants/strings';
+import { Stack, useRouter } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
+
+import { colors, radii, spacing, type } from '@/constants/theme';
+import { DEFAULT_CATEGORIES } from '@/constants/categories';
 import { useBudgetCreate } from '@/features/budget/hooks/useBudget';
 import { useCategories } from '@/features/budget/hooks/useCategories';
 
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
 export default function BudgetSettingsScreen() {
-  const { data: categories } = useCategories();
+  const router = useRouter();
+  const { data: serverCategories } = useCategories();
   const budgetCreate = useBudgetCreate();
 
-  const [overallAmount, setOverallAmount] = useState('');
-  const [categoryAmounts, setCategoryAmounts] = useState<Record<string, string>>({});
-  const [thresholds, setThresholds] = useState({ fifty: false, eighty: true, hundred: true });
+  const [overall, setOverall] = useState('');
   const [startDay, setStartDay] = useState('1');
+  const [catAmounts, setCatAmounts] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleCategoryAmountChange = useCallback((categoryId: string, value: string) => {
-    setCategoryAmounts((prev) => ({ ...prev, [categoryId]: value }));
-  }, []);
+  const categories =
+    serverCategories && serverCategories.length > 0
+      ? serverCategories.map((c) => {
+          const meta = DEFAULT_CATEGORIES.find((d) => d.id === c.id);
+          return {
+            id: c.id,
+            name: c.name,
+            color: meta?.color ?? colors.cat.other,
+            symbol: meta?.symbol ?? 'tag.fill',
+          };
+        })
+      : DEFAULT_CATEGORIES.map((c) => ({
+          id: c.id,
+          name: c.name,
+          color: c.color,
+          symbol: c.symbol,
+        }));
 
-  const handleSave = useCallback(async () => {
+  const handleSave = async () => {
     setIsSaving(true);
-
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(Math.min(parseInt(startDay, 10) || 1, 28)).padStart(2, '0');
-    const periodStart = `${year}-${month}-${day}`;
-
     try {
-      // Create overall budget
-      if (overallAmount && parseFloat(overallAmount) > 0) {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(Math.min(parseInt(startDay, 10) || 1, 28)).padStart(2, '0');
+      const periodStart = `${year}-${month}-${day}`;
+
+      if (overall && parseFloat(overall) > 0) {
         await budgetCreate.mutateAsync({
           category_id: null,
-          amount: parseFloat(overallAmount),
+          amount: parseFloat(overall),
           period_type: 'monthly',
           period_start: periodStart,
         });
       }
 
-      // Create per-category budgets
-      for (const [categoryId, amount] of Object.entries(categoryAmounts)) {
+      for (const [categoryId, amount] of Object.entries(catAmounts)) {
         if (amount && parseFloat(amount) > 0) {
           await budgetCreate.mutateAsync({
             category_id: categoryId,
@@ -63,256 +80,250 @@ export default function BudgetSettingsScreen() {
           });
         }
       }
-
       router.back();
     } catch {
       Alert.alert('Error', 'Failed to save budget. Please try again.');
     } finally {
       setIsSaving(false);
     }
-  }, [overallAmount, categoryAmounts, startDay, budgetCreate]);
+  };
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <>
+      <Stack.Screen
+        options={{
+          presentation: 'modal',
+          title: 'Budget',
+          headerLeft: () => (
+            <Pressable onPress={() => router.back()} hitSlop={12}>
+              <Text style={styles.headerBtn}>Cancel</Text>
+            </Pressable>
+          ),
+          headerRight: () => (
+            <Pressable onPress={handleSave} hitSlop={12} disabled={isSaving}>
+              <Text
+                style={[styles.headerBtn, { fontWeight: '600' }, isSaving && { opacity: 0.4 }]}
+              >
+                Save
+              </Text>
+            </Pressable>
+          ),
+        }}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.flex}
+        style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Overall Budget */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>
-              {strings.budgetSettings.overallBudget}
-            </Text>
-            <View style={styles.inputRow}>
-              <Text style={styles.currencySymbol}>$</Text>
-              <TextInput
-                style={styles.amountInput}
-                value={overallAmount}
-                onChangeText={setOverallAmount}
-                keyboardType="decimal-pad"
-                placeholder={strings.budgetSettings.amountPlaceholder}
-                placeholderTextColor={colors.light.disabled}
-                accessibilityLabel="Overall monthly budget amount"
-              />
-            </View>
-          </View>
+        <ScrollView
+          style={styles.root}
+          contentContainerStyle={{
+            padding: spacing.lg,
+            gap: spacing.lg,
+            paddingBottom: 80,
+          }}
+        >
+          <Section header="OVERALL" footer="Resets on the 1st of each month.">
+            <RowAmountInput
+              label="Monthly limit"
+              value={overall}
+              onChangeText={setOverall}
+              placeholder="$0.00"
+            />
+            <RowNumericInput
+              label="Start day"
+              value={startDay}
+              onChangeText={setStartDay}
+              suffix={ordinal(parseInt(startDay, 10) || 1)}
+            />
+          </Section>
 
-          {/* Per-Category Budgets */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>
-              {strings.budgetSettings.categoryBudgets}
-            </Text>
-            {categories?.map((category) => (
-              <View key={category.id} style={styles.categoryRow}>
-                <Text style={styles.categoryName}>{category.name}</Text>
-                <View style={styles.categoryInputWrapper}>
-                  <Text style={styles.currencySymbolSmall}>$</Text>
-                  <TextInput
-                    style={styles.categoryInput}
-                    value={categoryAmounts[category.id] ?? ''}
-                    onChangeText={(val) => handleCategoryAmountChange(category.id, val)}
-                    keyboardType="decimal-pad"
-                    placeholder={strings.budgetSettings.amountPlaceholder}
-                    placeholderTextColor={colors.light.disabled}
-                    accessibilityLabel={`${category.name} budget amount`}
-                  />
-                </View>
-              </View>
-            ))}
-          </View>
-
-          {/* Alert Thresholds */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>
-              {strings.budgetSettings.alertThresholds}
-            </Text>
-            <View style={styles.thresholdRow}>
-              <Text style={styles.thresholdLabel}>50%</Text>
-              <Switch
-                value={thresholds.fifty}
-                onValueChange={(v) => setThresholds((p) => ({ ...p, fifty: v }))}
-                trackColor={{ false: colors.light.border, true: colors.light.primaryLight }}
-                thumbColor={thresholds.fifty ? colors.light.primary : colors.light.disabled}
-                accessibilityLabel="Alert at 50 percent"
-              />
-            </View>
-            <View style={styles.thresholdRow}>
-              <Text style={styles.thresholdLabel}>80%</Text>
-              <Switch
-                value={thresholds.eighty}
-                onValueChange={(v) => setThresholds((p) => ({ ...p, eighty: v }))}
-                trackColor={{ false: colors.light.border, true: colors.light.primaryLight }}
-                thumbColor={thresholds.eighty ? colors.light.primary : colors.light.disabled}
-                accessibilityLabel="Alert at 80 percent"
-              />
-            </View>
-            <View style={styles.thresholdRow}>
-              <Text style={styles.thresholdLabel}>100%</Text>
-              <Switch
-                value={thresholds.hundred}
-                onValueChange={(v) => setThresholds((p) => ({ ...p, hundred: v }))}
-                trackColor={{ false: colors.light.border, true: colors.light.primaryLight }}
-                thumbColor={thresholds.hundred ? colors.light.primary : colors.light.disabled}
-                accessibilityLabel="Alert at 100 percent"
-              />
-            </View>
-          </View>
-
-          {/* Budget Start Date */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>
-              {strings.budgetSettings.startDate}
-            </Text>
-            <View style={styles.inputRow}>
-              <Text style={styles.dayLabel}>{strings.budgetSettings.dayOfMonth}:</Text>
-              <TextInput
-                style={styles.dayInput}
-                value={startDay}
-                onChangeText={setStartDay}
-                keyboardType="number-pad"
-                maxLength={2}
-                accessibilityLabel="Budget start day of month"
-              />
-            </View>
-          </View>
-        </ScrollView>
-
-        {/* Save Button */}
-        <View style={styles.saveContainer}>
-          <Pressable
-            style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
-            onPress={handleSave}
-            disabled={isSaving}
-            accessibilityLabel={isSaving ? strings.budgetSettings.saving : strings.budgetSettings.save}
-            accessibilityRole="button"
+          <Section
+            header="PER-CATEGORY LIMITS"
+            footer="Optional. Leave blank to share the overall limit."
           >
-            <Text style={styles.saveButtonText}>
-              {isSaving ? strings.budgetSettings.saving : strings.budgetSettings.save}
-            </Text>
-          </Pressable>
-        </View>
+            {categories.map((c, i) => (
+              <RowCategoryInput
+                key={c.id}
+                cat={c}
+                value={catAmounts[c.id] ?? ''}
+                onChangeText={(v) => setCatAmounts((p) => ({ ...p, [c.id]: v }))}
+                showDivider={i > 0}
+              />
+            ))}
+          </Section>
+        </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </>
+  );
+}
+
+interface SectionProps {
+  header?: string;
+  footer?: string;
+  children: React.ReactNode;
+}
+
+function Section({ header, footer, children }: SectionProps) {
+  const items = React.Children.toArray(children);
+  return (
+    <View>
+      {header ? <Text style={styles.sectionLabel}>{header}</Text> : null}
+      <View style={styles.listCard}>
+        {items.map((c, i) => (
+          <React.Fragment key={i}>
+            {c}
+            {i < items.length - 1 ? <View style={styles.separator} /> : null}
+          </React.Fragment>
+        ))}
+      </View>
+      {footer ? <Text style={styles.sectionFooter}>{footer}</Text> : null}
+    </View>
+  );
+}
+
+interface RowAmountInputProps {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder?: string;
+}
+
+function RowAmountInput({ label, value, onChangeText, placeholder }: RowAmountInputProps) {
+  return (
+    <View style={styles.row}>
+      <Text style={type.body}>{label}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {value ? <Text style={[type.body, { color: colors.iosLabel as string }]}>$</Text> : null}
+        <TextInput
+          style={[type.body, styles.input, { color: colors.iosLabel as string }]}
+          value={value}
+          onChangeText={onChangeText}
+          keyboardType="decimal-pad"
+          placeholder={placeholder ?? ''}
+          placeholderTextColor={colors.iosLabel3 as string}
+          accessibilityLabel={label}
+        />
+      </View>
+    </View>
+  );
+}
+
+interface RowNumericInputProps {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  suffix?: string;
+}
+
+function RowNumericInput({ label, value, onChangeText, suffix }: RowNumericInputProps) {
+  return (
+    <View style={styles.row}>
+      <Text style={type.body}>{label}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <TextInput
+          style={[type.body, styles.input, { color: colors.iosLabel as string, minWidth: 30 }]}
+          value={value}
+          onChangeText={onChangeText}
+          keyboardType="number-pad"
+          maxLength={2}
+          accessibilityLabel={label}
+        />
+        {suffix ? (
+          <Text style={[type.body, { color: colors.iosLabel2 as string }]}>{suffix}</Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+interface RowCategoryInputProps {
+  cat: { id: string; name: string; color: string; symbol: string };
+  value: string;
+  onChangeText: (v: string) => void;
+  showDivider: boolean;
+}
+
+function RowCategoryInput({ cat, value, onChangeText, showDivider }: RowCategoryInputProps) {
+  return (
+    <View style={[styles.row, showDivider && styles.rowDivider]}>
+      <View style={[styles.catCircle, { backgroundColor: cat.color }]}>
+        <SymbolView
+          name={cat.symbol as Parameters<typeof SymbolView>[0]['name']}
+          size={13}
+          tintColor="#fff"
+        />
+      </View>
+      <Text style={[type.body, { flex: 1 }]}>{cat.name}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {value ? <Text style={[type.body, { color: colors.iosLabel2 as string }]}>$</Text> : null}
+        <TextInput
+          style={[type.body, styles.input, { color: colors.iosLabel2 as string, minWidth: 60 }]}
+          value={value}
+          onChangeText={onChangeText}
+          keyboardType="decimal-pad"
+          placeholder="$0.00"
+          placeholderTextColor={colors.iosLabel3 as string}
+          accessibilityLabel={`${cat.name} budget amount`}
+        />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.light.background,
+  root: { flex: 1, backgroundColor: colors.iosBg as string },
+  headerBtn: { ...type.body, color: colors.tint },
+
+  sectionLabel: {
+    ...type.footnote,
+    color: colors.iosLabel2 as string,
+    letterSpacing: 0.5,
+    paddingHorizontal: 16,
+    paddingBottom: 6,
   },
-  flex: {
-    flex: 1,
+  sectionFooter: {
+    ...type.footnote,
+    color: colors.iosLabel2 as string,
+    paddingHorizontal: 16,
+    paddingTop: 6,
   },
-  scrollContent: {
-    padding: spacing.base,
-    paddingBottom: 100,
+
+  listCard: {
+    backgroundColor: colors.iosBg2,
+    borderRadius: radii.list,
+    overflow: 'hidden',
   },
-  card: {
-    backgroundColor: colors.light.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.base,
-    marginBottom: spacing.base,
-    ...shadows.card,
-  },
-  sectionTitle: {
-    ...typography.sectionHeader,
-    color: colors.light.textPrimary,
-    marginBottom: spacing.base,
-  },
-  inputRow: {
+
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  currencySymbol: {
-    ...typography.moneyLarge,
-    color: colors.light.textSecondary,
-    marginRight: spacing.sm,
-  },
-  amountInput: {
-    ...typography.moneyLarge,
-    color: colors.light.textPrimary,
-    flex: 1,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.light.primary,
-    paddingVertical: spacing.sm,
-  },
-  categoryRow: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    minHeight: touchTarget.minHeight,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.light.border,
+    gap: 10,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
   },
-  categoryName: {
-    ...typography.body,
-    color: colors.light.textPrimary,
-    flex: 1,
+  rowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.iosSeparator,
   },
-  categoryInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 120,
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.iosSeparator,
+    marginLeft: 16,
   },
-  currencySymbolSmall: {
-    ...typography.money,
-    color: colors.light.textSecondary,
-    marginRight: spacing.xs,
-  },
-  categoryInput: {
-    ...typography.money,
-    color: colors.light.textPrimary,
-    flex: 1,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.light.border,
-    paddingVertical: spacing.xs,
+
+  input: {
+    paddingVertical: 0,
     textAlign: 'right',
+    minWidth: 80,
   },
-  thresholdRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+
+  catCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
-    paddingVertical: spacing.sm,
-    minHeight: touchTarget.minHeight,
-  },
-  thresholdLabel: {
-    ...typography.bodyBold,
-    color: colors.light.textPrimary,
-  },
-  dayLabel: {
-    ...typography.body,
-    color: colors.light.textSecondary,
-    marginRight: spacing.md,
-  },
-  dayInput: {
-    ...typography.bodyBold,
-    color: colors.light.textPrimary,
-    width: 60,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.light.primary,
-    paddingVertical: spacing.sm,
-    textAlign: 'center',
-  },
-  saveContainer: {
-    paddingHorizontal: spacing.base,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.light.background,
-  },
-  saveButton: {
-    backgroundColor: colors.light.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.base,
-    alignItems: 'center',
-    minHeight: touchTarget.minHeight,
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    ...typography.bodyBold,
-    color: colors.light.surface,
+    justifyContent: 'center',
   },
 });

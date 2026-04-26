@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Grocery Genie — Mobile MVP Wireframes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  /* Tokens from mobile/src/constants/theme.ts (light mode) */
+  :root {
+    --primary: #2D7A4F;
+    --primary-light: #E8F5EE;
+    --warning: #F9AB00;
+    --warning-light: #FEF7E0;
+    --danger: #EA4335;
+    --danger-light: #FCE8E6;
+    --background: #F8F9FA;
+    --surface: #FFFFFF;
+    --text-primary: #1A1A1A;
+    --text-secondary: #4A5568;
+    --text-tertiary: #94A3B8;
+    --border: #E2E8F0;
+    --disabled: #CBD5E1;
+    --page-bg: #EEF1F4;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', Segoe UI, sans-serif;
+    background: var(--page-bg);
+    color: var(--text-primary);
+    padding: 32px 16px 64px;
+    min-height: 100vh;
+  }
+
+  header.page {
+    max-width: 1240px;
+    margin: 0 auto 24px;
+    padding: 0 16px;
+  }
+  header.page h1 { font-size: 22px; letter-spacing: -0.01em; }
+  header.page p {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-top: 4px;
+    line-height: 1.5;
+    max-width: 720px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 28px;
+    max-width: 1240px;
+    margin: 0 auto;
+  }
+
+  /* iPhone frame */
+  .phone {
+    background: #000;
+    border-radius: 36px;
+    padding: 8px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15), 0 2px 6px rgba(15, 23, 42, 0.08);
+    width: 320px;
+    margin: 0 auto;
+  }
+  .phone .screen {
+    background: var(--background);
+    border-radius: 28px;
+    overflow: hidden;
+    height: 640px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .status-bar {
+    height: 36px;
+    background: var(--background);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 18px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex-shrink: 0;
+  }
+  .notch {
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90px;
+    height: 22px;
+    background: #000;
+    border-radius: 14px;
+    z-index: 10;
+  }
+
+  .nav-bar {
+    background: var(--background);
+    padding: 6px 16px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .nav-bar h2 { font-size: 24px; font-weight: 700; }
+  .nav-bar .icon-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .nav-bar.modal {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-bar.modal h2 { font-size: 16px; }
+  .nav-bar .link { color: var(--primary); font-size: 13px; font-weight: 600; }
+
+  .content {
+    flex: 1;
+    overflow: hidden;
+    padding: 12px 16px;
+  }
+  .content.no-pad { padding: 0; }
+  .content > * + * { margin-top: 12px; }
+
+  .card {
+    background: var(--surface);
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+  .card h3 { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+
+  /* Bottom tab bar */
+  .tabs {
+    display: flex;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 6px 0 16px;
+    flex-shrink: 0;
+  }
+  .tab {
+    flex: 1;
+    text-align: center;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    padding: 6px;
+  }
+  .tab.active { color: var(--primary); font-weight: 600; }
+  .tab .icon { font-size: 22px; display: block; margin-bottom: 2px; }
+
+  /* Screen captions */
+  .caption {
+    text-align: center;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .caption strong { color: var(--text-primary); display: block; margin-bottom: 2px; }
+
+  /* Components */
+  .progress-bar {
+    height: 8px; background: var(--border);
+    border-radius: 4px; overflow: hidden; margin: 8px 0;
+  }
+  .progress-bar > span {
+    display: block; height: 100%; background: var(--primary);
+  }
+  .progress-bar.warn > span { background: var(--warning); }
+  .progress-bar.danger > span { background: var(--danger); }
+
+  .row { display: flex; justify-content: space-between; align-items: center; }
+  .row + .row { margin-top: 8px; }
+  .muted { color: var(--text-secondary); font-size: 12px; }
+  .num { font-weight: 700; font-size: 22px; letter-spacing: -0.02em; }
+  .num.small { font-size: 14px; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 600;
+  }
+  .badge.green { background: var(--primary-light); color: var(--primary); }
+  .badge.amber { background: var(--warning-light); color: var(--warning); }
+
+  .pill-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill {
+    padding: 6px 10px; border-radius: 999px;
+    background: var(--surface); border: 1px solid var(--border);
+    font-size: 11px;
+  }
+  .pill.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+  .input {
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; background: var(--surface); font-size: 13px;
+  }
+  .btn-primary {
+    background: var(--primary); color: white;
+    padding: 12px; border-radius: 12px; text-align: center;
+    font-weight: 600; font-size: 14px;
+  }
+  .btn-secondary {
+    background: var(--surface); color: var(--primary);
+    padding: 12px; border-radius: 12px; text-align: center;
+    font-weight: 600; font-size: 14px;
+    border: 1px solid var(--primary);
+  }
+
+  /* Bar chart */
+  .bars { display: flex; align-items: flex-end; gap: 10px; height: 70px; }
+  .bar { flex: 1; background: var(--primary-light); border-radius: 4px 4px 0 0; position: relative; }
+  .bar.now { background: var(--primary); }
+  .bar-label { position: absolute; bottom: -16px; left: 0; right: 0; text-align: center; font-size: 9px; color: var(--text-tertiary); }
+
+  /* Camera */
+  .camera-view {
+    flex: 1;
+    background: linear-gradient(180deg, #1a1a1a 0%, #2a2a2a 100%);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px;
+  }
+  .camera-frame {
+    flex: 1;
+    border: 2px dashed rgba(255,255,255,0.4);
+    border-radius: 12px;
+    margin: 16px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.6);
+    font-size: 11px;
+  }
+  .camera-controls {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+  }
+  .shutter {
+    width: 60px; height: 60px;
+    border-radius: 50%;
+    background: white;
+    border: 4px solid rgba(255,255,255,0.3);
+  }
+  .ghost-btn {
+    color: white;
+    font-size: 11px;
+    background: rgba(255,255,255,0.15);
+    padding: 8px 14px;
+    border-radius: 999px;
+  }
+
+  /* Switch */
+  .switch {
+    width: 36px; height: 20px;
+    border-radius: 999px;
+    background: var(--border);
+    position: relative;
+    flex-shrink: 0;
+  }
+  .switch::after {
+    content: ''; position: absolute;
+    width: 16px; height: 16px;
+    background: white;
+    border-radius: 50%;
+    top: 2px; left: 2px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  }
+  .switch.on { background: var(--primary-light); }
+  .switch.on::after { left: 18px; background: var(--primary); }
+
+  /* Receipt list rows */
+  .receipt-row {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex; gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .thumb {
+    width: 40px; height: 40px;
+    background: var(--background); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+
+  /* Line item edit row (review screen) */
+  .line-item {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 6px;
+    border: 1px solid var(--border);
+  }
+  .line-item.flagged { border-color: var(--warning); background: var(--warning-light); }
+  .line-item .li-row { display: flex; gap: 8px; align-items: center; }
+  .li-name { flex: 1; font-size: 12px; font-weight: 600; }
+  .li-price { font-size: 12px; color: var(--text-secondary); }
+  .li-cat { font-size: 10px; color: var(--primary); margin-top: 4px; }
+
+  /* Empty state */
+  .empty {
+    text-align: center;
+    padding: 36px 16px;
+  }
+  .empty .ico { font-size: 44px; opacity: 0.5; }
+  .empty h4 { margin: 12px 0 6px; font-size: 16px; }
+  .empty p { font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; }
+
+  /* Section legend strip */
+  .section-title {
+    max-width: 1240px;
+    margin: 32px auto 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0 16px;
+  }
+
+  .scroll-hint {
+    text-align: center;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    padding: 6px 0;
+  }
+</style>
+</head>
+<body>
+
+<header class="page">
+  <h1>Grocery Genie — Mobile MVP Wireframes</h1>
+  <p>
+    Six screens compose the MVP (Budget Copilot phase): three primary tabs (Dashboard, Scan, History)
+    plus three modals (Review, Budget Settings, Notification Settings). Wireframes use the live theme
+    tokens from <code>mobile/src/constants/theme.ts</code> (primary <code>#2D7A4F</code>).
+  </p>
+</header>
+
+<div class="section-title">Bottom Tabs</div>
+
+<div class="grid">
+
+  <!-- =================== DASHBOARD =================== -->
+  <div>
+    <div class="phone"><div class="screen">
+      <div class="notch"></div>
+      <div class="status-bar"><span>9:41</span><span>•••</span></div>
+
+      <div class="nav-bar">
+        <h2>Dashboard</h2>
+        <div class="icon-btn" title="Notification settings">⚙</div>
+      </div>
+
+      <div class="content" style="overflow: auto;">
+        <!-- Budget progress -->
+        <div class="card">
+          <div class="row">
+            <div class="muted">March 2026</div>
+            <span class="badge amber">12 days left</span>
+          </div>
+          <div class="num" style="margin-top:6px;">$387.42 / $500</div>
+          <div class="muted">$112.58 remaining · 77.5%</div>
+          <div class="progress-bar warn"><span style="width:77.5%"></span></div>
+        </div>
+
+        <!-- Categories -->
+        <div class="card">
+          <h3>By Category</h3>
+          <div class="row"><span class="muted">Groceries</span><span class="num small">$245</span></div>
+          <div class="progress-bar"><span style="width:81%"></span></div>
+          <div class="row"><span class="muted">Household</span><span class="num small">$87</span></div>
+          <div class="progress-bar"><span style="width:43%"></span></div>
+          <div class="row"><span class="muted">Beverages</span><span class="num small">$55</span></div>
+          <div class="progress-bar"><span style="width:62%"></span></div>
+        </div>
+
+        <!-- Top items -->
+        <div class="card">
+          <h3>Top Items</h3>
+          <div class="row"><span class="muted">Organic Milk</span><span class="num small">$24.95</span></div>
+          <div class="row"><span class="muted">Chicken Breast</span><span class="num small">$18.40</span></div>
+          <div class="row"><span class="muted">Bananas</span><span class="num small">$12.30</span></div>
+        </div>
+
+        <!-- 3-month trend -->
+        <div class="card">
+          <h3>3-Month Trend</h3>
+          <div class="bars" style="margin-bottom: 18px;">
+            <div class="bar" style="height:55%"><span class="bar-label">Jan</span></div>
+            <div class="bar" style="height:72%"><span class="bar-label">Feb</span></div>
+            <div class="bar now" style="height:78%"><span class="bar-label">Mar</span></div>
+          </div>
+        </div>
+        <div class="scroll-hint">Pull to refresh</div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active"><span class="icon">📊</span>Dashboard</div>
+        <div class="tab"><span class="icon">📷</span>Scan</div>
+        <div class="tab"><span class="icon">📋</span>History</div>
+      </div>
+    </div></div>
+    <div class="caption">
+      <strong>1. Dashboard</strong>
+      Budget progress · category breakdown · top items · 3-month trend (BC-04)
+    </div>
+  </div>
+
+  <!-- =================== SCAN (CAMERA) =================== -->
+  <div>
+    <div class="phone"><div class="screen">
+      <div class="notch"></div>
+      <div class="status-bar" style="background:#1a1a1a;color:white;"><span>9:41</span><span>•••</span></div>
+
+      <div class="camera-view">
+        <div class="ghost-btn" style="align-self:flex-end;">📁 Library</div>
+        <div class="camera-frame">
+          Align receipt within frame<br><small>Edge detection active</small>
+        </div>
+        <div class="camera-controls">
+          <div style="width:40px"></div>
+          <div class="shutter"></div>
+          <div class="ghost-btn">🔄</div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab"><span class="icon">📊</span>Dashboard</div>
+        <div class="tab active"><span class="icon">📷</span>Scan</div>
+        <div class="tab"><span class="icon">📋</span>History</div>
+      </div>
+    </div></div>
+    <div class="caption">
+      <strong>2. Scan (Camera)</strong>
+      Camera capture with edge-detection overlay; library upload alt (RC-01, RC-03)
+    </div>
+  </div>
+
+  <!-- =================== HISTORY =================== -->
+  <div>
+    <div class="phone"><div class="screen">
+      <div class="notch"></div>
+      <div class="status-bar"><span>9:41</span><span>•••</span></div>
+
+      <div class="nav-bar">
+        <h2>History</h2>
+      </div>
+
+      <div class="content" style="overflow:auto;">
+        <input class="input" style="width:100%; display:block;" placeholder="🔍  Search by store name" value="">
+
+        <div class="pill-row" style="margin-top:12px;">
+          <span class="pill active">All time</span>
+          <span class="pill">This week</span>
+          <span class="pill">This month</span>
+          <span class="pill">Last month</span>
+        </div>
+
+        <div style="margin-top: 14px;">
+          <div class="receipt-row">
+            <div class="thumb">🧾</div>
+            <div style="flex:1;">
+              <div style="font-weight:600; font-size:13px;">Whole Foods Market</div>
+              <div class="muted">Mar 20 · 14 items</div>
+            </div>
+            <div class="num small">$87.42</div>
+          </div>
+          <div class="receipt-row">
+            <div class="thumb">🧾</div>
+            <div style="flex:1;">
+              <div style="font-weight:600; font-size:13px;">Trader Joe's</div>
+              <div class="muted">Mar 12 · 8 items</div>
+            </div>
+            <div class="num small">$42.18</div>
+          </div>
+          <div class="receipt-row">
+            <div class="thumb">🧾</div>
+            <div style="flex:1;">
+              <div style="font-weight:600; font-size:13px;">Whole Foods Market</div>
+              <div class="muted">Mar 5 · 22 items</div>
+            </div>
+            <div class="num small">$112.74</div>
+          </div>
+          <div class="receipt-row">
+            <div class="thumb">🧾</div>
+            <div style="flex:1;">
+              <div style="font-weight:600; font-size:13px;">Costco Wholesale</div>
+              <div class="muted">Feb 28 · 31 items</div>
+            </div>
+            <div class="num small">$245.10</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab"><span class="icon">📊</span>Dashboard</div>
+        <div class="tab"><span class="icon">📷</span>Scan</div>
+        <div class="tab active"><span class="icon">📋</span>History</div>
+      </div>
+    </div></div>
+    <div class="caption">
+      <strong>3. History</strong>
+      Reverse-chronological list, store search, date filter chips (RC-04)
+    </div>
+  </div>
+
+</div>
+
+<div class="section-title">Modal Screens</div>
+
+<div class="grid">
+
+  <!-- =================== REVIEW (MODAL) =================== -->
+  <div>
+    <div class="phone"><div class="screen">
+      <div class="notch"></div>
+      <div class="status-bar"><span>9:41</span><span>•••</span></div>
+
+      <div class="nav-bar modal">
+        <span class="link">Cancel</span>
+        <h2>Review Receipt</h2>
+        <span style="width:40px"></span>
+      </div>
+
+      <div class="content" style="overflow:auto;">
+        <!-- Receipt header -->
+        <div class="card">
+          <h3>Store</h3>
+          <div class="input" style="margin-bottom:8px;">Whole Foods Market</div>
+          <h3>Date</h3>
+          <div class="input">2026-03-20</div>
+        </div>
+
+        <!-- Line items -->
+        <div style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.06em; margin: 4px 4px 8px;">
+          Items (3)
+        </div>
+
+        <div class="line-item">
+          <div class="li-row">
+            <div style="flex:1;">
+              <div class="li-name">Organic Bananas</div>
+              <div class="li-cat">Groceries · 95% confidence</div>
+            </div>
+            <div class="li-price">$1.29</div>
+          </div>
+        </div>
+
+        <div class="line-item flagged">
+          <div class="li-row">
+            <div style="flex:1;">
+              <div class="li-name">GRN BNLS CHKN ⚠</div>
+              <div class="li-cat" style="color:var(--warning)">Low confidence · tap to edit</div>
+            </div>
+            <div class="li-price">$8.40</div>
+          </div>
+        </div>
+
+        <div class="line-item">
+          <div class="li-row">
+            <div style="flex:1;">
+              <div class="li-name">Whole Milk 1 Gal</div>
+              <div class="li-cat">Beverages · 92% confidence</div>
+            </div>
+            <div class="li-price">$4.99</div>
+          </div>
+        </div>
+
+        <div class="card" style="background: var(--primary-light); margin-top:12px;">
+          <div class="row"><span class="muted">Total</span><span class="num small">$14.68</span></div>
+        </div>
+      </div>
+
+      <div style="padding: 12px 16px 24px; background:var(--surface); border-top:1px solid var(--border);">
+        <div class="btn-primary">Confirm &amp; Save</div>
+      </div>
+    </div></div>
+    <div class="caption">
+      <strong>4. Review (Modal)</strong>
+      Inline-edit fields · low-confidence flagged amber · explicit confirmation (RC-02, BC-05)
+    </div>
+  </div>
+
+  <!-- =================== BUDGET SETTINGS =================== -->
+  <div>
+    <div class="phone"><div class="screen">
+      <div class="notch"></div>
+      <div class="status-bar"><span>9:41</span><span>•••</span></div>
+
+      <div class="nav-bar modal">
+        <span class="link">Cancel</span>
+        <h2>Budget Settings</h2>
+        <span class="link">Save</span>
+      </div>
+
+      <div class="content" style="overflow:auto;">
+        <div class="card">
+          <h3>Overall Monthly Budget</h3>
+          <div class="input" style="font-size:18px; font-weight:600;">$ 500.00</div>
+        </div>
+
+        <div class="card">
+          <h3>Per-Category</h3>
+          <div class="row" style="margin-bottom:8px;"><span class="muted">Groceries</span><div class="input" style="padding:6px 10px; width:80px; text-align:right; font-size:12px;">$ 300</div></div>
+          <div class="row" style="margin-bottom:8px;"><span class="muted">Household</span><div class="input" style="padding:6px 10px; width:80px; text-align:right; font-size:12px;">$ 100</div></div>
+          <div class="row" style="margin-bottom:8px;"><span class="muted">Personal Care</span><div class="input" style="padding:6px 10px; width:80px; text-align:right; font-size:12px;">$ 50</div></div>
+          <div class="row" style="margin-bottom:8px;"><span class="muted">Beverages</span><div class="input" style="padding:6px 10px; width:80px; text-align:right; font-size:12px;">$ 50</div></div>
+          <div class="row"><span class="muted">Snacks &amp; Treats</span><div class="input" style="padding:6px 10px; width:80px; text-align:right; font-size:12px;">$ —</div></div>
+        </div>
+
+        <div class="card">
+          <h3>Period Start Day</h3>
+          <div class="input">Day 1 of each month</div>
+        </div>
+      </div>
+    </div></div>
+    <div class="caption">
+      <strong>5. Budget Settings (Modal)</strong>
+      Overall + per-category amounts · custom period start day (BC-02)
+    </div>
+  </div>
+
+  <!-- =================== NOTIFICATION SETTINGS =================== -->
+  <div>
+    <div class="phone"><div class="screen">
+      <div class="notch"></div>
+      <div class="status-bar"><span>9:41</span><span>•••</span></div>
+
+      <div class="nav-bar modal">
+        <span class="link">Cancel</span>
+        <h2>Notifications</h2>
+        <span class="link">Done</span>
+      </div>
+
+      <div class="content" style="overflow:auto;">
+        <div class="card">
+          <h3>Budget Alerts</h3>
+          <div class="row" style="margin-bottom:10px;">
+            <span style="font-size:13px;">Alert at 50%</span>
+            <span class="switch"></span>
+          </div>
+          <div class="row" style="margin-bottom:10px;">
+            <span style="font-size:13px;">Alert at 80%</span>
+            <span class="switch on"></span>
+          </div>
+          <div class="row">
+            <span style="font-size:13px;">Alert at 100%</span>
+            <span class="switch on"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Weekly Summary</h3>
+          <div class="row" style="margin-bottom:10px;">
+            <span style="font-size:13px;">Send weekly summary</span>
+            <span class="switch on"></span>
+          </div>
+          <div style="font-size:11px; color:var(--text-secondary); margin-bottom:10px;">Delivered on:</div>
+          <div class="pill-row">
+            <span class="pill">Sun</span>
+            <span class="pill active">Mon</span>
+            <span class="pill">Tue</span>
+            <span class="pill">Wed</span>
+            <span class="pill">Thu</span>
+            <span class="pill">Fri</span>
+            <span class="pill">Sat</span>
+          </div>
+        </div>
+
+        <!-- In-app notification preview -->
+        <div class="card" style="background: var(--warning-light); border-left: 3px solid var(--warning);">
+          <div style="font-size:12px; font-weight:600; color:var(--warning);">⚠  80% threshold preview</div>
+          <div style="font-size:11px; margin-top:4px;">"Groceries: $245 of $300 spent. 12 days left."</div>
+        </div>
+      </div>
+    </div></div>
+    <div class="caption">
+      <strong>6. Notification Settings (Modal)</strong>
+      50/80/100 threshold toggles · weekly summary day picker (BC-03, BC-06)
+    </div>
+  </div>
+
+</div>
+
+<div class="section-title">Empty State (First-Run)</div>
+
+<div class="grid">
+  <div>
+    <div class="phone"><div class="screen">
+      <div class="notch"></div>
+      <div class="status-bar"><span>9:41</span><span>•••</span></div>
+
+      <div class="nav-bar">
+        <h2>Dashboard</h2>
+        <div class="icon-btn">⚙</div>
+      </div>
+
+      <div class="content" style="display:flex; align-items:center; justify-content:center;">
+        <div class="empty">
+          <div class="ico">📊</div>
+          <h4>No budget yet</h4>
+          <p>Set a monthly budget to track your grocery spending against a goal.</p>
+          <div class="btn-primary" style="margin-bottom:10px;">Set a Budget</div>
+          <div class="btn-secondary">Scan Your First Receipt</div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active"><span class="icon">📊</span>Dashboard</div>
+        <div class="tab"><span class="icon">📷</span>Scan</div>
+        <div class="tab"><span class="icon">📋</span>History</div>
+      </div>
+    </div></div>
+    <div class="caption">
+      <strong>7. Empty State</strong>
+      First launch · prompts user to set a budget or scan first receipt
+    </div>
+  </div>
+</div>
+
+<footer style="max-width:1240px; margin:48px auto 0; padding:0 16px; font-size:11px; color:var(--text-tertiary);">
+  Generated from <code>mobile/app/</code> route structure. Tabs: <code>(tabs)/index.tsx</code>,
+  <code>scan.tsx</code>, <code>history.tsx</code>. Modals: <code>review.tsx</code>,
+  <code>budget-settings.tsx</code>, <code>notification-settings.tsx</code>.
+</footer>
+
+</body>
+</html>

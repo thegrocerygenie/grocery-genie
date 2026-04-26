@@ -1,31 +1,28 @@
+/**
+ * Tabs layout — Bottom navigation chrome.
+ *
+ * Drop-in for `app/(tabs)/_layout.tsx`. Three tabs match the design.
+ * Custom floating chrome-material tab bar (matches MVP mocks).
+ */
+
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { View, Pressable, StyleSheet, Text } from 'react-native';
 import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
-import { colors, type } from '@/constants/theme';
-import type {
-  BottomTabBarProps,
-  BottomTabNavigationOptions,
-} from '@react-navigation/bottom-tabs';
+import { colors, type } from './theme';
 
-interface TabDef {
-  name: string;
-  label: string;
-  symbol: string;
-}
-
-const TABS: TabDef[] = [
-  { name: 'index', label: 'Budget', symbol: 'cart.fill' },
-  { name: 'scan', label: 'Scan', symbol: 'camera.viewfinder' },
+const TABS = [
+  { name: 'index',   label: 'Budget',  symbol: 'cart.fill' },
+  { name: 'scan',    label: 'Scan',    symbol: 'camera.viewfinder' },
   { name: 'history', label: 'History', symbol: 'clock.fill' },
 ];
 
 export default function TabsLayout() {
   return (
     <Tabs
-      screenOptions={{ headerShown: false } as BottomTabNavigationOptions}
+      screenOptions={{ headerShown: false }}
       tabBar={(props) => <FloatingTabBar {...props} />}
     >
       {TABS.map((t) => (
@@ -35,11 +32,11 @@ export default function TabsLayout() {
   );
 }
 
-function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
+function FloatingTabBar({ state, navigation }: any) {
   return (
     <View style={styles.wrap} pointerEvents="box-none">
       <BlurView intensity={80} tint="systemChromeMaterial" style={styles.bar}>
-        {state.routes.map((route, idx) => {
+        {state.routes.map((route: any, idx: number) => {
           const active = state.index === idx;
           const tab = TABS.find((t) => t.name === route.name);
           if (!tab) return null;
@@ -55,20 +52,17 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
               onPress={onPress}
               style={[styles.tab, active && styles.tabActive]}
               hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={tab.label}
-              accessibilityState={{ selected: active }}
             >
               <SymbolView
-                name={tab.symbol as Parameters<typeof SymbolView>[0]['name']}
+                name={tab.symbol as any}
                 size={16}
-                tintColor={active ? colors.tint : (colors.iosLabel2 as string)}
+                tintColor={active ? colors.tint : colors.iosLabel2}
               />
               <Text
                 style={[
                   type.caption1,
                   {
-                    color: active ? colors.tint : (colors.iosLabel2 as string),
+                    color: active ? colors.tint : colors.iosLabel2,
                     fontWeight: '600',
                   },
                 ]}

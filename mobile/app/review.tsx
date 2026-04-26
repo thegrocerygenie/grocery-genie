@@ -1,48 +1,52 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { useQuery } from '@tanstack/react-query';
 
-import { strings } from '@/constants/strings';
-import { borderRadius, colors, shadows, spacing, typography } from '@/constants/theme';
-import { ConfirmButton } from '@/features/receipt-capture/components/ConfirmButton';
-import { LineItemCard } from '@/features/receipt-capture/components/LineItemCard';
+import { colors, radii, spacing, type } from '@/constants/theme';
+import { DEFAULT_CATEGORIES, getCategoryMeta } from '@/constants/categories';
 import { useReceiptConfirm } from '@/features/receipt-capture/hooks/useReceiptReview';
 import { getReceipt } from '@/features/receipt-capture/services/receiptApi';
-import type { EditableLineItem, LineItemCorrection } from '@/features/receipt-capture/types';
-import { useAnalytics } from '@/hooks/useAnalytics';
 import { useReceiptStore } from '@/store/receiptStore';
+import { useAnalytics } from '@/hooks/useAnalytics';
+import type {
+  EditableLineItem,
+  LineItemCorrection,
+} from '@/features/receipt-capture/types';
+
+const LOW_CONFIDENCE_THRESHOLD = 0.6;
+
+function formatLongDate(iso: string): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return `${months[m - 1]} ${d}, ${y}`;
+}
 
 export default function ReviewScreen() {
-  const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { receiptId } = useLocalSearchParams<{ receiptId?: string }>();
   const { capturedImageUri, activeScanResponse, clearScanSession } = useReceiptStore();
   const confirmMutation = useReceiptConfirm();
   const analytics = useAnalytics();
   const confirmed = useRef(false);
 
-  // Read-only mode: fetch receipt from API when navigated from history
   const isReadOnly = !!receiptId && !activeScanResponse;
-
-  // Track receipt abandonment
-  useEffect(() => {
-    return () => {
-      if (!confirmed.current && activeScanResponse && !isReadOnly) {
-        analytics.emit('receipt_abandoned', { stage: 'review' });
-      }
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: fetchedReceipt, isLoading: isFetchingReceipt } = useQuery({
     queryKey: ['receipt', receiptId],
@@ -50,7 +54,6 @@ export default function ReviewScreen() {
     enabled: isReadOnly,
   });
 
-  // Initialize form state from scan response OR fetched receipt
   const initialItems: EditableLineItem[] = useMemo(() => {
     if (activeScanResponse) {
       return (activeScanResponse.extraction.items ?? []).map((item) => ({
@@ -79,14 +82,11 @@ export default function ReviewScreen() {
     return [];
   }, [activeScanResponse, fetchedReceipt]);
 
-  const [storeName, setStoreName] = useState(
-    activeScanResponse?.extraction.store_name ?? '',
-  );
+  const [storeName, setStoreName] = useState(activeScanResponse?.extraction.store_name ?? '');
   const [receiptDate, setReceiptDate] = useState(activeScanResponse?.extraction.date ?? '');
   const [items, setItems] = useState<EditableLineItem[]>(initialItems);
 
-  // Update state when fetched receipt loads (read-only mode)
-  useMemo(() => {
+  useEffect(() => {
     if (fetchedReceipt && isReadOnly) {
       setStoreName(fetchedReceipt.store_name ?? '');
       setReceiptDate(fetchedReceipt.date);
@@ -94,28 +94,45 @@ export default function ReviewScreen() {
     }
   }, [fetchedReceipt, isReadOnly, initialItems]);
 
+  useEffect(() => {
+    return () => {
+      if (!confirmed.current && activeScanResponse && !isReadOnly) {
+        analytics.emit('receipt_abandoned', { stage: 'review' });
+      }
+    };
+  }, [activeScanResponse, isReadOnly, analytics]);
+
   const canConfirm = storeName.trim().length > 0 && items.length > 0;
 
-  const handleItemUpdate = useCallback((itemId: string, field: string, value: string | number) => {
+  const updateItemPrice = (itemId: string, price: number | null) => {
     setItems((prev) =>
       prev.map((item) =>
-        item.id === itemId ? { ...item, [field]: value, isEdited: true } : item,
+        item.id === itemId
+          ? { ...item, totalPrice: price ?? 0, isEdited: true }
+          : item,
       ),
     );
-  }, []);
+  };
 
-  const handleConfirm = useCallback(async () => {
-    if (!activeScanResponse) return;
+  const updateItemCategory = (itemId: string, categoryId: string) => {
+    setItems((prev) =>
+      prev.map((item) => (item.id === itemId ? { ...item, categoryId, isEdited: true } : item)),
+    );
+  };
 
-    // Build corrections for edited items
+  const handleSave = () => {
+    if (isReadOnly) {
+      router.back();
+      return;
+    }
+    if (!activeScanResponse || !canConfirm) return;
+
     const corrections: LineItemCorrection[] = items
       .filter((item) => item.isEdited)
       .map((item) => {
         const correction: LineItemCorrection = { id: item.id };
         const original = activeScanResponse.extraction.items.find((i) => i.id === item.id);
-        if (original && item.name !== original.name) {
-          correction.name = item.name;
-        }
+        if (original && item.name !== original.name) correction.name = item.name;
         if (original && item.categoryId !== original.category_id) {
           correction.category_id = item.categoryId ?? undefined;
         }
@@ -141,233 +158,333 @@ export default function ReviewScreen() {
         },
       },
     );
-  }, [activeScanResponse, items, confirmMutation, clearScanSession]);
+  };
 
-  // Loading state for read-only mode
   if (isReadOnly && isFetchingReceipt) {
     return (
-      <View style={styles.emptyContainer}>
-        <ActivityIndicator size="large" color={colors.light.primary} />
+      <View style={[styles.root, styles.center]}>
+        <ActivityIndicator color={colors.tint} />
       </View>
     );
   }
 
-  // Guard: no scan data and no fetched receipt
   if (!activeScanResponse && !fetchedReceipt) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No receipt data. Please scan a receipt first.</Text>
+      <View style={[styles.root, styles.center]}>
+        <Text style={[type.body, { color: colors.iosLabel2 as string, textAlign: 'center' }]}>
+          No receipt data. Please scan a receipt first.
+        </Text>
       </View>
     );
   }
 
   const extraction = activeScanResponse?.extraction;
-  const displaySubtotal = extraction?.subtotal ?? fetchedReceipt?.subtotal;
-  const displayTax = extraction?.tax ?? fetchedReceipt?.tax;
-  const displayTotal = extraction?.total ?? fetchedReceipt?.total;
-  const imageUri = capturedImageUri ?? fetchedReceipt?.image_url;
-
-  const renderHeader = () => (
-    <View>
-      {/* Receipt image */}
-      {imageUri && (
-        <Pressable
-          style={styles.imageContainer}
-          accessibilityLabel="Receipt image, tap to expand"
-          accessibilityRole="image"
-        >
-          <Image
-            source={{ uri: imageUri }}
-            style={styles.image}
-            resizeMode="cover"
-          />
-        </Pressable>
-      )}
-
-      {/* Store name & date */}
-      <View style={styles.headerCard}>
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>{strings.review.storeName}</Text>
-          <TextInput
-            style={styles.fieldInput}
-            value={storeName}
-            onChangeText={setStoreName}
-            placeholder="Store name"
-            editable={!isReadOnly}
-            accessibilityLabel={`Store name: ${storeName}`}
-          />
-        </View>
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>{strings.review.date}</Text>
-          <TextInput
-            style={styles.fieldInput}
-            value={receiptDate}
-            onChangeText={setReceiptDate}
-            placeholder="YYYY-MM-DD"
-            editable={!isReadOnly}
-            accessibilityLabel={`Date: ${receiptDate}`}
-          />
-        </View>
-      </View>
-
-      {/* Items section header */}
-      <Text style={styles.sectionHeader}>
-        {strings.review.items} ({items.length})
-      </Text>
-    </View>
-  );
-
-  const renderFooter = () => (
-    <View style={styles.totalsCard}>
-      {displaySubtotal != null && (
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>{strings.review.subtotal}</Text>
-          <Text style={styles.totalValue}>${displaySubtotal.toFixed(2)}</Text>
-        </View>
-      )}
-      {displayTax != null && (
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>{strings.review.tax}</Text>
-          <Text style={styles.totalValue}>${displayTax.toFixed(2)}</Text>
-        </View>
-      )}
-      {displayTotal != null && (
-        <View style={[styles.totalRow, styles.grandTotal]}>
-          <Text style={styles.grandTotalLabel}>{strings.review.total}</Text>
-          <Text style={styles.grandTotalValue}>${displayTotal.toFixed(2)}</Text>
-        </View>
-      )}
-    </View>
-  );
+  const displaySubtotal = extraction?.subtotal ?? fetchedReceipt?.subtotal ?? null;
+  const displayTax = extraction?.tax ?? fetchedReceipt?.tax ?? null;
+  const displayTotal = extraction?.total ?? fetchedReceipt?.total ?? null;
+  const imageUri = capturedImageUri ?? fetchedReceipt?.image_url ?? null;
+  const dominantCategoryId = items.find((i) => i.categoryId)?.categoryId ?? null;
+  const dominantCategoryName = getCategoryMeta(dominantCategoryId).name;
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <LineItemCard
-            item={item}
-            onUpdate={isReadOnly ? () => {} : (field, value) => handleItemUpdate(item.id, field, value)}
-          />
-        )}
-        ListHeaderComponent={renderHeader}
-        ListFooterComponent={renderFooter}
-        contentContainerStyle={{ paddingBottom: isReadOnly ? 40 + insets.bottom : 100 + insets.bottom }}
+    <>
+      <Stack.Screen
+        options={{
+          presentation: 'modal',
+          title: 'Review',
+          headerLeft: () => (
+            <Pressable onPress={() => router.back()} hitSlop={12}>
+              <Text style={styles.headerBtn}>{isReadOnly ? 'Done' : 'Cancel'}</Text>
+            </Pressable>
+          ),
+          headerRight: () =>
+            isReadOnly ? null : (
+              <Pressable
+                onPress={handleSave}
+                hitSlop={12}
+                disabled={!canConfirm || confirmMutation.isPending}
+              >
+                {confirmMutation.isPending ? (
+                  <ActivityIndicator color={colors.tint} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.headerBtn,
+                      { fontWeight: '600' },
+                      !canConfirm && { opacity: 0.4 },
+                    ]}
+                  >
+                    Save
+                  </Text>
+                )}
+              </Pressable>
+            ),
+        }}
       />
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg, paddingBottom: 60 }}
+      >
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" />
+        ) : null}
 
-      {/* Sticky confirm button — only in edit mode */}
-      {!isReadOnly && (
-        <View style={[styles.confirmContainer, { paddingBottom: insets.bottom }]}>
-          <ConfirmButton
-            onPress={handleConfirm}
-            disabled={!canConfirm}
-            loading={confirmMutation.isPending}
+        <ListGroup>
+          <ListInputRow
+            label="Store"
+            value={storeName}
+            onChangeText={setStoreName}
+            editable={!isReadOnly}
+            placeholder="Store name"
           />
+          <ListInputRow
+            label="Date"
+            value={formatLongDate(receiptDate) || receiptDate}
+            onChangeText={setReceiptDate}
+            editable={false}
+            placeholder="YYYY-MM-DD"
+          />
+          <ListRow
+            label="Total"
+            value={displayTotal != null ? `$${displayTotal.toFixed(2)}` : '—'}
+          />
+          <ListRow label="Category" value={dominantCategoryName} chevron />
+        </ListGroup>
+
+        <View>
+          <Text style={styles.sectionLabel}>ITEMS · {items.length}</Text>
+          <View style={styles.listCard}>
+            {items.map((item, i) => (
+              <ItemRow
+                key={item.id}
+                item={item}
+                showDivider={i > 0}
+                readOnly={isReadOnly}
+                onChangePrice={(p) => updateItemPrice(item.id, p)}
+                onChangeCategory={(cid) => updateItemCategory(item.id, cid)}
+              />
+            ))}
+          </View>
         </View>
+
+        {(displaySubtotal != null || displayTax != null) && (
+          <View style={styles.listCard}>
+            {displaySubtotal != null && (
+              <ListRow label="Subtotal" value={`$${displaySubtotal.toFixed(2)}`} />
+            )}
+            {displayTax != null && <ListRow label="Tax" value={`$${displayTax.toFixed(2)}`} />}
+          </View>
+        )}
+      </ScrollView>
+    </>
+  );
+}
+
+interface ListGroupProps {
+  children: React.ReactNode;
+}
+
+function ListGroup({ children }: ListGroupProps) {
+  const items = React.Children.toArray(children);
+  return (
+    <View style={styles.listCard}>
+      {items.map((c, i) => (
+        <React.Fragment key={i}>
+          {c}
+          {i < items.length - 1 && <View style={styles.separator} />}
+        </React.Fragment>
+      ))}
+    </View>
+  );
+}
+
+interface ListRowProps {
+  label: string;
+  value: string;
+  chevron?: boolean;
+}
+
+function ListRow({ label, value, chevron }: ListRowProps) {
+  return (
+    <View style={styles.row}>
+      <Text style={type.body}>{label}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <Text style={[type.body, { color: colors.iosLabel2 as string }]}>{value}</Text>
+        {chevron ? (
+          <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3 as string} />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+interface ListInputRowProps {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  editable: boolean;
+  placeholder?: string;
+}
+
+function ListInputRow({ label, value, onChangeText, editable, placeholder }: ListInputRowProps) {
+  return (
+    <View style={styles.row}>
+      <Text style={type.body}>{label}</Text>
+      <TextInput
+        style={[type.body, styles.inputValue]}
+        value={value}
+        onChangeText={onChangeText}
+        editable={editable}
+        placeholder={placeholder}
+        placeholderTextColor={colors.iosLabel3 as string}
+      />
+    </View>
+  );
+}
+
+interface ItemRowProps {
+  item: EditableLineItem;
+  showDivider: boolean;
+  readOnly: boolean;
+  onChangePrice: (p: number | null) => void;
+  onChangeCategory: (categoryId: string) => void;
+}
+
+function ItemRow({ item, showDivider, readOnly, onChangePrice, onChangeCategory }: ItemRowProps) {
+  const conf = item.extractionConfidence ?? 1;
+  const lowConf = conf < LOW_CONFIDENCE_THRESHOLD;
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(item.totalPrice.toFixed(2));
+  const meta = getCategoryMeta(item.categoryId);
+
+  const cycleCategory = () => {
+    if (readOnly) return;
+    const idx = DEFAULT_CATEGORIES.findIndex((c) => c.id === meta.id);
+    const next = DEFAULT_CATEGORIES[(idx + 1) % DEFAULT_CATEGORIES.length];
+    onChangeCategory(next.id);
+  };
+
+  return (
+    <View style={[styles.row, showDivider && styles.rowDivider]}>
+      <Pressable
+        onPress={cycleCategory}
+        disabled={readOnly}
+        style={[styles.itemDot, { backgroundColor: meta.color }]}
+        accessibilityRole="button"
+        accessibilityLabel={`Category ${meta.name}, tap to change`}
+      >
+        <SymbolView
+          name={meta.symbol as Parameters<typeof SymbolView>[0]['name']}
+          size={11}
+          tintColor="#fff"
+        />
+      </Pressable>
+      <Text style={[type.body, { flex: 1 }]} numberOfLines={1}>
+        {item.name}
+      </Text>
+      {editing && !readOnly ? (
+        <TextInput
+          autoFocus
+          keyboardType="decimal-pad"
+          value={text}
+          onChangeText={setText}
+          onBlur={() => {
+            const n = parseFloat(text);
+            onChangePrice(Number.isFinite(n) ? n : null);
+            setEditing(false);
+          }}
+          style={[
+            type.body,
+            { color: colors.tint, fontWeight: '600', minWidth: 70, textAlign: 'right' },
+          ]}
+        />
+      ) : (
+        <Pressable
+          onPress={() => !readOnly && setEditing(true)}
+          disabled={readOnly}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+        >
+          {lowConf ? <Text style={styles.verifyTag}>verify</Text> : null}
+          <Text
+            style={[
+              type.body,
+              {
+                fontWeight: '600',
+                color: lowConf ? colors.orange : (colors.iosLabel as string),
+              },
+            ]}
+          >
+            ${item.totalPrice.toFixed(2)}
+          </Text>
+        </Pressable>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.light.background,
+  root: { flex: 1, backgroundColor: colors.iosBg as string },
+  center: { alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+
+  headerBtn: { ...type.body, color: colors.tint },
+
+  image: {
+    height: 200,
+    borderRadius: radii.card,
+    backgroundColor: colors.iosFill3,
   },
-  emptyContainer: {
+
+  sectionLabel: {
+    ...type.footnote,
+    color: colors.iosLabel2 as string,
+    letterSpacing: 0.5,
+    paddingHorizontal: 16,
+    paddingBottom: 6,
+  },
+
+  listCard: {
+    backgroundColor: colors.iosBg2,
+    borderRadius: radii.list,
+    overflow: 'hidden',
+  },
+
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 44,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    gap: 10,
+  },
+  rowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.iosSeparator,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.iosSeparator,
+    marginLeft: 16,
+  },
+
+  inputValue: {
+    color: colors.iosLabel2 as string,
     flex: 1,
+    textAlign: 'right',
+    paddingVertical: 0,
+  },
+
+  itemDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.xl,
   },
-  emptyText: {
-    ...typography.body,
-    color: colors.light.textSecondary,
-    textAlign: 'center',
-  },
-  imageContainer: {
-    height: 200,
-    margin: spacing.base,
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-    ...shadows.card,
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  headerCard: {
-    backgroundColor: colors.light.surface,
-    marginHorizontal: spacing.base,
-    marginBottom: spacing.base,
-    padding: spacing.base,
-    borderRadius: borderRadius.md,
-    ...shadows.card,
-  },
-  field: {
-    marginBottom: spacing.md,
-  },
-  fieldLabel: {
-    ...typography.caption,
-    color: colors.light.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  fieldInput: {
-    ...typography.body,
-    color: colors.light.textPrimary,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.light.border,
-    paddingVertical: spacing.xs,
-  },
-  sectionHeader: {
-    ...typography.sectionHeader,
-    color: colors.light.textPrimary,
-    marginHorizontal: spacing.base,
-    marginBottom: spacing.md,
-  },
-  totalsCard: {
-    backgroundColor: colors.light.surface,
-    marginHorizontal: spacing.base,
-    marginTop: spacing.sm,
-    padding: spacing.base,
-    borderRadius: borderRadius.md,
-    ...shadows.card,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
-  },
-  totalLabel: {
-    ...typography.body,
-    color: colors.light.textSecondary,
-  },
-  totalValue: {
-    fontSize: typography.money.fontSize,
-    fontWeight: typography.money.fontWeight,
-    color: colors.light.textPrimary,
-  },
-  grandTotal: {
-    borderTopWidth: 1,
-    borderTopColor: colors.light.border,
-    paddingTop: spacing.sm,
-    marginTop: spacing.xs,
-    marginBottom: 0,
-  },
-  grandTotalLabel: {
-    ...typography.bodyBold,
-    color: colors.light.textPrimary,
-  },
-  grandTotalValue: {
-    fontSize: typography.moneyLarge.fontSize,
-    fontWeight: typography.moneyLarge.fontWeight,
-    color: colors.light.textPrimary,
-  },
-  confirmContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+
+  verifyTag: {
+    ...type.caption2,
+    color: colors.orange,
+    fontWeight: '500',
   },
 });

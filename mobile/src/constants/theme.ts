@@ -1,89 +1,92 @@
+/**
+ * Grocery Genie — Design tokens.
+ * Mirrors design_handoff_grocery_genie/reference/tokens-v2.css.
+ *
+ * Use these instead of inlining hex/numbers. iOS-first; Android falls
+ * back where SF Symbols / chrome-material blur aren't available.
+ */
+
+import { Platform, type TextStyle } from 'react-native';
+
 export const colors = {
-  light: {
-    primary: '#2D7A4F',
-    primaryLight: '#E8F5EE',
-    success: '#34A853',
-    successLight: '#E6F4EA',
-    warning: '#F9AB00',
-    warningLight: '#FEF7E0',
-    danger: '#EA4335',
-    dangerLight: '#FCE8E6',
-    background: '#F8F9FA',
-    surface: '#FFFFFF',
-    textPrimary: '#1A1A2E',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    disabled: '#9CA3AF',
-  },
-  dark: {
-    primary: '#4ADE80',
-    primaryLight: '#1A3A2A',
-    success: '#4ADE80',
-    successLight: '#1A3A2A',
-    warning: '#FBBF24',
-    warningLight: '#3A2F1A',
-    danger: '#F87171',
-    dangerLight: '#3A1A1A',
-    background: '#0F172A',
-    surface: '#1E293B',
-    textPrimary: '#F1F5F9',
-    textSecondary: '#94A3B8',
-    border: '#334155',
-    disabled: '#475569',
+  iosBg: Platform.select({ ios: 'systemGroupedBackground', default: '#F2F2F7' }),
+  iosBg2: '#FFFFFF',
+  iosBg3: '#F2F2F7',
+  iosFill1: 'rgba(120,120,128,0.20)',
+  iosFill3: 'rgba(120,120,128,0.12)',
+  iosSeparator: 'rgba(60,60,67,0.29)',
+  iosLabel: '#000000',
+  iosLabel2: 'rgba(60,60,67,0.60)',
+  iosLabel3: 'rgba(60,60,67,0.30)',
+
+  tint: '#1F7A4A',
+  tintPressed: '#195F3A',
+  tintBg: 'rgba(31,122,74,0.12)',
+
+  red: '#FF3B30',
+  orange: '#FF9500',
+  yellow: '#FFCC00',
+  green: '#34C759',
+  blue: '#007AFF',
+  indigo: '#5856D6',
+  pink: '#FF2D55',
+  teal: '#30B0C7',
+  gray: '#8E8E93',
+
+  cat: {
+    groceries: '#34C759',
+    household: '#007AFF',
+    personalCare: '#FF2D55',
+    beverages: '#5856D6',
+    snacks: '#FF9500',
+    babyKids: '#FFCC00',
+    pet: '#30B0C7',
+    other: '#8E8E93',
   },
 } as const;
 
-export const typography = {
-  display: { fontSize: 28, fontWeight: '700' as const, lineHeight: 34 },
-  sectionHeader: { fontSize: 20, fontWeight: '600' as const, lineHeight: 28 },
-  body: { fontSize: 16, fontWeight: '400' as const, lineHeight: 24 },
-  bodyBold: { fontSize: 16, fontWeight: '600' as const, lineHeight: 24 },
-  caption: { fontSize: 13, fontWeight: '400' as const, lineHeight: 18 },
-  money: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    fontVariant: ['tabular-nums'] as ('tabular-nums')[],
-  },
-  moneyLarge: {
-    fontSize: 28,
-    fontWeight: '700' as const,
-    fontVariant: ['tabular-nums'] as ('tabular-nums')[],
-  },
+export const radii = {
+  card: 10,
+  list: 10,
+  sheet: 22,
+  button: 12,
+  cap: 9999,
 } as const;
 
 export const spacing = {
   xs: 4,
   sm: 8,
   md: 12,
-  base: 16,
-  lg: 20,
+  lg: 16,
   xl: 24,
   xxl: 32,
-  xxxl: 48,
 } as const;
 
-export const borderRadius = {
-  sm: 6,
-  md: 12,
-  lg: 16,
-  full: 9999,
+const money: TextStyle = {
+  fontFamily: Platform.select({ ios: 'SF Pro Rounded', default: 'System' }),
+  fontVariant: ['tabular-nums'],
+  fontWeight: '700',
+};
+
+export const type = {
+  largeTitle: { fontSize: 34, fontWeight: '700', letterSpacing: 0.36 } as TextStyle,
+  title1: { fontSize: 28, fontWeight: '700' } as TextStyle,
+  title2: { fontSize: 22, fontWeight: '700' } as TextStyle,
+  title3: { fontSize: 20, fontWeight: '600' } as TextStyle,
+  headline: { fontSize: 17, fontWeight: '600' } as TextStyle,
+  body: { fontSize: 17, fontWeight: '400' } as TextStyle,
+  callout: { fontSize: 16, fontWeight: '400' } as TextStyle,
+  subheadline: { fontSize: 15, fontWeight: '400' } as TextStyle,
+  footnote: { fontSize: 13, fontWeight: '400' } as TextStyle,
+  caption1: { fontSize: 12, fontWeight: '400' } as TextStyle,
+  caption2: { fontSize: 11, fontWeight: '400' } as TextStyle,
+  money,
 } as const;
 
-export const shadows = {
-  card: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  elevated: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 4,
-  },
+export const springs = {
+  ring: { damping: 18, stiffness: 90 },
+  ui: { damping: 22, stiffness: 220 },
+  interactive: { damping: 26, stiffness: 300 },
 } as const;
 
 export const touchTarget = {

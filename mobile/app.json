@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "platforms": ["ios"],
-    "scheme": "grocery-genie",
+    "scheme": "grocerygenie",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -24,10 +24,7 @@
     "plugins": [
       "expo-router",
       "expo-camera",
-      "expo-image-manipulator",
-      "expo-image-picker",
-      "expo-haptics",
-      "react-native-reanimated"
+      "expo-image-picker"
     ]
   }
 }
