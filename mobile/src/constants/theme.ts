@@ -9,7 +9,7 @@
 import { Platform, type TextStyle } from 'react-native';
 
 export const colors = {
-  iosBg: Platform.select({ ios: 'systemGroupedBackground', default: '#F2F2F7' }),
+  iosBg: '#F2F2F7',
   iosBg2: '#FFFFFF',
   iosBg3: '#F2F2F7',
   iosFill1: 'rgba(120,120,128,0.20)',

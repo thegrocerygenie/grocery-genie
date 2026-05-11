@@ -15,25 +15,35 @@ import { SymbolView } from 'expo-symbols';
 import { useQuery } from '@tanstack/react-query';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
-import { DEFAULT_CATEGORIES, getCategoryMeta } from '@/constants/categories';
+import { getCategoryMeta } from '@/constants/categories';
+import { CategoryPickerSheet } from '@/components/CategoryPickerSheet';
 import { useReceiptConfirm } from '@/features/receipt-capture/hooks/useReceiptReview';
 import { getReceipt } from '@/features/receipt-capture/services/receiptApi';
 import { useReceiptStore } from '@/store/receiptStore';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import type {
-  EditableLineItem,
-  LineItemCorrection,
-} from '@/features/receipt-capture/types';
+import type { EditableLineItem, LineItemCorrection } from '@/features/receipt-capture/types';
 
 const LOW_CONFIDENCE_THRESHOLD = 0.6;
+const HIGH_VALUE_TOTAL = 500;
+const HIGH_VALUE_ITEM = 100;
 
 function formatLongDate(iso: string): string {
   if (!iso) return '';
   const [y, m, d] = iso.split('-').map(Number);
   if (!y || !m || !d) return iso;
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return `${months[m - 1]} ${d}, ${y}`;
 }
@@ -85,6 +95,7 @@ export default function ReviewScreen() {
   const [storeName, setStoreName] = useState(activeScanResponse?.extraction.store_name ?? '');
   const [receiptDate, setReceiptDate] = useState(activeScanResponse?.extraction.date ?? '');
   const [items, setItems] = useState<EditableLineItem[]>(initialItems);
+  const [categoryPickerItemId, setCategoryPickerItemId] = useState<string | null>(null);
 
   useEffect(() => {
     if (fetchedReceipt && isReadOnly) {
@@ -107,9 +118,7 @@ export default function ReviewScreen() {
   const updateItemPrice = (itemId: string, price: number | null) => {
     setItems((prev) =>
       prev.map((item) =>
-        item.id === itemId
-          ? { ...item, totalPrice: price ?? 0, isEdited: true }
-          : item,
+        item.id === itemId ? { ...item, totalPrice: price ?? 0, isEdited: true } : item,
       ),
     );
   };
@@ -186,6 +195,13 @@ export default function ReviewScreen() {
   const dominantCategoryId = items.find((i) => i.categoryId)?.categoryId ?? null;
   const dominantCategoryName = getCategoryMeta(dominantCategoryId).name;
 
+  const isHighValueReceipt =
+    !isReadOnly &&
+    ((displayTotal ?? 0) >= HIGH_VALUE_TOTAL ||
+      items.some((it) => it.totalPrice >= HIGH_VALUE_ITEM));
+
+  const pickerItem = items.find((i) => i.id === categoryPickerItemId) ?? null;
+
   return (
     <>
       <Stack.Screen
@@ -225,6 +241,28 @@ export default function ReviewScreen() {
         style={styles.root}
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg, paddingBottom: 60 }}
       >
+        {isHighValueReceipt ? (
+          <View style={styles.highValueBanner}>
+            <View style={styles.highValueIcon}>
+              <SymbolView name="exclamationmark.triangle.fill" size={14} tintColor="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[type.footnote, { fontWeight: '600' }]}>Confirm before saving</Text>
+              <Text
+                style={[
+                  type.caption1,
+                  { color: colors.iosLabel2 as string, marginTop: 2, lineHeight: 16 },
+                ]}
+              >
+                {(displayTotal ?? 0) >= HIGH_VALUE_TOTAL
+                  ? 'This receipt is over $500.'
+                  : 'One or more items are over $100.'}{' '}
+                Please verify totals.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         {imageUri ? (
           <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" />
         ) : null}
@@ -261,7 +299,7 @@ export default function ReviewScreen() {
                 showDivider={i > 0}
                 readOnly={isReadOnly}
                 onChangePrice={(p) => updateItemPrice(item.id, p)}
-                onChangeCategory={(cid) => updateItemCategory(item.id, cid)}
+                onPickCategory={() => setCategoryPickerItemId(item.id)}
               />
             ))}
           </View>
@@ -276,6 +314,19 @@ export default function ReviewScreen() {
           </View>
         )}
       </ScrollView>
+
+      <CategoryPickerSheet
+        visible={categoryPickerItemId !== null}
+        itemName={pickerItem?.name}
+        selectedId={pickerItem?.categoryId ?? null}
+        onSelect={(cid) => {
+          if (categoryPickerItemId) {
+            updateItemCategory(categoryPickerItemId, cid);
+          }
+          setCategoryPickerItemId(null);
+        }}
+        onClose={() => setCategoryPickerItemId(null)}
+      />
     </>
   );
 }
@@ -347,27 +398,20 @@ interface ItemRowProps {
   showDivider: boolean;
   readOnly: boolean;
   onChangePrice: (p: number | null) => void;
-  onChangeCategory: (categoryId: string) => void;
+  onPickCategory: () => void;
 }
 
-function ItemRow({ item, showDivider, readOnly, onChangePrice, onChangeCategory }: ItemRowProps) {
+function ItemRow({ item, showDivider, readOnly, onChangePrice, onPickCategory }: ItemRowProps) {
   const conf = item.extractionConfidence ?? 1;
   const lowConf = conf < LOW_CONFIDENCE_THRESHOLD;
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(item.totalPrice.toFixed(2));
   const meta = getCategoryMeta(item.categoryId);
 
-  const cycleCategory = () => {
-    if (readOnly) return;
-    const idx = DEFAULT_CATEGORIES.findIndex((c) => c.id === meta.id);
-    const next = DEFAULT_CATEGORIES[(idx + 1) % DEFAULT_CATEGORIES.length];
-    onChangeCategory(next.id);
-  };
-
   return (
     <View style={[styles.row, showDivider && styles.rowDivider]}>
       <Pressable
-        onPress={cycleCategory}
+        onPress={onPickCategory}
         disabled={readOnly}
         style={[styles.itemDot, { backgroundColor: meta.color }]}
         accessibilityRole="button"
@@ -486,5 +530,22 @@ const styles = StyleSheet.create({
     ...type.caption2,
     color: colors.orange,
     fontWeight: '500',
+  },
+
+  highValueBanner: {
+    backgroundColor: 'rgba(255,149,0,0.12)',
+    borderRadius: radii.list,
+    padding: spacing.md,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+  },
+  highValueIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    backgroundColor: colors.orange,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

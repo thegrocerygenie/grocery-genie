@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -14,12 +15,27 @@ import SegmentedControl from '@react-native-segmented-control/segmented-control'
 
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { getCategoryMeta } from '@/constants/categories';
+import { CaptureActionSheet } from '@/components/CaptureActionSheet';
 import { useReceipts } from '@/features/receipt-capture/hooks/useReceipts';
+import { useDeleteReceipt } from '@/features/lifecycle/hooks/useLifecycle';
 import type { ReceiptResponse } from '@/features/receipt-capture/types';
 
 type FilterIndex = 0 | 1 | 2;
 
-const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_SHORT = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 
 function pad(n: number): string {
   return n < 10 ? `0${n}` : String(n);
@@ -53,26 +69,31 @@ interface ReceiptRowProps {
   receipt: ReceiptResponse;
   showDivider: boolean;
   onPress: () => void;
+  onDelete: () => void;
 }
 
-function ReceiptRow({ receipt, showDivider, onPress }: ReceiptRowProps) {
+function ReceiptRow({ receipt, showDivider, onPress, onDelete }: ReceiptRowProps) {
   const firstCategory = receipt.items.find((item) => item.category_id)?.category_id ?? null;
   const meta = getCategoryMeta(firstCategory);
   const pendingSync = receipt.status === 'pending';
   const itemCount = receipt.items.length;
   const total = receipt.total ?? 0;
-  const sub = pendingSync ? 'Pending sync' : `${formatShortDate(receipt.date)} · ${itemCount} items`;
+  const sub = pendingSync
+    ? 'Pending sync'
+    : `${formatShortDate(receipt.date)} · ${itemCount} items`;
 
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onDelete}
+      delayLongPress={400}
       style={({ pressed }) => [
         styles.row,
         showDivider && styles.rowDivider,
         pressed && { backgroundColor: colors.iosFill3 },
       ]}
       accessibilityRole="button"
-      accessibilityLabel={`${receipt.store_name ?? 'Receipt'}, ${sub}, $${total.toFixed(2)}`}
+      accessibilityLabel={`${receipt.store_name ?? 'Receipt'}, ${sub}, $${total.toFixed(2)}. Long press to delete.`}
     >
       <View style={[styles.catCircle, { backgroundColor: meta.color }]}>
         <SymbolView
@@ -140,6 +161,25 @@ export default function HistoryScreen() {
   const [filter, setFilter] = useState<FilterIndex>(1);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [actionSheetOpen, setActionSheetOpen] = useState(false);
+  const deleteReceipt = useDeleteReceipt();
+
+  const onDelete = (id: string, label: string) => {
+    Alert.alert(
+      'Delete receipt?',
+      `${label} will be moved to Recently Deleted (30 days to restore).`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void deleteReceipt.mutateAsync(id);
+          },
+        },
+      ],
+    );
+  };
 
   const dateRange = useMemo(() => getDateRange(filter), [filter]);
   const queryParams = useMemo(
@@ -176,6 +216,16 @@ export default function HistoryScreen() {
               setPage(1);
             },
           },
+          headerRight: () => (
+            <Pressable
+              onPress={() => setActionSheetOpen(true)}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Add receipt"
+            >
+              <SymbolView name="plus" size={20} tintColor={colors.tint} />
+            </Pressable>
+          ),
         }}
       />
       <FlatList
@@ -217,6 +267,7 @@ export default function HistoryScreen() {
               receipt={item}
               showDivider={index > 0}
               onPress={() => router.push({ pathname: '/review', params: { receiptId: item.id } })}
+              onDelete={() => onDelete(item.id, item.store_name ?? 'Receipt')}
             />
           </View>
         )}
@@ -225,6 +276,17 @@ export default function HistoryScreen() {
         }
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.3}
+      />
+
+      <CaptureActionSheet
+        visible={actionSheetOpen}
+        onClose={() => setActionSheetOpen(false)}
+        onTakePhoto={() => router.push('/(tabs)/scan')}
+        onChooseFromLibrary={() =>
+          Alert.alert('Coming soon', 'Photo library import is on the roadmap.')
+        }
+        onChooseFiles={() => Alert.alert('Coming soon', 'File import is on the roadmap.')}
+        onManualEntry={() => router.push('/manual-entry')}
       />
     </>
   );

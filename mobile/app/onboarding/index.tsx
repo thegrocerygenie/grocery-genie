@@ -16,9 +16,7 @@ export default function OnboardingWelcome() {
             <SymbolView name="cart.fill" size={44} tintColor="#fff" />
           </View>
           <Text style={styles.wordmark}>Grocery Genie</Text>
-          <Text style={styles.tagline}>
-            Snap a receipt, watch your grocery budget take shape.
-          </Text>
+          <Text style={styles.tagline}>Snap a receipt, watch your grocery budget take shape.</Text>
         </View>
         <View style={styles.ctaStack}>
           <Pressable
@@ -26,10 +24,18 @@ export default function OnboardingWelcome() {
               styles.primaryBtn,
               pressed && { backgroundColor: colors.tintPressed },
             ]}
-            onPress={() => router.push('/onboarding/budget')}
+            onPress={() => router.push('/onboarding/sign-up')}
             accessibilityRole="button"
           >
             <Text style={styles.primaryBtnLabel}>Get Started</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/onboarding/sign-in')}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="I already have an account"
+          >
+            <Text style={styles.tertiaryBtn}>I already have an account</Text>
           </Pressable>
         </View>
       </View>
@@ -86,4 +92,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryBtnLabel: { color: '#fff', ...type.headline },
+  tertiaryBtn: {
+    color: colors.tint,
+    ...type.subheadline,
+    fontWeight: '500',
+    textAlign: 'center',
+    paddingVertical: 8,
+  },
 });

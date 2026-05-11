@@ -139,6 +139,10 @@ export default function DashboardScreen() {
     );
   }
 
+  const onSettings = () => {
+    router.push('/settings');
+  };
+
   return (
     <>
       <Stack.Screen
@@ -147,6 +151,16 @@ export default function DashboardScreen() {
           headerLargeTitle: true,
           headerTransparent: true,
           headerBlurEffect: 'systemChromeMaterial',
+          headerRight: () => (
+            <Pressable
+              onPress={onSettings}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
+            >
+              <SymbolView name="gearshape.fill" size={20} tintColor={colors.tint} />
+            </Pressable>
+          ),
         }}
       />
       <ScrollView
@@ -160,7 +174,12 @@ export default function DashboardScreen() {
         {view.state === 'empty' ? (
           <EmptyState onScan={onScan} onSetBudget={onSetBudget} />
         ) : (
-          <FilledState data={view} onSetBudget={onSetBudget} />
+          <FilledState
+            data={view}
+            onSetBudget={onSetBudget}
+            onTopItems={() => router.push('/top-items')}
+            onTrend={() => router.push('/trend')}
+          />
         )}
       </ScrollView>
     </>
@@ -176,15 +195,9 @@ function EmptyState({ onScan, onSetBudget }: EmptyStateProps) {
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIcon}>
-        <SymbolView
-          name="camera.viewfinder"
-          size={28}
-          tintColor={colors.iosLabel2 as string}
-        />
+        <SymbolView name="camera.viewfinder" size={28} tintColor={colors.iosLabel2 as string} />
       </View>
-      <Text style={[type.headline, { textAlign: 'center' }]}>
-        Scan your first receipt
-      </Text>
+      <Text style={[type.headline, { textAlign: 'center' }]}>Scan your first receipt</Text>
       <Text
         style={[
           type.subheadline,
@@ -215,9 +228,11 @@ function EmptyState({ onScan, onSetBudget }: EmptyStateProps) {
 interface FilledStateProps {
   data: Extract<DashboardViewState, { state: 'on-track' | 'over' }>;
   onSetBudget: () => void;
+  onTopItems: () => void;
+  onTrend: () => void;
 }
 
-function FilledState({ data, onSetBudget }: FilledStateProps) {
+function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProps) {
   const noBudget = data.cap <= 0;
   const progress = noBudget ? 0 : data.spent / data.cap;
   const over = data.state === 'over';
@@ -229,11 +244,7 @@ function FilledState({ data, onSetBudget }: FilledStateProps) {
       <View style={styles.heroCard}>
         {noBudget ? (
           <View style={styles.heroCtaIcon}>
-            <SymbolView
-              name="exclamationmark.triangle.fill"
-              size={28}
-              tintColor={colors.orange}
-            />
+            <SymbolView name="exclamationmark.triangle.fill" size={28} tintColor={colors.orange} />
           </View>
         ) : (
           <BudgetRing
@@ -277,10 +288,7 @@ function FilledState({ data, onSetBudget }: FilledStateProps) {
                 ${data.spent.toFixed(0)} / ${data.cap.toFixed(0)}
               </Text>
               <Text
-                style={[
-                  type.caption1,
-                  { color: over ? colors.red : colors.tint, marginTop: 2 },
-                ]}
+                style={[type.caption1, { color: over ? colors.red : colors.tint, marginTop: 2 }]}
               >
                 {over
                   ? `Over by $${overBy.toFixed(0)} · ${data.daysLeft} days left`
@@ -302,7 +310,17 @@ function FilledState({ data, onSetBudget }: FilledStateProps) {
 
       {data.categories.length > 0 && (
         <>
-          <Text style={styles.sectionLabel}>BY CATEGORY</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionLabel}>BY CATEGORY</Text>
+            <Pressable
+              onPress={onTopItems}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="Top items"
+            >
+              <Text style={styles.sectionLink}>Top items</Text>
+            </Pressable>
+          </View>
           <View style={styles.listGroup}>
             {data.categories.map((c, i) => (
               <CategoryRow key={c.id} cat={c} showDivider={i > 0} />
@@ -310,6 +328,21 @@ function FilledState({ data, onSetBudget }: FilledStateProps) {
           </View>
         </>
       )}
+
+      <Pressable
+        onPress={onTrend}
+        style={({ pressed }) => [
+          styles.trendBtn,
+          pressed && { backgroundColor: colors.iosFill3 },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel="See 3-month trend"
+      >
+        <SymbolView name="chart.bar.fill" size={16} tintColor={colors.tint} />
+        <Text style={[type.subheadline, { color: colors.tint, fontWeight: '600' }]}>
+          See 3-month trend
+        </Text>
+      </Pressable>
     </View>
   );
 }
@@ -325,9 +358,7 @@ function CategoryRow({ cat, showDivider }: CategoryRowProps) {
   const over = pct > 100;
 
   return (
-    <View
-      style={[styles.catRow, showDivider && { borderTopWidth: StyleSheet.hairlineWidth }]}
-    >
+    <View style={[styles.catRow, showDivider && { borderTopWidth: StyleSheet.hairlineWidth }]}>
       <View style={[styles.catCircle, { backgroundColor: cat.color }]}>
         <SymbolView
           name={cat.symbol as Parameters<typeof SymbolView>[0]['name']}
@@ -426,8 +457,28 @@ const styles = StyleSheet.create({
     ...type.footnote,
     color: colors.iosLabel2 as string,
     letterSpacing: 0.5,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xs,
+  },
+  sectionLink: {
+    ...type.footnote,
+    color: colors.tint,
+    fontWeight: '600',
+  },
+  trendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 44,
+    borderRadius: radii.list,
+    backgroundColor: colors.iosBg2,
+    marginTop: spacing.sm,
   },
 
   listGroup: {

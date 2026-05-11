@@ -101,9 +101,7 @@ export default function BudgetSettingsScreen() {
           ),
           headerRight: () => (
             <Pressable onPress={handleSave} hitSlop={12} disabled={isSaving}>
-              <Text
-                style={[styles.headerBtn, { fontWeight: '600' }, isSaving && { opacity: 0.4 }]}
-              >
+              <Text style={[styles.headerBtn, { fontWeight: '600' }, isSaving && { opacity: 0.4 }]}>
                 Save
               </Text>
             </Pressable>

@@ -65,3 +65,28 @@ export async function updateReceipt(
     body: JSON.stringify(updates),
   });
 }
+
+export interface ManualLineItem {
+  name: string;
+  quantity?: number;
+  unit_price: number;
+  total_price: number;
+  category_id?: string | null;
+}
+
+export interface ManualReceiptPayload {
+  store_name: string;
+  date: string; // YYYY-MM-DD
+  total: number;
+  subtotal?: number | null;
+  tax?: number | null;
+  currency?: string;
+  items: ManualLineItem[];
+}
+
+export async function createManualReceipt(payload: ManualReceiptPayload): Promise<ReceiptResponse> {
+  return apiClient<ReceiptResponse>('/api/receipts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
