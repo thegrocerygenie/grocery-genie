@@ -5,12 +5,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
+    auth as auth_routes,
+)
+from app.api.routes import (
     budgets,
     categories,
     dashboard,
     health,
     notifications,
     receipts,
+)
+from app.api.routes import (
+    users as users_routes,
 )
 from app.core.dependencies import engine
 from app.core.rate_limit import RateLimitMiddleware
@@ -40,6 +46,8 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(auth_routes.router)
+app.include_router(users_routes.router)
 app.include_router(receipts.router)
 app.include_router(budgets.router)
 app.include_router(dashboard.router)

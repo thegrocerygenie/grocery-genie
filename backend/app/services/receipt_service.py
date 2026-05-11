@@ -405,7 +405,7 @@ class ReceiptService:
         """List receipts with pagination and optional filters."""
         query = (
             select(Receipt)
-            .where(Receipt.user_id == user_id)
+            .where(Receipt.user_id == user_id, Receipt.deleted_at.is_(None))
             .options(
                 selectinload(Receipt.line_items),
                 selectinload(Receipt.store),
@@ -413,7 +413,9 @@ class ReceiptService:
         )
 
         count_query = select(func.count()).select_from(
-            select(Receipt.id).where(Receipt.user_id == user_id).subquery()
+            select(Receipt.id)
+            .where(Receipt.user_id == user_id, Receipt.deleted_at.is_(None))
+            .subquery()
         )
 
         if store:
@@ -455,19 +457,114 @@ class ReceiptService:
 
         return receipts, total
 
-    async def _get_receipt(self, receipt_id: uuid.UUID, user_id: uuid.UUID) -> Receipt:
+    async def _get_receipt(
+        self,
+        receipt_id: uuid.UUID,
+        user_id: uuid.UUID,
+        *,
+        include_deleted: bool = False,
+    ) -> Receipt:
+        conditions = [Receipt.id == receipt_id, Receipt.user_id == user_id]
+        if not include_deleted:
+            conditions.append(Receipt.deleted_at.is_(None))
         result = await self.db.execute(
             select(Receipt)
             .options(
                 selectinload(Receipt.line_items),
                 selectinload(Receipt.store),
             )
-            .where(Receipt.id == receipt_id, Receipt.user_id == user_id)
+            .where(*conditions)
         )
         receipt = result.scalar_one_or_none()
         if receipt is None:
             raise ValueError(f"Receipt {receipt_id} not found")
         return receipt
+
+    async def soft_delete_receipt(
+        self, receipt_id: uuid.UUID, user_id: uuid.UUID
+    ) -> Receipt:
+        receipt = await self._get_receipt(receipt_id, user_id)
+        receipt.deleted_at = datetime.now(UTC)
+        await self.db.flush()
+        return receipt
+
+    async def restore_receipt(
+        self, receipt_id: uuid.UUID, user_id: uuid.UUID
+    ) -> Receipt:
+        receipt = await self._get_receipt(receipt_id, user_id, include_deleted=True)
+        if receipt.deleted_at is None:
+            return receipt
+        deleted_at = receipt.deleted_at
+        if deleted_at.tzinfo is None:
+            deleted_at = deleted_at.replace(tzinfo=UTC)
+        if deleted_at < datetime.now(UTC) - timedelta(days=30):
+            raise ValueError("Receipt past 30-day restore window")
+        receipt.deleted_at = None
+        await self.db.flush()
+        return receipt
+
+    async def list_recently_deleted(self, user_id: uuid.UUID) -> list[Receipt]:
+        cutoff = datetime.now(UTC) - timedelta(days=30)
+        # SQLite-friendly cutoff (naive) for in-memory tests; Postgres ignores TZ.
+        cutoff_naive = cutoff.replace(tzinfo=None)
+        result = await self.db.execute(
+            select(Receipt)
+            .options(selectinload(Receipt.store), selectinload(Receipt.line_items))
+            .where(
+                Receipt.user_id == user_id,
+                Receipt.deleted_at.is_not(None),
+                Receipt.deleted_at >= cutoff_naive,
+            )
+            .order_by(Receipt.deleted_at.desc())
+        )
+        return list(result.scalars().unique().all())
+
+    async def create_manual_receipt(
+        self,
+        *,
+        user_id: uuid.UUID,
+        store_name: str,
+        receipt_date: date,
+        total: float,
+        subtotal: float | None,
+        tax: float | None,
+        currency: str,
+        items: list[dict],
+    ) -> Receipt:
+        """Create a receipt without an image (manual entry fallback)."""
+        store = await self.store_service.find_or_create(store_name)
+        receipt = Receipt(
+            user_id=user_id,
+            store_id=store.id,
+            date=receipt_date,
+            subtotal=subtotal,
+            tax=tax,
+            total=total,
+            currency=currency,
+            extraction_confidence=None,
+            image_url=None,
+            thumbnail_url=None,
+            status="confirmed",
+        )
+        self.db.add(receipt)
+        await self.db.flush()
+
+        for item_data in items:
+            line = LineItem(
+                receipt_id=receipt.id,
+                raw_name=item_data["name"],
+                quantity=item_data.get("quantity", 1.0),
+                unit_price=item_data["unit_price"],
+                total_price=item_data["total_price"],
+                category_id=item_data.get("category_id"),
+                extraction_confidence=None,
+                category_confidence=None,
+            )
+            self.db.add(line)
+        await self.db.flush()
+
+        # Re-fetch with eager loading
+        return await self._get_receipt(receipt.id, user_id)
 
     async def _get_user_mappings(
         self, user_id: uuid.UUID

@@ -31,11 +31,17 @@ async def seeded_users(db_session):
 
 
 @pytest.fixture
-async def raw_client(db_session, mock_extractor, db_engine):
+async def raw_client(db_session, mock_extractor, db_engine, monkeypatch):
     """Client with NO auth override — tests real security.py auth flow."""
+    # Tests use the legacy `api_token` dev fallback, which is gated on
+    # settings.debug to keep the cutover path open. Enable it for these tests.
+    from app.core import config as config_module
     from app.core.dependencies import get_db
     from app.llm.provider import get_receipt_extractor
     from main import app
+
+    settings = config_module.get_settings()
+    monkeypatch.setattr(settings, "debug", True)
 
     async def override_get_db():
         yield db_session

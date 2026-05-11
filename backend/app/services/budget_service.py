@@ -56,6 +56,7 @@ class BudgetService:
             select(Budget).where(
                 Budget.id == budget_id,
                 Budget.user_id == user_id,
+                Budget.deleted_at.is_(None),
             )
         )
         budget = result.scalar_one_or_none()
@@ -64,6 +65,60 @@ class BudgetService:
         budget.amount = amount
         await self.db.flush()
         return budget
+
+    async def soft_delete_budget(
+        self, budget_id: uuid.UUID, user_id: uuid.UUID
+    ) -> Budget:
+        from datetime import UTC, datetime
+
+        result = await self.db.execute(
+            select(Budget).where(
+                Budget.id == budget_id,
+                Budget.user_id == user_id,
+                Budget.deleted_at.is_(None),
+            )
+        )
+        budget = result.scalar_one_or_none()
+        if budget is None:
+            raise ValueError(f"Budget {budget_id} not found")
+        budget.deleted_at = datetime.now(UTC)
+        await self.db.flush()
+        return budget
+
+    async def restore_budget(self, budget_id: uuid.UUID, user_id: uuid.UUID) -> Budget:
+        from datetime import UTC, datetime, timedelta
+
+        result = await self.db.execute(
+            select(Budget).where(
+                Budget.id == budget_id,
+                Budget.user_id == user_id,
+            )
+        )
+        budget = result.scalar_one_or_none()
+        if budget is None:
+            raise ValueError(f"Budget {budget_id} not found")
+        if budget.deleted_at is None:
+            return budget
+        if budget.deleted_at < datetime.now(UTC) - timedelta(days=30):
+            raise ValueError("Budget past 30-day restore window")
+        budget.deleted_at = None
+        await self.db.flush()
+        return budget
+
+    async def list_recently_deleted(self, user_id: uuid.UUID) -> list[Budget]:
+        from datetime import UTC, datetime, timedelta
+
+        cutoff = datetime.now(UTC) - timedelta(days=30)
+        result = await self.db.execute(
+            select(Budget)
+            .where(
+                Budget.user_id == user_id,
+                Budget.deleted_at.is_not(None),
+                Budget.deleted_at >= cutoff,
+            )
+            .order_by(Budget.deleted_at.desc())
+        )
+        return list(result.scalars().all())
 
     async def get_period_dates(
         self, user_id: uuid.UUID, period: str
@@ -151,7 +206,9 @@ class BudgetService:
         period_start, period_end = await self.get_period_dates(user_id, period)
 
         # Get all budgets for this user
-        result = await self.db.execute(select(Budget).where(Budget.user_id == user_id))
+        result = await self.db.execute(
+            select(Budget).where(Budget.user_id == user_id, Budget.deleted_at.is_(None))
+        )
         budgets = list(result.scalars().all())
 
         # Get spending by category
@@ -331,7 +388,9 @@ class BudgetService:
         days_left = max(0, (period_end - today).days)
 
         # Get all budgets
-        result = await self.db.execute(select(Budget).where(Budget.user_id == user_id))
+        result = await self.db.execute(
+            select(Budget).where(Budget.user_id == user_id, Budget.deleted_at.is_(None))
+        )
         budgets = list(result.scalars().all())
         if not budgets:
             return []

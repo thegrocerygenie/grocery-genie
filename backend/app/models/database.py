@@ -2,6 +2,7 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     Date,
     DateTime,
@@ -10,6 +11,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
+    SmallInteger,
     String,
     UniqueConstraint,
     func,
@@ -27,9 +29,56 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Legacy dev token — kept behind settings.DEBUG fallback during cutover.
     api_token: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     locale: Mapped[str] = mapped_column(String(10), default="en_US")
     currency_preference: Mapped[str] = mapped_column(String(3), default="USD")
+
+    # Auth columns (Phase A)
+    password_hash: Mapped[str | None] = mapped_column(String(255))
+    password_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    email_verification_token_hash: Mapped[str | None] = mapped_column(String(64))
+    email_verification_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    password_reset_token_hash: Mapped[str | None] = mapped_column(String(64))
+    password_reset_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    pending_email: Mapped[str | None] = mapped_column(String(255))
+    pending_email_token_hash: Mapped[str | None] = mapped_column(String(64))
+    pending_email_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    apple_subject: Mapped[str | None] = mapped_column(String(255), unique=True)
+    google_subject: Mapped[str | None] = mapped_column(String(255), unique=True)
+    failed_signin_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # Notification + summary preferences (Phase B — typed for hot-path query)
+    notif_threshold_50: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    notif_threshold_80: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
+    notif_threshold_100: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
+    weekly_summary_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
+    weekly_summary_day: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=0
+    )
+    # Free-form prefs the server doesn't query (e.g., ocr_languages: list[str])
+    preferences: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+
+    bounced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -41,6 +90,24 @@ class User(Base):
     budgets: Mapped[list["Budget"]] = relationship(back_populates="user")
     item_mappings: Mapped[list["UserItemMapping"]] = relationship(back_populates="user")
     notifications: Mapped[list["Notification"]] = relationship(back_populates="user")
+    auth_events: Mapped[list["AuthEvent"]] = relationship(back_populates="user")
+
+
+class AuthEvent(Base):
+    __tablename__ = "auth_events"
+    __table_args__ = (Index("ix_auth_events_user_created", "user_id", "created_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    ip: Mapped[str | None] = mapped_column(String(45))
+    user_agent: Mapped[str | None] = mapped_column(String(500))
+    event_metadata: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    user: Mapped["User | None"] = relationship(back_populates="auth_events")
 
 
 class Store(Base):
@@ -91,6 +158,9 @@ class Receipt(Base):
     thumbnail_url: Mapped[str | None] = mapped_column(String(1000))
     extraction_confidence: Mapped[float | None] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -143,6 +213,9 @@ class Budget(Base):
     period_start: Mapped[date] = mapped_column(Date, nullable=False)
     period_type: Mapped[str] = mapped_column(String(20), default="monthly")
     rollover_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

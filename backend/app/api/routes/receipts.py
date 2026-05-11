@@ -25,7 +25,9 @@ from app.llm.provider import (
 from app.models.database import Receipt as ReceiptModel
 from app.models.database import User
 from app.models.schemas import (
+    DeletedItemResponse,
     LineItemResponse,
+    ManualReceiptCreateRequest,
     ReceiptListResponse,
     ReceiptResponse,
     ReceiptScanResponse,
@@ -177,6 +179,38 @@ async def scan_receipt(
     return result
 
 
+@router.get("/recently-deleted", response_model=list[DeletedItemResponse])
+async def recently_deleted(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[DeletedItemResponse]:
+    from datetime import UTC, datetime
+
+    service = ReceiptService(db=db)
+    receipts = await service.list_recently_deleted(user.id)
+    now = datetime.now(UTC)
+    out: list[DeletedItemResponse] = []
+    for r in receipts:
+        if r.deleted_at is None:
+            continue
+        deleted_at = r.deleted_at
+        if deleted_at.tzinfo is None:
+            deleted_at = deleted_at.replace(tzinfo=UTC)
+        days_left = max(0, 30 - (now - deleted_at).days)
+        store_label = r.store.name if r.store else "Receipt"
+        total_label = f"${float(r.total):.2f}" if r.total else ""
+        out.append(
+            DeletedItemResponse(
+                id=r.id,
+                deleted_at=deleted_at,
+                days_remaining=days_left,
+                label=f"{store_label} · {total_label}".strip(" ·"),
+                type="receipt",
+            )
+        )
+    return out
+
+
 @router.get("/{receipt_id}", response_model=ReceiptResponse)
 async def get_receipt(
     receipt_id: str,
@@ -208,6 +242,58 @@ async def update_receipt(
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail="Receipt not found") from None
         raise HTTPException(status_code=400, detail=str(e)) from e
+    return _receipt_to_response(receipt)
+
+
+@router.post("", response_model=ReceiptResponse, status_code=201)
+async def create_manual_receipt(
+    body: ManualReceiptCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+    analytics: AnalyticsService = Depends(get_analytics_service),
+) -> ReceiptResponse:
+    """Manual receipt entry — fallback for failed extraction."""
+    service = ReceiptService(db=db, analytics=analytics)
+    receipt = await service.create_manual_receipt(
+        user_id=user.id,
+        store_name=body.store_name,
+        receipt_date=body.date,
+        total=body.total,
+        subtotal=body.subtotal,
+        tax=body.tax,
+        currency=body.currency,
+        items=[item.model_dump() for item in body.items],
+    )
+    analytics.emit("receipt_manual_created", {"item_count": len(body.items)}, user.id)
+    return _receipt_to_response(receipt)
+
+
+@router.delete("/{receipt_id}", status_code=204)
+async def delete_receipt(
+    receipt_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    service = ReceiptService(db=db)
+    try:
+        await service.soft_delete_receipt(uuid.UUID(receipt_id), user.id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Receipt not found") from None
+
+
+@router.post("/{receipt_id}/restore", response_model=ReceiptResponse)
+async def restore_receipt(
+    receipt_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ReceiptResponse:
+    service = ReceiptService(db=db)
+    try:
+        receipt = await service.restore_receipt(uuid.UUID(receipt_id), user.id)
+    except ValueError as e:
+        if "past 30-day" in str(e):
+            raise HTTPException(status_code=410, detail=str(e)) from e
+        raise HTTPException(status_code=404, detail="Receipt not found") from None
     return _receipt_to_response(receipt)
 
 

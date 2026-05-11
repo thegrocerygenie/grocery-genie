@@ -5,15 +5,15 @@ import { SymbolView } from 'expo-symbols';
 import { useCameraPermissions } from 'expo-camera';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
-import { useOnboardingStore } from '@/store/onboardingStore';
+import { useAuthStore } from '@/store/authStore';
 
 export default function OnboardingCamera() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
-  const { markComplete } = useOnboardingStore();
+  const markFirstRunCompleted = useAuthStore((s) => s.markFirstRunCompleted);
 
   const finish = () => {
-    markComplete();
+    void markFirstRunCompleted();
     router.replace('/(tabs)');
   };
 
@@ -34,8 +34,7 @@ export default function OnboardingCamera() {
           </View>
           <Text style={[type.title2, { textAlign: 'center' }]}>Allow Camera Access</Text>
           <Text style={styles.tagline}>
-            Grocery Genie uses the camera only to scan receipts. Photos are processed
-            on-device.
+            Grocery Genie uses the camera only to scan receipts. Photos are processed on-device.
           </Text>
         </View>
         <View style={styles.ctaStack}>

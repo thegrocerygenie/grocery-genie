@@ -1,25 +1,45 @@
 import React, { useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
+import { useMe, useUpdatePreferences } from '@/features/auth/hooks/useAuth';
 import { useNotificationStore } from '@/store/notificationStore';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export default function NotificationSettingsScreen() {
-  const { preferences, setThreshold, setWeeklySummaryEnabled, setWeeklySummaryDay } =
-    useNotificationStore();
+  const { data: profile } = useMe();
+  const update = useUpdatePreferences();
+  const localStore = useNotificationStore();
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
+
+  // Server is source of truth; local store stays as offline fallback.
+  const prefs = profile?.preferences;
+  const fifty = prefs?.notification_thresholds.fifty ?? localStore.preferences.fiftyPercent;
+  const eighty = prefs?.notification_thresholds.eighty ?? localStore.preferences.eightyPercent;
+  const hundred = prefs?.notification_thresholds.hundred ?? localStore.preferences.hundredPercent;
+  const summaryEnabled =
+    prefs?.weekly_summary.enabled ?? localStore.preferences.weeklySummaryEnabled;
+  const summaryDay = prefs?.weekly_summary.day ?? localStore.preferences.weeklySummaryDay;
+
+  const setThreshold = (key: 'fifty' | 'eighty' | 'hundred', value: boolean) => {
+    update.mutate({ notification_thresholds: { [key]: value } });
+    if (key === 'fifty') localStore.setThreshold('fiftyPercent', value);
+    if (key === 'eighty') localStore.setThreshold('eightyPercent', value);
+    if (key === 'hundred') localStore.setThreshold('hundredPercent', value);
+  };
+
+  const setWeeklySummaryEnabled = (value: boolean) => {
+    update.mutate({ weekly_summary: { enabled: value } });
+    localStore.setWeeklySummaryEnabled(value);
+  };
+
+  const setWeeklySummaryDay = (day: number) => {
+    update.mutate({ weekly_summary: { day } });
+    localStore.setWeeklySummaryDay(day);
+  };
 
   return (
     <>
@@ -32,33 +52,29 @@ export default function NotificationSettingsScreen() {
           header="BUDGET ALERTS"
           footer="We'll send a quiet notification once per threshold per month."
         >
-          <ToggleRow
-            label="50% of budget"
-            on={preferences.fiftyPercent}
-            onChange={(v) => setThreshold('fiftyPercent', v)}
-          />
+          <ToggleRow label="50% of budget" on={fifty} onChange={(v) => setThreshold('fifty', v)} />
           <ToggleRow
             label="80% of budget"
-            on={preferences.eightyPercent}
-            onChange={(v) => setThreshold('eightyPercent', v)}
+            on={eighty}
+            onChange={(v) => setThreshold('eighty', v)}
           />
           <ToggleRow
             label="100% of budget"
-            on={preferences.hundredPercent}
-            onChange={(v) => setThreshold('hundredPercent', v)}
+            on={hundred}
+            onChange={(v) => setThreshold('hundred', v)}
           />
         </Section>
 
         <Section header="WEEKLY SUMMARY">
           <ToggleRow
             label="Send weekly summary"
-            on={preferences.weeklySummaryEnabled}
+            on={summaryEnabled}
             onChange={setWeeklySummaryEnabled}
           />
-          {preferences.weeklySummaryEnabled ? (
+          {summaryEnabled ? (
             <NavRow
               label="Day"
-              value={DAYS[preferences.weeklySummaryDay] ?? 'Sunday'}
+              value={DAYS[summaryDay] ?? 'Sunday'}
               onPress={() => setDayPickerOpen(true)}
             />
           ) : null}
@@ -67,7 +83,7 @@ export default function NotificationSettingsScreen() {
 
       <DayPickerSheet
         visible={dayPickerOpen}
-        selected={preferences.weeklySummaryDay}
+        selected={summaryDay}
         onSelect={(d) => {
           setWeeklySummaryDay(d);
           setDayPickerOpen(false);

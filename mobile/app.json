@@ -6,7 +6,9 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "platforms": ["ios"],
+    "platforms": [
+      "ios"
+    ],
     "scheme": "grocerygenie",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -24,7 +26,8 @@
     "plugins": [
       "expo-router",
       "expo-camera",
-      "expo-image-picker"
+      "expo-image-picker",
+      "expo-build-properties"
     ]
   }
 }

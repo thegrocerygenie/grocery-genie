@@ -264,9 +264,7 @@ async def test_check_thresholds_at_100(
 
 
 @pytest.mark.asyncio
-async def test_check_thresholds_at_50(
-    service, user_id, default_categories, db_session
-):
+async def test_check_thresholds_at_50(service, user_id, default_categories, db_session):
     """BC-03: 50% breach fires before 80% — overview promises configurable 50/80/100."""
     cat = default_categories[0]
     await _create_confirmed_receipt(

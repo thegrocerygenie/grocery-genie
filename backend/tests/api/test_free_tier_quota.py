@@ -71,9 +71,7 @@ async def test_scan_prior_month_does_not_count(
 ):
     """Receipts scanned in a prior calendar month don't count against current quota."""
     # Seed 25 receipts from a previous month
-    last_month = (datetime.now(UTC).replace(day=1) - timedelta(days=1)).replace(
-        hour=12
-    )
+    last_month = (datetime.now(UTC).replace(day=1) - timedelta(days=1)).replace(hour=12)
     for i in range(25):
         r = Receipt(
             user_id=DEV_USER_ID,

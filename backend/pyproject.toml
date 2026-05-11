@@ -18,6 +18,15 @@ dependencies = [
     "alembic>=1.13.0",
     "httpx>=0.27.0",
     "python-multipart>=0.0.12",
+    "bcrypt>=4.2.0",
+    "pyjwt[crypto]>=2.9.0",
+    "resend>=2.0.0",
+    "google-auth>=2.35.0",
+    "slowapi>=0.1.9",
+    "structlog>=24.4.0",
+    "prometheus-fastapi-instrumentator>=7.0.0",
+    "cryptography>=43.0.0",
+    "jinja2>=3.1.0",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +54,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.ruff.lint.per-file-ignores]
 "app/api/routes/*.py" = ["B008"]  # Depends() in function defaults is standard FastAPI
 "app/core/security.py" = ["B008"]
+"app/services/email.py" = ["E501"]  # HTML email templates have long lines
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

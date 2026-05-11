@@ -199,3 +199,136 @@ class CategoryResponse(BaseModel):
 class ErrorResponse(BaseModel):
     detail: str
     code: str | None = None
+
+
+# --- Auth ---
+
+
+class SignUpRequest(BaseModel):
+    email: str
+    password: str
+    name: str | None = None
+
+
+class SignInRequest(BaseModel):
+    email: str
+    password: str
+
+
+class TokenPairResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    needs_onboarding: bool = False
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class ResendVerificationRequest(BaseModel):
+    email: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class AppleSignInRequest(BaseModel):
+    identity_token: str
+    authorization_code: str
+    nonce: str | None = None
+    name: str | None = None
+
+
+class GoogleSignInRequest(BaseModel):
+    id_token: str
+
+
+class EmailChangeRequestPayload(BaseModel):
+    new_email: str
+    current_password: str
+
+
+class EmailChangeConfirmPayload(BaseModel):
+    token: str
+
+
+# --- User profile + preferences ---
+
+
+class NotificationThresholds(BaseModel):
+    fifty: bool | None = None
+    eighty: bool | None = None
+    hundred: bool | None = None
+
+
+class WeeklySummaryUpdate(BaseModel):
+    enabled: bool | None = None
+    day: int | None = Field(default=None, ge=0, le=6)
+
+
+class UserPreferencesPublic(BaseModel):
+    notification_thresholds: dict
+    weekly_summary: dict
+    ocr_languages: list[str] = Field(default_factory=list)
+
+
+class UserProfileResponse(BaseModel):
+    id: uuid.UUID
+    email: str
+    name: str
+    locale: str
+    currency_preference: str
+    email_verified_at: datetime | None
+    preferences: UserPreferencesPublic
+    needs_onboarding: bool = False
+
+
+class UserPreferencesUpdate(BaseModel):
+    locale: str | None = None
+    currency_preference: str | None = None
+    notification_thresholds: NotificationThresholds | None = None
+    weekly_summary: WeeklySummaryUpdate | None = None
+    ocr_languages: list[str] | None = None
+
+
+# --- Manual receipt ---
+
+
+class ManualLineItem(BaseModel):
+    name: str
+    quantity: float = 1.0
+    unit_price: float
+    total_price: float
+    category_id: uuid.UUID | None = None
+
+
+class ManualReceiptCreateRequest(BaseModel):
+    store_name: str
+    date: date
+    total: float
+    subtotal: float | None = None
+    tax: float | None = None
+    currency: str = "USD"
+    items: list[ManualLineItem] = Field(default_factory=list)
+
+
+# --- Soft-delete listings ---
+
+
+class DeletedItemResponse(BaseModel):
+    id: uuid.UUID
+    deleted_at: datetime
+    days_remaining: int
+    label: str  # human-readable summary
+    type: str  # "receipt" | "budget"
