@@ -188,8 +188,14 @@ npx expo prebuild --platform ios   # Generate native project
 ```
 
 ### Backend API (from `backend/`)
+
 ```bash
-uvicorn main:app --reload              # Dev server
+# First-time setup (or after pulling a new migration)
+make db-up && make backend-migrate
+```
+
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8001  # Dev server (port 8001; --host 0.0.0.0 so Expo Go on the LAN can reach it)
 pytest                                  # Run tests
 ruff check . && ruff format .          # Lint + format
 alembic upgrade head                   # Run DB migrations

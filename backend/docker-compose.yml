@@ -1,0 +1,36 @@
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: grocery_genie_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: grocery_genie
+      POSTGRES_PASSWORD: grocery_genie_dev
+      POSTGRES_DB: grocery_genie
+    ports:
+      - "54440:5432"
+    volumes:
+      - grocery_genie_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grocery_genie -d grocery_genie"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: grocery_genie_redis
+    restart: unless-stopped
+    ports:
+      - "54441:6379"
+    volumes:
+      - grocery_genie_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  grocery_genie_db_data:
+  grocery_genie_redis_data:

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en" style="--accent:#1F7A4A;">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#F0EEE9">
+
+  <title>Grocery Genie — From receipts to a kitchen that thinks ahead</title>
+  <meta name="description" content="Grocery Genie turns the receipts in your camera roll into a smart pantry that tracks prices, plans meals, and quietly stops food waste before it happens. Coming Q3 2026 on iOS.">
+  <meta name="keywords" content="grocery app, receipt scanner, pantry tracker, meal planning, price tracking, grocery budgeting, iOS">
+  <meta name="author" content="Grocery Genie">
+  <link rel="canonical" href="https://grocerygenie.app/">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Grocery Genie">
+  <meta property="og:title" content="Grocery Genie — From receipts to a kitchen that thinks ahead">
+  <meta property="og:description" content="A smart pantry that starts with a receipt. Track prices, plan meals, stop food waste. Coming Q3 2026 on iOS.">
+  <meta property="og:url" content="https://grocerygenie.app/">
+  <meta property="og:image" content="https://grocerygenie.app/og-image.png">
+  <meta property="og:image:secure_url" content="https://grocerygenie.app/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Grocery Genie — receipts become a smart pantry">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Grocery Genie — From receipts to a kitchen that thinks ahead">
+  <meta name="twitter:description" content="A smart pantry that starts with a receipt. Track prices, plan meals, stop food waste.">
+  <meta name="twitter:image" content="https://grocerygenie.app/og-image.png">
+  <meta name="twitter:image:alt" content="Grocery Genie — receipts become a smart pantry">
+
+  <!-- Icons -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="alternate icon" type="image/png" href="/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="mask-icon" href="/favicon.svg" color="#1F7A4A">
+  <link rel="manifest" href="/site.webmanifest">
+
+  <!-- Preconnect / preload -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap">
+
+  <link rel="stylesheet" href="/tokens.css">
+  <link rel="stylesheet" href="/styles.css">
+
+  <!-- Robots -->
+  <meta name="robots" content="index, follow, max-image-preview:large">
+
+  <!-- JSON-LD: Organization -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Grocery Genie",
+    "url": "https://grocerygenie.app",
+    "logo": "https://grocerygenie.app/favicon.svg",
+    "description": "A smart pantry that starts with a receipt. Receipt scanning, price tracking, meal planning. iOS-first launch Q3 2026.",
+    "foundingLocation": { "@type": "Place", "name": "Brooklyn, NY" },
+    "sameAs": []
+  }
+  </script>
+
+  <!-- JSON-LD: WebSite -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Grocery Genie",
+    "url": "https://grocerygenie.app",
+    "potentialAction": {
+      "@type": "SubscribeAction",
+      "target": "https://grocerygenie.app/#waitlist"
+    }
+  }
+  </script>
+
+  <!-- Reduced motion fallback -->
+  <style>
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+    }
+    /* Keyboard focus */
+    a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible {
+      outline: 2px solid var(--accent, #1F7A4A);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    /* Skip-link */
+    .skip-link { position: absolute; top: -40px; left: 8px; background: var(--ink, #15140F); color: var(--paper, #F0EEE9); padding: 8px 12px; border-radius: 4px; font-size: 13px; z-index: 100; }
+    .skip-link:focus { top: 8px; }
+    /* Form states (in addition to styles.css) */
+    .waitlist[data-state="loading"] button { opacity: 0.6; cursor: wait; }
+    .waitlist[data-state="success"] button { background: var(--accent, #1F7A4A); }
+    .waitlist[data-state="error"] input { border-color: #C0392B; }
+    .form-message { font-size: 13px; margin-top: 10px; min-height: 18px; line-height: 1.4; }
+    .form-message[data-tone="success"] { color: var(--accent, #1F7A4A); }
+    .form-message[data-tone="error"] { color: #C0392B; }
+    .cta-block .form-message[data-tone="success"] { color: rgba(240,238,233,0.9); }
+    .cta-block .form-message[data-tone="error"] { color: #FFB4A8; }
+    /* Anchor offset for sticky-ish headings */
+    section[id], div[id] { scroll-margin-top: 24px; }
+  </style>
+</head>
+<body data-bg="paper">
+<a class="skip-link" href="#main">Skip to content</a>
+
+<!-- NAV -->
+<nav class="nav" aria-label="Primary">
+  <div class="wordmark">Grocery <em>Genie</em></div>
+  <div class="nav-links" role="list">
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+    <a href="#features">Roadmap</a>
+    <a href="#faq">FAQ</a>
+  </div>
+  <a class="nav-cta" href="#waitlist">Join waitlist</a>
+</nav>
+
+<main class="page" id="main">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div>
+      <div class="pill"><span class="dot"></span>Coming Q3 2026 · Join the waitlist</div>
+      <h1>From <em>receipts</em><br>to a kitchen<br>that <em>thinks ahead.</em></h1>
+      <p class="lede">Grocery Genie turns the receipts in your camera roll into a smart pantry that tracks prices, plans meals, and quietly stops the food waste before it happens.</p>
+      <form class="waitlist" id="waitlist" data-form="hero" novalidate>
+        <input type="email" name="email" placeholder="you@kitchen.com" autocomplete="email" required aria-label="Email address">
+        <button type="submit">Join waitlist</button>
+      </form>
+        <div class="form-message" aria-live="polite"></div>
+      <div class="wait-meta" id="wait-count">2,847 cooks already in line · iOS first</div>
+    </div>
+    <div class="hero-visual" aria-hidden="true">
+      <div class="tile tile-1" id="hero-mock-1"><div class="mock" style="width: 260px; height: 520px; position: relative;"><div style="position: absolute; inset: 0px; background: rgb(28, 28, 30); border-radius: 36px; padding: 4px; box-shadow: rgba(21, 20, 15, 0.35) 0px 30px 60px -20px, rgba(255, 255, 255, 0.4) 0px 0px 0px 0.5px inset;"><div style="width: 100%; height: 100%; background: var(--ios-bg); border-radius: 32px; overflow: hidden; position: relative; font-family: var(--font-sf); color: var(--ios-label);"><div style="height: 28px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0px 18px 4px; font-size: 11px; font-weight: 600;"><span>9:41</span><span style="display: inline-block; width: 24px; height: 8px; background: currentcolor; opacity: 0.4; border-radius: 2px;"></span></div><div style="position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 78px; height: 22px; background: rgb(0, 0, 0); border-radius: 999px;"></div><div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 14px; height: 100%;"><div><div style="font-size: 11px; color: var(--ios-label-2);">Olive oil · 1L</div><div style="font-family: var(--font-sf-rounded); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px;">$15.32</div><div style="font-size: 11px; color: var(--sys-red); margin-top: 2px;">↑ 43% in 12 months</div></div><div style="background: var(--ios-bg-2); border-radius: 14px; padding: 12px;"><svg width="220" height="90"><path d="M4.0,82.0 L27.6,82.0 L51.1,67.2 L74.7,67.2 L98.2,57.3 L121.8,42.5 L145.3,42.5 L168.9,32.7 L192.4,17.9 L216.0,8.0" fill="none" stroke="var(--gg-tint)" stroke-width="2"></path><circle cx="4" cy="82" r="1.5" fill="var(--gg-tint)"></circle><circle cx="27.555555555555554" cy="82" r="1.5" fill="var(--gg-tint)"></circle><circle cx="51.11111111111111" cy="67.20000000000002" r="1.5" fill="var(--gg-tint)"></circle><circle cx="74.66666666666666" cy="67.20000000000002" r="1.5" fill="var(--gg-tint)"></circle><circle cx="98.22222222222221" cy="57.333333333333336" r="1.5" fill="var(--gg-tint)"></circle><circle cx="121.77777777777779" cy="42.533333333333346" r="1.5" fill="var(--gg-tint)"></circle><circle cx="145.33333333333331" cy="42.533333333333346" r="1.5" fill="var(--gg-tint)"></circle><circle cx="168.88888888888889" cy="32.66666666666667" r="1.5" fill="var(--gg-tint)"></circle><circle cx="192.44444444444443" cy="17.866666666666674" r="1.5" fill="var(--gg-tint)"></circle><circle cx="216" cy="8" r="3" fill="var(--gg-tint)"></circle></svg><div style="display: flex; justify-content: space-between; font-size: 9px; color: var(--ios-label-2); margin-top: 4px;"><span>May '24</span><span>Apr '25</span></div></div><div style="background: var(--ios-bg-2); border-radius: 14px; padding: 10px; font-size: 11px; color: var(--ios-label-2);"><div style="display: flex; justify-content: space-between; padding: 3px 0px;"><span>Trader Joe's</span><span style="color: var(--gg-tint); font-weight: 600;">$13.99</span></div><div style="display: flex; justify-content: space-between; padding: 3px 0px;"><span>Whole Foods</span><span>$15.99</span></div><div style="display: flex; justify-content: space-between; padding: 3px 0px;"><span>Safeway</span><span>$16.49</span></div></div></div></div></div><div class="mock-label">Track every price</div></div></div>
+      <div class="tile tile-2" id="hero-mock-2"><div class="mock" style="width: 260px; height: 520px; position: relative;"><div style="position: absolute; inset: 0px; background: rgb(28, 28, 30); border-radius: 36px; padding: 4px; box-shadow: rgba(21, 20, 15, 0.35) 0px 30px 60px -20px, rgba(255, 255, 255, 0.4) 0px 0px 0px 0.5px inset;"><div style="width: 100%; height: 100%; background: var(--ios-bg); border-radius: 32px; overflow: hidden; position: relative; font-family: var(--font-sf); color: var(--ios-label);"><div style="height: 28px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0px 18px 4px; font-size: 11px; font-weight: 600;"><span>9:41</span><span style="display: inline-block; width: 24px; height: 8px; background: currentcolor; opacity: 0.4; border-radius: 2px;"></span></div><div style="position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 78px; height: 22px; background: rgb(0, 0, 0); border-radius: 999px;"></div><div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; height: 100%;"><div><div style="font-size: 11px; color: var(--ios-label-2);">Pantry</div><div style="font-family: var(--font-sf-rounded); font-size: 22px; font-weight: 700;">32 items</div></div><div style="background: var(--ios-bg-2); border-radius: 14px; padding: 4px 0px;"><div style="padding: 8px 14px; border-top-width: medium; border-top-style: none; border-top-color: currentcolor; display: flex; align-items: center; gap: 10px;"><div style="width: 6px; height: 6px; border-radius: 3px; background: var(--sys-orange);"></div><span style="font-size: 12px; flex: 1 1 0%;">Bananas</span><span style="font-size: 10px; color: var(--ios-label-2);">4 days</span></div><div style="padding: 8px 14px; border-top: 0.5px solid var(--ios-separator); display: flex; align-items: center; gap: 10px;"><div style="width: 6px; height: 6px; border-radius: 3px; background: var(--sys-red);"></div><span style="font-size: 12px; flex: 1 1 0%;">Chicken breast</span><span style="font-size: 10px; color: var(--ios-label-2);">2 days</span></div><div style="padding: 8px 14px; border-top: 0.5px solid var(--ios-separator); display: flex; align-items: center; gap: 10px;"><div style="width: 6px; height: 6px; border-radius: 3px; background: var(--sys-orange);"></div><span style="font-size: 12px; flex: 1 1 0%;">Romaine</span><span style="font-size: 10px; color: var(--ios-label-2);">5 days</span></div><div style="padding: 8px 14px; border-top: 0.5px solid var(--ios-separator); display: flex; align-items: center; gap: 10px;"><div style="width: 6px; height: 6px; border-radius: 3px; background: var(--sys-red);"></div><span style="font-size: 12px; flex: 1 1 0%;">Sourdough</span><span style="font-size: 10px; color: var(--ios-label-2);">3 days</span></div><div style="padding: 8px 14px; border-top: 0.5px solid var(--ios-separator); display: flex; align-items: center; gap: 10px;"><div style="width: 6px; height: 6px; border-radius: 3px; background: var(--sys-green);"></div><span style="font-size: 12px; flex: 1 1 0%;">Eggs</span><span style="font-size: 10px; color: var(--ios-label-2);">3 weeks</span></div><div style="padding: 8px 14px; border-top: 0.5px solid var(--ios-separator); display: flex; align-items: center; gap: 10px;"><div style="width: 6px; height: 6px; border-radius: 3px; background: var(--sys-green);"></div><span style="font-size: 12px; flex: 1 1 0%;">Olive oil</span><span style="font-size: 10px; color: var(--ios-label-2);">12 months</span></div></div><div style="background: var(--gg-tint-bg); color: var(--gg-tint); padding: 10px 12px; border-radius: 10px; font-size: 11px;"><div style="font-weight: 600;">Cook tonight</div><div style="margin-top: 2px; opacity: 0.85;">Chicken Caesar uses 4 expiring items</div></div></div></div></div><div class="mock-label">See what's in your kitchen</div></div></div>
+      <div class="tile tile-3" id="hero-mock-3"><div class="mock" style="width: 260px; height: 520px; position: relative;"><div style="position: absolute; inset: 0px; background: rgb(28, 28, 30); border-radius: 36px; padding: 4px; box-shadow: rgba(21, 20, 15, 0.35) 0px 30px 60px -20px, rgba(255, 255, 255, 0.4) 0px 0px 0px 0.5px inset;"><div style="width: 100%; height: 100%; background: var(--ios-bg); border-radius: 32px; overflow: hidden; position: relative; font-family: var(--font-sf); color: var(--ios-label);"><div style="height: 28px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0px 18px 4px; font-size: 11px; font-weight: 600;"><span>9:41</span><span style="display: inline-block; width: 24px; height: 8px; background: currentcolor; opacity: 0.4; border-radius: 2px;"></span></div><div style="position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 78px; height: 22px; background: rgb(0, 0, 0); border-radius: 999px;"></div><div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 14px; height: 100%;"><div><div style="font-size: 11px; color: var(--ios-label-2);">Your inflation · 12 months</div><div style="display: flex; align-items: baseline; gap: 6px; margin-top: 2px;"><span style="font-family: var(--font-sf-rounded); font-size: 30px; font-weight: 700; color: var(--sys-red);">+6.2%</span><span style="font-size: 11px; color: var(--ios-label-2);">vs CPI 4.1%</span></div></div><div style="background: var(--ios-bg-2); border-radius: 14px; padding: 12px 8px;"><svg width="220" height="86"><circle cx="6" cy="82" r="1.5" fill="var(--ios-label-2)"></circle><circle cx="24.90909090909091" cy="69.31428571428572" r="1.5" fill="var(--ios-label-2)"></circle><circle cx="43.81818181818182" cy="59.8" r="1.5" fill="var(--ios-label-2)"></circle><circle cx="62.72727272727272" cy="52.400000000000006" r="1.5" fill="var(--ios-label-2)"></circle><circle cx="81.63636363636364" cy="46.05714285714286" r="1.5" fill="var(--ios-label-2)"></circle><circle cx="100.54545454545455" cy="40.77142857142857" r="1.5" fill="var(--ios-label-2)"></circle><circle cx="119.45454545454544" cy="34.42857142857142" r="1.5" fill="var(--ios-label-2)"></circle><circle cx="138.36363636363637" cy="28.08571428571429" r="1.5" fill="var(--ios-label-2)"></circle><circle cx="157.27272727272728" cy="24.91428571428571" r="1.5" fill="var(--ios-label-2)"></circle><circle cx="176.1818181818182" cy="19.628571428571426" r="1.5" fill="var(--ios-label-2)"></circle><circle cx="195.0909090909091" cy="18.571428571428577" r="1.5" fill="var(--ios-label-2)"></circle><circle cx="214" cy="16.457142857142856" r="3" fill="var(--sys-red)"></circle><path d="M6.0,82.0 L24.9,69.3 L43.8,59.8 L62.7,52.4 L81.6,46.1 L100.5,40.8 L119.5,34.4 L138.4,28.1 L157.3,24.9 L176.2,19.6 L195.1,18.6 L214.0,16.5" fill="none" stroke="var(--sys-red)" stroke-width="1.5" stroke-opacity="0.6"></path></svg></div><div style="font-size: 11px; color: var(--ios-label-2);">Top contributors</div><div style="display: flex; justify-content: space-between; font-size: 12px;"><span>Eggs</span><span style="color: var(--sys-red); font-weight: 600; font-variant-numeric: tabular-nums;">+28%</span></div><div style="display: flex; justify-content: space-between; font-size: 12px;"><span>Olive oil</span><span style="color: var(--sys-red); font-weight: 600; font-variant-numeric: tabular-nums;">+18%</span></div><div style="display: flex; justify-content: space-between; font-size: 12px;"><span>Bananas</span><span style="color: var(--sys-green); font-weight: 600; font-variant-numeric: tabular-nums;">−8%</span></div></div></div></div><div class="mock-label">Your personal inflation</div></div></div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how" class="how">
+    <div class="section-head" style="padding-top:0">
+      <div class="label">How it works</div>
+      <h2>Four ingredients. <em>One smart kitchen.</em></h2>
+      <p class="sub">Each step earns the next. Capture, prices, pantry, taste — we compound, we don't pivot.</p>
+    </div>
+    <div class="how-grid">
+      <div class="step">
+        <div class="num">01</div>
+        <h3>Snap the receipt</h3>
+        <p>Point your camera at any receipt. Items, prices, and stores are read automatically. No manual entry.</p>
+      </div>
+      <div class="step">
+        <div class="num">02</div>
+        <h3>Watch prices drift</h3>
+        <p>Every item gets a price history across stores. See what costs more, what got cheaper, where to shop.</p>
+      </div>
+      <div class="step">
+        <div class="num">03</div>
+        <h3>Cook your pantry</h3>
+        <p>Receipts become a virtual pantry. Recipes match what's already in your kitchen, in expiry order.</p>
+      </div>
+      <div class="step">
+        <div class="num">04</div>
+        <h3>Trust the suggestions</h3>
+        <p>Over time, the app learns your taste, schedule, and routines. The week plans itself.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <div class="section-head">
+      <div class="label">Features</div>
+      <h2>Less guessing. <em>More cooking.</em></h2>
+      <p class="sub">Everything is built around one idea: capture what's already happening in your kitchen, and quietly turn it into something useful.</p>
+    </div>
+
+    <div class="feature">
+      <div>
+        <div class="meta">01 · Capture</div>
+        <h3>The receipt is the data.</h3>
+        <p>Most apps ask you to type in your groceries. We don't. Snap a receipt — even a crumpled one — and we read every line, match brands, and remember sizes.</p>
+        <ul>
+          <li><span class="check">→</span>Reads paper, email and photo receipts</li>
+          <li><span class="check">→</span>Brand &amp; size matching across stores</li>
+          <li><span class="check">→</span>Manual entry &amp; offline fallback</li>
+        </ul>
+      </div>
+      <div class="feature-visual" aria-hidden="true" id="feat-1"><div class="mock" style="width: 260px; height: 520px; position: relative;"><div style="position: absolute; inset: 0px; background: rgb(28, 28, 30); border-radius: 36px; padding: 4px; box-shadow: rgba(21, 20, 15, 0.35) 0px 30px 60px -20px, rgba(255, 255, 255, 0.4) 0px 0px 0px 0.5px inset;"><div style="width: 100%; height: 100%; background: var(--ios-bg); border-radius: 32px; overflow: hidden; position: relative; font-family: var(--font-sf); color: var(--ios-label);"><div style="height: 28px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0px 18px 4px; font-size: 11px; font-weight: 600;"><span>9:41</span><span style="display: inline-block; width: 24px; height: 8px; background: currentcolor; opacity: 0.4; border-radius: 2px;"></span></div><div style="position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 78px; height: 22px; background: rgb(0, 0, 0); border-radius: 999px;"></div><div style="position: absolute; inset: 28px 0px 0px; background: rgb(10, 10, 10);"><div style="position: absolute; left: 50%; top: 60px; transform: translateX(-50%) rotate(-2deg); width: 150px; padding: 12px 12px 16px; background: rgb(255, 255, 255); color: rgb(0, 0, 0); font-family: var(--font-mono); font-size: 7px; line-height: 1.6; box-shadow: rgba(0, 0, 0, 0.5) 0px 12px 30px;"><div style="text-align: center; font-family: var(--font-sf); font-weight: 700; font-size: 9px; margin-bottom: 8px;">TRADER JOE'S</div><div style="display: flex; justify-content: space-between;"><span>ORG MILK</span><span>4.49</span></div><div style="display: flex; justify-content: space-between;"><span>EGGS DZ</span><span>5.74</span></div><div style="display: flex; justify-content: space-between;"><span>ROMAINE 2</span><span>3.98</span></div><div style="display: flex; justify-content: space-between;"><span>CHKN BRST</span><span>11.20</span></div><div style="display: flex; justify-content: space-between;"><span>OLIVE OIL</span><span>15.32</span></div><div style="display: flex; justify-content: space-between;"><span>BANANAS</span><span>2.29</span></div><div style="display: flex; justify-content: space-between;"><span>SOURDOUGH</span><span>5.49</span></div><div style="display: flex; justify-content: space-between;"><span>AVOCADO 3</span><span>4.47</span></div><div style="border-top: 1px dashed rgb(0, 0, 0); margin-top: 4px; padding-top: 3px; display: flex; justify-content: space-between; font-weight: 700;"><span>TOTAL</span><span>52.98</span></div></div><div style="position: absolute; inset: 50px auto auto 20px; width: 22px; height: 22px; border-top: 2px solid var(--gg-tint); border-bottom-width: medium; border-bottom-style: none; border-bottom-color: currentcolor; border-left: 2px solid var(--gg-tint); border-right-width: medium; border-right-style: none; border-right-color: currentcolor;"></div><div style="position: absolute; inset: 50px 20px auto auto; width: 22px; height: 22px; border-top: 2px solid var(--gg-tint); border-bottom-width: medium; border-bottom-style: none; border-bottom-color: currentcolor; border-left-width: medium; border-left-style: none; border-left-color: currentcolor; border-right: 2px solid var(--gg-tint);"></div><div style="position: absolute; inset: auto auto 60px 20px; width: 22px; height: 22px; border-top-width: medium; border-top-style: none; border-top-color: currentcolor; border-bottom: 2px solid var(--gg-tint); border-left: 2px solid var(--gg-tint); border-right-width: medium; border-right-style: none; border-right-color: currentcolor;"></div><div style="position: absolute; inset: auto 20px 60px auto; width: 22px; height: 22px; border-top-width: medium; border-top-style: none; border-top-color: currentcolor; border-bottom: 2px solid var(--gg-tint); border-left-width: medium; border-left-style: none; border-left-color: currentcolor; border-right: 2px solid var(--gg-tint);"></div><div style="position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); width: 56px; height: 56px; border-radius: 28px; border: 3px solid rgb(255, 255, 255); display: grid; place-items: center;"><div style="width: 44px; height: 44px; border-radius: 22px; background: rgb(255, 255, 255);"></div></div><div style="position: absolute; bottom: 100px; left: 0px; right: 0px; text-align: center; color: rgb(255, 255, 255); font-size: 11px;">Hold steady — receipt detected</div></div></div></div><div class="mock-label">Scan a receipt</div></div></div>
+    </div>
+
+    <div class="feature flip">
+      <div>
+        <div class="meta">02 · Prices</div>
+        <h3>Know what things <em>actually</em> cost.</h3>
+        <p>Eggs went up. Olive oil's been climbing for a year. Your store charges $2 more for butter than the one across the street. We surface all of it without nagging.</p>
+        <ul>
+          <li><span class="check">→</span>12-month price history per item</li>
+          <li><span class="check">→</span>Cross-store comparison</li>
+          <li><span class="check">→</span>Personal inflation rate</li>
+        </ul>
+      </div>
+      <div class="feature-visual" aria-hidden="true" id="feat-2"><div class="mock" style="width: 260px; height: 520px; position: relative;"><div style="position: absolute; inset: 0px; background: rgb(28, 28, 30); border-radius: 36px; padding: 4px; box-shadow: rgba(21, 20, 15, 0.35) 0px 30px 60px -20px, rgba(255, 255, 255, 0.4) 0px 0px 0px 0.5px inset;"><div style="width: 100%; height: 100%; background: var(--ios-bg); border-radius: 32px; overflow: hidden; position: relative; font-family: var(--font-sf); color: var(--ios-label);"><div style="height: 28px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0px 18px 4px; font-size: 11px; font-weight: 600;"><span>9:41</span><span style="display: inline-block; width: 24px; height: 8px; background: currentcolor; opacity: 0.4; border-radius: 2px;"></span></div><div style="position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 78px; height: 22px; background: rgb(0, 0, 0); border-radius: 999px;"></div><div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 14px; height: 100%;"><div><div style="font-size: 11px; color: var(--ios-label-2);">Olive oil · 1L</div><div style="font-family: var(--font-sf-rounded); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px;">$15.32</div><div style="font-size: 11px; color: var(--sys-red); margin-top: 2px;">↑ 43% in 12 months</div></div><div style="background: var(--ios-bg-2); border-radius: 14px; padding: 12px;"><svg width="220" height="90"><path d="M4.0,82.0 L27.6,82.0 L51.1,67.2 L74.7,67.2 L98.2,57.3 L121.8,42.5 L145.3,42.5 L168.9,32.7 L192.4,17.9 L216.0,8.0" fill="none" stroke="var(--gg-tint)" stroke-width="2"></path><circle cx="4" cy="82" r="1.5" fill="var(--gg-tint)"></circle><circle cx="27.555555555555554" cy="82" r="1.5" fill="var(--gg-tint)"></circle><circle cx="51.11111111111111" cy="67.20000000000002" r="1.5" fill="var(--gg-tint)"></circle><circle cx="74.66666666666666" cy="67.20000000000002" r="1.5" fill="var(--gg-tint)"></circle><circle cx="98.22222222222221" cy="57.333333333333336" r="1.5" fill="var(--gg-tint)"></circle><circle cx="121.77777777777779" cy="42.533333333333346" r="1.5" fill="var(--gg-tint)"></circle><circle cx="145.33333333333331" cy="42.533333333333346" r="1.5" fill="var(--gg-tint)"></circle><circle cx="168.88888888888889" cy="32.66666666666667" r="1.5" fill="var(--gg-tint)"></circle><circle cx="192.44444444444443" cy="17.866666666666674" r="1.5" fill="var(--gg-tint)"></circle><circle cx="216" cy="8" r="3" fill="var(--gg-tint)"></circle></svg><div style="display: flex; justify-content: space-between; font-size: 9px; color: var(--ios-label-2); margin-top: 4px;"><span>May '24</span><span>Apr '25</span></div></div><div style="background: var(--ios-bg-2); border-radius: 14px; padding: 10px; font-size: 11px; color: var(--ios-label-2);"><div style="display: flex; justify-content: space-between; padding: 3px 0px;"><span>Trader Joe's</span><span style="color: var(--gg-tint); font-weight: 600;">$13.99</span></div><div style="display: flex; justify-content: space-between; padding: 3px 0px;"><span>Whole Foods</span><span>$15.99</span></div><div style="display: flex; justify-content: space-between; padding: 3px 0px;"><span>Safeway</span><span>$16.49</span></div></div></div></div></div><div class="mock-label">Track every price</div></div></div>
+    </div>
+
+    <div class="feature">
+      <div>
+        <div class="meta">03 · Pantry</div>
+        <h3>Cook from what you have.</h3>
+        <p>Your receipts become a virtual pantry. We track shelf life, send a gentle nudge before things expire, and rank recipes by what's already in your kitchen.</p>
+        <ul>
+          <li><span class="check">→</span>Auto-pantry from every receipt</li>
+          <li><span class="check">→</span>Expiry-aware recipe ranking</li>
+          <li><span class="check">→</span>Smart shopping list of just what's missing</li>
+        </ul>
+      </div>
+      <div class="feature-visual" aria-hidden="true" id="feat-3"><div class="mock" style="width: 260px; height: 520px; position: relative;"><div style="position: absolute; inset: 0px; background: rgb(28, 28, 30); border-radius: 36px; padding: 4px; box-shadow: rgba(21, 20, 15, 0.35) 0px 30px 60px -20px, rgba(255, 255, 255, 0.4) 0px 0px 0px 0.5px inset;"><div style="width: 100%; height: 100%; background: var(--ios-bg); border-radius: 32px; overflow: hidden; position: relative; font-family: var(--font-sf); color: var(--ios-label);"><div style="height: 28px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0px 18px 4px; font-size: 11px; font-weight: 600;"><span>9:41</span><span style="display: inline-block; width: 24px; height: 8px; background: currentcolor; opacity: 0.4; border-radius: 2px;"></span></div><div style="position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 78px; height: 22px; background: rgb(0, 0, 0); border-radius: 999px;"></div><div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; height: 100%;"><div><div style="font-size: 11px; color: var(--ios-label-2);">Pantry</div><div style="font-family: var(--font-sf-rounded); font-size: 22px; font-weight: 700;">32 items</div></div><div style="background: var(--ios-bg-2); border-radius: 14px; padding: 4px 0px;"><div style="padding: 8px 14px; border-top-width: medium; border-top-style: none; border-top-color: currentcolor; display: flex; align-items: center; gap: 10px;"><div style="width: 6px; height: 6px; border-radius: 3px; background: var(--sys-orange);"></div><span style="font-size: 12px; flex: 1 1 0%;">Bananas</span><span style="font-size: 10px; color: var(--ios-label-2);">4 days</span></div><div style="padding: 8px 14px; border-top: 0.5px solid var(--ios-separator); display: flex; align-items: center; gap: 10px;"><div style="width: 6px; height: 6px; border-radius: 3px; background: var(--sys-red);"></div><span style="font-size: 12px; flex: 1 1 0%;">Chicken breast</span><span style="font-size: 10px; color: var(--ios-label-2);">2 days</span></div><div style="padding: 8px 14px; border-top: 0.5px solid var(--ios-separator); display: flex; align-items: center; gap: 10px;"><div style="width: 6px; height: 6px; border-radius: 3px; background: var(--sys-orange);"></div><span style="font-size: 12px; flex: 1 1 0%;">Romaine</span><span style="font-size: 10px; color: var(--ios-label-2);">5 days</span></div><div style="padding: 8px 14px; border-top: 0.5px solid var(--ios-separator); display: flex; align-items: center; gap: 10px;"><div style="width: 6px; height: 6px; border-radius: 3px; background: var(--sys-red);"></div><span style="font-size: 12px; flex: 1 1 0%;">Sourdough</span><span style="font-size: 10px; color: var(--ios-label-2);">3 days</span></div><div style="padding: 8px 14px; border-top: 0.5px solid var(--ios-separator); display: flex; align-items: center; gap: 10px;"><div style="width: 6px; height: 6px; border-radius: 3px; background: var(--sys-green);"></div><span style="font-size: 12px; flex: 1 1 0%;">Eggs</span><span style="font-size: 10px; color: var(--ios-label-2);">3 weeks</span></div><div style="padding: 8px 14px; border-top: 0.5px solid var(--ios-separator); display: flex; align-items: center; gap: 10px;"><div style="width: 6px; height: 6px; border-radius: 3px; background: var(--sys-green);"></div><span style="font-size: 12px; flex: 1 1 0%;">Olive oil</span><span style="font-size: 10px; color: var(--ios-label-2);">12 months</span></div></div><div style="background: var(--gg-tint-bg); color: var(--gg-tint); padding: 10px 12px; border-radius: 10px; font-size: 11px;"><div style="font-weight: 600;">Cook tonight</div><div style="margin-top: 2px; opacity: 0.85;">Chicken Caesar uses 4 expiring items</div></div></div></div></div><div class="mock-label">See what's in your kitchen</div></div></div>
+    </div>
+
+    <div class="feature flip">
+      <div>
+        <div class="meta">04 · Taste</div>
+        <h3>The week plans itself.</h3>
+        <p>After a few months, the app knows your Friday salmon habit, that you've thrown out eggplant three times, and that you cook for four on Sundays. So it just… plans.</p>
+        <ul>
+          <li><span class="check">→</span>LLM substitutions from your real pantry</li>
+          <li><span class="check">→</span>Taste profile from what you've cooked</li>
+          <li><span class="check">→</span>A weekly plan that needs only 4 things bought</li>
+        </ul>
+      </div>
+      <div class="feature-visual" aria-hidden="true" id="feat-4"><div class="mock" style="width: 260px; height: 520px; position: relative;"><div style="position: absolute; inset: 0px; background: rgb(28, 28, 30); border-radius: 36px; padding: 4px; box-shadow: rgba(21, 20, 15, 0.35) 0px 30px 60px -20px, rgba(255, 255, 255, 0.4) 0px 0px 0px 0.5px inset;"><div style="width: 100%; height: 100%; background: var(--ios-bg); border-radius: 32px; overflow: hidden; position: relative; font-family: var(--font-sf); color: var(--ios-label);"><div style="height: 28px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0px 18px 4px; font-size: 11px; font-weight: 600;"><span>9:41</span><span style="display: inline-block; width: 24px; height: 8px; background: currentcolor; opacity: 0.4; border-radius: 2px;"></span></div><div style="position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 78px; height: 22px; background: rgb(0, 0, 0); border-radius: 999px;"></div><div style="height: 86px; background: linear-gradient(135deg, var(--sys-green) 0%, color-mix(in oklab, var(--sys-green) 50%, white) 100%); position: relative;"><div style="position: absolute; bottom: 8px; left: 14px; color: rgb(255, 255, 255);"><div style="font-size: 10px; opacity: 0.85;">25 min · serves 2</div><div style="font-size: 16px; font-weight: 700;">Banana oat pancakes</div></div></div><div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 8px;"><div style="font-size: 10px; color: var(--ios-label-2); text-transform: uppercase; letter-spacing: 0.06em;">Ingredients</div><div style="display: flex; align-items: center; gap: 8px; font-size: 11px;"><div style="width: 14px; height: 14px; border-radius: 3px; background: transparent; border: 1px solid var(--ios-label-3); display: grid; place-items: center; flex-shrink: 0;"><span style="color: var(--sys-green); font-size: 9px; font-weight: 700;">✓</span></div><span style="flex: 1 1 0%; text-decoration: none; color: var(--ios-label);">Bananas</span><span style="font-size: 9px; color: var(--sys-green); font-weight: 600;">In pantry</span></div><div style="display: flex; align-items: center; gap: 8px; font-size: 11px;"><div style="width: 14px; height: 14px; border-radius: 3px; background: transparent; border: 1px solid var(--ios-label-3); display: grid; place-items: center; flex-shrink: 0;"><span style="color: var(--sys-green); font-size: 9px; font-weight: 700;">✓</span></div><span style="flex: 1 1 0%; text-decoration: none; color: var(--ios-label);">Oats</span><span style="font-size: 9px; color: var(--sys-green); font-weight: 600;">In pantry</span></div><div style="display: flex; align-items: center; gap: 8px; font-size: 11px;"><div style="width: 14px; height: 14px; border-radius: 3px; background: transparent; border: 1px solid var(--ios-label-3); display: grid; place-items: center; flex-shrink: 0;"><span style="color: var(--sys-green); font-size: 9px; font-weight: 700;">✓</span></div><span style="flex: 1 1 0%; text-decoration: none; color: var(--ios-label);">Eggs</span><span style="font-size: 9px; color: var(--sys-green); font-weight: 600;">In pantry</span></div><div style="display: flex; align-items: center; gap: 8px; font-size: 11px;"><div style="width: 14px; height: 14px; border-radius: 3px; background: var(--gg-tint-bg); border: 1px solid var(--gg-tint); display: grid; place-items: center; flex-shrink: 0;"></div><span style="flex: 1 1 0%; text-decoration: line-through; color: var(--ios-label-3);">Buttermilk</span><span style="font-size: 9px; color: var(--gg-tint); font-weight: 600;">Use milk + lemon</span></div><div style="display: flex; align-items: center; gap: 8px; font-size: 11px;"><div style="width: 14px; height: 14px; border-radius: 3px; background: transparent; border: 1px solid var(--ios-label-3); display: grid; place-items: center; flex-shrink: 0;"><span style="color: var(--sys-green); font-size: 9px; font-weight: 700;">✓</span></div><span style="flex: 1 1 0%; text-decoration: none; color: var(--ios-label);">Maple syrup</span><span style="font-size: 9px; color: var(--sys-green); font-weight: 600;">In pantry</span></div><div style="background: var(--gg-tint-bg); color: var(--gg-tint); padding: 8px 10px; border-radius: 8px; font-size: 10px; margin-top: 4px; line-height: 1.4;"><strong>Smart swap:</strong> milk + 1 tbsp lemon juice mimics buttermilk. Saves a trip.</div></div></div></div><div class="mock-label">Recipes that fit your kitchen</div></div></div>
+    </div>
+  </section>
+
+  <!-- NUMBERS -->
+  <section class="numbers">
+    <div class="section-head" style="padding:0 0 24px">
+      <div class="label">What we care about</div>
+      <h2>Tracking what <em>actually</em> matters.</h2>
+    </div>
+    <div class="nums-grid">
+      <div class="num-card">
+        <div class="big">$<em>1,734</em></div>
+        <div class="label-sm">Avg. annual food waste per US household, USDA. We're trying to halve it.</div>
+      </div>
+      <div class="num-card">
+        <div class="big">12<em>×</em></div>
+        <div class="label-sm">Times the average receipt is opened then forgotten. Once is enough.</div>
+      </div>
+      <div class="num-card">
+        <div class="big">6.<em>2%</em></div>
+        <div class="label-sm">Avg personal grocery inflation our beta users see — half a point above CPI.</div>
+      </div>
+      <div class="num-card">
+        <div class="big">0<em>kb</em></div>
+        <div class="label-sm">Receipt data shared with anyone. Your kitchen, your data, full stop.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUOTE -->
+  <section class="quote">
+    <div class="label">Beta tester</div>
+    <div>
+      <blockquote>"I stopped buying olive oil at <em>the wrong store.</em> That alone has paid for the year — and I haven't even started cooking from the pantry yet."</blockquote>
+      <cite>— Sarah K., beta user since November</cite>
+    </div>
+  </section>
+
+  <!-- CTA BLOCK -->
+  <div class="cta-block" id="waitlist-2">
+    <div>
+      <h2>Be among the first <em>1,000.</em></h2>
+      <p class="sub">Join the waitlist for early TestFlight access, a free year of Premium when we launch, and a hand in shaping what ships next.</p>
+    </div>
+    <div>
+      <form class="waitlist" id="waitlist-cta" data-form="cta" novalidate>
+        <input type="email" name="email" placeholder="you@kitchen.com" autocomplete="email" required aria-label="Email address">
+        <button type="submit">Get early access</button>
+      </form>
+        <div class="form-message" aria-live="polite"></div>
+      <div class="wait-meta" style="margin-top: 14px;">No spam. One launch email and you're in.</div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <section id="faq" class="faq">
+    <div class="section-head" style="padding:0 0 16px">
+      <div class="label">FAQ</div>
+      <h2>The honest answers.</h2>
+    </div>
+    <details>
+      <summary>When does it launch?<span class="plus">+</span></summary>
+      <p>V1 — receipt scanning, price tracking, household sharing — ships Q3 2026 on iOS. The full pantry &amp; meal-planning experience follows in Q4. Android comes after iOS hits 10K weekly active.</p>
+    </details>
+    <details>
+      <summary>Will my receipts be private?<span class="plus">+</span></summary>
+      <p>Yes. Receipts are processed on-device for OCR, then encrypted in transit and at rest. We never sell or share your data. Anonymized, aggregated price points may inform the community-pricing feature — and that's fully opt-in.</p>
+    </details>
+    <details>
+      <summary>What does it cost?<span class="plus">+</span></summary>
+      <p>Free forever for receipt scanning, ledger, basic budgets, and 3-month price history. Premium ($3.99/mo) unlocks the full price history, cross-store comparison, alerts, exports, and recipe matching. Family ($6.99/mo) covers up to five household members.</p>
+    </details>
+    <details>
+      <summary>Does it work with email receipts?<span class="plus">+</span></summary>
+      <p>Yes. Forward digital receipts from Amazon, Instacart, Whole Foods, etc. to a private inbox and they're parsed automatically. Photo and paper receipts work too.</p>
+    </details>
+    <details>
+      <summary>Why "Genie"?<span class="plus">+</span></summary>
+      <p>Because the best kitchen tool is the one that does the work for you and stays out of the way until you ask. Less spreadsheet, more wish-granting.</p>
+    </details>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="col brand-col">
+      <div class="wordmark">Grocery <em>Genie</em></div>
+      <p>A smart pantry that starts with a receipt. Built by a small team in Brooklyn.</p>
+    </div>
+    <div class="col">
+      <h4>Product</h4>
+      <a href="#features">Features</a>
+      <a href="#features">Roadmap</a>
+      <a href="#waitlist">Join waitlist</a>
+    </div>
+    <div class="col">
+      <h4>Company</h4>
+      <a href="#">About</a>
+      <a href="#">Press</a>
+      <a href="#">Contact</a>
+    </div>
+    <div class="col">
+      <h4>Legal</h4>
+      <a href="#">Privacy</a>
+      <a href="#">Terms</a>
+      <a href="#">Security</a>
+    </div>
+  </footer>
+  <div class="legal">
+    <span>© 2026 Grocery Genie</span>
+    <span>Made with care in Brooklyn</span>
+  </div>
+
+</main>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>

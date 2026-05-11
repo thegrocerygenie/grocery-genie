@@ -1,0 +1,19 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+
+# Platform build/cache
+.vercel/
+.netlify/
+.cloudflare/
+.wrangler/
+dist/
+build/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
