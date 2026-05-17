@@ -403,48 +403,37 @@ class ReceiptService:
         to_date: str | None = None,
     ) -> tuple[list[Receipt], int]:
         """List receipts with pagination and optional filters."""
+        # Accumulate WHERE conditions once and apply them to both the page
+        # query and the count query, so every filter composes correctly and
+        # the total always matches the filtered result set.
+        conditions = [
+            Receipt.user_id == user_id,
+            Receipt.deleted_at.is_(None),
+        ]
+        if from_date:
+            conditions.append(Receipt.date >= date.fromisoformat(from_date))
+        if to_date:
+            conditions.append(Receipt.date <= date.fromisoformat(to_date))
+
         query = (
             select(Receipt)
-            .where(Receipt.user_id == user_id, Receipt.deleted_at.is_(None))
+            .where(*conditions)
             .options(
                 selectinload(Receipt.line_items),
                 selectinload(Receipt.store),
             )
         )
 
-        count_query = select(func.count()).select_from(
-            select(Receipt.id)
-            .where(Receipt.user_id == user_id, Receipt.deleted_at.is_(None))
-            .subquery()
-        )
+        count_subquery = select(Receipt.id).where(*conditions)
 
         if store:
-            query = query.join(Receipt.store).where(
-                Store.normalized_name.ilike(f"%{store.lower()}%")
-            )
-            count_query = select(func.count()).select_from(
-                select(Receipt.id)
-                .where(Receipt.user_id == user_id)
-                .join(Store, Receipt.store_id == Store.id)
-                .where(Store.normalized_name.ilike(f"%{store.lower()}%"))
-                .subquery()
-            )
+            store_filter = Store.normalized_name.ilike(f"%{store.lower()}%")
+            query = query.join(Receipt.store).where(store_filter)
+            count_subquery = count_subquery.join(
+                Store, Receipt.store_id == Store.id
+            ).where(store_filter)
 
-        if from_date:
-            parsed_from = date.fromisoformat(from_date)
-            query = query.where(Receipt.date >= parsed_from)
-            count_query = select(func.count()).select_from(
-                select(Receipt.id)
-                .where(
-                    Receipt.user_id == user_id,
-                    Receipt.date >= parsed_from,
-                )
-                .subquery()
-            )
-
-        if to_date:
-            parsed_to = date.fromisoformat(to_date)
-            query = query.where(Receipt.date <= parsed_to)
+        count_query = select(func.count()).select_from(count_subquery.subquery())
 
         query = query.order_by(Receipt.date.desc(), Receipt.created_at.desc())
         query = query.offset((page - 1) * per_page).limit(per_page)

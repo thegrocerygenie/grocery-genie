@@ -279,12 +279,53 @@ async def test_list_receipts_filter_by_date_range(
     resp = await client.get("/api/receipts?from_date=2026-02-01&to_date=2026-02-28")
     assert resp.status_code == 200
     data = resp.json()
-    # Validate that filtering actually works on returned items (query-side).
-    # NOTE: Known bug in ReceiptService.list_receipts — `total` count-query
-    # ignores `to_date` when both `from_date` and `to_date` are supplied.
-    # Once fixed, tighten this assertion to `data["total"] == 1`.
+    # Both the returned page and the total count must reflect the date range.
+    assert data["total"] == 1
     assert len(data["items"]) == 1
     assert data["items"][0]["store_name"] == "Store Feb"
+
+
+async def test_list_receipts_store_and_date_filters_compose(
+    client: AsyncClient, test_image_bytes: bytes, mock_extractor
+):
+    """store + from_date + to_date filters compose for both items and total."""
+    from app.llm.schemas import ExtractedLineItem, ReceiptExtractionResult
+
+    for store, receipt_date in [
+        ("Loblaws", "2026-01-15"),
+        ("Loblaws", "2026-02-20"),
+        ("No Frills", "2026-02-22"),
+    ]:
+        mock_extractor._result = ReceiptExtractionResult(
+            store_name=store,
+            date=receipt_date,
+            currency="USD",
+            items=[
+                ExtractedLineItem(
+                    name="Item",
+                    quantity=1,
+                    unit_price=10.0,
+                    total_price=10.0,
+                    confidence=0.9,
+                )
+            ],
+            subtotal=10.0,
+            total=10.0,
+            confidence=0.85,
+        )
+        await _create_receipt(client, test_image_bytes)
+
+    mock_extractor._result = None
+
+    resp = await client.get(
+        "/api/receipts?store=loblaws&from_date=2026-02-01&to_date=2026-02-28"
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    # Only the February Loblaws receipt matches all three filters.
+    assert data["total"] == 1
+    assert len(data["items"]) == 1
+    assert data["items"][0]["store_name"] == "Loblaws"
 
 
 async def test_list_receipts_filter_from_date_only(
