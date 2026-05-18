@@ -332,3 +332,18 @@ class DeletedItemResponse(BaseModel):
     days_remaining: int
     label: str  # human-readable summary
     type: str  # "receipt" | "budget"
+
+
+# --- Analytics ---
+
+
+class AnalyticsEventRequest(BaseModel):
+    """A client-emitted analytics event.
+
+    No ``user_id`` — it is derived from the authenticated JWT, never trusted
+    from the request body. No ``timestamp`` — the analytics backend stamps
+    events on receipt.
+    """
+
+    event_name: str = Field(..., min_length=1, max_length=64)
+    properties: dict[str, str | int | float | bool | None] = Field(default_factory=dict)

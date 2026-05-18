@@ -21,6 +21,26 @@ async def _create_receipt(client: AsyncClient, image_bytes: bytes) -> dict:
     return resp.json()
 
 
+def _install_analytics_spy() -> list[tuple[str, dict, uuid.UUID]]:
+    """Override get_analytics_service with a spy; return the captured calls list.
+
+    The `client` fixture clears dependency_overrides on teardown.
+    """
+    from app.services.analytics_service import AnalyticsService, get_analytics_service
+    from main import app
+
+    calls: list[tuple[str, dict, uuid.UUID]] = []
+
+    class _Spy:
+        def emit(self, event_name, properties, user_id) -> None:
+            calls.append((event_name, properties, user_id))
+
+    app.dependency_overrides[get_analytics_service] = lambda: AnalyticsService(
+        backend=_Spy()
+    )
+    return calls
+
+
 # --- POST /api/receipts/scan tests ---
 
 
@@ -37,6 +57,56 @@ async def test_successful_extraction(client: AsyncClient, test_image_bytes: byte
     assert extraction["date"] == "2026-03-15"
     assert len(extraction["items"]) == 3
     assert extraction["confidence"] > 0.5
+
+
+async def test_scan_emits_source_from_form_field(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    """receipt_scan_started carries the source supplied as a form field."""
+    calls = _install_analytics_spy()
+
+    resp = await client.post(
+        "/api/receipts/scan",
+        files={"file": ("receipt.jpg", io.BytesIO(test_image_bytes), "image/jpeg")},
+        data={"source": "library"},
+    )
+    assert resp.status_code == 200
+    scan_started = [c for c in calls if c[0] == "receipt_scan_started"]
+    assert len(scan_started) == 1
+    assert scan_started[0][1] == {"source": "library"}
+
+
+async def test_scan_invalid_source_falls_back_to_camera(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    """An unrecognised source falls back to 'camera' — analytics never blocks a scan."""
+    calls = _install_analytics_spy()
+
+    resp = await client.post(
+        "/api/receipts/scan",
+        files={"file": ("receipt.jpg", io.BytesIO(test_image_bytes), "image/jpeg")},
+        data={"source": "hacker"},
+    )
+    assert resp.status_code == 200
+    scan_started = [c for c in calls if c[0] == "receipt_scan_started"]
+    assert len(scan_started) == 1
+    assert scan_started[0][1] == {"source": "camera"}
+
+
+async def test_scan_defaults_source_to_camera(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    """Omitting the source form field defaults to 'camera'."""
+    calls = _install_analytics_spy()
+
+    resp = await client.post(
+        "/api/receipts/scan",
+        files={"file": ("receipt.jpg", io.BytesIO(test_image_bytes), "image/jpeg")},
+    )
+    assert resp.status_code == 200
+    scan_started = [c for c in calls if c[0] == "receipt_scan_started"]
+    assert len(scan_started) == 1
+    assert scan_started[0][1] == {"source": "camera"}
 
 
 async def test_invalid_file_type(client: AsyncClient):

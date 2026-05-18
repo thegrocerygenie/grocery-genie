@@ -5,15 +5,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
-    auth as auth_routes,
-)
-from app.api.routes import (
+    analytics,
     budgets,
     categories,
     dashboard,
     health,
     notifications,
     receipts,
+)
+from app.api.routes import (
+    auth as auth_routes,
 )
 from app.api.routes import (
     users as users_routes,
@@ -53,3 +54,4 @@ app.include_router(budgets.router)
 app.include_router(dashboard.router)
 app.include_router(categories.router)
 app.include_router(notifications.router)
+app.include_router(analytics.router)

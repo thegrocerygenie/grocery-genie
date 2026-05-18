@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,6 +45,9 @@ ALLOWED_CONTENT_TYPES = {
     "application/pdf",
 }
 
+# Valid values for the receipt_scan_started analytics `source` property.
+SCAN_SOURCES = {"camera", "library", "pdf", "manual"}
+
 QUALITY_CHECKABLE_TYPES = {"image/jpeg", "image/png"}
 
 _CONTENT_TYPE_EXTS = {
@@ -81,13 +84,16 @@ def _receipt_to_response(receipt) -> ReceiptResponse:
 @router.post("/scan", response_model=ReceiptScanResponse)
 async def scan_receipt(
     file: UploadFile,
+    source: str = Form("camera"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
     extractor: ReceiptExtractor = Depends(get_receipt_extractor),
     category_assigner: CategoryAssigner = Depends(get_category_assigner),
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> ReceiptScanResponse:
-    analytics.emit("receipt_scan_started", {"source": "upload"}, user.id)
+    # An unrecognised source must never block a scan — fall back to "camera".
+    scan_source = source if source in SCAN_SOURCES else "camera"
+    analytics.emit("receipt_scan_started", {"source": scan_source}, user.id)
 
     # Free-tier quota: reject scans that would exceed the monthly limit
     settings = get_settings()

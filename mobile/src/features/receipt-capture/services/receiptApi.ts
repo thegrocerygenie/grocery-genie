@@ -1,3 +1,4 @@
+import type { ScanSource } from '@/constants/analyticsEvents';
 import { apiClient, ApiError, getAuthHeaders } from '@/services/api';
 import type {
   ReceiptListResponse,
@@ -11,6 +12,7 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
 export async function scanReceipt(
   imageUri: string,
   mimeType: string,
+  source: ScanSource = 'camera',
 ): Promise<ReceiptScanResponse> {
   const formData = new FormData();
   const extension = mimeType === 'image/png' ? 'png' : 'jpg';
@@ -19,6 +21,8 @@ export async function scanReceipt(
     type: mimeType,
     name: `receipt.${extension}`,
   } as unknown as Blob);
+  // Drives the receipt_scan_started analytics event emitted server-side.
+  formData.append('source', source);
 
   const response = await fetch(`${API_BASE_URL}/api/receipts/scan`, {
     method: 'POST',

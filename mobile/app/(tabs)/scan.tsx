@@ -1,10 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { Stack, useRouter } from 'expo-router';
 
+import { ANALYTICS_EVENTS } from '@/constants/analyticsEvents';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useReceiptScan } from '@/features/receipt-capture/hooks/useReceiptScan';
 import { useReceiptStore } from '@/store/receiptStore';
@@ -22,6 +23,18 @@ export default function ScanScreen() {
   const { setCapturedImageUri, setActiveScanResponse } = useReceiptStore();
   const analytics = useAnalytics();
 
+  // Tracks whether a scan was submitted, so leaving the camera without ever
+  // capturing is recorded as a capture-stage abandonment.
+  const scanSubmitted = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (!scanSubmitted.current) {
+        analytics.emit(ANALYTICS_EVENTS.RECEIPT_ABANDONED, { stage: 'capture' });
+      }
+    };
+  }, [analytics]);
+
   if (!permission) {
     return (
       <View style={styles.permissionRoot}>
@@ -38,7 +51,6 @@ export default function ScanScreen() {
     if (flowState === 'capturing' || flowState === 'processing') return;
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    analytics.emit('receipt_scan_started', { source: 'camera' });
 
     setFlowState('capturing');
     try {
@@ -51,9 +63,12 @@ export default function ScanScreen() {
         return;
       }
 
+      // A scan is being submitted — this is no longer a capture abandonment.
+      // The server emits receipt_scan_started from the request's source field.
+      scanSubmitted.current = true;
       setFlowState('processing');
       scanMutation.mutate(
-        { imageUri: photo.uri, mimeType: 'image/jpeg' },
+        { imageUri: photo.uri, mimeType: 'image/jpeg', source: 'camera' },
         {
           onSuccess: (response) => {
             setCapturedImageUri(photo.uri);
