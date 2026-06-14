@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.events.types import BudgetThresholdBreached
-from app.models.database import Budget, Category, LineItem, Receipt
+from app.models.database import Budget, Category, LineItem, Receipt, User
 from app.models.schemas import (
     BudgetCategorySummary,
     BudgetCreateRequest,
@@ -395,6 +395,13 @@ class BudgetService:
         if not budgets:
             return []
 
+        # Respect the user's per-threshold notification preferences (BC-03).
+        # A threshold only fires if both it is globally configured AND the user
+        # has it enabled. Unknown users fall back to all configured thresholds.
+        active_thresholds = await self._active_thresholds(user_id)
+        if not active_thresholds:
+            return []
+
         # Get spending
         spending = await self.get_spending_by_category(
             user_id, period_start, period_end
@@ -434,7 +441,7 @@ class BudgetService:
             percent = current_spend / budget_amount * 100
             remaining = budget_amount - current_spend
 
-            for threshold in get_settings().budget_alert_thresholds:
+            for threshold in active_thresholds:
                 if percent >= threshold:
                     breaches.append(
                         BudgetThresholdBreached(
@@ -449,6 +456,27 @@ class BudgetService:
                     )
 
         return breaches
+
+    async def _active_thresholds(self, user_id: uuid.UUID) -> list[int]:
+        """Configured alert thresholds the user has not opted out of.
+
+        Maps the user's typed preference columns (notif_threshold_50/80/100)
+        onto the globally configured thresholds. A configured threshold with no
+        matching preference column (e.g. a custom value) is always included.
+        """
+        configured = get_settings().budget_alert_thresholds
+        user = (
+            await self.db.execute(select(User).where(User.id == user_id))
+        ).scalar_one_or_none()
+        if user is None:
+            return list(configured)
+
+        prefs = {
+            50: user.notif_threshold_50,
+            80: user.notif_threshold_80,
+            100: user.notif_threshold_100,
+        }
+        return [t for t in configured if prefs.get(t, True)]
 
     async def _get_category_names(
         self, category_ids: set[uuid.UUID]

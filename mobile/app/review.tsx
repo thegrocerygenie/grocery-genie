@@ -15,13 +15,15 @@ import { SymbolView } from 'expo-symbols';
 import { useQuery } from '@tanstack/react-query';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
-import { getCategoryMeta } from '@/constants/categories';
+import { resolveCategoryMeta } from '@/constants/categories';
 import { CategoryPickerSheet } from '@/components/CategoryPickerSheet';
 import { useReceiptConfirm } from '@/features/receipt-capture/hooks/useReceiptReview';
 import { getReceipt } from '@/features/receipt-capture/services/receiptApi';
+import { useCategories } from '@/features/budget/hooks/useCategories';
 import { useReceiptStore } from '@/store/receiptStore';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import type { EditableLineItem, LineItemCorrection } from '@/features/receipt-capture/types';
+import type { CategoryResponse } from '@/features/budget/types';
 
 const LOW_CONFIDENCE_THRESHOLD = 0.6;
 const HIGH_VALUE_TOTAL = 500;
@@ -54,6 +56,7 @@ export default function ReviewScreen() {
   const { capturedImageUri, activeScanResponse, clearScanSession } = useReceiptStore();
   const confirmMutation = useReceiptConfirm();
   const analytics = useAnalytics();
+  const { data: categories } = useCategories();
   const confirmed = useRef(false);
 
   const isReadOnly = !!receiptId && !activeScanResponse;
@@ -193,7 +196,7 @@ export default function ReviewScreen() {
   const displayTotal = extraction?.total ?? fetchedReceipt?.total ?? null;
   const imageUri = capturedImageUri ?? fetchedReceipt?.image_url ?? null;
   const dominantCategoryId = items.find((i) => i.categoryId)?.categoryId ?? null;
-  const dominantCategoryName = getCategoryMeta(dominantCategoryId).name;
+  const dominantCategoryName = resolveCategoryMeta(dominantCategoryId, categories).name;
 
   const isHighValueReceipt =
     !isReadOnly &&
@@ -298,6 +301,7 @@ export default function ReviewScreen() {
                 item={item}
                 showDivider={i > 0}
                 readOnly={isReadOnly}
+                categories={categories}
                 onChangePrice={(p) => updateItemPrice(item.id, p)}
                 onPickCategory={() => setCategoryPickerItemId(item.id)}
               />
@@ -319,6 +323,7 @@ export default function ReviewScreen() {
         visible={categoryPickerItemId !== null}
         itemName={pickerItem?.name}
         selectedId={pickerItem?.categoryId ?? null}
+        categories={categories}
         onSelect={(cid) => {
           if (categoryPickerItemId) {
             updateItemCategory(categoryPickerItemId, cid);
@@ -397,16 +402,24 @@ interface ItemRowProps {
   item: EditableLineItem;
   showDivider: boolean;
   readOnly: boolean;
+  categories?: CategoryResponse[];
   onChangePrice: (p: number | null) => void;
   onPickCategory: () => void;
 }
 
-function ItemRow({ item, showDivider, readOnly, onChangePrice, onPickCategory }: ItemRowProps) {
+function ItemRow({
+  item,
+  showDivider,
+  readOnly,
+  categories,
+  onChangePrice,
+  onPickCategory,
+}: ItemRowProps) {
   const conf = item.extractionConfidence ?? 1;
   const lowConf = conf < LOW_CONFIDENCE_THRESHOLD;
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(item.totalPrice.toFixed(2));
-  const meta = getCategoryMeta(item.categoryId);
+  const meta = resolveCategoryMeta(item.categoryId, categories);
 
   return (
     <View style={[styles.row, showDivider && styles.rowDivider]}>

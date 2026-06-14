@@ -14,7 +14,7 @@ import * as Haptics from 'expo-haptics';
 
 import { BudgetRing } from '@/components/BudgetRing';
 import { colors, radii, spacing, type } from '@/constants/theme';
-import { getCategoryMeta } from '@/constants/categories';
+import { getCategoryMetaByName } from '@/constants/categories';
 import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
 import { useBudgetStore } from '@/store/budgetStore';
 import type { DashboardData as ApiDashboardData } from '@/features/budget/types';
@@ -82,7 +82,9 @@ function adaptDashboard(api: ApiDashboardData | undefined, period: string): Dash
   const categories: CategorySpend[] = api.categories
     .filter((c) => c.spent > 0 || c.budget > 0)
     .map((c) => {
-      const meta = getCategoryMeta(c.category_id);
+      // category_id is a backend UUID; resolve display meta by the category
+      // name that the API returns alongside it (matches DEFAULT_CATEGORIES).
+      const meta = getCategoryMetaByName(c.name);
       return {
         id: c.category_id,
         name: c.name,

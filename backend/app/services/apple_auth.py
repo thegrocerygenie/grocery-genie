@@ -67,17 +67,16 @@ def _select_apple_key(jwks: dict, kid: str) -> dict | None:
     return None
 
 
-async def _verify_identity_token(
-    identity_token: str, expected_nonce: str | None
-) -> dict:
+async def _decode_apple_jwt(token: str) -> dict:
+    """Verify an Apple-issued JWT against Apple's JWKs (signature/aud/iss/exp)."""
     settings = get_settings()
     if not settings.apple_client_id:
         raise ValueError("apple client id not configured")
 
-    headers = jwt.get_unverified_header(identity_token)
+    headers = jwt.get_unverified_header(token)
     kid = headers.get("kid")
     if not kid:
-        raise ValueError("identity token missing kid")
+        raise ValueError("apple token missing kid")
 
     jwks = await get_apple_jwks_memo()
     if jwks is None:
@@ -89,15 +88,21 @@ async def _verify_identity_token(
 
     public_key = jwt.algorithms.RSAAlgorithm.from_jwk(key)  # type: ignore[arg-type]
     try:
-        claims = jwt.decode(
-            identity_token,
+        return jwt.decode(
+            token,
             public_key,
             algorithms=["RS256"],
             audience=settings.apple_client_id,
             issuer=APPLE_ISSUER,
         )
     except jwt.InvalidTokenError as e:
-        raise ValueError(f"apple identity token invalid: {e}") from e
+        raise ValueError(f"apple token invalid: {e}") from e
+
+
+async def _verify_identity_token(
+    identity_token: str, expected_nonce: str | None
+) -> dict:
+    claims = await _decode_apple_jwt(identity_token)
 
     if expected_nonce:
         # Apple SHA-256-hashes the nonce that's submitted from the client.
@@ -156,14 +161,12 @@ async def verify_apple_sign_in(
     if not sub:
         raise ValueError("identity token missing sub")
 
-    # Re-verify the exchanged id_token's sub matches.
+    # Re-verify the exchanged id_token — full signature/aud/iss verification
+    # against Apple's JWKs (never trust an unverified token's `sub`).
     exchanged_id = exchange_body.get("id_token")
     if not isinstance(exchanged_id, str):
         raise ValueError("apple exchange id_token missing")
-    try:
-        exchanged_claims = jwt.decode(exchanged_id, options={"verify_signature": False})
-    except jwt.InvalidTokenError as e:
-        raise ValueError("apple exchange id_token unparsable") from e
+    exchanged_claims = await _decode_apple_jwt(exchanged_id)
     if exchanged_claims.get("sub") != sub:
         raise ValueError("apple sub mismatch between identity and exchange")
 

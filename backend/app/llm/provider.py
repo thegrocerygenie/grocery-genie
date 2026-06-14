@@ -1,7 +1,6 @@
 import base64
 import json
 import logging
-import os
 import time
 from typing import Protocol
 
@@ -15,7 +14,7 @@ from app.llm.prompts.category_assignment import (
     SYSTEM_PROMPT as CAT_SYSTEM_PROMPT,
 )
 from app.llm.prompts.receipt_extraction import PROMPT_VERSION, SYSTEM_PROMPT
-from app.llm.schemas import ReceiptExtractionResult
+from app.llm.schemas import CategoryAssignmentList, ReceiptExtractionResult
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +32,6 @@ class LiteLLMReceiptExtractor:
         self.model = f"{settings.llm_provider}/{settings.llm_model}"
         self.temperature = settings.llm_temperature
         self.api_key = settings.llm_api_key
-
-        # LiteLLM reads ANTHROPIC_API_KEY from env for Anthropic provider
-        if self.api_key and settings.llm_provider == "anthropic":
-            os.environ["ANTHROPIC_API_KEY"] = self.api_key
 
     async def extract(
         self, image_data: bytes, content_type: str
@@ -173,9 +168,6 @@ class LiteLLMCategoryAssigner:
         self.temperature = settings.llm_temperature
         self.api_key = settings.llm_api_key
 
-        if self.api_key and settings.llm_provider == "anthropic":
-            os.environ["ANTHROPIC_API_KEY"] = self.api_key
-
     async def assign(self, item_names: list[str]) -> list[dict]:
         items_text = "\n".join(f"- {name}" for name in item_names)
 
@@ -208,7 +200,86 @@ class LiteLLMCategoryAssigner:
             },
         )
 
-        return json.loads(raw_content)
+        # Validate the structured output before it can reach the DB. A malformed
+        # response (object instead of array, missing keys, bad confidence) raises
+        # here and is handled by the caller's rule-based fallback.
+        validated = CategoryAssignmentList.model_validate(json.loads(raw_content))
+        return [a.model_dump() for a in validated.root]
+
+
+# Keyword → category-name map for the deterministic fallback. Matched as
+# case-insensitive substrings against the raw item name. Categories must match
+# the seeded defaults in app/core/seed.py.
+_RULE_KEYWORDS: list[tuple[tuple[str, ...], str]] = [
+    (
+        (
+            "milk",
+            "bread",
+            "egg",
+            "banana",
+            "apple",
+            "produce",
+            "meat",
+            "rice",
+            "pasta",
+            "cheese",
+            "yogurt",
+            "vegetable",
+            "fruit",
+            "chicken",
+        ),
+        "Groceries",
+    ),
+    (
+        ("water", "soda", "juice", "coffee", "tea", "cola", "beer", "wine", "drink"),
+        "Beverages",
+    ),
+    (
+        ("chip", "candy", "chocolate", "cookie", "snack", "ice cream", "treat"),
+        "Snacks & Treats",
+    ),
+    (
+        (
+            "towel",
+            "detergent",
+            "soap",
+            "cleaner",
+            "trash",
+            "foil",
+            "napkin",
+            "tissue",
+            "battery",
+        ),
+        "Household",
+    ),
+    (
+        ("shampoo", "toothpaste", "deodorant", "razor", "lotion", "cosmetic"),
+        "Personal Care",
+    ),
+    (("diaper", "wipes", "formula", "baby"), "Baby & Kids"),
+    (("dog", "cat", "pet", "kibble", "litter"), "Pet"),
+]
+
+
+class RuleBasedCategoryAssigner:
+    """Deterministic keyword fallback used when the LLM assigner is unavailable.
+
+    Satisfies the CLAUDE.md mandate: "Fallback to rule-based processing if LLM
+    unavailable." Unmatched items map to "Other" with low confidence so the user
+    is prompted to review them.
+    """
+
+    async def assign(self, item_names: list[str]) -> list[dict]:
+        out: list[dict] = []
+        for name in item_names:
+            lowered = name.lower()
+            category = "Other"
+            for keywords, cat in _RULE_KEYWORDS:
+                if any(kw in lowered for kw in keywords):
+                    category = cat
+                    break
+            out.append({"name": name, "category": category, "confidence": 0.4})
+        return out
 
 
 class MockCategoryAssigner:

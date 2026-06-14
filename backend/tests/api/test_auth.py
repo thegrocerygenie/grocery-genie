@@ -244,6 +244,39 @@ async def test_verify_email_flow(auth_client, db_session):
 
 
 @pytest.mark.asyncio
+async def test_password_change_invalidates_existing_tokens(auth_client, db_session):
+    """H7: a token issued before the last password change is rejected."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from app.models.database import User
+
+    resp = await auth_client.post(
+        "/api/auth/sign-up",
+        json={"email": "reset-inv@test.com", "password": "TestPass1234!"},
+    )
+    token = resp.json()["access_token"]
+
+    me = await auth_client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert me.status_code == 200
+
+    # Simulate a password reset occurring after this token was minted.
+    user = (
+        await db_session.execute(select(User).where(User.email == "reset-inv@test.com"))
+    ).scalar_one()
+    user.password_updated_at = datetime.now(UTC) + timedelta(seconds=5)
+    await db_session.flush()
+
+    me_after = await auth_client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert me_after.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_refresh_rotates_pair(auth_client):
     sign_up = await auth_client.post(
         "/api/auth/sign-up",

@@ -41,6 +41,37 @@ def _install_analytics_spy() -> list[tuple[str, dict, uuid.UUID]]:
     return calls
 
 
+# --- Receipt image serving (ownership-checked) tests ---
+
+
+async def test_receipt_image_served_to_owner(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    """H4: a receipt's owner can fetch its image via the authenticated route."""
+    data = await _create_receipt(client, test_image_bytes)
+    image_url = f"/api/receipts/{data['receipt_id']}/image"
+
+    resp = await client.get(image_url)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "image/jpeg"
+    assert resp.content == test_image_bytes
+
+
+async def test_receipt_image_unknown_id_returns_404(client: AsyncClient):
+    resp = await client.get(f"/api/receipts/{uuid.uuid4()}/image")
+    assert resp.status_code == 404
+
+
+async def test_scan_rejects_oversized_upload(client: AsyncClient):
+    """H4/size-cap: an upload above the 10 MB ceiling is rejected with 413."""
+    big = io.BytesIO(b"\xff" * (10 * 1024 * 1024 + 1))
+    resp = await client.post(
+        "/api/receipts/scan",
+        files={"file": ("huge.jpg", big, "image/jpeg")},
+    )
+    assert resp.status_code == 413
+
+
 # --- POST /api/receipts/scan tests ---
 
 

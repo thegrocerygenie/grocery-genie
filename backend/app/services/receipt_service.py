@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 import uuid
 from datetime import UTC, date, datetime, timedelta
@@ -11,7 +12,11 @@ from sqlalchemy.orm import selectinload
 
 from app.events.dispatcher import dispatcher
 from app.events.types import ItemCorrected, ReceiptConfirmed
-from app.llm.provider import CategoryAssigner, ReceiptExtractor
+from app.llm.provider import (
+    CategoryAssigner,
+    ReceiptExtractor,
+    RuleBasedCategoryAssigner,
+)
 from app.models.database import (
     Category,
     LineItem,
@@ -31,6 +36,8 @@ from app.services.store_service import StoreService
 
 if TYPE_CHECKING:
     from app.services.analytics_service import AnalyticsService
+
+logger = logging.getLogger(__name__)
 
 
 class ReceiptService:
@@ -91,8 +98,17 @@ class ReceiptService:
         # Look up or create store
         store = await self.store_service.find_or_create(extraction.store_name)
 
-        # Parse date
-        receipt_date = date.fromisoformat(extraction.date)
+        # Parse date — the LLM is asked for ISO YYYY-MM-DD but compliance isn't
+        # guaranteed (esp. non-US receipts). Never 500 on a bad date; fall back
+        # to today and flag for review.
+        try:
+            receipt_date = date.fromisoformat(extraction.date)
+        except ValueError:
+            logger.warning(
+                "Non-ISO date from extractor (%r); defaulting to today",
+                extraction.date,
+            )
+            receipt_date = date.today()
 
         # Check for duplicate receipt before persisting
         is_duplicate = await self._check_duplicate(
@@ -185,22 +201,43 @@ class ReceiptService:
         ]
 
         if uncategorized_items and self.category_assigner:
+            names = [li.raw_name for li, _ in uncategorized_items]
             try:
-                assignments = await self.category_assigner.assign(
-                    [li.raw_name for li, _ in uncategorized_items]
-                )
-                assignment_map = {a["name"]: a for a in assignments}
-                for li, resp in uncategorized_items:
-                    assignment = assignment_map.get(li.raw_name)
-                    if assignment and assignment.get("category"):
-                        cat_id = category_lookup.get(assignment["category"])
-                        if cat_id:
-                            li.category_id = cat_id
-                            li.category_confidence = assignment.get("confidence", 0.7)
-                            resp.category_id = cat_id
-                            resp.category_confidence = li.category_confidence
+                assignments = await self.category_assigner.assign(names)
             except Exception:
-                pass  # Fallback: items remain uncategorized for user review
+                # CLAUDE.md mandates a rule-based fallback when the LLM is
+                # unavailable or returns invalid output. Log it (was silently
+                # swallowed before), emit a metric, then degrade gracefully.
+                logger.exception(
+                    "Category assignment failed for receipt %s; "
+                    "falling back to rule-based assignment",
+                    receipt.id,
+                )
+                if self.analytics:
+                    self.analytics.emit(
+                        "category_assignment_failed",
+                        {"item_count": len(names)},
+                        user_id,
+                    )
+                try:
+                    assignments = await RuleBasedCategoryAssigner().assign(names)
+                except Exception:
+                    logger.exception(
+                        "Rule-based category fallback failed for receipt %s",
+                        receipt.id,
+                    )
+                    assignments = []
+
+            assignment_map = {a["name"]: a for a in assignments}
+            for li, resp in uncategorized_items:
+                assignment = assignment_map.get(li.raw_name)
+                if assignment and assignment.get("category"):
+                    cat_id = category_lookup.get(assignment["category"])
+                    if cat_id:
+                        li.category_id = cat_id
+                        li.category_confidence = assignment.get("confidence", 0.7)
+                        resp.category_id = cat_id
+                        resp.category_confidence = li.category_confidence
 
         return ReceiptScanResponse(
             receipt_id=receipt.id,

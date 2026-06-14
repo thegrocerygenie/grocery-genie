@@ -2,6 +2,11 @@ from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Well-known insecure default. If this value ever signs tokens in production,
+# anyone who reads the source can forge a token for any user.
+INSECURE_JWT_SECRET_DEFAULT = "dev-secret-change-me-32+bytes-of-random-data"
+MIN_JWT_SECRET_LENGTH = 32
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_prefix="GG_")
@@ -9,6 +14,10 @@ class Settings(BaseSettings):
     # App
     app_name: str = "Grocery Genie"
     debug: bool = False
+
+    # CORS — explicit allowed origins for non-debug deployments. In debug mode
+    # the app falls back to "*" for local development convenience.
+    cors_origins: list[str] = []
 
     # Database
     database_url: str = "postgresql+asyncpg://localhost:5432/grocery_genie"
@@ -47,7 +56,7 @@ class Settings(BaseSettings):
     budget_alert_thresholds: list[int] = [50, 80, 100]
 
     # Auth — JWT
-    jwt_secret: str = "dev-secret-change-me-32+bytes-of-random-data"
+    jwt_secret: str = INSECURE_JWT_SECRET_DEFAULT
     jwt_algorithm: str = "HS256"
     jwt_access_ttl_seconds: int = 3600  # 1h
     jwt_refresh_ttl_seconds: int = 60 * 60 * 24 * 30  # 30d
@@ -86,6 +95,34 @@ class Settings(BaseSettings):
 
     # Google Sign In
     google_client_id: str = ""
+
+    def production_safety_errors(self) -> list[str]:
+        """Return config problems that must block startup in non-debug mode.
+
+        Returns an empty list when the configuration is safe. Only enforced
+        when ``debug`` is False so local development keeps its convenient
+        defaults.
+        """
+        if self.debug:
+            return []
+
+        errors: list[str] = []
+        if self.jwt_secret == INSECURE_JWT_SECRET_DEFAULT:
+            errors.append(
+                "GG_JWT_SECRET is set to the well-known development default; "
+                "set it to a unique random value (32+ bytes)."
+            )
+        elif len(self.jwt_secret) < MIN_JWT_SECRET_LENGTH:
+            errors.append(
+                f"GG_JWT_SECRET must be at least {MIN_JWT_SECRET_LENGTH} "
+                f"characters (got {len(self.jwt_secret)})."
+            )
+        if self.database_echo:
+            errors.append(
+                "GG_DATABASE_ECHO must be False in production; it logs raw "
+                "SQL parameters including auth tokens."
+            )
+        return errors
 
 
 @lru_cache

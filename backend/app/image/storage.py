@@ -1,3 +1,4 @@
+import asyncio
 import io
 import logging
 import os
@@ -8,10 +9,29 @@ from PIL import Image
 
 logger = logging.getLogger(__name__)
 
+# Extensions a stored receipt image may use, and the thumbnail extension.
+RECEIPT_EXTS = (".jpg", ".png", ".heic", ".pdf")
+THUMBNAIL_EXT = ".jpg"
+
+_EXT_MEDIA_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".heic": "image/heic",
+    ".pdf": "application/pdf",
+}
+
+
+def media_type_for_path(path: str) -> str:
+    """Best-effort media type from a stored file path's extension."""
+    _, ext = os.path.splitext(path)
+    return _EXT_MEDIA_TYPES.get(ext.lower(), "application/octet-stream")
+
 
 class FileStorage(Protocol):
     async def save(self, data: bytes, path: str) -> str: ...
     async def get_url(self, path: str) -> str: ...
+    async def read(self, path: str) -> bytes | None: ...
 
 
 class LocalFileStorage:
@@ -30,6 +50,18 @@ class LocalFileStorage:
 
     async def get_url(self, path: str) -> str:
         return f"/uploads/{path}"
+
+    async def read(self, path: str) -> bytes | None:
+        """Return the bytes at ``path`` or None if the file does not exist."""
+        full_path = os.path.join(self.base_path, path)
+
+        def _read() -> bytes | None:
+            if not os.path.isfile(full_path):
+                return None
+            with open(full_path, "rb") as f:
+                return f.read()
+
+        return await asyncio.to_thread(_read)
 
 
 def generate_receipt_path(receipt_id: uuid.UUID, suffix: str = ".jpg") -> str:

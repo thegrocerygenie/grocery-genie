@@ -3,23 +3,56 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
-import { DEFAULT_CATEGORIES } from '@/constants/categories';
+import {
+  DEFAULT_CATEGORIES,
+  getCategoryMetaByName,
+  type CategoryMeta,
+} from '@/constants/categories';
+import type { CategoryResponse } from '@/features/budget/types';
 
 export interface CategoryPickerSheetProps {
   visible: boolean;
   itemName?: string;
   selectedId: string | null;
+  /**
+   * Real backend categories (UUID ids). When provided, the sheet emits UUID
+   * `category_id` values so corrections satisfy the backend. Falls back to the
+   * static DEFAULT_CATEGORIES slugs only when this is absent/empty (offline).
+   */
+  categories?: CategoryResponse[];
   onSelect: (categoryId: string) => void;
   onClose: () => void;
+}
+
+/**
+ * A single selectable row: the id sent on select plus the display meta. For
+ * backend categories the id is a UUID while icon/color come from the matching
+ * default category (by name); offline this is just a default category.
+ */
+interface CategoryOption {
+  readonly id: string;
+  readonly meta: CategoryMeta;
+}
+
+function buildOptions(categories: CategoryResponse[] | undefined): CategoryOption[] {
+  if (categories && categories.length > 0) {
+    return categories.map((cat) => ({
+      id: cat.id,
+      meta: { ...getCategoryMetaByName(cat.name), name: cat.name },
+    }));
+  }
+  return DEFAULT_CATEGORIES.map((meta) => ({ id: meta.id, meta }));
 }
 
 export function CategoryPickerSheet({
   visible,
   itemName,
   selectedId,
+  categories,
   onSelect,
   onClose,
 }: CategoryPickerSheetProps) {
+  const options = buildOptions(categories);
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button">
@@ -55,27 +88,27 @@ export function CategoryPickerSheet({
           ) : null}
 
           <View style={styles.listCard}>
-            {DEFAULT_CATEGORIES.map((cat, i) => (
+            {options.map((opt, i) => (
               <Pressable
-                key={cat.id}
-                onPress={() => onSelect(cat.id)}
+                key={opt.id}
+                onPress={() => onSelect(opt.id)}
                 style={({ pressed }) => [
                   styles.row,
                   i > 0 && styles.rowDivider,
                   pressed && { backgroundColor: colors.iosFill3 },
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel={`${cat.name}${selectedId === cat.id ? ', selected' : ''}`}
+                accessibilityLabel={`${opt.meta.name}${selectedId === opt.id ? ', selected' : ''}`}
               >
-                <View style={[styles.circle, { backgroundColor: cat.color }]}>
+                <View style={[styles.circle, { backgroundColor: opt.meta.color }]}>
                   <SymbolView
-                    name={cat.symbol as Parameters<typeof SymbolView>[0]['name']}
+                    name={opt.meta.symbol as Parameters<typeof SymbolView>[0]['name']}
                     size={14}
                     tintColor="#fff"
                   />
                 </View>
-                <Text style={[type.body, { flex: 1, fontWeight: '500' }]}>{cat.name}</Text>
-                {selectedId === cat.id ? (
+                <Text style={[type.body, { flex: 1, fontWeight: '500' }]}>{opt.meta.name}</Text>
+                {selectedId === opt.id ? (
                   <SymbolView name="checkmark" size={18} tintColor={colors.tint} />
                 ) : null}
               </Pressable>

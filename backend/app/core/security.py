@@ -140,6 +140,20 @@ def create_token(
     return token, payload
 
 
+def token_predates_password_change(iat: int, user: User) -> bool:
+    """True if a token issued at ``iat`` predates the user's last password change.
+
+    Lets a password reset/change invalidate every previously issued session
+    without tracking individual token families.
+    """
+    changed = user.password_updated_at
+    if changed is None:
+        return False
+    if changed.tzinfo is None:
+        changed = changed.replace(tzinfo=UTC)
+    return iat < int(changed.timestamp())
+
+
 def decode_token(token: str, expected_typ: TokenType | None = None) -> TokenPayload:
     settings = _settings()
     try:
@@ -215,6 +229,8 @@ async def get_current_user(
         user = result.scalar_one_or_none()
         if user is None:
             raise HTTPException(status_code=401, detail="user not found")
+        if token_predates_password_change(payload.iat, user):
+            raise HTTPException(status_code=401, detail="session expired")
         return user
 
     # Fall back to static api_token in DEBUG only.

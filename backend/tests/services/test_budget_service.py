@@ -4,7 +4,7 @@ from datetime import date
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import Category, LineItem, Receipt
+from app.models.database import Category, LineItem, Receipt, User
 from app.models.schemas import BudgetCreateRequest
 from app.services.budget_service import BudgetService
 
@@ -286,6 +286,42 @@ async def test_check_thresholds_at_50(service, user_id, default_categories, db_s
     assert any(b.threshold_percent == 50 for b in breaches)
     assert not any(b.threshold_percent == 80 for b in breaches)
     assert not any(b.threshold_percent == 100 for b in breaches)
+
+
+@pytest.mark.asyncio
+async def test_check_thresholds_respects_user_opt_out(
+    service, user_id, default_categories, db_session
+):
+    """H2: a user who disabled the 80% alert must not receive it."""
+    user = User(
+        id=user_id,
+        email="prefs@test.com",
+        name="Prefs User",
+        notif_threshold_50=False,
+        notif_threshold_80=False,
+        notif_threshold_100=True,
+    )
+    db_session.add(user)
+    await db_session.flush()
+
+    cat = default_categories[0]
+    await _create_confirmed_receipt(
+        db_session,
+        user_id,
+        date(2026, 3, 10),
+        [("Big order", 90.0, cat.id)],
+    )
+    request = BudgetCreateRequest(
+        category_id=None, amount=100.0, period_type="monthly", period_start="2026-03-01"
+    )
+    await service.create_budget(user_id, request)
+
+    breaches = await service.check_thresholds(user_id, date(2026, 3, 10))
+    # 90% of 100 crosses 50% and 80%, but the user opted out of both.
+    assert not any(b.threshold_percent == 80 for b in breaches)
+    assert not any(b.threshold_percent == 50 for b in breaches)
+    # 100% not reached, so no breach at all.
+    assert breaches == []
 
 
 @pytest.mark.asyncio

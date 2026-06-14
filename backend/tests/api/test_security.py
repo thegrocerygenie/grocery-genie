@@ -165,6 +165,38 @@ async def test_user_isolation_receipts(raw_client, seeded_users, user_a_receipt)
 
 
 @pytest.mark.asyncio
+async def test_user_isolation_receipt_image(raw_client, seeded_users, test_image_bytes):
+    """H4: User B cannot fetch User A's receipt image by guessing its UUID."""
+    import io
+
+    # User A scans a receipt — this writes the image to storage.
+    scan = await raw_client.post(
+        "/api/receipts/scan",
+        files={"file": ("receipt.jpg", io.BytesIO(test_image_bytes), "image/jpeg")},
+        headers={"Authorization": f"Bearer {DEV_USER_TOKEN}"},
+    )
+    assert scan.status_code == 200
+    receipt_id = scan.json()["receipt_id"]
+    image_url = f"/api/receipts/{receipt_id}/image"
+
+    # Owner can fetch it.
+    resp_a = await raw_client.get(
+        image_url, headers={"Authorization": f"Bearer {DEV_USER_TOKEN}"}
+    )
+    assert resp_a.status_code == 200
+
+    # A different authenticated user cannot.
+    resp_b = await raw_client.get(
+        image_url, headers={"Authorization": f"Bearer {USER_B_TOKEN}"}
+    )
+    assert resp_b.status_code == 404
+
+    # Unauthenticated request is rejected outright.
+    resp_anon = await raw_client.get(image_url)
+    assert resp_anon.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_user_isolation_budgets(raw_client, seeded_users, user_a_receipt):
     """User B cannot see User A's budget summary."""
     # User A has a budget

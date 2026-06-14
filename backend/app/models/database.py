@@ -56,6 +56,9 @@ class User(Base):
     apple_subject: Mapped[str | None] = mapped_column(String(255), unique=True)
     google_subject: Mapped[str | None] = mapped_column(String(255), unique=True)
     failed_signin_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_failed_signin_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Notification + summary preferences (Phase B — typed for hot-path query)

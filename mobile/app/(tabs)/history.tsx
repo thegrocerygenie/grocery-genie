@@ -14,11 +14,13 @@ import { SymbolView } from 'expo-symbols';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
-import { getCategoryMeta } from '@/constants/categories';
+import { resolveCategoryMeta } from '@/constants/categories';
 import { CaptureActionSheet } from '@/components/CaptureActionSheet';
 import { useReceipts } from '@/features/receipt-capture/hooks/useReceipts';
+import { useCategories } from '@/features/budget/hooks/useCategories';
 import { useDeleteReceipt } from '@/features/lifecycle/hooks/useLifecycle';
 import type { ReceiptResponse } from '@/features/receipt-capture/types';
+import type { CategoryResponse } from '@/features/budget/types';
 
 type FilterIndex = 0 | 1 | 2;
 
@@ -68,13 +70,14 @@ function formatShortDate(iso: string): string {
 interface ReceiptRowProps {
   receipt: ReceiptResponse;
   showDivider: boolean;
+  categories?: CategoryResponse[];
   onPress: () => void;
   onDelete: () => void;
 }
 
-function ReceiptRow({ receipt, showDivider, onPress, onDelete }: ReceiptRowProps) {
+function ReceiptRow({ receipt, showDivider, categories, onPress, onDelete }: ReceiptRowProps) {
   const firstCategory = receipt.items.find((item) => item.category_id)?.category_id ?? null;
-  const meta = getCategoryMeta(firstCategory);
+  const meta = resolveCategoryMeta(firstCategory, categories);
   const pendingSync = receipt.status === 'pending';
   const itemCount = receipt.items.length;
   const total = receipt.total ?? 0;
@@ -193,6 +196,7 @@ export default function HistoryScreen() {
   );
 
   const { data, isLoading, isRefetching, refetch } = useReceipts(queryParams);
+  const { data: categories } = useCategories();
   const receipts = data?.items ?? [];
 
   const handleEndReached = () => {
@@ -266,6 +270,7 @@ export default function HistoryScreen() {
             <ReceiptRow
               receipt={item}
               showDivider={index > 0}
+              categories={categories}
               onPress={() => router.push({ pathname: '/review', params: { receiptId: item.id } })}
               onDelete={() => onDelete(item.id, item.store_name ?? 'Receipt')}
             />

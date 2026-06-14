@@ -21,6 +21,7 @@ from app.core.security import (
     generate_email_token,
     hash_email_token,
     hash_password,
+    token_predates_password_change,
     verify_password,
 )
 from app.core.token_denylist import (
@@ -212,7 +213,20 @@ async def sign_in(
         raise AccountLockedError("account locked")
 
     if not verify_password(password, user.password_hash):
-        user.failed_signin_count = (user.failed_signin_count or 0) + 1
+        # Sliding window: only count failures within
+        # signin_lockout_window_seconds of each other. A failure after the
+        # window has elapsed restarts the count rather than accumulating
+        # forever (which would eventually lock out a legitimate user).
+        last_failed = _aware(user.last_failed_signin_at)
+        within_window = (
+            last_failed is not None
+            and (now - last_failed).total_seconds()
+            <= settings.signin_lockout_window_seconds
+        )
+        user.failed_signin_count = (
+            (user.failed_signin_count or 0) + 1 if within_window else 1
+        )
+        user.last_failed_signin_at = now
         if user.failed_signin_count >= settings.signin_lockout_threshold:
             user.locked_until = now + timedelta(
                 seconds=settings.signin_lockout_duration_seconds
@@ -229,6 +243,7 @@ async def sign_in(
         raise InvalidCredentialsError("invalid credentials")
 
     user.failed_signin_count = 0
+    user.last_failed_signin_at = None
     user.locked_until = None
     pair = issue_tokens(user.id)
     await auth_audit.record(
@@ -278,6 +293,10 @@ async def refresh(
     user = await db.get(User, _uuid(payload.sub))
     if user is None:
         raise InvalidTokenError("user not found")
+
+    # A password reset/change invalidates every session issued before it.
+    if token_predates_password_change(int(payload.iat), user):
+        raise InvalidTokenError("session expired")
 
     # Denylist the old refresh JTI for the remainder of its lifetime.
     remaining = max(0, payload.exp - int(datetime.now(tz=UTC).timestamp()))

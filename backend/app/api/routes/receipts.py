@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Response, UploadFile
 from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,10 +11,13 @@ from app.core.dependencies import get_db
 from app.core.security import get_current_user
 from app.image.preprocessor import assess_image_quality
 from app.image.storage import (
+    RECEIPT_EXTS,
+    THUMBNAIL_EXT,
     LocalFileStorage,
     create_thumbnail,
     generate_receipt_path,
     generate_thumbnail_path,
+    media_type_for_path,
 )
 from app.llm.provider import (
     CategoryAssigner,
@@ -49,6 +52,9 @@ ALLOWED_CONTENT_TYPES = {
 SCAN_SOURCES = {"camera", "library", "pdf", "manual"}
 
 QUALITY_CHECKABLE_TYPES = {"image/jpeg", "image/png"}
+
+# Hard ceiling on a single receipt upload (defends against OOM via huge bodies).
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 
 _CONTENT_TYPE_EXTS = {
     "image/jpeg": ".jpg",
@@ -120,7 +126,13 @@ async def scan_receipt(
             f"Accepted: JPEG, PNG, HEIC, PDF.",
         )
 
-    image_data = await file.read()
+    # Cap the upload to avoid reading an unbounded body into memory (OOM DoS).
+    image_data = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(image_data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large (max {MAX_UPLOAD_BYTES // (1024 * 1024)} MB).",
+        )
 
     # Validate file is not empty
     if not image_data:
@@ -161,7 +173,9 @@ async def scan_receipt(
     ext = _content_type_to_ext(file.content_type or "image/jpeg")
     image_path = generate_receipt_path(result.receipt_id, ext)
     await storage.save(image_data, image_path)
-    image_url = await storage.get_url(image_path)
+    # Serve through an authenticated, ownership-checked route — never a raw
+    # static path (which would let any user fetch another's receipt by UUID).
+    image_url = f"/api/receipts/{result.receipt_id}/image"
 
     # Generate thumbnail for JPEG/PNG
     if file.content_type in QUALITY_CHECKABLE_TYPES:
@@ -170,7 +184,7 @@ async def scan_receipt(
         )
         thumb_path = generate_thumbnail_path(result.receipt_id, ".jpg")
         await storage.save(thumb_data, thumb_path)
-        thumbnail_url = await storage.get_url(thumb_path)
+        thumbnail_url = f"/api/receipts/{result.receipt_id}/thumbnail"
     else:
         thumbnail_url = image_url
 
@@ -183,6 +197,58 @@ async def scan_receipt(
     receipt_record.thumbnail_url = thumbnail_url
 
     return result
+
+
+async def _owned_receipt_or_404(
+    receipt_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession
+) -> ReceiptModel:
+    """Load a receipt only if it belongs to the requesting user."""
+    result = await db.execute(
+        sa_select(ReceiptModel).where(
+            ReceiptModel.id == receipt_id, ReceiptModel.user_id == user_id
+        )
+    )
+    receipt = result.scalar_one_or_none()
+    if receipt is None:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+    return receipt
+
+
+async def _serve_stored_file(candidate_paths: list[str]) -> Response:
+    storage = LocalFileStorage(get_settings().storage_path)
+    for path in candidate_paths:
+        data = await storage.read(path)
+        if data is not None:
+            return Response(content=data, media_type=media_type_for_path(path))
+    raise HTTPException(status_code=404, detail="Image not found")
+
+
+@router.get("/{receipt_id}/image")
+async def get_receipt_image(
+    receipt_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Response:
+    """Stream a receipt's original image — only to its owner."""
+    await _owned_receipt_or_404(receipt_id, user.id, db)
+    candidates = [generate_receipt_path(receipt_id, ext) for ext in RECEIPT_EXTS]
+    return await _serve_stored_file(candidates)
+
+
+@router.get("/{receipt_id}/thumbnail")
+async def get_receipt_thumbnail(
+    receipt_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Response:
+    """Stream a receipt's thumbnail — only to its owner.
+
+    Falls back to the original image when no thumbnail exists (e.g. HEIC/PDF).
+    """
+    await _owned_receipt_or_404(receipt_id, user.id, db)
+    candidates = [generate_thumbnail_path(receipt_id, THUMBNAIL_EXT)]
+    candidates += [generate_receipt_path(receipt_id, ext) for ext in RECEIPT_EXTS]
+    return await _serve_stored_file(candidates)
 
 
 @router.get("/recently-deleted", response_model=list[DeletedItemResponse])

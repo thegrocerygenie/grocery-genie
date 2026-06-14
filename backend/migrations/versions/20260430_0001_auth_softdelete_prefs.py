@@ -1,7 +1,7 @@
 """Phase A+B+C: auth columns, auth_events, prefs, soft-delete.
 
 Revision ID: 20260430_0001
-Revises:
+Revises: 20260418_0000
 Create Date: 2026-04-30
 """
 
@@ -12,7 +12,7 @@ from alembic import op
 
 # revision identifiers
 revision: str = "20260430_0001"
-down_revision: str | None = None
+down_revision: str | None = "20260418_0000"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
