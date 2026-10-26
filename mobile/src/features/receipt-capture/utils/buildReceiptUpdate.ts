@@ -13,6 +13,7 @@ export function buildReceiptUpdate(
   extraction: ReceiptExtraction,
   items: EditableLineItem[],
   storeName: string,
+  receiptDate: string,
 ): ReceiptUpdateRequest {
   const originals = new Map(extraction.items.map((item) => [item.id, item]));
 
@@ -34,6 +35,7 @@ export function buildReceiptUpdate(
   const update: ReceiptUpdateRequest = { status: 'confirmed' };
   const trimmedStore = storeName.trim();
   if (trimmedStore && trimmedStore !== extraction.store_name) update.store_name = trimmedStore;
+  if (receiptDate && receiptDate !== extraction.date) update.date = receiptDate;
   if (corrections.length > 0) update.items = corrections;
   return update;
 }

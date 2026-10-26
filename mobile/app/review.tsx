@@ -13,6 +13,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useQuery } from '@tanstack/react-query';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { resolveCategoryMeta } from '@/constants/categories';
@@ -24,6 +25,11 @@ import { useReceiptStore } from '@/store/receiptStore';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { buildReceiptUpdate } from '@/features/receipt-capture/utils/buildReceiptUpdate';
 import { isLowConfidence } from '@/features/receipt-capture/utils/confidence';
+import {
+  fromIsoDate,
+  latestReceiptDate,
+  toIsoDate,
+} from '@/features/receipt-capture/utils/receiptDate';
 import { receiptImageSource } from '@/features/receipt-capture/utils/receiptImageSource';
 import { API_BASE_URL, getAuthHeaders } from '@/services/api';
 import type { EditableLineItem } from '@/features/receipt-capture/types';
@@ -145,7 +151,7 @@ export default function ReviewScreen() {
     confirmMutation.mutate(
       {
         receiptId: activeScanResponse.receipt_id,
-        updates: buildReceiptUpdate(activeScanResponse.extraction, items, storeName),
+        updates: buildReceiptUpdate(activeScanResponse.extraction, items, storeName, receiptDate),
       },
       {
         onSuccess: () => {
@@ -214,6 +220,8 @@ export default function ReviewScreen() {
                 onPress={handleSave}
                 hitSlop={12}
                 disabled={!canConfirm || confirmMutation.isPending}
+                accessibilityRole="button"
+                accessibilityLabel="Save"
               >
                 {confirmMutation.isPending ? (
                   <ActivityIndicator color={colors.tint} />
@@ -270,13 +278,11 @@ export default function ReviewScreen() {
             editable={!isReadOnly}
             placeholder="Store name"
           />
-          <ListInputRow
-            label="Date"
-            value={formatLongDate(receiptDate) || receiptDate}
-            onChangeText={setReceiptDate}
-            editable={false}
-            placeholder="YYYY-MM-DD"
-          />
+          {isReadOnly ? (
+            <ListRow label="Date" value={formatLongDate(receiptDate) || receiptDate} />
+          ) : (
+            <ListDateRow label="Date" value={receiptDate} onChange={setReceiptDate} />
+          )}
           <ListRow
             label="Total"
             value={displayTotal != null ? `$${displayTotal.toFixed(2)}` : '—'}
@@ -385,6 +391,32 @@ function ListInputRow({ label, value, onChangeText, editable, placeholder }: Lis
         editable={editable}
         placeholder={placeholder}
         placeholderTextColor={colors.iosLabel3 as string}
+      />
+    </View>
+  );
+}
+
+interface ListDateRowProps {
+  label: string;
+  /** YYYY-MM-DD. */
+  value: string;
+  onChange: (iso: string) => void;
+}
+
+function ListDateRow({ label, value, onChange }: ListDateRowProps) {
+  return (
+    <View style={styles.row}>
+      <Text style={type.body}>{label}</Text>
+      <DateTimePicker
+        mode="date"
+        display="compact"
+        value={fromIsoDate(value)}
+        maximumDate={latestReceiptDate()}
+        onChange={(event, picked) => {
+          if (event.type === 'set' && picked) onChange(toIsoDate(picked));
+        }}
+        accentColor={colors.tint}
+        accessibilityLabel="Receipt date"
       />
     </View>
   );

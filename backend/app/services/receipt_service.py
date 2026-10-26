@@ -245,7 +245,9 @@ class ReceiptService:
             status=receipt.status,
             extraction=ReceiptExtraction(
                 store_name=extraction.store_name,
-                date=extraction.date,
+                # The stored date, not the raw string: an unreadable one was
+                # replaced with today, and review edits start from this value.
+                date=receipt.date.isoformat(),
                 items=item_responses,
                 subtotal=extraction.subtotal,
                 tax=extraction.tax,
@@ -362,6 +364,19 @@ class ReceiptService:
                     user_id,
                 )
             receipt.store = await self.store_service.find_or_create(updates.store_name)
+
+        if updates.date is not None and updates.date != receipt.date:
+            if self.analytics:
+                self.analytics.emit(
+                    "receipt_correction_made",
+                    {
+                        "field": "date",
+                        "original_value": receipt.date.isoformat(),
+                        "corrected_value": updates.date.isoformat(),
+                    },
+                    user_id,
+                )
+            receipt.date = updates.date
 
         if updates.items:
             line_items_by_id = {li.id: li for li in receipt.line_items}
