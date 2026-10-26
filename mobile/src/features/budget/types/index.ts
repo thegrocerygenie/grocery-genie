@@ -61,6 +61,11 @@ export interface DashboardData {
   categories: BudgetCategorySummary[];
   top_items: DashboardTopItem[];
   trend: DashboardTrendMonth[];
+  /**
+   * Mean monthly spend over the 3 months before the trend window; 0 when there
+   * was none. Absent from servers older than the comparison.
+   */
+  prior_average?: number;
   previous_period: string;
   category_changes: DashboardCategoryChange[];
 }
