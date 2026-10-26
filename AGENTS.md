@@ -152,7 +152,7 @@ With the full suite green, ask the user before each commit, and again before eac
 
 Skills live in `.agents/skills/<name>/` and load in both Claude Code and Codex. Before you add, rename, or remove one, read `docs/agents/harnesses.md`; after, run `scripts/check-agent-skills.py`.
 
-The user runs four skills by hand to build and keep verification skills: `gg-create-verification-skill` and `gg-maintain-verification-skill` drive the app the way a user does, and `gg-create-formal-verification-skill` and `gg-maintain-formal-verification-skill` check risky code formally.
+Four skills build and keep verification skills: `gg-create-verification-skill` and `gg-maintain-verification-skill` drive the app the way a user does, and `gg-create-formal-verification-skill` and `gg-maintain-formal-verification-skill` check risky code formally.
 
 ## Key Conventions
 

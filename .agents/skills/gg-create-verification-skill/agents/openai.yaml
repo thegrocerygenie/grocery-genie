@@ -1,5 +1,3 @@
 interface:
   display_name: "GG Create Verification Skill"
   short_description: "Generate a skill that drives the app like a user"
-policy:
-  allow_implicit_invocation: false

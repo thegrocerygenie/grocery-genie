@@ -12,6 +12,7 @@ Claude Code and Codex both work on this repo. They share one set of instructions
 - `.claude/skills/<name>` is a relative symlink to it, which Claude Code reads. Create it from the repo root with `ln -s ../../.agents/skills/<name> .claude/skills/<name>`.
 - A user-invoked skill (`disable-model-invocation: true` in its frontmatter) also ships `agents/openai.yaml` with `policy: allow_implicit_invocation: false`. Codex ignores the frontmatter flag and reads only that file.
 - A skill adapted from elsewhere gets a `gg-` prefix. Claude Code runs a personal skill (`~/.claude/skills/`) over a project skill with the same name, and Codex also reads personal skills from `~/.agents/skills/`. The prefix keeps the repo copy the one that runs.
+- A change to a skill's `disable-model-invocation` flag reaches a running Claude Code session only after a delay of minutes; until then the `Skill` tool still applies the old flag.
 - To run a skill by name, type `/<name>` in Claude Code or `$<name>` in Codex.
 - Every command a skill relies on runs from a shell, so both harnesses can follow it. A harness-only tool, such as the iOS Simulator tool in the Claude desktop app, is an optional extra, named as Claude-only.
 - `scripts/check-agent-skills.py` checks the layout: names, symlinks, and Codex policy files. Run it after you add, rename, or remove a skill.
