@@ -85,6 +85,7 @@ docs/prd/                # Product requirements — see directory for full listi
 .claude/skills/           # Symlinks into .agents/skills for Claude Code
 .claude/commands/         # Verification checklists (Claude Code slash commands)
 docs/agents/harnesses.md  # How Claude Code and Codex share skills and instructions
+formal/                   # TLA+ models, run by verify-* skills (formal/budget_alerts/run.sh)
 scripts/check-agent-skills.py  # Checks the skill layout for both harnesses
 ```
 
