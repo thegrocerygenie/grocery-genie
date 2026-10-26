@@ -82,11 +82,12 @@ interface ReceiptRowProps {
 function ReceiptRow({ receipt, showDivider, categories, onPress, onDelete }: ReceiptRowProps) {
   const firstCategory = receipt.items.find((item) => item.category_id)?.category_id ?? null;
   const meta = resolveCategoryMeta(firstCategory, categories);
-  const pendingSync = receipt.status === 'pending';
+  // A scan the user has not confirmed yet; tapping it opens review to confirm.
+  const needsReview = receipt.status === 'pending_review';
   const itemCount = receipt.items.length;
   const total = receipt.total ?? 0;
-  const sub = pendingSync
-    ? 'Pending sync'
+  const sub = needsReview
+    ? 'Needs review'
     : `${formatShortDate(receipt.date)} · ${itemCount} items`;
 
   return (
@@ -117,7 +118,7 @@ function ReceiptRow({ receipt, showDivider, categories, onPress, onDelete }: Rec
           style={[
             type.caption1,
             {
-              color: pendingSync ? colors.orange : (colors.iosLabel2 as string),
+              color: needsReview ? colors.orange : (colors.iosLabel2 as string),
               marginTop: 1,
             },
           ]}

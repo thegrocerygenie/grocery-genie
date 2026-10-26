@@ -25,6 +25,7 @@ import { useReceiptStore } from '@/store/receiptStore';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { buildReceiptUpdate } from '@/features/receipt-capture/utils/buildReceiptUpdate';
 import { isLowConfidence } from '@/features/receipt-capture/utils/confidence';
+import { extractionFromReceipt } from '@/features/receipt-capture/utils/extractionFromReceipt';
 import {
   fromIsoDate,
   latestReceiptDate,
@@ -68,17 +69,30 @@ export default function ReviewScreen() {
   const { data: categories } = useCategories();
   const confirmed = useRef(false);
 
-  const isReadOnly = !!receiptId && !activeScanResponse;
+  // Opened from History: a stored receipt. One the user has not confirmed
+  // yet (pending_review) stays editable, and Save confirms it.
+  const isFromHistory = !!receiptId && !activeScanResponse;
 
   const { data: fetchedReceipt, isLoading: isFetchingReceipt } = useQuery({
     queryKey: ['receipt', receiptId],
     queryFn: () => getReceipt(receiptId!),
-    enabled: isReadOnly,
+    enabled: isFromHistory,
   });
 
-  const initialItems: EditableLineItem[] = useMemo(() => {
-    if (activeScanResponse) {
-      return (activeScanResponse.extraction.items ?? []).map((item) => ({
+  const isReadOnly = isFromHistory && fetchedReceipt?.status !== 'pending_review';
+  const editingReceiptId = activeScanResponse?.receipt_id ?? fetchedReceipt?.id;
+
+  // What edits are compared against: the scan's extraction, or the stored receipt.
+  const baseline = useMemo(
+    () =>
+      activeScanResponse?.extraction ??
+      (fetchedReceipt ? extractionFromReceipt(fetchedReceipt) : null),
+    [activeScanResponse, fetchedReceipt],
+  );
+
+  const initialItems: EditableLineItem[] = useMemo(
+    () =>
+      (baseline?.items ?? []).map((item) => ({
         id: item.id,
         name: item.name,
         quantity: item.quantity,
@@ -87,22 +101,9 @@ export default function ReviewScreen() {
         categoryId: item.category_id,
         extractionConfidence: item.extraction_confidence,
         isEdited: false,
-      }));
-    }
-    if (fetchedReceipt) {
-      return fetchedReceipt.items.map((item) => ({
-        id: item.id,
-        name: item.raw_name,
-        quantity: item.quantity,
-        unitPrice: item.unit_price,
-        totalPrice: item.total_price,
-        categoryId: item.category_id,
-        extractionConfidence: item.extraction_confidence,
-        isEdited: false,
-      }));
-    }
-    return [];
-  }, [activeScanResponse, fetchedReceipt]);
+      })),
+    [baseline],
+  );
 
   const [storeName, setStoreName] = useState(activeScanResponse?.extraction.store_name ?? '');
   const [receiptDate, setReceiptDate] = useState(activeScanResponse?.extraction.date ?? '');
@@ -110,12 +111,12 @@ export default function ReviewScreen() {
   const [categoryPickerItemId, setCategoryPickerItemId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (fetchedReceipt && isReadOnly) {
+    if (fetchedReceipt && isFromHistory) {
       setStoreName(fetchedReceipt.store_name ?? '');
       setReceiptDate(fetchedReceipt.date);
       setItems(initialItems);
     }
-  }, [fetchedReceipt, isReadOnly, initialItems]);
+  }, [fetchedReceipt, isFromHistory, initialItems]);
 
   useEffect(() => {
     return () => {
@@ -163,18 +164,22 @@ export default function ReviewScreen() {
       router.back();
       return;
     }
-    if (!activeScanResponse || !canConfirm) return;
+    if (!baseline || !editingReceiptId || !canConfirm) return;
 
     confirmMutation.mutate(
       {
-        receiptId: activeScanResponse.receipt_id,
-        updates: buildReceiptUpdate(activeScanResponse.extraction, items, storeName, receiptDate),
+        receiptId: editingReceiptId,
+        updates: buildReceiptUpdate(baseline, items, storeName, receiptDate),
       },
       {
         onSuccess: () => {
           confirmed.current = true;
-          clearScanSession();
-          router.replace('/(tabs)');
+          if (activeScanResponse) {
+            clearScanSession();
+            router.replace('/(tabs)');
+          } else {
+            router.back();
+          }
         },
         onError: (error) => {
           Alert.alert('Save Failed', error.message, [{ text: 'OK' }]);
@@ -183,7 +188,7 @@ export default function ReviewScreen() {
     );
   };
 
-  if (isReadOnly && isFetchingReceipt) {
+  if (isFromHistory && isFetchingReceipt) {
     return (
       <View style={[styles.root, styles.center]}>
         <ActivityIndicator color={colors.tint} />
@@ -408,6 +413,7 @@ function ListInputRow({ label, value, onChangeText, editable, placeholder }: Lis
         onChangeText={onChangeText}
         editable={editable}
         placeholder={placeholder}
+        accessibilityLabel={label}
         placeholderTextColor={colors.iosLabel3 as string}
       />
     </View>

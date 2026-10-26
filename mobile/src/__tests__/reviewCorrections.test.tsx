@@ -9,7 +9,7 @@ import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-librar
 
 import ReviewScreen from '../../app/review';
 import { useReceiptStore } from '@/store/receiptStore';
-import type { ReceiptScanResponse } from '@/features/receipt-capture/types';
+import type { ReceiptResponse, ReceiptScanResponse } from '@/features/receipt-capture/types';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 // The native picker has no JS renderer in Jest; stand in a view that keeps
@@ -30,6 +30,10 @@ jest.mock('@/features/budget/hooks/useCategories', () => ({
 }));
 jest.mock('@/hooks/useAnalytics', () => ({
   useAnalytics: () => ({ emit: jest.fn() }),
+}));
+const mockGetReceipt = jest.fn();
+jest.mock('@/features/receipt-capture/services/receiptApi', () => ({
+  getReceipt: (id: string) => mockGetReceipt(id),
 }));
 
 const scan: ReceiptScanResponse = {
@@ -60,7 +64,7 @@ const scan: ReceiptScanResponse = {
 
 function renderReview() {
   const queryClient = new QueryClient();
-  renderRouter(
+  const routerScreen = renderRouter(
     {
       // Mirrors app/_layout.tsx, which declares this route as a modal. The
       // Stack renders the header, where Save lives.
@@ -80,6 +84,7 @@ function renderReview() {
     { initialUrl: '/' },
   );
   act(() => router.push('/review'));
+  return routerScreen;
 }
 
 beforeEach(() => {
@@ -191,5 +196,77 @@ describe('Review screen quantity edit', () => {
       { receiptId: 'r-1', updates: { status: 'confirmed' } },
       expect.anything(),
     );
+  });
+});
+
+describe('Review opened from History', () => {
+  function stored(status: string): ReceiptResponse {
+    return {
+      id: 'r-2',
+      user_id: 'u-1',
+      store_name: 'Test Grocery Store',
+      date: '2026-03-15',
+      subtotal: 1.29,
+      tax: null,
+      total: 1.29,
+      currency: 'USD',
+      image_url: null,
+      extraction_confidence: 0.95,
+      status,
+      items: [
+        {
+          id: 'item-9',
+          raw_name: 'Organic Bananas',
+          quantity: 1,
+          unit_price: 1.29,
+          total_price: 1.29,
+          unit_of_measure: null,
+          category_id: null,
+          category_confidence: null,
+          extraction_confidence: 0.95,
+          corrected: false,
+        },
+      ],
+      created_at: null,
+    };
+  }
+
+  function openFromHistory() {
+    useReceiptStore.getState().clearScanSession();
+    const routerScreen = renderReview();
+    act(() => router.back());
+    act(() => router.push({ pathname: '/review', params: { receiptId: 'r-2' } }));
+    return routerScreen;
+  }
+
+  it('lets the user correct and confirm a scan that needs review', async () => {
+    mockGetReceipt.mockResolvedValue(stored('pending_review'));
+    mockMutate.mockImplementationOnce((_vars, options: { onSuccess: () => void }) =>
+      options.onSuccess(),
+    );
+    const routerScreen = openFromHistory();
+
+    fireEvent.changeText(await screen.findByLabelText('Store'), 'Corner Market');
+    save();
+
+    expect(mockGetReceipt).toHaveBeenCalledWith('r-2');
+    expect(mockMutate).toHaveBeenCalledWith(
+      { receiptId: 'r-2', updates: { store_name: 'Corner Market', status: 'confirmed' } },
+      expect.anything(),
+    );
+    // Back to History, not to the scan flow's home tab.
+    expect(routerScreen.getPathname()).toBe('/');
+  });
+
+  it('shows a confirmed receipt read-only', async () => {
+    mockGetReceipt.mockResolvedValue(stored('confirmed'));
+    openFromHistory();
+
+    expect(await screen.findByText('Done')).toBeTruthy();
+    expect(screen.queryByLabelText('Save')).toBeNull();
+    expect(screen.queryByLabelText('Receipt date')).toBeNull();
+    expect(
+      screen.queryByLabelText('Quantity of Organic Bananas')?.props.accessibilityState,
+    ).toMatchObject({ disabled: true });
   });
 });
