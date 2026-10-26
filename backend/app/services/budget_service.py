@@ -546,6 +546,25 @@ class BudgetService:
 
         return trend
 
+    async def get_prior_average(
+        self, user_id: uuid.UUID, period: str, months: int = 3
+    ) -> float:
+        """Mean monthly spend over the ``months`` before the trend window.
+
+        The trend covers ``period`` and the ``months - 1`` before it, so the
+        prior window is the ``months`` months before that.
+        """
+        first = period
+        for _ in range(months):
+            first = previous_period(first)
+        last = first
+        for _ in range(months - 1):
+            first = previous_period(first)
+        start, _ = await self.get_period_dates(user_id, first)
+        _, end = await self.get_period_dates(user_id, last)
+        total = await self.get_total_spending(user_id, start, end)
+        return round(total / months, 2)
+
     async def get_category_changes(
         self, user_id: uuid.UUID, period: str
     ) -> list[DashboardCategoryChange]:
@@ -587,6 +606,7 @@ class BudgetService:
         period_start, period_end = await self.get_period_dates(user_id, period)
         top_items = await self.get_top_items(user_id, period_start, period_end)
         trend = await self.get_spending_trend(user_id, period)
+        prior_average = await self.get_prior_average(user_id, period)
         category_changes = await self.get_category_changes(user_id, period)
 
         return DashboardSpendingResponse(
@@ -595,6 +615,7 @@ class BudgetService:
             categories=summary.categories,
             top_items=top_items,
             trend=trend,
+            prior_average=prior_average,
             previous_period=previous_period(period),
             category_changes=category_changes,
         )

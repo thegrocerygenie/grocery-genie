@@ -364,3 +364,40 @@ async def test_dashboard_top_items_carry_their_category(
             "category_name": None,
         },
     ]
+
+
+# --- Design "3-month trend": the 3-month average against the 3 months before ---
+
+
+@pytest.mark.asyncio
+async def test_dashboard_compares_the_trend_with_the_three_months_before(
+    client: AsyncClient, seeded_db, db_session
+):
+    groceries = await _category_id(db_session, "Groceries")
+
+    # Prior window Oct-Dec 2025: 300 + 0 + 150 = 450 -> 150/month.
+    # Trend window Jan-Mar 2026 is irrelevant to prior_average.
+    await _add_receipt(db_session, date(2025, 10, 5), [(groceries, 300.0)])
+    await _add_receipt(db_session, date(2025, 12, 20), [(None, 150.0)])
+    await _add_receipt(db_session, date(2026, 1, 9), [(groceries, 99.0)])
+    # Before the prior window, another user's, and a pending scan: none count.
+    await _add_receipt(db_session, date(2025, 9, 30), [(groceries, 1000.0)])
+    await _add_receipt(
+        db_session, date(2025, 11, 3), [(groceries, 1000.0)], user_id=USER_B_ID
+    )
+    await _add_receipt(
+        db_session, date(2025, 11, 4), [(groceries, 1000.0)], status="pending"
+    )
+
+    response = await client.get("/api/dashboard/spending?period=2026-03")
+
+    assert response.json()["prior_average"] == 150.0
+
+
+@pytest.mark.asyncio
+async def test_dashboard_prior_average_is_zero_without_earlier_spending(
+    client: AsyncClient, seeded_db
+):
+    response = await client.get("/api/dashboard/spending?period=2026-03")
+
+    assert response.json()["prior_average"] == 0.0
