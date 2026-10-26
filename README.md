@@ -91,11 +91,23 @@ You can put these in `backend/.env` instead of exporting them. Every call goes t
 | Setting | Default | Meaning |
 |---|---|---|
 | `GG_LLM_PROVIDER` | `anthropic` | LiteLLM provider prefix |
-| `GG_LLM_MODEL` | `claude-sonnet-4-20250514` | Model name for that provider |
+| `GG_LLM_MODEL` | `claude-sonnet-5-5` | Model name for that provider |
+| `GG_LLM_TEMPERATURE` | unset | Sent only when set. Leave it unset for Claude Sonnet 5.5, which rejects any non-default value. |
+| `GG_LLM_MAX_TOKENS` | `16000` | Output cap per call, thinking included |
 | `GG_LLM_API_KEY` | empty | Key for that provider, or the proxy's key |
 | `GG_LLM_API_BASE` | empty | Base URL of a LiteLLM proxy or gateway. Empty calls the provider's own API. |
 
-To call a LiteLLM proxy, set `GG_LLM_PROVIDER=litellm_proxy`, `GG_LLM_MODEL` to the model name the proxy serves, `GG_LLM_API_BASE` to the proxy URL (for example `http://localhost:4000`), and `GG_LLM_API_KEY` to the proxy's key. The provider keys stay on the proxy.
+To call a LiteLLM proxy, set `GG_LLM_PROVIDER=litellm_proxy`, `GG_LLM_MODEL` to the model name the proxy serves, `GG_LLM_API_BASE` to the proxy URL, and `GG_LLM_API_KEY` to the proxy's key. The provider keys stay on the proxy.
+
+#### Local LiteLLM proxy
+
+The repo runs one in Docker. It serves the alias `receipt-vision`, defined in `backend/llm-proxy/config.yaml`.
+
+1. Copy `backend/llm-proxy/.env.example` to `backend/llm-proxy/.env`. Set `ANTHROPIC_API_KEY`, and set `LITELLM_MASTER_KEY` to a new key: `echo "sk-$(openssl rand -hex 24)"`.
+2. Copy `backend/.env.example` to `backend/.env`. Set `GG_LLM_API_KEY` to the same `LITELLM_MASTER_KEY`.
+3. Run `make llm-up`. The proxy listens on `http://localhost:54442`. `make db-up` does not start it.
+
+To change the model, edit `model` in `backend/llm-proxy/config.yaml` and run `make llm-up` again. Run the extraction harness against the proxy before you rely on the new model.
 
 ### Mobile
 

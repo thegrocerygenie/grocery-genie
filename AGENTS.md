@@ -38,7 +38,7 @@ See `docs/prd/PHASE_SCOPE.md` for what's in and out of scope.
 - **Receipt extraction:** Vision model processes receipt image → structured JSON
 - **Category assignment:** Text model classifies line items into spending categories
 - **Output validation:** Pydantic models validate all LLM structured outputs before persistence
-- Temperature = 0 for all extraction tasks
+- Send no `temperature`: the default model, Claude Sonnet 5.5, accepts only its default sampling (`llm_temperature` in `backend/app/core/config.py`).
 - Structured JSON output with schema enforcement
 - Fallback to rule-based processing if LLM unavailable or returns invalid output
 
@@ -244,6 +244,6 @@ Use the `validate` checklist (or `make validate`) for the full suite.
 
 ## Important Context
 - System prompts are specification documents — each instruction addresses a specific model failure.
-- Temperature 0 improves determinism but doesn't guarantee it. Validation layers essential.
+- Extraction output can vary from run to run, so the validation layers are what keep it correct.
 - International receipts use varied decimal separators — parsing must handle locale-specific formats.
 - Competitive moat is the data pipeline and three-layer value extraction, not UI polish.

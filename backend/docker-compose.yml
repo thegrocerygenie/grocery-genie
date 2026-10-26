@@ -31,6 +31,21 @@ services:
       timeout: 3s
       retries: 10
 
+  # LiteLLM proxy. Opt-in so `make db-up` does not start it: `make llm-up`.
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.106.4
+    container_name: grocery_genie_litellm
+    profiles: ["llm"]
+    restart: unless-stopped
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    env_file:
+      - path: llm-proxy/.env
+        required: false
+    volumes:
+      - ./llm-proxy/config.yaml:/app/config.yaml:ro
+    ports:
+      - "54442:4000"
+
 volumes:
   grocery_genie_db_data:
   grocery_genie_redis_data:

@@ -18,7 +18,7 @@ Run from backend/ directory:
 ## Consistency Check (optional, slower)
 
 Run `pytest tests/llm_validation/test_extraction_consistency.py -v`
-- Sends each test receipt 5 times with temperature=0.
+- Sends each test receipt 5 times with the configured model settings.
 - Flags any receipt where outputs vary across runs.
 - Target: ≥95% of receipts produce identical output.
 

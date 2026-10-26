@@ -1,4 +1,4 @@
-"""GG_LLM_API_BASE routes LLM calls to a LiteLLM proxy (or any base URL)."""
+"""The options each LiteLLM call sends: model, base URL, sampling, max_tokens."""
 
 import json
 from types import SimpleNamespace
@@ -78,3 +78,39 @@ async def test_no_api_base_lets_litellm_use_the_provider_default(calls):
     await LiteLLMCategoryAssigner(settings).assign(["Milk"])
 
     assert [c["api_base"] for c in calls] == [None, None]
+
+
+async def test_default_model_is_claude_sonnet_5_5(calls):
+    await LiteLLMReceiptExtractor(_settings()).extract(b"img", "image/jpeg")
+
+    assert calls[0]["model"] == "anthropic/claude-sonnet-5-5"
+
+
+async def test_temperature_is_not_sent_by_default(calls):
+    """Claude Sonnet 5.5 rejects any non-default temperature with a 400."""
+    settings = _settings()
+
+    await LiteLLMReceiptExtractor(settings).extract(b"img", "image/jpeg")
+    await LiteLLMCategoryAssigner(settings).assign(["Milk"])
+
+    assert all("temperature" not in c for c in calls)
+
+
+async def test_a_configured_temperature_is_sent(calls):
+    """For a model that accepts sampling settings."""
+    settings = _settings(llm_temperature=0.0)
+
+    await LiteLLMReceiptExtractor(settings).extract(b"img", "image/jpeg")
+    await LiteLLMCategoryAssigner(settings).assign(["Milk"])
+
+    assert [c["temperature"] for c in calls] == [0.0, 0.0]
+
+
+async def test_max_tokens_is_sent(calls):
+    """Without it, LiteLLM asks for the model's full 128K output."""
+    settings = _settings()
+
+    await LiteLLMReceiptExtractor(settings).extract(b"img", "image/jpeg")
+    await LiteLLMCategoryAssigner(settings).assign(["Milk"])
+
+    assert [c["max_tokens"] for c in calls] == [16000, 16000]
