@@ -8,7 +8,9 @@ import { Stack, router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 
 import HistoryScreen from '../../app/(tabs)/history/index';
+import { useAuthStore } from '@/store/authStore';
 import { useOfflineStore } from '@/store/offlineStore';
+import { fakeAccessToken } from '@/testing/jwt';
 import type { ReceiptResponse } from '@/features/receipt-capture/types';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
@@ -61,8 +63,9 @@ jest.mock('@/features/receipt-capture/hooks/useReceipts', () => ({
 
 const TWO_HOURS_AGO = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
-function queue(status: 'pending' | 'failed' = 'pending') {
+function queue(status: 'pending' | 'failed' = 'pending', ownerId = 'user-a') {
   useOfflineStore.getState().addPendingReceipt({
+    ownerId,
     imageUri: 'file:///doc/pending-receipts/a.jpg',
     mimeType: 'image/jpeg',
     capturedAt: TWO_HOURS_AGO,
@@ -88,6 +91,7 @@ function renderHistory() {
 beforeEach(() => {
   mockConnected = false;
   useOfflineStore.setState({ pendingReceipts: [] });
+  useAuthStore.setState({ accessToken: fakeAccessToken('user-a') });
 });
 
 afterEach(() => {
@@ -140,6 +144,16 @@ describe('History offline queue', () => {
 
     expect(screen.getByText('Uploading 1 receipt…')).toBeTruthy();
     expect(screen.getByText('Captured 2h ago · uploading')).toBeTruthy();
+  });
+
+  it('hides photos another user captured on this device', () => {
+    queue('pending', 'user-b');
+    queue('failed', 'user-b');
+    renderHistory();
+
+    expect(screen.queryByText('Pending')).toBeNull();
+    expect(screen.queryByText(/receipts? queued/)).toBeNull();
+    expect(screen.queryByText('Couldn’t read this photo')).toBeNull();
   });
 
   it('shows nothing extra when the queue is empty', () => {

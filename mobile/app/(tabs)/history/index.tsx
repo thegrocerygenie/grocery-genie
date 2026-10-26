@@ -29,6 +29,8 @@ import type { ReceiptResponse } from '@/features/receipt-capture/types';
 import type { CategoryResponse } from '@/features/budget/types';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useOfflineStore, type PendingReceipt } from '@/store/offlineStore';
+import { useAuthStore } from '@/store/authStore';
+import { tokenSubject } from '@/features/auth/utils/tokenSubject';
 
 type FilterIndex = 0 | 1 | 2;
 
@@ -177,7 +179,13 @@ export default function HistoryScreen() {
   const receiptImport = useReceiptImport();
   const deleteReceipt = useDeleteReceipt();
   const { isConnected } = useNetworkStatus();
-  const pendingReceipts = useOfflineStore((s) => s.pendingReceipts);
+  const ownerId = tokenSubject(useAuthStore((s) => s.accessToken));
+  const allPending = useOfflineStore((s) => s.pendingReceipts);
+  // The queue is device-wide; show only what this user captured.
+  const pendingReceipts = useMemo(
+    () => allPending.filter((r) => r.ownerId === ownerId),
+    [allPending, ownerId],
+  );
   const removePendingReceipt = useOfflineStore((s) => s.removePendingReceipt);
 
   const dropPending = (receipt: PendingReceipt) => {
