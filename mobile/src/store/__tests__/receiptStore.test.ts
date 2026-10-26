@@ -28,6 +28,9 @@ describe('receiptStore', () => {
         total: null,
         currency: 'USD',
         confidence: 0.9,
+        store_name_confidence: null,
+        date_confidence: null,
+        total_confidence: null,
       },
     };
     useReceiptStore.getState().setActiveScanResponse(response);
@@ -48,6 +51,9 @@ describe('receiptStore', () => {
         total: null,
         currency: 'USD',
         confidence: 0.5,
+        store_name_confidence: null,
+        date_confidence: null,
+        total_confidence: null,
       },
     });
     useReceiptStore.getState().clearScanSession();

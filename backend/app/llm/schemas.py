@@ -9,6 +9,8 @@ _SUBTOTAL_DRIFT_CONFIDENCE_CAP = 0.6
 _FUTURE_DATE_CONFIDENCE_CAP = 0.5
 _PRICE_TOLERANCE = 0.02
 _SUBTOTAL_TOLERANCE = 0.01
+# Receipt-level fields scored on their own (RC-02 AC 2).
+_FIELD_CONFIDENCES = ("store_name_confidence", "date_confidence", "total_confidence")
 
 
 class ExtractedLineItem(BaseModel):
@@ -47,7 +49,23 @@ class ReceiptExtractionResult(BaseModel):
     tax: float | None = None
     total: float | None = None
     confidence: float = Field(ge=0.0, le=1.0)
+    # Per-field scores for the review screen. None when the model omits one,
+    # which the client treats as "not flagged".
+    store_name_confidence: float | None = None
+    date_confidence: float | None = None
+    total_confidence: float | None = None
     warnings: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def clamp_field_confidences(self) -> "ReceiptExtractionResult":
+        """Clamp out-of-range field scores to 0-1 rather than fail the scan."""
+        for field in _FIELD_CONFIDENCES:
+            value = getattr(self, field)
+            if value is not None and not 0.0 <= value <= 1.0:
+                clamped = min(max(value, 0.0), 1.0)
+                self.warnings.append(f"{field} {value} out of range; using {clamped}")
+                setattr(self, field, clamped)
+        return self
 
     @model_validator(mode="after")
     def check_date_not_future(self) -> "ReceiptExtractionResult":
@@ -56,12 +74,21 @@ class ReceiptExtractionResult(BaseModel):
             parsed = date.fromisoformat(self.date)
         except ValueError:
             self.warnings.append(f"unparseable date: {self.date!r}")
-            self.confidence = min(self.confidence, _FUTURE_DATE_CONFIDENCE_CAP)
+            self._cap_date_confidence()
             return self
         if parsed > datetime.now().date():
             self.warnings.append(f"future-dated receipt: {self.date}")
-            self.confidence = min(self.confidence, _FUTURE_DATE_CONFIDENCE_CAP)
+            self._cap_date_confidence()
         return self
+
+    def _cap_date_confidence(self) -> None:
+        self.confidence = min(self.confidence, _FUTURE_DATE_CONFIDENCE_CAP)
+        # An unparseable date is stored as today, so the Date row needs a
+        # low score even when the model gave none.
+        self.date_confidence = min(
+            self.date_confidence if self.date_confidence is not None else 1.0,
+            _FUTURE_DATE_CONFIDENCE_CAP,
+        )
 
     @model_validator(mode="after")
     def check_subtotal_tolerance(self) -> "ReceiptExtractionResult":

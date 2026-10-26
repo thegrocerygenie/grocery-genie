@@ -127,6 +127,9 @@ class MockReceiptExtractor:
             tax=1.18,
             total=15.95,
             confidence=0.91,
+            store_name_confidence=0.97,
+            date_confidence=0.95,
+            total_confidence=0.93,
         )
 
 
@@ -153,6 +156,9 @@ class LowConfidenceMockExtractor:
             tax=0.0,
             total=0.0,
             confidence=0.15,
+            store_name_confidence=0.1,
+            date_confidence=0.1,
+            total_confidence=0.1,
         )
 
 

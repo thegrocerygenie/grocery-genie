@@ -14,6 +14,9 @@ describe('Receipt types', () => {
         total: null,
         currency: 'USD',
         confidence: 0.85,
+        store_name_confidence: null,
+        date_confidence: null,
+        total_confidence: null,
       },
     };
     expect(response.receipt_id).toBe('test-uuid');
