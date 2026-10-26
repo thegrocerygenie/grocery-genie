@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { useOfflineStore } from '../offlineStore';
 
 // Reset store between tests
@@ -64,5 +66,37 @@ describe('offlineStore', () => {
 
     expect(useOfflineStore.getState().pendingReceipts).toHaveLength(1);
     expect(useOfflineStore.getState().pendingReceipts[0].imageUri).toBe('file:///b.jpg');
+  });
+
+  it('resets a receipt left syncing by a crash back to pending on restart', async () => {
+    await AsyncStorage.setItem(
+      'grocery-genie-offline',
+      JSON.stringify({
+        state: {
+          pendingReceipts: [
+            {
+              id: 'pending-1',
+              imageUri: 'file:///a.jpg',
+              mimeType: 'image/jpeg',
+              capturedAt: '2026-03-22T10:00:00Z',
+              status: 'syncing',
+            },
+            {
+              id: 'pending-2',
+              imageUri: 'file:///b.jpg',
+              mimeType: 'image/jpeg',
+              capturedAt: '2026-03-22T11:00:00Z',
+              status: 'failed',
+            },
+          ],
+        },
+        version: 0,
+      }),
+    );
+
+    await useOfflineStore.persist.rehydrate();
+
+    const statuses = useOfflineStore.getState().pendingReceipts.map((r) => r.status);
+    expect(statuses).toEqual(['pending', 'failed']);
   });
 });
