@@ -85,6 +85,10 @@ export default function RootLayout() {
           <Stack.Screen name="language-settings" options={{ title: 'Language' }} />
           <Stack.Screen name="about" options={{ title: 'About' }} />
           <Stack.Screen
+            name="receipt/[id]"
+            options={{ title: 'Receipt', headerBackTitle: 'History' }}
+          />
+          <Stack.Screen
             name="manual-entry"
             options={{ title: 'Manual Entry', presentation: 'modal' }}
           />

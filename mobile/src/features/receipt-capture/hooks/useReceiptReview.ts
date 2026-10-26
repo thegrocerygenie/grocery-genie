@@ -12,7 +12,8 @@ export function useReceiptConfirm() {
 
   return useMutation<ReceiptResponse, Error, ConfirmParams>({
     mutationFn: ({ receiptId, updates }) => updateReceipt(receiptId, updates),
-    onSuccess: () => {
+    onSuccess: (_data, { receiptId }) => {
+      queryClient.invalidateQueries({ queryKey: ['receipt', receiptId] });
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },

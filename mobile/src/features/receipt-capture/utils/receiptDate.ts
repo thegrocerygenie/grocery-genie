@@ -18,3 +18,25 @@ export function toIsoDate(date: Date): string {
 export function latestReceiptDate(now: Date = new Date()): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 }
+
+/** "2026-04-19" → "Apr 19, 2026"; anything else comes back unchanged. */
+export function formatLongDate(iso: string): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return `${months[m - 1]} ${d}, ${y}`;
+}
