@@ -23,6 +23,14 @@ describe('ImportProgressOverlay', () => {
     expect(UNSAFE_getByType(Image).props.source).toEqual({ uri: 'file:///photo.jpg' });
   });
 
+  it('renders inline, not as a native Modal', () => {
+    // iOS won't present the review modal while another modal is showing, so a
+    // Modal here left the import stuck on the screen it started from.
+    const { UNSAFE_queryAllByType } = render(<ImportProgressOverlay visible previewUri={null} />);
+    const { Modal } = jest.requireActual('react-native');
+    expect(UNSAFE_queryAllByType(Modal)).toHaveLength(0);
+  });
+
   it('renders nothing when hidden', () => {
     render(<ImportProgressOverlay visible={false} previewUri={null} />);
     expect(screen.queryByRole('progressbar')).toBeNull();

@@ -1,13 +1,5 @@
 import React, { useEffect } from 'react';
-import {
-  AccessibilityInfo,
-  ActivityIndicator,
-  Image,
-  Modal,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
@@ -20,46 +12,52 @@ interface ImportProgressOverlayProps {
   previewUri: string | null;
 }
 
-/** Blocks the screen while an imported receipt uploads and is extracted. */
+/**
+ * Covers the screen while an imported receipt uploads and is extracted.
+ *
+ * Render it last inside the screen. It is a plain view, not a native Modal:
+ * iOS won't present the review modal while another modal is still showing.
+ */
 export function ImportProgressOverlay({ visible, previewUri }: ImportProgressOverlayProps) {
   useEffect(() => {
     if (visible) AccessibilityInfo.announceForAccessibility(MESSAGE);
   }, [visible]);
 
+  if (!visible) return null;
+
   return (
-    <Modal animationType="fade" transparent visible={visible} statusBarTranslucent>
-      <View style={styles.backdrop}>
-        <View
-          style={styles.card}
-          accessible
-          accessibilityRole="progressbar"
-          accessibilityLabel={MESSAGE}
-          accessibilityState={{ busy: true }}
-        >
-          <View style={styles.preview}>
-            {previewUri ? (
-              <Image
-                source={{ uri: previewUri }}
-                style={styles.previewImage}
-                resizeMode="cover"
-                accessibilityIgnoresInvertColors
-              />
-            ) : (
-              <SymbolView name="doc.text.fill" size={30} tintColor={colors.tint} />
-            )}
-          </View>
-          <Text style={styles.title}>{MESSAGE}</Text>
-          <Text style={styles.caption}>This takes a few seconds.</Text>
-          <ActivityIndicator style={styles.spinner} color={colors.tint} />
+    <View style={styles.backdrop} accessibilityViewIsModal>
+      <View
+        style={styles.card}
+        accessible
+        accessibilityRole="progressbar"
+        accessibilityLabel={MESSAGE}
+        accessibilityState={{ busy: true }}
+      >
+        <View style={styles.preview}>
+          {previewUri ? (
+            <Image
+              source={{ uri: previewUri }}
+              style={styles.previewImage}
+              resizeMode="cover"
+              accessibilityIgnoresInvertColors
+            />
+          ) : (
+            <SymbolView name="doc.text.fill" size={30} tintColor={colors.tint} />
+          )}
         </View>
+        <Text style={styles.title}>{MESSAGE}</Text>
+        <Text style={styles.caption}>This takes a few seconds.</Text>
+        <ActivityIndicator style={styles.spinner} color={colors.tint} />
       </View>
-    </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   backdrop: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
     backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
