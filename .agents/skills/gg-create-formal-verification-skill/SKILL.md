@@ -1,7 +1,6 @@
 ---
 name: gg-create-formal-verification-skill
-description: "Generate a project-local skill that formally verifies the code where a bug costs the most and tests reach the least, with whichever verification tool fits. Run by hand for races, retries, state machines, parsers, or invariants that need more than tests."
-disable-model-invocation: true
+description: "Formally verify the riskiest promise in the code (races, retries, state machines, invariants) with a model checker or verifier, and leave a verify-<area> skill that rechecks it. Use when tests cannot reach the orderings or inputs that break the code, or the user asks to model-check or prove something."
 ---
 
 # Create a formal verification skill

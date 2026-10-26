@@ -50,3 +50,6 @@ backend/uploads/
 # Misc
 *.log
 *.pid
+
+# Verification runs (verify-* skills): state and evidence
+.verification/

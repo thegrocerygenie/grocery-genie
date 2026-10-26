@@ -2,6 +2,7 @@ import uuid
 from datetime import UTC, date, datetime
 
 import pytest
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import Category, LineItem, Receipt, User
@@ -286,6 +287,50 @@ async def test_check_thresholds_at_50(service, user_id, default_categories, db_s
     assert any(b.threshold_percent == 50 for b in breaches)
     assert not any(b.threshold_percent == 80 for b in breaches)
     assert not any(b.threshold_percent == 100 for b in breaches)
+
+
+@pytest.mark.asyncio
+async def test_check_thresholds_locks_budgets_before_reading_spend(
+    service, user_id, default_categories, db_session, monkeypatch
+):
+    """H1: two receipts confirmed at once must not both read spend without the
+    other. check_thresholds locks the user's budget rows (FOR UPDATE, in id
+    order) before it reads spend, so concurrent confirms for one user take
+    turns. SQLite drops FOR UPDATE, so check the SQL as Postgres would get it;
+    formal/budget_alerts/repro/h1_concurrent_confirm.py proves the behavior.
+    """
+    request = BudgetCreateRequest(
+        category_id=None, amount=100.0, period_type="monthly", period_start="2026-03-01"
+    )
+    await service.create_budget(user_id, request)
+    await service.create_budget(
+        user_id,
+        BudgetCreateRequest(
+            category_id=default_categories[0].id,
+            amount=50.0,
+            period_type="monthly",
+            period_start="2026-03-01",
+        ),
+    )
+
+    statements: list[str] = []
+    execute = db_session.execute
+
+    async def recording_execute(statement, *args, **kwargs):
+        statements.append(
+            str(statement.compile(dialect=postgresql.dialect())).replace("\n", " ")
+        )
+        return await execute(statement, *args, **kwargs)
+
+    monkeypatch.setattr(db_session, "execute", recording_execute)
+    await service.check_thresholds(user_id, date(2026, 3, 10))
+
+    locks = [s for s in statements if "FROM budgets" in s and "FOR UPDATE" in s]
+    assert len(locks) == 1, statements
+    assert "ORDER BY budgets.id" in locks[0]
+    assert "budgets.category_id IS NULL" not in locks[0]  # all of the user's budgets
+    spend_read = next(i for i, s in enumerate(statements) if "sum(line_items" in s)
+    assert statements.index(locks[0]) < spend_read
 
 
 @pytest.mark.asyncio
