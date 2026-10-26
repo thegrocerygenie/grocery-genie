@@ -2,11 +2,11 @@ import React, { useMemo } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 
+import { getCategoryMetaByName } from '@/constants/categories';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
 import { useBudgetStore } from '@/store/budgetStore';
-
-const FALLBACK_COLOR = colors.cat.groceries;
+import { monthName } from '@/utils/period';
 
 export default function TopItemsScreen() {
   const { selectedPeriod } = useBudgetStore();
@@ -18,6 +18,8 @@ export default function TopItemsScreen() {
       name: it.name,
       trips: `${it.count} trip${it.count === 1 ? '' : 's'}`,
       amount: it.total_spent,
+      // Uncategorized items fall back to the "Other" grey.
+      color: getCategoryMetaByName(it.category_name).color,
     }));
   }, [data]);
 
@@ -37,7 +39,9 @@ export default function TopItemsScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: 120, gap: spacing.sm }}
       >
-        <Text style={styles.intro}>Ranked by total spend this period.</Text>
+        <Text style={styles.intro}>
+          {monthName(data?.period ?? selectedPeriod)} · ranked by total spend
+        </Text>
 
         {isLoading ? (
           <View style={styles.empty}>
@@ -70,11 +74,12 @@ export default function TopItemsScreen() {
                 </View>
                 <View style={styles.barTrack}>
                   <View
+                    testID={`top-item-bar-${i}`}
                     style={[
                       styles.barFill,
                       {
                         width: max > 0 ? `${(it.amount / max) * 100}%` : '0%',
-                        backgroundColor: FALLBACK_COLOR,
+                        backgroundColor: it.color,
                       },
                     ]}
                   />

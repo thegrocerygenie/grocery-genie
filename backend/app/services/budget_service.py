@@ -434,14 +434,59 @@ class BudgetService:
             .order_by(func.sum(LineItem.total_price).desc())
             .limit(limit)
         )
+        rows = result.all()
+        categories = await self._dominant_categories(
+            user_id, start, end, [row[0] for row in rows]
+        )
+        names = await self._get_category_names(
+            {cid for cid in categories.values() if cid is not None}
+        )
         return [
             DashboardTopItem(
                 name=row[0],
                 total_spent=round(float(row[1]), 2),
                 count=row[2],
+                category_id=categories.get(row[0]),
+                category_name=names.get(categories.get(row[0])),
             )
-            for row in result.all()
+            for row in rows
         ]
+
+    async def _dominant_categories(
+        self, user_id: uuid.UUID, start: date, end: date, item_names: list[str]
+    ) -> dict[str, uuid.UUID | None]:
+        """For each item name, the category with the most spend in the period.
+
+        An item can sit in more than one category (a correction, or a store
+        that files it differently). Ties go to the category seen with more
+        line items, then to a stable order.
+        """
+        if not item_names:
+            return {}
+        result = await self.db.execute(
+            select(
+                LineItem.raw_name,
+                LineItem.category_id,
+                func.sum(LineItem.total_price),
+                func.count(),
+            )
+            .join(Receipt, LineItem.receipt_id == Receipt.id)
+            .where(
+                Receipt.user_id == user_id,
+                Receipt.status == "confirmed",
+                Receipt.deleted_at.is_(None),
+                Receipt.date >= start,
+                Receipt.date <= end,
+                LineItem.raw_name.in_(item_names),
+            )
+            .group_by(LineItem.raw_name, LineItem.category_id)
+        )
+        best: dict[str, tuple[float, int, str, uuid.UUID | None]] = {}
+        for name, category_id, spent, count in result.all():
+            key = (float(spent), count, str(category_id or ""), category_id)
+            if name not in best or key[:3] > best[name][:3]:
+                best[name] = key
+        return {name: entry[3] for name, entry in best.items()}
 
     async def get_spending_trend(
         self, user_id: uuid.UUID, period: str, months: int = 3
