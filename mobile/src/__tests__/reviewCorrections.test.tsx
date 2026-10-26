@@ -5,7 +5,7 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack, router } from 'expo-router';
-import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
+import { act, fireEvent, renderRouter, screen, within } from 'expo-router/testing-library';
 
 import ReviewScreen from '../../app/review';
 import { useReceiptStore } from '@/store/receiptStore';
@@ -59,6 +59,9 @@ const scan: ReceiptScanResponse = {
     total: 1.29,
     currency: 'USD',
     confidence: 0.95,
+    store_name_confidence: 0.95,
+    date_confidence: 0.95,
+    total_confidence: 0.95,
   },
 };
 
@@ -320,6 +323,79 @@ describe('Review screen low-confidence flags (AC 2)', () => {
   });
 });
 
+describe('Review screen store, date and total flags (AC 2)', () => {
+  type FieldConfidences = Pick<
+    ReceiptScanResponse['extraction'],
+    'store_name_confidence' | 'date_confidence' | 'total_confidence'
+  >;
+
+  function withFieldConfidences(confidences: FieldConfidences) {
+    useReceiptStore.getState().setActiveScanResponse({
+      ...scan,
+      extraction: { ...scan.extraction, ...confidences },
+    });
+  }
+
+  it('flags each of store, date and total read with low confidence', () => {
+    withFieldConfidences({
+      store_name_confidence: 0.4,
+      date_confidence: 0.69,
+      total_confidence: 0.5,
+    });
+    renderReview();
+
+    expect(screen.getAllByText('verify')).toHaveLength(3);
+    const store = screen.getByLabelText('Store');
+    expect(store).toHaveStyle({ color: '#FF9500' });
+    expect(store.props.accessibilityHint).toMatch(/low confidence/i);
+    expect(screen.getByLabelText('Receipt date').props.accessibilityHint).toMatch(
+      /low confidence/i,
+    );
+    const total = screen.getByLabelText('Total, $1.29, low confidence');
+    expect(within(total).getByText('$1.29')).toHaveStyle({ color: '#FF9500' });
+  });
+
+  it('does not flag store, date or total at the threshold', () => {
+    withFieldConfidences({
+      store_name_confidence: 0.7,
+      date_confidence: 0.7,
+      total_confidence: 0.7,
+    });
+    renderReview();
+
+    expect(screen.queryByText('verify')).toBeNull();
+    const store = screen.getByLabelText('Store');
+    expect(store).not.toHaveStyle({ color: '#FF9500' });
+    expect(store.props.accessibilityHint).toBeUndefined();
+    expect(screen.getByLabelText('Receipt date').props.accessibilityHint).toBeUndefined();
+    expect(screen.getByLabelText('Total, $1.29')).toBeTruthy();
+  });
+
+  it('does not flag a field with no confidence score', () => {
+    withFieldConfidences({
+      store_name_confidence: null,
+      date_confidence: null,
+      total_confidence: null,
+    });
+    renderReview();
+
+    expect(screen.queryByText('verify')).toBeNull();
+  });
+
+  it('flags only the field read with low confidence', () => {
+    withFieldConfidences({
+      store_name_confidence: 0.95,
+      date_confidence: 0.95,
+      total_confidence: 0.3,
+    });
+    renderReview();
+
+    expect(screen.getAllByText('verify')).toHaveLength(1);
+    expect(screen.getByLabelText('Total, $1.29, low confidence')).toBeTruthy();
+    expect(screen.getByLabelText('Store')).not.toHaveStyle({ color: '#FF9500' });
+  });
+});
+
 describe('Review opened from History', () => {
   function stored(status: string): ReceiptResponse {
     return {
@@ -333,6 +409,9 @@ describe('Review opened from History', () => {
       currency: 'USD',
       image_url: null,
       extraction_confidence: 0.95,
+      store_name_confidence: 0.95,
+      date_confidence: 0.95,
+      total_confidence: 0.95,
       status,
       items: [
         {
@@ -377,6 +456,20 @@ describe('Review opened from History', () => {
     );
     // Back to History, not to the scan flow's home tab.
     expect(routerScreen.getPathname()).toBe('/');
+  });
+
+  it('flags the stored store, date and total confidences', async () => {
+    mockGetReceipt.mockResolvedValue({
+      ...stored('pending_review'),
+      store_name_confidence: 0.5,
+      date_confidence: 0.6,
+      total_confidence: 0.4,
+    });
+    openFromHistory();
+
+    expect(await screen.findByLabelText('Total, $1.29, low confidence')).toBeTruthy();
+    expect(screen.getAllByText('verify')).toHaveLength(3);
+    expect(screen.getByLabelText('Store')).toHaveStyle({ color: '#FF9500' });
   });
 
   it('shows a confirmed receipt read-only', async () => {

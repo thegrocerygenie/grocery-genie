@@ -1,4 +1,4 @@
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 
 SYSTEM_PROMPT = """\
 You are a receipt data extraction system. Your job is to analyze receipt images \
@@ -24,6 +24,9 @@ clearly printed. It is better to return null than to guess.
    - 0.7-0.9 = legible but minor ambiguity (e.g., smudged digit)
    - 0.3-0.6 = partially legible, some guessing required
    - 0.0 = not visible or not present
+   Score the store name, the date and the total each on their own \
+(store_name_confidence, date_confidence, total_confidence), apart from the \
+overall receipt confidence.
 
 5. **Currency detection**: Extract the currency symbol or code if present on the \
 receipt. If no currency is indicated, default to "USD".
@@ -56,6 +59,9 @@ Return ONLY valid JSON matching this schema:
   "subtotal": 0.00,
   "tax": 0.00,
   "total": 0.00,
+  "store_name_confidence": 0.95,
+  "date_confidence": 0.95,
+  "total_confidence": 0.95,
   "confidence": 0.90
 }
 ```
@@ -115,6 +121,9 @@ A US grocery receipt from "Trader Joe's" dated 03/15/2026 with 3 items.
   "subtotal": 7.26,
   "tax": 0.33,
   "total": 7.59,
+  "store_name_confidence": 0.98,
+  "date_confidence": 0.96,
+  "total_confidence": 0.97,
   "confidence": 0.94
 }
 ```

@@ -745,6 +745,86 @@ async def test_scan_reports_the_stored_date_when_extracted_date_is_unreadable(
     assert scan["extraction"]["date"] == stored["date"]
 
 
+# --- RC-02 AC 2: store, date and total carry their own confidence ---
+# Persisted on receipts so a scan reopened from History is flagged too
+# (user decision, 2026-10-26).
+
+
+async def test_scan_returns_store_date_and_total_confidence(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    scan = await _create_receipt(client, test_image_bytes)
+
+    extraction = scan["extraction"]
+    assert extraction["store_name_confidence"] == 0.97
+    assert extraction["date_confidence"] == 0.95
+    assert extraction["total_confidence"] == 0.93
+
+
+async def test_field_confidences_are_persisted_for_history(
+    client: AsyncClient, test_image_bytes: bytes, mock_extractor
+):
+    from app.llm.schemas import ExtractedLineItem, ReceiptExtractionResult
+
+    mock_extractor._result = ReceiptExtractionResult(
+        store_name="Smudged Mart",
+        date="2026-03-15",
+        items=[
+            ExtractedLineItem(
+                name="Apples",
+                quantity=1,
+                unit_price=3.0,
+                total_price=3.0,
+                confidence=0.9,
+            )
+        ],
+        subtotal=3.0,
+        total=3.0,
+        confidence=0.85,
+        store_name_confidence=0.4,
+        date_confidence=0.7,
+        total_confidence=0.69,
+    )
+    scan = await _create_receipt(client, test_image_bytes)
+    mock_extractor._result = None
+
+    stored = (await client.get(f"/api/receipts/{scan['receipt_id']}")).json()
+    assert stored["store_name_confidence"] == 0.4
+    assert stored["date_confidence"] == 0.7
+    assert stored["total_confidence"] == 0.69
+
+    listed = (await client.get("/api/receipts")).json()["items"]
+    row = next(r for r in listed if r["id"] == scan["receipt_id"])
+    assert row["store_name_confidence"] == 0.4
+
+
+async def test_unreadable_date_is_returned_with_a_low_date_confidence(
+    client: AsyncClient, test_image_bytes: bytes, mock_extractor
+):
+    from app.llm.schemas import ExtractedLineItem, ReceiptExtractionResult
+
+    mock_extractor._result = ReceiptExtractionResult(
+        store_name="Corner Market",
+        date="15/03/2026",
+        items=[
+            ExtractedLineItem(
+                name="Apples",
+                quantity=1,
+                unit_price=3.0,
+                total_price=3.0,
+                confidence=0.9,
+            )
+        ],
+        total=3.0,
+        confidence=0.85,
+        date_confidence=0.95,
+    )
+    scan = await _create_receipt(client, test_image_bytes)
+    mock_extractor._result = None
+
+    assert scan["extraction"]["date_confidence"] <= 0.5
+
+
 # --- RC-02 AC 1: item quantity is editable ---
 # The line total is what was paid and what spend sums, so a quantity edit
 # keeps total_price and recomputes unit_price (user decision, 2026-10-26).
