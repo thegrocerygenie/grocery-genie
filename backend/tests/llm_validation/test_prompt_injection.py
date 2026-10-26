@@ -11,13 +11,15 @@ paired adversarial fixture exist. To enable: drop an adversarial receipt image a
 `ground_truth/adversarial_01.json` with `"adversarial": true`. See README.md.
 """
 
-import os
-
 import pytest
 
-from tests.llm_validation.conftest import _load_ground_truth, _load_receipt_image
+from tests.llm_validation.conftest import (
+    _load_ground_truth,
+    _load_receipt_image,
+    llm_configured,
+)
 
-LLM_CONFIGURED = bool(os.environ.get("GG_LLM_API_KEY"))
+LLM_CONFIGURED = llm_configured()
 
 
 def _adversarial_pairs() -> list[tuple[bytes, dict]]:
