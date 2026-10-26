@@ -17,6 +17,7 @@ jest.mock('expo-haptics', () => ({
 }));
 jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
+  Tabs: { Screen: () => null },
   useRouter: () => ({ push: mockPush, back: jest.fn() }),
 }));
 jest.mock('expo-camera', () => {

@@ -4,7 +4,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import NetInfo from '@react-native-community/netinfo';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, Tabs, useRouter } from 'expo-router';
 
 import { ANALYTICS_EVENTS } from '@/constants/analyticsEvents';
 import { colors, radii, spacing, type } from '@/constants/theme';
@@ -65,8 +65,10 @@ export default function ScanScreen() {
 
   if (!permission.granted) {
     // NFR: without camera access, fall back to importing from the photo library.
+    // No Cancel here, so the tab bar stays as the way out.
     return (
       <>
+        <Tabs.Screen options={{ tabBarStyle: undefined }} />
         <PermissionScreen
           denied={!permission.canAskAgain}
           onRequest={requestPermission}
@@ -158,6 +160,8 @@ export default function ScanScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
+      {/* Design "Scan · capture": full-screen camera; Cancel is the way out. */}
+      <Tabs.Screen options={{ tabBarStyle: { display: 'none' } }} />
       <View style={styles.root}>
         <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
 
