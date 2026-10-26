@@ -106,6 +106,16 @@ async def update_me(
     return _to_profile(user, needs_onboarding=needs)
 
 
+@router.post("/me/onboarding-complete", response_model=UserProfileResponse)
+async def complete_onboarding(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserProfileResponse:
+    await auth_service.complete_onboarding(db, user)
+    needs = await auth_service.user_needs_onboarding(db, user.id)
+    return _to_profile(user, needs_onboarding=needs)
+
+
 @router.post("/me/email-change/request", status_code=202)
 async def request_email_change(
     body: EmailChangeRequestPayload,
