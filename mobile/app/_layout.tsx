@@ -77,10 +77,7 @@ export default function RootLayout() {
             name="budget-settings"
             options={{ title: 'Budget Settings', presentation: 'modal' }}
           />
-          <Stack.Screen name="notification-settings" options={{ title: 'Alerts' }} />
-          <Stack.Screen name="settings" options={{ title: 'Settings', presentation: 'modal' }} />
-          <Stack.Screen name="language-settings" options={{ title: 'Language' }} />
-          <Stack.Screen name="about" options={{ title: 'About' }} />
+          <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen
             name="receipt/[id]"
             options={{ title: 'Receipt', headerBackTitle: 'History' }}

@@ -7,7 +7,7 @@ import { Linking } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 
-import SettingsScreen from '../../app/settings';
+import SettingsScreen from '../../app/settings/index';
 import { LINKS } from '@/constants/links';
 import type { BudgetResponse } from '@/features/budget/types';
 import type { UserProfile } from '@/features/auth/types';
@@ -54,8 +54,8 @@ function renderSettings() {
     {
       _layout: () => <Stack />,
       index: () => null,
-      settings: SettingsScreen,
-      about: () => null,
+      'settings/index': SettingsScreen,
+      'settings/about': () => null,
     },
     { initialUrl: '/' },
   );
@@ -90,7 +90,7 @@ describe('Settings hub', () => {
     expect(screen.queryByText('v1.0.0')).toBeNull();
     fireEvent.press(screen.getByLabelText('About'));
 
-    expect(routerScreen.getPathname()).toBe('/about');
+    expect(routerScreen.getPathname()).toBe('/settings/about');
   });
 
   it.each([
