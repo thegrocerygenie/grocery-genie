@@ -167,10 +167,20 @@ class DashboardTopItem(BaseModel):
     count: int
 
 
+class DashboardTrendCategory(BaseModel):
+    """One category's share of a trend month. ``category_id`` is None for
+    uncategorized spend, so the shares add up to the month's total."""
+
+    category_id: uuid.UUID | None
+    name: str
+    spent: float
+
+
 class DashboardTrendMonth(BaseModel):
     period: str
     spent: float
     budget: float | None = None
+    categories: list[DashboardTrendCategory] = []
 
 
 class DashboardCategoryChange(BaseModel):

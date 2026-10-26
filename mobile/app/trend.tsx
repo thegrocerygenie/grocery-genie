@@ -8,6 +8,7 @@ import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
 import { useBudgetStore } from '@/store/budgetStore';
 import { getCategoryMetaByName } from '@/constants/categories';
 import { percentChange } from '@/features/budget/utils/monthOverMonth';
+import { buildTrendBreakdown, type TrendSegment } from '@/features/budget/utils/trendBreakdown';
 import type { DashboardCategoryChange } from '@/features/budget/types';
 
 const MONTH_SHORT = [
@@ -79,14 +80,17 @@ export default function TrendScreen() {
   const { selectedPeriod } = useBudgetStore();
   const { data, isLoading } = useDashboardSpending(selectedPeriod);
 
-  const months = useMemo(() => {
-    const list = data?.trend ?? [];
-    return list.slice(0, 3).map((m) => ({
-      period: m.period,
-      label: periodLabel(m.period),
-      total: m.spent,
-    }));
-  }, [data]);
+  const breakdown = useMemo(() => buildTrendBreakdown((data?.trend ?? []).slice(0, 3)), [data]);
+  const months = useMemo(
+    () =>
+      breakdown.months.map((m) => ({
+        period: m.period,
+        label: periodLabel(m.period),
+        total: m.total,
+        segments: m.segments,
+      })),
+    [breakdown],
+  );
 
   const max = months.length > 0 ? Math.max(...months.map((m) => m.total), 1) : 1;
   const avg =
@@ -171,15 +175,7 @@ export default function TrendScreen() {
                         ${m.total.toFixed(0)}
                       </Text>
                       <View style={[styles.bar, { height: Math.max(h, 6) }]}>
-                        <View
-                          style={[
-                            styles.barFill,
-                            {
-                              height: '100%',
-                              backgroundColor: colors.tint,
-                            },
-                          ]}
-                        />
+                        <StackedFill period={m.period} total={m.total} segments={m.segments} />
                       </View>
                       <Text style={[type.caption1, { color: colors.iosLabel2 as string }]}>
                         {m.label}
@@ -188,6 +184,23 @@ export default function TrendScreen() {
                   );
                 })}
               </View>
+              {breakdown.categories.length > 0 ? (
+                <View style={styles.legend}>
+                  {breakdown.categories.map((c) => (
+                    <View
+                      key={c.key}
+                      style={styles.legendItem}
+                      accessible
+                      accessibilityLabel={`${c.name}, ${months.length}-month average ${money(c.average)}`}
+                    >
+                      <View style={[styles.legendDot, { backgroundColor: c.color }]} />
+                      <Text style={styles.caption}>
+                        {c.name} {money(c.average)} avg
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
             </View>
 
             {categoryChanges.length > 0 ? (
@@ -210,6 +223,38 @@ export default function TrendScreen() {
           </>
         )}
       </ScrollView>
+    </>
+  );
+}
+
+interface StackedFillProps {
+  period: string;
+  total: number;
+  segments: TrendSegment[];
+}
+
+/**
+ * A month's bar split by category, largest 3-month spender at the bottom. With
+ * no split (no spend, or an older server) the bar is one tint fill.
+ */
+function StackedFill({ period, total, segments }: StackedFillProps) {
+  const drawn = segments.filter((s) => s.spent > 0);
+  if (drawn.length === 0 || total <= 0) {
+    return <View style={[styles.barFill, styles.barFillPlain]} />;
+  }
+  // The bar stacks top to bottom, so draw the smallest share first.
+  return (
+    <>
+      {[...drawn].reverse().map((s) => (
+        <View
+          key={s.key}
+          testID={`trend-segment-${period}-${s.key}`}
+          style={[
+            styles.barFill,
+            { height: `${(s.spent / total) * 100}%`, backgroundColor: s.color },
+          ]}
+        />
+      ))}
     </>
   );
 }
@@ -324,6 +369,27 @@ const styles = StyleSheet.create({
   },
   barFill: {
     width: '100%',
+  },
+  barFillPlain: {
+    height: '100%',
+    backgroundColor: colors.tint,
+  },
+  legend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: spacing.md,
+    rowGap: 6,
+    paddingTop: spacing.sm,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
 
   sectionLabel: {
