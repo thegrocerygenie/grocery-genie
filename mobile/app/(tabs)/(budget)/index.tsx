@@ -135,38 +135,46 @@ export default function DashboardScreen() {
     router.push('/budget-settings');
   };
 
-  if (isLoading) {
-    return (
-      <View style={[styles.root, styles.center]}>
-        <ActivityIndicator color={colors.tint} />
-      </View>
-    );
-  }
-
   const onSettings = () => {
     router.push('/settings');
   };
 
+  // Rendered in every state: without it the header falls back to the route name ("index").
+  const header = (
+    <Stack.Screen
+      options={{
+        title: 'Budget',
+        headerLargeTitle: true,
+        headerTransparent: true,
+        headerBlurEffect: headerBlurFor(Platform.Version),
+        headerRight: () => (
+          <Pressable
+            onPress={onSettings}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+          >
+            <SymbolView name="gearshape.fill" size={20} tintColor={colors.tint} />
+          </Pressable>
+        ),
+      }}
+    />
+  );
+
+  if (isLoading) {
+    return (
+      <>
+        {header}
+        <View style={[styles.root, styles.center]}>
+          <ActivityIndicator color={colors.tint} />
+        </View>
+      </>
+    );
+  }
+
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: 'Budget',
-          headerLargeTitle: true,
-          headerTransparent: true,
-          headerBlurEffect: headerBlurFor(Platform.Version),
-          headerRight: () => (
-            <Pressable
-              onPress={onSettings}
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel="Settings"
-            >
-              <SymbolView name="gearshape.fill" size={20} tintColor={colors.tint} />
-            </Pressable>
-          ),
-        }}
-      />
+      {header}
       <ScrollView
         style={styles.root}
         contentInsetAdjustmentBehavior="automatic"
