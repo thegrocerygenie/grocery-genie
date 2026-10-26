@@ -1,10 +1,15 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Constants from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
+import { LINKS } from '@/constants/links';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useMe, useSignOut } from '@/features/auth/hooks/useAuth';
+import { useBudgets } from '@/features/budget/hooks/useBudget';
+import { alertsSummary, budgetsSummary } from '@/features/settings/utils/settingsSummary';
+import { useNotificationStore } from '@/store/notificationStore';
 
 interface RowDef {
   key: string;
@@ -15,25 +20,6 @@ interface RowDef {
   value?: string;
   href?: string;
 }
-
-const SPENDING_ROWS: RowDef[] = [
-  {
-    key: 'budget',
-    symbol: 'cart.fill',
-    iconBg: colors.green,
-    title: 'Budgets',
-    detail: 'Monthly limit · category caps',
-    href: '/budget-settings',
-  },
-  {
-    key: 'notifications',
-    symbol: 'bell.fill',
-    iconBg: colors.orange,
-    title: 'Notifications',
-    detail: 'Thresholds · weekly summary',
-    href: '/notification-settings',
-  },
-];
 
 const RECEIPT_ROWS: RowDef[] = [
   {
@@ -49,7 +35,38 @@ const RECEIPT_ROWS: RowDef[] = [
 export default function SettingsScreen() {
   const router = useRouter();
   const { data: profile } = useMe();
+  const { data: budgets } = useBudgets();
+  const localAlerts = useNotificationStore((s) => s.preferences);
   const signOut = useSignOut();
+
+  // Design "Settings · root": each row says what is set, not what it is for.
+  // Alerts read the server first and fall back to the local copy, as the
+  // Notifications screen does.
+  const prefs = profile?.preferences;
+  const spendingRows: RowDef[] = [
+    {
+      key: 'budget',
+      symbol: 'cart.fill',
+      iconBg: colors.green,
+      title: 'Budgets',
+      detail: budgetsSummary(budgets),
+      href: '/budget-settings',
+    },
+    {
+      key: 'notifications',
+      symbol: 'bell.fill',
+      iconBg: colors.orange,
+      title: 'Notifications',
+      detail: alertsSummary({
+        fifty: prefs?.notification_thresholds.fifty ?? localAlerts.fiftyPercent,
+        eighty: prefs?.notification_thresholds.eighty ?? localAlerts.eightyPercent,
+        hundred: prefs?.notification_thresholds.hundred ?? localAlerts.hundredPercent,
+        weekly: prefs?.weekly_summary.enabled ?? localAlerts.weeklySummaryEnabled,
+      }),
+      href: '/notification-settings',
+    },
+  ];
+  const version = Constants.expoConfig?.version;
 
   const onSignOut = async () => {
     await signOut.mutateAsync();
@@ -96,7 +113,7 @@ export default function SettingsScreen() {
         </Pressable>
 
         <Section header="SPENDING">
-          {SPENDING_ROWS.map((r, i) => (
+          {spendingRows.map((r, i) => (
             <SettingsRow
               key={r.key}
               row={r}
@@ -123,9 +140,13 @@ export default function SettingsScreen() {
             onPress={() => router.push('/recently-deleted')}
           />
           <SettingsLinkRow title="Change email" onPress={() => router.push('/email-change')} />
-          <SettingsTextRow title="Privacy" />
-          <SettingsTextRow title="Help & feedback" />
-          <SettingsTextRow title="About" detail="v1.0.0" />
+          <SettingsLinkRow title="Privacy" onPress={() => Linking.openURL(LINKS.privacyPolicy)} />
+          <SettingsLinkRow title="Help & feedback" onPress={() => Linking.openURL(LINKS.help)} />
+          <SettingsLinkRow
+            title="About"
+            detail={version ? `v${version}` : undefined}
+            onPress={() => router.push('/about')}
+          />
         </Section>
 
         <Pressable
@@ -200,29 +221,13 @@ function SettingsRow({ row, onPress }: SettingsRowProps) {
   );
 }
 
-interface SettingsTextRowProps {
-  title: string;
-  detail?: string;
-}
-
-function SettingsTextRow({ title, detail }: SettingsTextRowProps) {
-  return (
-    <View style={styles.row}>
-      <Text style={[type.body, { flex: 1 }]}>{title}</Text>
-      {detail ? (
-        <Text style={[type.body, { color: colors.iosLabel2 as string }]}>{detail}</Text>
-      ) : null}
-      <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3 as string} />
-    </View>
-  );
-}
-
 interface SettingsLinkRowProps {
   title: string;
+  detail?: string;
   onPress: () => void;
 }
 
-function SettingsLinkRow({ title, onPress }: SettingsLinkRowProps) {
+function SettingsLinkRow({ title, detail, onPress }: SettingsLinkRowProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -231,6 +236,9 @@ function SettingsLinkRow({ title, onPress }: SettingsLinkRowProps) {
       accessibilityLabel={title}
     >
       <Text style={[type.body, { flex: 1 }]}>{title}</Text>
+      {detail ? (
+        <Text style={[type.body, { color: colors.iosLabel2 as string }]}>{detail}</Text>
+      ) : null}
       <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3 as string} />
     </Pressable>
   );
