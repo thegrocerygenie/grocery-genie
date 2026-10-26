@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -357,3 +357,28 @@ async def test_top_items_limited_to_10(
     top = await service.get_top_items(user_id, start, end)
     assert len(top) == 10
     assert top[0].total_spent >= top[-1].total_spent
+
+
+@pytest.mark.asyncio
+async def test_spending_excludes_soft_deleted_receipts(
+    service, user_id, default_categories, db_session
+):
+    """A deleted confirmed receipt must not count toward spend or top items."""
+    cat = default_categories[0]
+    await _create_confirmed_receipt(
+        db_session, user_id, date(2026, 3, 5), [("Milk", 4.0, cat.id)]
+    )
+    deleted = await _create_confirmed_receipt(
+        db_session, user_id, date(2026, 3, 10), [("Steak", 40.0, cat.id)]
+    )
+    deleted.deleted_at = datetime.now(UTC)
+    await db_session.flush()
+
+    start, end = date(2026, 3, 1), date(2026, 3, 31)
+    by_category = await service.get_spending_by_category(user_id, start, end)
+    total = await service.get_total_spending(user_id, start, end)
+    top_items = await service.get_top_items(user_id, start, end)
+
+    assert by_category == {cat.id: 4.0}
+    assert total == 4.0
+    assert [item.name for item in top_items] == ["Milk"]

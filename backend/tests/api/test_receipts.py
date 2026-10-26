@@ -1,8 +1,10 @@
 import io
 import uuid
 
+import pytest
 from httpx import AsyncClient
 
+from app.core.seed import seed_default_categories
 from app.llm.provider import (
     LowConfidenceMockExtractor,
     get_receipt_extractor,
@@ -515,3 +517,123 @@ async def test_list_receipts_ordered_reverse_chronological(
     items = resp.json()["items"]
     dates = [i["date"] for i in items]
     assert dates == sorted(dates, reverse=True)
+
+
+@pytest.fixture
+async def seeded_categories(db_session):
+    await seed_default_categories(db_session)
+
+
+async def _category_id(client: AsyncClient, name: str) -> str:
+    resp = await client.get("/api/categories")
+    assert resp.status_code == 200
+    return next(c["id"] for c in resp.json() if c["name"] == name)
+
+
+async def test_name_and_category_correction_applies_on_next_scan(
+    client: AsyncClient, test_image_bytes: bytes, seeded_categories
+):
+    """Correcting name and category together must still teach the next scan.
+
+    The next scan extracts the original name, so the mapping has to be keyed
+    on that name, not on the user's corrected one.
+    """
+    household_id = await _category_id(client, "Household")
+    scan = await _create_receipt(client, test_image_bytes)
+    bananas = next(
+        i for i in scan["extraction"]["items"] if i["name"] == "Organic Bananas"
+    )
+
+    resp = await client.patch(
+        f"/api/receipts/{scan['receipt_id']}",
+        json={
+            "items": [
+                {"id": bananas["id"], "name": "Bananas", "category_id": household_id}
+            ],
+            "status": "confirmed",
+        },
+    )
+    assert resp.status_code == 200
+
+    rescan = await _create_receipt(client, test_image_bytes)
+    rescanned = next(
+        i for i in rescan["extraction"]["items"] if i["name"] == "Organic Bananas"
+    )
+    assert rescanned["category_id"] == household_id
+    assert rescanned["category_confidence"] == 1.0
+
+
+async def test_category_only_correction_applies_on_next_scan(
+    client: AsyncClient, test_image_bytes: bytes, seeded_categories
+):
+    """Regression guard for the path that already worked."""
+    household_id = await _category_id(client, "Household")
+    scan = await _create_receipt(client, test_image_bytes)
+    milk = next(
+        i for i in scan["extraction"]["items"] if i["name"] == "Whole Milk 1 Gal"
+    )
+
+    resp = await client.patch(
+        f"/api/receipts/{scan['receipt_id']}",
+        json={"items": [{"id": milk["id"], "category_id": household_id}]},
+    )
+    assert resp.status_code == 200
+
+    rescan = await _create_receipt(client, test_image_bytes)
+    rescanned = next(
+        i for i in rescan["extraction"]["items"] if i["name"] == "Whole Milk 1 Gal"
+    )
+    assert rescanned["category_id"] == household_id
+
+
+async def test_update_receipt_corrects_item_price(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    """A price edit on the review screen must be saved, not dropped."""
+    scan = await _create_receipt(client, test_image_bytes)
+    receipt_id = scan["receipt_id"]
+    item_id = scan["extraction"]["items"][0]["id"]
+
+    resp = await client.patch(
+        f"/api/receipts/{receipt_id}",
+        json={"items": [{"id": item_id, "total_price": 2.50}]},
+    )
+    assert resp.status_code == 200
+    item = next(i for i in resp.json()["items"] if i["id"] == item_id)
+    assert item["total_price"] == 2.50
+    assert item["unit_price"] == 2.50  # quantity is 1
+    assert item["corrected"] is True
+
+    fetched = await client.get(f"/api/receipts/{receipt_id}")
+    item = next(i for i in fetched.json()["items"] if i["id"] == item_id)
+    assert item["total_price"] == 2.50
+
+
+async def test_update_receipt_rejects_negative_price(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    scan = await _create_receipt(client, test_image_bytes)
+    item_id = scan["extraction"]["items"][0]["id"]
+
+    resp = await client.patch(
+        f"/api/receipts/{scan['receipt_id']}",
+        json={"items": [{"id": item_id, "total_price": -1}]},
+    )
+    assert resp.status_code == 422
+
+
+async def test_update_receipt_corrects_store_name(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    """A store-name edit on the review screen must be saved, not dropped."""
+    scan = await _create_receipt(client, test_image_bytes)
+    receipt_id = scan["receipt_id"]
+
+    resp = await client.patch(
+        f"/api/receipts/{receipt_id}", json={"store_name": "Corner Market"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["store_name"] == "Corner Market"
+
+    fetched = await client.get(f"/api/receipts/{receipt_id}")
+    assert fetched.json()["store_name"] == "Corner Market"

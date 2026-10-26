@@ -1,0 +1,89 @@
+import type { EditableLineItem, ReceiptExtraction } from '../types';
+import { buildReceiptUpdate } from '../utils/buildReceiptUpdate';
+
+const extraction: ReceiptExtraction = {
+  store_name: 'Test Grocery Store',
+  date: '2026-03-15',
+  items: [
+    {
+      id: 'item-1',
+      name: 'Organic Bananas',
+      quantity: 1,
+      unit_price: 1.29,
+      total_price: 1.29,
+      category_id: 'cat-groceries',
+      category_confidence: 0.9,
+      extraction_confidence: 0.95,
+    },
+    {
+      id: 'item-2',
+      name: 'Whole Milk',
+      quantity: 1,
+      unit_price: 4.99,
+      total_price: 4.99,
+      category_id: 'cat-groceries',
+      category_confidence: 0.9,
+      extraction_confidence: 0.92,
+    },
+  ],
+  subtotal: 6.28,
+  tax: null,
+  total: 6.28,
+  currency: 'USD',
+  confidence: 0.91,
+};
+
+function editable(overrides: Partial<EditableLineItem>[] = []): EditableLineItem[] {
+  return extraction.items.map((item, i) => ({
+    id: item.id,
+    name: item.name,
+    quantity: item.quantity,
+    unitPrice: item.unit_price,
+    totalPrice: item.total_price,
+    categoryId: item.category_id,
+    extractionConfidence: item.extraction_confidence,
+    isEdited: false,
+    ...overrides[i],
+  }));
+}
+
+describe('buildReceiptUpdate', () => {
+  it('confirms with no corrections when nothing was edited', () => {
+    expect(buildReceiptUpdate(extraction, editable(), 'Test Grocery Store')).toEqual({
+      status: 'confirmed',
+    });
+  });
+
+  it('sends an edited price as total_price', () => {
+    const items = editable([{ totalPrice: 2.5, isEdited: true }]);
+
+    expect(buildReceiptUpdate(extraction, items, 'Test Grocery Store')).toEqual({
+      items: [{ id: 'item-1', total_price: 2.5 }],
+      status: 'confirmed',
+    });
+  });
+
+  it('sends an edited store name, trimmed', () => {
+    expect(buildReceiptUpdate(extraction, editable(), '  Corner Market ')).toEqual({
+      store_name: 'Corner Market',
+      status: 'confirmed',
+    });
+  });
+
+  it('keeps sending name and category corrections', () => {
+    const items = editable([{}, { name: 'Milk', categoryId: 'cat-dairy', isEdited: true }]);
+
+    expect(buildReceiptUpdate(extraction, items, 'Test Grocery Store')).toEqual({
+      items: [{ id: 'item-2', name: 'Milk', category_id: 'cat-dairy' }],
+      status: 'confirmed',
+    });
+  });
+
+  it('skips an item marked edited whose values are unchanged', () => {
+    const items = editable([{ isEdited: true }]);
+
+    expect(buildReceiptUpdate(extraction, items, 'Test Grocery Store')).toEqual({
+      status: 'confirmed',
+    });
+  });
+});
