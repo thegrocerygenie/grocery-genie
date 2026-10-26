@@ -44,7 +44,7 @@ export function syncPendingReceipts(deps: SyncDeps): Promise<SyncResult> {
 }
 
 async function runSync({ scan, deleteImage }: SyncDeps): Promise<SyncResult> {
-  const { updateStatus, removePendingReceipt } = useOfflineStore.getState();
+  const { updateStatus, markAttemptFailed, removePendingReceipt } = useOfflineStore.getState();
   const queued = useOfflineStore.getState().pendingReceipts.filter((r) => r.status === 'pending');
   const result: SyncResult = { synced: 0, failed: 0 };
 
@@ -54,7 +54,7 @@ async function runSync({ scan, deleteImage }: SyncDeps): Promise<SyncResult> {
       await scan(receipt.imageUri, receipt.mimeType);
     } catch (error) {
       if (isRetryableScanError(error)) {
-        updateStatus(receipt.id, 'pending');
+        markAttemptFailed(receipt.id);
         return result;
       }
       updateStatus(receipt.id, 'failed');

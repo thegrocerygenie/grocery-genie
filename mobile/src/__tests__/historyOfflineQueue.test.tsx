@@ -117,6 +117,31 @@ describe('History offline queue', () => {
     expect(screen.getByText('Captured 2h ago · uploading')).toBeTruthy();
   });
 
+  it('says the upload waits to retry after an attempt failed while online', () => {
+    mockConnected = true;
+    queue();
+    const id = useOfflineStore.getState().pendingReceipts[0].id;
+    useOfflineStore.getState().markAttemptFailed(id);
+    renderHistory();
+
+    expect(screen.getByText('1 receipt waiting to upload')).toBeTruthy();
+    expect(screen.getByText('Will retry')).toBeTruthy();
+    expect(screen.getByText('Captured 2h ago · will retry')).toBeTruthy();
+    expect(screen.queryByText(/^Uploading/)).toBeNull();
+  });
+
+  it('says uploading again once the retry starts', () => {
+    mockConnected = true;
+    queue();
+    const id = useOfflineStore.getState().pendingReceipts[0].id;
+    useOfflineStore.getState().markAttemptFailed(id);
+    useOfflineStore.getState().updateStatus(id, 'syncing');
+    renderHistory();
+
+    expect(screen.getByText('Uploading 1 receipt…')).toBeTruthy();
+    expect(screen.getByText('Captured 2h ago · uploading')).toBeTruthy();
+  });
+
   it('shows nothing extra when the queue is empty', () => {
     renderHistory();
 

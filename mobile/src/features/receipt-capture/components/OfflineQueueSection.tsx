@@ -28,22 +28,23 @@ export function OfflineQueueSection({
 }: OfflineQueueSectionProps) {
   if (pending.length === 0) return null;
 
-  const queued = pending.filter((r) => r.status !== 'failed').length;
+  const banner = bannerState(
+    pending.filter((r) => r.status !== 'failed'),
+    isConnected,
+  );
 
   return (
     <View style={styles.root}>
-      {queued > 0 ? (
+      {banner ? (
         <View style={styles.banner} accessible accessibilityRole="summary">
           <View style={styles.bannerIcon}>
-            <SymbolView name={isConnected ? 'arrow.up' : 'wifi.slash'} size={12} tintColor="#fff" />
+            <SymbolView name={banner.symbol} size={12} tintColor="#fff" />
           </View>
-          <Text style={styles.bannerText}>
-            {isConnected ? `Uploading ${plural(queued)}…` : `Offline · ${plural(queued)} queued`}
-          </Text>
-          {isConnected ? (
-            <ActivityIndicator size="small" color={colors.orange} />
+          <Text style={styles.bannerText}>{banner.text}</Text>
+          {banner.action ? (
+            <Text style={styles.bannerAction}>{banner.action}</Text>
           ) : (
-            <Text style={styles.bannerAction}>Will sync</Text>
+            <ActivityIndicator size="small" color={colors.orange} />
           )}
         </View>
       ) : null}
@@ -64,6 +65,38 @@ export function OfflineQueueSection({
   );
 }
 
+interface BannerState {
+  symbol: 'wifi.slash' | 'arrow.up' | 'arrow.clockwise';
+  text: string;
+  /** Right-hand label; null while an upload runs, so a spinner shows instead. */
+  action: string | null;
+}
+
+/**
+ * Offline: waiting for a connection. Online: uploading while an upload runs or
+ * before any has been tried; after a failed attempt, waiting to retry, so the
+ * banner never claims an upload is running while the server is down.
+ */
+function bannerState(queued: PendingReceipt[], isConnected: boolean): BannerState | null {
+  if (queued.length === 0) return null;
+  const count = plural(queued.length);
+  if (!isConnected) {
+    return { symbol: 'wifi.slash', text: `Offline · ${count} queued`, action: 'Will sync' };
+  }
+  const uploading = queued.some((r) => r.status === 'syncing');
+  if (!uploading && queued.some((r) => r.lastAttemptFailed)) {
+    return { symbol: 'arrow.clockwise', text: `${count} waiting to upload`, action: 'Will retry' };
+  }
+  return { symbol: 'arrow.up', text: `Uploading ${count}…`, action: null };
+}
+
+/** What a queued row is doing, shown after its capture time. */
+function rowState(receipt: PendingReceipt, isConnected: boolean): string {
+  if (!isConnected) return 'waiting for connection';
+  if (receipt.status !== 'syncing' && receipt.lastAttemptFailed) return 'will retry';
+  return 'uploading';
+}
+
 interface PendingRowProps {
   receipt: PendingReceipt;
   isConnected: boolean;
@@ -75,7 +108,7 @@ function PendingRow({ receipt, isConnected, showDivider, onPressFailed }: Pendin
   const failed = receipt.status === 'failed';
   const detail = failed
     ? 'Couldn’t read this photo'
-    : `${formatQueuedAgo(receipt.capturedAt)} · ${isConnected ? 'uploading' : 'waiting for connection'}`;
+    : `${formatQueuedAgo(receipt.capturedAt)} · ${rowState(receipt, isConnected)}`;
 
   return (
     <Pressable
