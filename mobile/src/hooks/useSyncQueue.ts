@@ -5,6 +5,8 @@ import { AppState } from 'react-native';
 import { scanReceipt } from '@/features/receipt-capture/services/receiptApi';
 import { syncPendingReceipts } from '@/features/receipt-capture/services/offlineQueue';
 import { deletePendingImage } from '@/features/receipt-capture/services/pendingImageFiles';
+import { tokenSubject } from '@/features/auth/utils/tokenSubject';
+import { useAuthStore } from '@/store/authStore';
 import { useOfflineStore } from '@/store/offlineStore';
 
 import { useNetworkStatus } from './useNetworkStatus';
@@ -17,20 +19,22 @@ import { useNetworkStatus } from './useNetworkStatus';
 export function useSyncQueue() {
   const { isConnected } = useNetworkStatus();
   const queryClient = useQueryClient();
-  // Failed photos never upload again, so they must not trigger a sync. A
-  // pending → syncing → pending bounce keeps the count, so a failing server
-  // does not cause a retry loop.
+  const ownerId = tokenSubject(useAuthStore((s) => s.accessToken));
+  // Only the signed-in user's photos count. Failed photos never upload again,
+  // so they must not trigger a sync. A pending → syncing → pending bounce keeps
+  // the count, so a failing server does not cause a retry loop.
   const queuedCount = useOfflineStore(
-    (s) => s.pendingReceipts.filter((r) => r.status !== 'failed').length,
+    (s) => s.pendingReceipts.filter((r) => r.status !== 'failed' && r.ownerId === ownerId).length,
   );
 
   useEffect(() => {
-    if (!isConnected || queuedCount === 0) return;
+    if (!isConnected || !ownerId || queuedCount === 0) return;
 
     const sync = async () => {
       const { synced } = await syncPendingReceipts({
         scan: (uri, mimeType) => scanReceipt(uri, mimeType, 'camera'),
         deleteImage: deletePendingImage,
+        ownerId,
       });
       if (synced > 0) {
         await queryClient.invalidateQueries({ queryKey: ['receipts'] });
@@ -43,5 +47,5 @@ export function useSyncQueue() {
       if (state === 'active') void sync();
     });
     return () => subscription.remove();
-  }, [isConnected, queuedCount, queryClient]);
+  }, [isConnected, ownerId, queuedCount, queryClient]);
 }

@@ -19,6 +19,8 @@ export function isRetryableScanError(error: unknown): boolean {
 export interface SyncDeps {
   scan: (imageUri: string, mimeType: string) => Promise<unknown>;
   deleteImage: (imageUri: string) => void;
+  /** The signed-in user; only photos they captured are uploaded. */
+  ownerId: string;
 }
 
 export interface SyncResult {
@@ -43,9 +45,14 @@ export function syncPendingReceipts(deps: SyncDeps): Promise<SyncResult> {
   return inFlight;
 }
 
-async function runSync({ scan, deleteImage }: SyncDeps): Promise<SyncResult> {
+async function runSync({ scan, deleteImage, ownerId }: SyncDeps): Promise<SyncResult> {
   const { updateStatus, markAttemptFailed, removePendingReceipt } = useOfflineStore.getState();
-  const queued = useOfflineStore.getState().pendingReceipts.filter((r) => r.status === 'pending');
+  // Another account's photo (or one with no owner) waits for its owner: uploading
+  // it here would file it under the wrong account, or let that account's server
+  // mark it failed.
+  const queued = useOfflineStore
+    .getState()
+    .pendingReceipts.filter((r) => r.status === 'pending' && r.ownerId === ownerId);
   const result: SyncResult = { synced: 0, failed: 0 };
 
   for (const receipt of queued) {

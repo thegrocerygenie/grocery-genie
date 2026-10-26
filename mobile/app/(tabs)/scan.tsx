@@ -13,6 +13,8 @@ import { useReceiptImport } from '@/features/receipt-capture/hooks/useReceiptImp
 import { useReceiptScan } from '@/features/receipt-capture/hooks/useReceiptScan';
 import { isRetryableScanError } from '@/features/receipt-capture/services/offlineQueue';
 import { persistCapturedImage } from '@/features/receipt-capture/services/pendingImageFiles';
+import { tokenSubject } from '@/features/auth/utils/tokenSubject';
+import { useAuthStore } from '@/store/authStore';
 import { scanErrorHint } from '@/features/receipt-capture/utils/scanErrorHint';
 import { useOfflineStore } from '@/store/offlineStore';
 import { useReceiptStore } from '@/store/receiptStore';
@@ -35,6 +37,7 @@ export default function ScanScreen() {
   const receiptImport = useReceiptImport();
   const { setCapturedImageUri, setActiveScanResponse } = useReceiptStore();
   const addPendingReceipt = useOfflineStore((s) => s.addPendingReceipt);
+  const ownerId = tokenSubject(useAuthStore((s) => s.accessToken)) ?? undefined;
   const analytics = useAnalytics();
 
   // Tracks whether a scan was submitted, so leaving the camera without ever
@@ -95,6 +98,7 @@ export default function ScanScreen() {
         imageUri: persistCapturedImage(uri),
         mimeType: 'image/jpeg',
         capturedAt: new Date().toISOString(),
+        ownerId,
       });
     } catch {
       fail();

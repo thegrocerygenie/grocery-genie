@@ -8,7 +8,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 
 import ScanScreen from '../../app/(tabs)/scan';
 import { ApiError } from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
 import { useOfflineStore } from '@/store/offlineStore';
+import { fakeAccessToken } from '@/testing/jwt';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('expo-haptics', () => ({
@@ -62,6 +64,7 @@ beforeEach(() => {
   mockScanError = null;
   mockPush.mockClear();
   useOfflineStore.setState({ pendingReceipts: [] });
+  useAuthStore.setState({ accessToken: fakeAccessToken('user-a') });
 });
 
 describe('Scan queues receipts it cannot upload', () => {
@@ -75,6 +78,7 @@ describe('Scan queues receipts it cannot upload', () => {
     const [queued] = useOfflineStore.getState().pendingReceipts;
     expect(queued.imageUri).toBe('file:///doc/pending-receipts/shot.jpg');
     expect(queued.status).toBe('pending');
+    expect(queued.ownerId).toBe('user-a');
     expect(mockPush).not.toHaveBeenCalled();
   });
 
