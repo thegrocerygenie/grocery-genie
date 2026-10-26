@@ -28,6 +28,7 @@ Each feature file starts with an H1 title and one paragraph describing the user-
 ## Features
 
 - [Scan and confirm a receipt](./scan-confirm.md) covers scan, review, confirm, and spend on the dashboard.
+- [Review and correct a scan](./review-correct.md) covers correcting the store, the date, and an item's name, quantity, and price before confirming. It also covers the original values kept for each correction, the 422 checks, the retry, and unconfirmed scans in History.
 - [Budget alerts](./budget-alerts.md) covers the 50/80/100% alerts once per threshold per period, and alerts from manual entries.
 - [Manual receipt entry](./manual-receipt.md) covers entering a receipt without a photo and its effect on spend.
 - [Item category correction](./item-correction.md) covers correcting an item's category, retroactive update, and the mapping applied to the next scan.
