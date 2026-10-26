@@ -637,3 +637,108 @@ async def test_update_receipt_corrects_store_name(
 
     fetched = await client.get(f"/api/receipts/{receipt_id}")
     assert fetched.json()["store_name"] == "Corner Market"
+
+
+# --- RC-02 AC 1: the receipt date is editable ---
+
+
+async def test_update_receipt_corrects_date(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    """A date edit on the review screen is saved."""
+    scan = await _create_receipt(client, test_image_bytes)
+    receipt_id = scan["receipt_id"]
+
+    resp = await client.patch(
+        f"/api/receipts/{receipt_id}", json={"date": "2026-03-20"}
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["date"] == "2026-03-20"
+    fetched = await client.get(f"/api/receipts/{receipt_id}")
+    assert fetched.json()["date"] == "2026-03-20"
+
+
+async def test_confirm_with_corrected_date_moves_spend_to_that_month(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    """The mock receipt is dated 2026-03-15; the user says it was 2026-04-02."""
+    scan = await _create_receipt(client, test_image_bytes)
+
+    await client.patch(
+        f"/api/receipts/{scan['receipt_id']}",
+        json={"date": "2026-04-02", "status": "confirmed"},
+    )
+
+    march = (await client.get("/api/dashboard/spending?period=2026-03")).json()
+    april = (await client.get("/api/dashboard/spending?period=2026-04")).json()
+    assert march["overall"]["spent"] == 0.0
+    assert april["overall"]["spent"] == 14.77
+
+
+async def test_date_correction_is_recorded_as_a_correction(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    calls = _install_analytics_spy()
+    scan = await _create_receipt(client, test_image_bytes)
+
+    await client.patch(
+        f"/api/receipts/{scan['receipt_id']}", json={"date": "2026-03-20"}
+    )
+
+    corrections = [p for name, p, _ in calls if name == "receipt_correction_made"]
+    assert {
+        "field": "date",
+        "original_value": "2026-03-15",
+        "corrected_value": "2026-03-20",
+    } in corrections
+
+
+async def test_update_receipt_rejects_a_future_date(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    from datetime import date, timedelta
+
+    scan = await _create_receipt(client, test_image_bytes)
+    too_late = (date.today() + timedelta(days=2)).isoformat()
+
+    resp = await client.patch(
+        f"/api/receipts/{scan['receipt_id']}", json={"date": too_late}
+    )
+
+    assert resp.status_code == 422
+    fetched = await client.get(f"/api/receipts/{scan['receipt_id']}")
+    assert fetched.json()["date"] == "2026-03-15"
+
+
+async def test_scan_reports_the_stored_date_when_extracted_date_is_unreadable(
+    client: AsyncClient, test_image_bytes: bytes, mock_extractor
+):
+    """The review screen edits the date the scan returns, so it must be the
+    date the server stored (today, for an unreadable one), in ISO form."""
+    from datetime import date
+
+    from app.llm.schemas import ExtractedLineItem, ReceiptExtractionResult
+
+    mock_extractor._result = ReceiptExtractionResult(
+        store_name="Corner Market",
+        date="15/03/2026",
+        items=[
+            ExtractedLineItem(
+                name="Apples",
+                quantity=1,
+                unit_price=3.0,
+                total_price=3.0,
+                confidence=0.9,
+            )
+        ],
+        subtotal=3.0,
+        total=3.0,
+        confidence=0.85,
+    )
+    scan = await _create_receipt(client, test_image_bytes)
+    mock_extractor._result = None
+
+    stored = (await client.get(f"/api/receipts/{scan['receipt_id']}")).json()
+    assert stored["date"] == date.today().isoformat()
+    assert scan["extraction"]["date"] == stored["date"]

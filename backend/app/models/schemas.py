@@ -1,7 +1,8 @@
+import datetime as dt
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # --- Receipt Extraction (from scan endpoint) ---
 
@@ -87,8 +88,18 @@ class LineItemCorrection(BaseModel):
 
 class ReceiptUpdateRequest(BaseModel):
     store_name: str | None = Field(default=None, min_length=1, max_length=255)
+    # dt.date: a bare `date` here would resolve to this field, not the type.
+    date: dt.date | None = None
     items: list[LineItemCorrection] | None = None
     status: str | None = None
+
+    @field_validator("date")
+    @classmethod
+    def date_not_in_future(cls, value: dt.date | None) -> dt.date | None:
+        # One day of slack: the phone's local date can be ahead of server UTC.
+        if value is not None and value > date.today() + timedelta(days=1):
+            raise ValueError("Receipt date cannot be in the future")
+        return value
 
 
 # --- Budget ---

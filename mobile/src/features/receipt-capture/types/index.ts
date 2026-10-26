@@ -79,6 +79,8 @@ export interface LineItemCorrection {
 
 export interface ReceiptUpdateRequest {
   store_name?: string;
+  /** YYYY-MM-DD. */
+  date?: string;
   items?: LineItemCorrection[];
   status?: string;
 }
