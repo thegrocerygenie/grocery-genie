@@ -12,7 +12,10 @@ interface NotificationPreferences {
 
 interface NotificationState {
   preferences: NotificationPreferences;
-  setThreshold: (key: 'fiftyPercent' | 'eightyPercent' | 'hundredPercent', enabled: boolean) => void;
+  setThreshold: (
+    key: 'fiftyPercent' | 'eightyPercent' | 'hundredPercent',
+    enabled: boolean,
+  ) => void;
   setWeeklySummaryEnabled: (enabled: boolean) => void;
   setWeeklySummaryDay: (day: number) => void;
 }

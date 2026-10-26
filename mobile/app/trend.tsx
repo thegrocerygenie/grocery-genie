@@ -42,9 +42,7 @@ export default function TrendScreen() {
 
   const max = months.length > 0 ? Math.max(...months.map((m) => m.total), 1) : 1;
   const avg =
-    months.length > 0
-      ? Math.round(months.reduce((s, m) => s + m.total, 0) / months.length)
-      : 0;
+    months.length > 0 ? Math.round(months.reduce((s, m) => s + m.total, 0) / months.length) : 0;
   const priorAvg = avg > 0 ? avg * 1.15 : 0; // illustrative comparison
   const delta = priorAvg > 0 ? Math.round(((avg - priorAvg) / priorAvg) * 100) : 0;
 
@@ -69,7 +67,12 @@ export default function TrendScreen() {
         ) : months.length === 0 ? (
           <View style={styles.empty}>
             <Text style={[type.headline, { textAlign: 'center' }]}>Not enough data yet</Text>
-            <Text style={[type.footnote, { color: colors.iosLabel2 as string, textAlign: 'center', maxWidth: 240 }]}>
+            <Text
+              style={[
+                type.footnote,
+                { color: colors.iosLabel2 as string, textAlign: 'center', maxWidth: 240 },
+              ]}
+            >
               Once you have receipts across multiple months, your trend will show here.
             </Text>
           </View>
@@ -101,7 +104,10 @@ export default function TrendScreen() {
                   return (
                     <View key={m.label} style={styles.chartCol}>
                       <Text
-                        style={[type.caption1, { fontWeight: '600', color: colors.iosLabel as string }]}
+                        style={[
+                          type.caption1,
+                          { fontWeight: '600', color: colors.iosLabel as string },
+                        ]}
                       >
                         ${m.total.toFixed(0)}
                       </Text>

@@ -46,7 +46,9 @@ export default function TopItemsScreen() {
         ) : items.length === 0 ? (
           <View style={styles.empty}>
             <Text style={[type.headline, { textAlign: 'center' }]}>No items yet</Text>
-            <Text style={[type.footnote, { color: colors.iosLabel2 as string, textAlign: 'center' }]}>
+            <Text
+              style={[type.footnote, { color: colors.iosLabel2 as string, textAlign: 'center' }]}
+            >
               Scan a receipt to start ranking your most-bought items.
             </Text>
           </View>

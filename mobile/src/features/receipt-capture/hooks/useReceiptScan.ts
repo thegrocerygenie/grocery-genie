@@ -13,7 +13,6 @@ interface ScanParams {
 
 export function useReceiptScan() {
   return useMutation<ReceiptScanResponse, Error, ScanParams>({
-    mutationFn: ({ imageUri, mimeType, source }) =>
-      scanReceipt(imageUri, mimeType, source),
+    mutationFn: ({ imageUri, mimeType, source }) => scanReceipt(imageUri, mimeType, source),
   });
 }

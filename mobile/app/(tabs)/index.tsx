@@ -333,10 +333,7 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
 
       <Pressable
         onPress={onTrend}
-        style={({ pressed }) => [
-          styles.trendBtn,
-          pressed && { backgroundColor: colors.iosFill3 },
-        ]}
+        style={({ pressed }) => [styles.trendBtn, pressed && { backgroundColor: colors.iosFill3 }]}
         accessibilityRole="button"
         accessibilityLabel="See 3-month trend"
       >
