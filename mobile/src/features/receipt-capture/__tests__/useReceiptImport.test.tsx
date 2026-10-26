@@ -31,7 +31,11 @@ const scan = scanReceipt as jest.Mock;
 const response = { receipt_id: 'r-9', status: 'pending_review', extraction: { items: [] } };
 
 function renderImportHook() {
-  const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+  // gcTime Infinity: a finished mutation otherwise schedules a 5-minute cache
+  // timer that keeps Jest from exiting.
+  const client = new QueryClient({
+    defaultOptions: { mutations: { retry: false, gcTime: Infinity } },
+  });
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
