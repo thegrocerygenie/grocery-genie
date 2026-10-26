@@ -201,6 +201,9 @@ class DashboardSpendingResponse(BaseModel):
     categories: list[BudgetCategorySummary]
     top_items: list[DashboardTopItem]
     trend: list[DashboardTrendMonth]
+    # Mean monthly spend over the 3 months before the trend window, so the
+    # trend's average can be compared with it. 0.0 when there was none.
+    prior_average: float = 0.0
     previous_period: str
     category_changes: list[DashboardCategoryChange]
 

@@ -93,8 +93,12 @@ export default function TrendScreen() {
   );
 
   const max = months.length > 0 ? Math.max(...months.map((m) => m.total), 1) : 1;
-  const avg =
-    months.length > 0 ? Math.round(months.reduce((s, m) => s + m.total, 0) / months.length) : 0;
+  const exactAvg = months.length > 0 ? months.reduce((s, m) => s + m.total, 0) / months.length : 0;
+  const avg = Math.round(exactAvg);
+  // Design "3-month trend": the average against the 3 months before. Only with
+  // a full window and spending before it; a percentage of nothing means nothing.
+  const priorChange =
+    months.length === 3 ? percentChange(exactAvg, data?.prior_average ?? 0) : null;
 
   // BC-04 AC 2: this month vs last month, for the total and per category.
   const period = data?.period ?? selectedPeriod;
@@ -155,9 +159,23 @@ export default function TrendScreen() {
                   </Text>
                 ) : null}
               </View>
-              <Text style={styles.caption}>
-                {months.length}-month average {money(avg)}
-              </Text>
+              <View style={styles.averageRow}>
+                <Text style={styles.caption}>
+                  {months.length}-month average {money(avg)}
+                </Text>
+                {priorChange !== null ? (
+                  <Text
+                    style={[styles.priorChange, { color: changeColor(priorChange) }]}
+                    accessibilityLabel={
+                      priorChange === 0
+                        ? 'Same as the 3 months before'
+                        : `${changeWords(priorChange).replace(/^./, (c) => c.toUpperCase())} from the 3 months before`
+                    }
+                  >
+                    {changeText(priorChange)} vs prior 3 months
+                  </Text>
+                ) : null}
+              </View>
               <View style={styles.chart}>
                 {months.map((m) => {
                   const h = (m.total / max) * 130;
@@ -325,6 +343,16 @@ const styles = StyleSheet.create({
     ...type.money,
     fontSize: 28,
     color: colors.iosLabel as string,
+  },
+  averageRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    columnGap: 6,
+  },
+  priorChange: {
+    ...type.caption1,
+    fontWeight: '600',
   },
   totalChange: {
     ...type.footnote,

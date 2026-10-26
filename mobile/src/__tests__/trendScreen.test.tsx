@@ -143,4 +143,22 @@ describe('Trend screen month-over-month', () => {
     expect(screen.getByLabelText('March: $35')).toBeTruthy();
     expect(screen.queryByLabelText(/3-month average \$/)).toBeNull();
   });
+
+  it('compares the 3-month average with the 3 months before (design: "vs prior")', () => {
+    // Trend 0 + 30 + 35 = 65 over 3 months is $21.67 a month; prior $25 a month.
+    mockDashboard.data = dashboard({ prior_average: 25 });
+    renderTrend();
+
+    expect(screen.getByText('3-month average $22')).toBeTruthy();
+    expect(screen.getByText('−13% vs prior 3 months')).toBeTruthy();
+    expect(screen.getByLabelText('Down 13 percent from the 3 months before')).toBeTruthy();
+  });
+
+  it('shows no prior comparison when the 3 months before had no spending', () => {
+    mockDashboard.data = dashboard({ prior_average: 0 });
+    renderTrend();
+
+    expect(screen.getByText('3-month average $22')).toBeTruthy();
+    expect(screen.queryByText(/vs prior/)).toBeNull();
+  });
 });
