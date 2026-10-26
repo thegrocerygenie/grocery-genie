@@ -93,7 +93,7 @@ Budget vs. actual for specified period.
 ```
 
 ### GET /api/dashboard/spending?period=2026-03 [MVP]
-Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-month trend (oldest first, ending at `period`), and a month-over-month comparison per category. `category_changes` lists every category with spend in `period` or `previous_period`, largest current spend first; uncategorized spend is left out. Each trend month splits its `spent` into `categories`, largest first; uncategorized spend is kept there (`category_id` null, name "Uncategorized") so the parts add up to `spent`.
+Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-month trend (oldest first, ending at `period`), and a month-over-month comparison per category. `category_changes` lists every category with spend in `period` or `previous_period`, largest current spend first; uncategorized spend is left out. Each top item carries the category that holds most of its spend (`category_id` and `category_name` are null when uncategorized). Each trend month splits its `spent` into `categories`, largest first; uncategorized spend is kept there (`category_id` null, name "Uncategorized") so the parts add up to `spent`.
 
 **Response:**
 ```json
@@ -101,7 +101,7 @@ Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-mont
   "period": "2026-03",
   "overall": { "budget": 500, "spent": 35.0, "remaining": 465.0, "percent": 7.0 },
   "categories": [ "…as in /api/budgets/summary" ],
-  "top_items": [ { "name": "Bananas", "total_spent": 5.0, "count": 1 } ],
+  "top_items": [ { "name": "Bananas", "total_spent": 5.0, "count": 1, "category_id": "uuid", "category_name": "Groceries" } ],
   "trend": [
     { "period": "2026-01", "spent": 0.0, "budget": 500, "categories": [] },
     "…",

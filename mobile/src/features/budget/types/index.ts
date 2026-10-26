@@ -22,6 +22,9 @@ export interface DashboardTopItem {
   name: string;
   total_spent: number;
   count: number;
+  /** The category holding most of the item's spend; null when uncategorized. */
+  category_id?: string | null;
+  category_name?: string | null;
 }
 
 /** One category's share of a trend month; `category_id` is null for uncategorized spend. */
