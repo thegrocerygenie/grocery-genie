@@ -83,6 +83,10 @@ class User(Base):
     preferences: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
     bounced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set when the user finishes onboarding, with or without a budget (Skip).
+    onboarding_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

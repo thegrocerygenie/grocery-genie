@@ -493,6 +493,91 @@ async def test_signin_after_soft_deleted_budget_needs_onboarding(auth_client):
     assert resp.json()["needs_onboarding"] is True
 
 
+# ── POST /api/users/me/onboarding-complete ──────────────────────
+
+
+async def _sign_up_headers(auth_client, email: str) -> dict[str, str]:
+    resp = await auth_client.post(
+        "/api/auth/sign-up", json={"email": email, "password": "TestPass1234!"}
+    )
+    return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+
+@pytest.mark.asyncio
+async def test_onboarding_complete_without_budget_ends_onboarding(auth_client):
+    """Skip on Set Budget, then Not now on camera: the user finishes onboarding
+    with no budget and must not be routed back to it (budgets are optional)."""
+    payload = {"email": "skipped_budget@test.com", "password": "TestPass1234!"}
+    headers = await _sign_up_headers(auth_client, payload["email"])
+
+    done = await auth_client.post("/api/users/me/onboarding-complete", headers=headers)
+    assert done.status_code == 200, done.text
+    assert done.json()["needs_onboarding"] is False
+
+    me = await auth_client.get("/api/auth/me", headers=headers)
+    assert me.json()["needs_onboarding"] is False
+    users_me = await auth_client.get("/api/users/me", headers=headers)
+    assert users_me.json()["needs_onboarding"] is False
+    sign_in = await auth_client.post("/api/auth/sign-in", json=payload)
+    assert sign_in.json()["needs_onboarding"] is False
+
+
+@pytest.mark.asyncio
+async def test_onboarding_complete_is_idempotent(auth_client, db_session):
+    """A retried or repeated call keeps the first completion time."""
+    from sqlalchemy import select
+
+    from app.models.database import User
+
+    headers = await _sign_up_headers(auth_client, "twice@test.com")
+
+    first = await auth_client.post("/api/users/me/onboarding-complete", headers=headers)
+    assert first.status_code == 200
+    completed_at = (
+        await db_session.execute(
+            select(User.onboarding_completed_at).where(User.email == "twice@test.com")
+        )
+    ).scalar_one()
+    assert completed_at is not None
+
+    second = await auth_client.post(
+        "/api/users/me/onboarding-complete", headers=headers
+    )
+    assert second.status_code == 200
+    assert second.json()["needs_onboarding"] is False
+    again = (
+        await db_session.execute(
+            select(User.onboarding_completed_at).where(User.email == "twice@test.com")
+        )
+    ).scalar_one()
+    assert again == completed_at
+
+
+@pytest.mark.asyncio
+async def test_onboarding_complete_survives_budget_delete(auth_client):
+    """Once onboarding is done, deleting the budget does not restart it."""
+    headers = await _sign_up_headers(auth_client, "done_then_delete@test.com")
+    create_budget = await auth_client.post(
+        "/api/budgets",
+        headers=headers,
+        json={"amount": 400.0, "period_type": "monthly", "period_start": "2026-05-01"},
+    )
+    await auth_client.post("/api/users/me/onboarding-complete", headers=headers)
+    deleted = await auth_client.delete(
+        f"/api/budgets/{create_budget.json()['id']}", headers=headers
+    )
+    assert deleted.status_code == 204
+
+    me = await auth_client.get("/api/auth/me", headers=headers)
+    assert me.json()["needs_onboarding"] is False
+
+
+@pytest.mark.asyncio
+async def test_onboarding_complete_requires_auth(auth_client):
+    resp = await auth_client.post("/api/users/me/onboarding-complete")
+    assert resp.status_code == 401
+
+
 # ── Apple sign-in ───────────────────────────────────────────────
 
 

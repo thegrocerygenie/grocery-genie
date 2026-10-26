@@ -122,6 +122,13 @@ Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-mont
 }
 ```
 
+## Onboarding
+
+### POST /api/users/me/onboarding-complete [MVP]
+Ends onboarding, with or without a budget (Skip on Set Budget). Idempotent: a repeat call keeps the first completion time. Returns the user profile with `needs_onboarding: false`.
+
+`needs_onboarding` (on `/api/auth/me`, `/api/users/me`, and the sign-up and sign-in token pairs) is true only while the user has not completed onboarding and has no active monthly budget. After completion, deleting the budget does not restart onboarding.
+
 ## Price Intelligence [V1.1]
 
 ### GET /api/items/{canonical_id}/prices?store=...&from=...&to=...

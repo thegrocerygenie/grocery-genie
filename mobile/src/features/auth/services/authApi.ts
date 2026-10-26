@@ -112,3 +112,7 @@ export async function updatePreferences(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+export async function completeOnboarding(): Promise<UserProfile> {
+  return apiClient<UserProfile>('/api/users/me/onboarding-complete', { method: 'POST' });
+}
