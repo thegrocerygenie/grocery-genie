@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { SymbolView } from 'expo-symbols';
@@ -22,6 +22,8 @@ const TABS: TabDef[] = [
 export default function TabsLayout() {
   return (
     <Tabs
+      // Scan's Cancel returns to the tab the user came from, not always Budget.
+      backBehavior="history"
       screenOptions={{ headerShown: false } as BottomTabNavigationOptions}
       tabBar={(props) => <FloatingTabBar {...props} />}
     >
@@ -32,7 +34,12 @@ export default function TabsLayout() {
   );
 }
 
-function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
+function FloatingTabBar({ state, navigation, descriptors }: BottomTabBarProps) {
+  // A screen hides the bar with `tabBarStyle: { display: 'none' }` (Scan's camera).
+  const focused = descriptors[state.routes[state.index].key];
+  const barStyle = StyleSheet.flatten(focused?.options.tabBarStyle as StyleProp<ViewStyle>);
+  if (barStyle?.display === 'none') return null;
+
   return (
     <View style={styles.wrap} pointerEvents="box-none">
       <BlurView intensity={80} tint="systemChromeMaterial" style={styles.bar}>
