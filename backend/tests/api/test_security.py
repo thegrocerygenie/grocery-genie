@@ -214,3 +214,11 @@ async def test_user_isolation_budgets(raw_client, seeded_users, user_a_receipt):
     )
     assert resp_b.status_code == 200
     assert resp_b.json()["overall"]["budget"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_push_token_registration_requires_auth(raw_client):
+    response = await raw_client.post(
+        "/api/users/me/push-tokens", json={"token": "ExponentPushToken[abc]"}
+    )
+    assert response.status_code == 401

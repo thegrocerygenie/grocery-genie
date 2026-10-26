@@ -110,3 +110,62 @@ async def test_mark_notification_user_isolation(client_user_b, notifications):
     notification = notifications[0]
     response = await client_user_b.patch(f"/api/notifications/{notification.id}/read")
     assert response.status_code == 404
+
+
+# --- budget_alert_opened source ---
+
+
+@pytest.fixture
+async def threshold_alert(db_session):
+    n = Notification(
+        user_id=DEV_USER_ID,
+        type="budget_threshold",
+        title="Budget 80%",
+        body="$100 remaining",
+        data='{"threshold": 80}',
+    )
+    db_session.add(n)
+    await db_session.flush()
+    return n
+
+
+def _opened_events(calls):
+    return [props for name, props, _ in calls if name == "budget_alert_opened"]
+
+
+@pytest.mark.asyncio
+async def test_alert_opened_from_push_is_attributed_to_push(client, threshold_alert):
+    from tests.api.test_receipts import _install_analytics_spy
+
+    calls = _install_analytics_spy()
+
+    resp = await client.patch(
+        f"/api/notifications/{threshold_alert.id}/read", params={"source": "push"}
+    )
+
+    assert resp.status_code == 200
+    assert _opened_events(calls) == [
+        {"threshold_percent": 80, "notification_source": "push"}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_alert_opened_defaults_to_in_app(client, threshold_alert):
+    from tests.api.test_receipts import _install_analytics_spy
+
+    calls = _install_analytics_spy()
+
+    resp = await client.patch(f"/api/notifications/{threshold_alert.id}/read")
+
+    assert resp.status_code == 200
+    assert _opened_events(calls) == [
+        {"threshold_percent": 80, "notification_source": "in_app"}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_alert_opened_rejects_unknown_source(client, threshold_alert):
+    resp = await client.patch(
+        f"/api/notifications/{threshold_alert.id}/read", params={"source": "email"}
+    )
+    assert resp.status_code == 422

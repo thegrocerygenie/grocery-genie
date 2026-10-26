@@ -201,6 +201,7 @@ ruff check . && ruff format .          # Lint + format
 alembic upgrade head                   # Run DB migrations
 alembic revision --autogenerate -m ""  # Generate migration
 celery -A app.tasks worker --loglevel=info  # Celery worker
+celery -A app.tasks beat --loglevel=info    # Celery beat: weekly summaries, push delivery
 pytest tests/llm_validation/ -v        # LLM accuracy harness
 ```
 

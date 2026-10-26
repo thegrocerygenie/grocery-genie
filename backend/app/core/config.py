@@ -81,6 +81,12 @@ class Settings(BaseSettings):
     resend_from: str = "Grocery Genie <noreply@onresend.dev>"
     resend_domain: str = ""
 
+    # Push — Expo push service. The access token is optional; set it when
+    # "Enhanced push security" is on for the Expo project.
+    expo_push_access_token: str = ""
+    # Pending pushes older than this are marked expired instead of sent late.
+    push_max_age_minutes: int = 60
+
     # Deep links
     app_scheme: str = "grocerygenie"
     verify_email_path: str = "verify"
