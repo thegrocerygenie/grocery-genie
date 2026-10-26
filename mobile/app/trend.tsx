@@ -109,6 +109,8 @@ export default function TrendScreen() {
       <Stack.Screen
         options={{
           title: 'Trend',
+          // Opened from the Budget tab; otherwise iOS shows the group name "(tabs)".
+          headerBackTitle: 'Budget',
           headerLargeTitle: true,
           headerBlurEffect: 'systemChromeMaterial',
         }}
