@@ -8,12 +8,16 @@ export interface PendingReceipt {
   mimeType: string;
   capturedAt: string;
   status: 'pending' | 'syncing' | 'failed';
+  /** An upload was tried and failed for a reason worth retrying (network, server). */
+  lastAttemptFailed?: boolean;
 }
 
 interface OfflineState {
   pendingReceipts: PendingReceipt[];
   addPendingReceipt: (receipt: Omit<PendingReceipt, 'id' | 'status'>) => void;
   updateStatus: (id: string, status: PendingReceipt['status']) => void;
+  /** Put a receipt back in the queue after an upload attempt failed and should be retried. */
+  markAttemptFailed: (id: string) => void;
   removePendingReceipt: (id: string) => void;
 }
 
@@ -37,6 +41,13 @@ export const useOfflineStore = create<OfflineState>()(
       updateStatus: (id, status) =>
         set((state) => ({
           pendingReceipts: state.pendingReceipts.map((r) => (r.id === id ? { ...r, status } : r)),
+        })),
+
+      markAttemptFailed: (id) =>
+        set((state) => ({
+          pendingReceipts: state.pendingReceipts.map((r) =>
+            r.id === id ? { ...r, status: 'pending' as const, lastAttemptFailed: true } : r,
+          ),
         })),
 
       removePendingReceipt: (id) =>

@@ -69,6 +69,8 @@ describe('syncPendingReceipts', () => {
     const left = useOfflineStore.getState().pendingReceipts;
     expect(left).toHaveLength(2);
     expect(left.every((r) => r.status === 'pending')).toBe(true);
+    // The one that was tried is marked, so History can say it waits to retry.
+    expect(left.map((r) => r.lastAttemptFailed ?? false)).toEqual([true, false]);
   });
 
   it('marks a rejected photo failed, keeps its file, and carries on', async () => {
