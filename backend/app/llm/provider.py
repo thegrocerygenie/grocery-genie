@@ -32,6 +32,7 @@ class LiteLLMReceiptExtractor:
         self.model = f"{settings.llm_provider}/{settings.llm_model}"
         self.temperature = settings.llm_temperature
         self.api_key = settings.llm_api_key
+        self.api_base = settings.llm_api_base
 
     async def extract(
         self, image_data: bytes, content_type: str
@@ -44,6 +45,7 @@ class LiteLLMReceiptExtractor:
             model=self.model,
             temperature=self.temperature,
             api_key=self.api_key or None,
+            api_base=self.api_base or None,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {
@@ -173,6 +175,7 @@ class LiteLLMCategoryAssigner:
         self.model = f"{settings.llm_provider}/{settings.llm_model}"
         self.temperature = settings.llm_temperature
         self.api_key = settings.llm_api_key
+        self.api_base = settings.llm_api_base
 
     async def assign(self, item_names: list[str]) -> list[dict]:
         items_text = "\n".join(f"- {name}" for name in item_names)
@@ -182,6 +185,7 @@ class LiteLLMCategoryAssigner:
             model=self.model,
             temperature=self.temperature,
             api_key=self.api_key or None,
+            api_base=self.api_base or None,
             messages=[
                 {"role": "system", "content": CAT_SYSTEM_PROMPT},
                 {

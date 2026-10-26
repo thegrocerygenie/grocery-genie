@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     llm_model: str = "claude-sonnet-4-20250514"
     llm_temperature: float = 0.0
     llm_api_key: str = ""
+    # Base URL for a LiteLLM proxy or other OpenAI-compatible gateway, e.g.
+    # http://litellm:4000 with llm_provider "litellm_proxy". Empty calls the
+    # provider's own API.
+    llm_api_base: str = ""
 
     # Extraction
     extraction_confidence_threshold: float = 0.7
