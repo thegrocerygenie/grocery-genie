@@ -91,3 +91,72 @@ describe('sign-up password minimum', () => {
     expect(screen.queryByText('Use at least 12 characters.')).toBeNull();
   });
 });
+
+describe('reset-password hints', () => {
+  const tooShort = 'Use at least 12 characters.';
+  const mismatch = "Passwords don't match.";
+
+  beforeEach(() => {
+    open('reset-password', ResetPasswordScreen, '/reset-password?token=t');
+  });
+
+  function type(password: string, confirm: string) {
+    fireEvent.changeText(screen.getByLabelText('New password'), password);
+    fireEvent.changeText(screen.getByLabelText('Confirm password'), confirm);
+  }
+
+  function resetDisabled(): boolean | undefined {
+    return screen.getByRole('button', { name: 'Reset password' }).props.accessibilityState
+      ?.disabled;
+  }
+
+  it('states the 12-character minimum in the placeholder', () => {
+    expect(screen.getByLabelText('New password').props.placeholder).toContain('12+');
+  });
+
+  it('shows no hint before the user types', () => {
+    expect(screen.queryByText(tooShort)).toBeNull();
+    expect(screen.queryByText(mismatch)).toBeNull();
+  });
+
+  it('says why Reset password is off at 11 matching characters', () => {
+    type('a'.repeat(11), 'a'.repeat(11));
+
+    expect(resetDisabled()).toBe(true);
+    expect(screen.getByText(tooShort)).toBeTruthy();
+  });
+
+  it('stays quiet while the confirm is a correct prefix', () => {
+    type('a'.repeat(12), 'a'.repeat(5));
+
+    expect(resetDisabled()).toBe(true);
+    expect(screen.queryByText(mismatch)).toBeNull();
+  });
+
+  it('says the passwords differ once the confirm goes wrong', () => {
+    type('a'.repeat(12), 'aab');
+
+    expect(resetDisabled()).toBe(true);
+    expect(screen.getByText(mismatch)).toBeTruthy();
+  });
+
+  it('says the passwords differ when the confirm is too long', () => {
+    type('a'.repeat(12), 'a'.repeat(13));
+
+    expect(screen.getByText(mismatch)).toBeTruthy();
+  });
+
+  it('enables Reset password with no hint at 12 matching characters', () => {
+    type('a'.repeat(12), 'a'.repeat(12));
+
+    expect(resetDisabled()).toBe(false);
+    expect(screen.queryByText(tooShort)).toBeNull();
+    expect(screen.queryByText(mismatch)).toBeNull();
+  });
+
+  it('labels the show-password toggle', () => {
+    fireEvent.press(screen.getByRole('button', { name: 'Show password' }));
+
+    expect(screen.getByRole('button', { name: 'Hide password' })).toBeTruthy();
+  });
+});

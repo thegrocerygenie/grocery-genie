@@ -26,8 +26,13 @@ export default function ResetPasswordScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const reset = useResetPassword();
 
-  const canSubmit =
-    !!token && password.length >= PASSWORD_MIN_LENGTH && password === confirm && !reset.isPending;
+  const passwordTooShort = password.length < PASSWORD_MIN_LENGTH;
+  // Wait until the confirm stops being a correct prefix, so typing it does not flash an error.
+  const confirmMismatch =
+    confirm.length > 0 &&
+    confirm !== password &&
+    (confirm.length >= password.length || !password.startsWith(confirm));
+  const canSubmit = !!token && !passwordTooShort && password === confirm && !reset.isPending;
 
   const onSubmit = async () => {
     if (!canSubmit || !token) return;
@@ -74,7 +79,7 @@ export default function ResetPasswordScreen() {
           <View style={styles.listCard}>
             <View style={styles.inputRow}>
               <TextInput
-                placeholder="New password"
+                placeholder={`New password · ${PASSWORD_MIN_LENGTH}+ characters`}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
@@ -88,6 +93,7 @@ export default function ResetPasswordScreen() {
                 onPress={() => setShowPassword((p) => !p)}
                 hitSlop={8}
                 accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
               >
                 <SymbolView
                   name={showPassword ? 'eye.slash' : 'eye'}
@@ -111,6 +117,17 @@ export default function ResetPasswordScreen() {
               />
             </View>
           </View>
+
+          {password.length > 0 && passwordTooShort && (
+            <Text style={styles.hint} accessibilityLiveRegion="polite">
+              {`Use at least ${PASSWORD_MIN_LENGTH} characters.`}
+            </Text>
+          )}
+          {!passwordTooShort && confirmMismatch && (
+            <Text style={styles.hint} accessibilityLiveRegion="polite">
+              Passwords don&apos;t match.
+            </Text>
+          )}
 
           <Pressable
             style={({ pressed }) => [
@@ -180,6 +197,12 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.iosSeparator,
     marginLeft: 16,
+  },
+  hint: {
+    ...type.footnote,
+    color: colors.iosLabel2 as string,
+    marginTop: -spacing.sm,
+    paddingHorizontal: 16,
   },
 
   primaryBtn: {
