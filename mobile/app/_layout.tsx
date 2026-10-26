@@ -77,10 +77,7 @@ export default function RootLayout() {
             name="budget-settings"
             options={{ title: 'Budget Settings', presentation: 'modal' }}
           />
-          <Stack.Screen
-            name="notification-settings"
-            options={{ title: 'Notification Settings', presentation: 'modal' }}
-          />
+          <Stack.Screen name="notification-settings" options={{ title: 'Alerts' }} />
           <Stack.Screen name="settings" options={{ title: 'Settings', presentation: 'modal' }} />
           <Stack.Screen name="language-settings" options={{ title: 'Language' }} />
           <Stack.Screen name="about" options={{ title: 'About' }} />

@@ -43,7 +43,8 @@ export default function NotificationSettingsScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Alerts' }} />
+      {/* Design "15 · Notifications": pushed from Settings with Back, not a modal. */}
+      <Stack.Screen options={{ title: 'Alerts', headerBackTitle: 'Settings' }} />
       <ScrollView
         style={styles.root}
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
