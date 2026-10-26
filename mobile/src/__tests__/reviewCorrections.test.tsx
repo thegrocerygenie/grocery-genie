@@ -1,6 +1,6 @@
 /**
- * RC-02 AC 1: the receipt date is editable on the review screen. The edited
- * date goes out in the PATCH that confirms the scan.
+ * RC-02 AC 1: each extracted field is editable on the review screen. An edit
+ * goes out in the PATCH that confirms the scan; an untouched field does not.
  */
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -82,16 +82,20 @@ function renderReview() {
   act(() => router.push('/review'));
 }
 
+beforeEach(() => {
+  jest.clearAllMocks();
+  useReceiptStore.getState().setActiveScanResponse(scan);
+});
+
+afterEach(() => {
+  useReceiptStore.getState().clearScanSession();
+});
+
+function save() {
+  fireEvent.press(screen.getByLabelText('Save'));
+}
+
 describe('Review screen date edit', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    useReceiptStore.getState().setActiveScanResponse(scan);
-  });
-
-  afterEach(() => {
-    useReceiptStore.getState().clearScanSession();
-  });
-
   it('shows the extracted date in the picker', () => {
     renderReview();
 
@@ -108,7 +112,7 @@ describe('Review screen date edit', () => {
       { type: 'set' },
       new Date(2026, 2, 20),
     );
-    fireEvent.press(screen.getByLabelText('Save'));
+    save();
 
     expect(mockMutate).toHaveBeenCalledWith(
       {
@@ -122,8 +126,67 @@ describe('Review screen date edit', () => {
   it('does not send the date when the user leaves it alone', () => {
     renderReview();
 
-    fireEvent.press(screen.getByLabelText('Save'));
+    save();
 
+    expect(mockMutate).toHaveBeenCalledWith(
+      { receiptId: 'r-1', updates: { status: 'confirmed' } },
+      expect.anything(),
+    );
+  });
+});
+
+describe('Review screen quantity edit', () => {
+  function editQuantity(text: string) {
+    fireEvent.press(screen.getByLabelText('Quantity of Organic Bananas'));
+    const input = screen.getByLabelText('Edit quantity of Organic Bananas');
+    fireEvent.changeText(input, text);
+    fireEvent(input, 'blur');
+  }
+
+  it('shows each item quantity', () => {
+    renderReview();
+
+    expect(screen.getByText('Qty 1')).toBeTruthy();
+  });
+
+  it('sends an edited quantity and no price change', () => {
+    renderReview();
+
+    editQuantity('2');
+    save();
+
+    expect(screen.getByText('Qty 2')).toBeTruthy();
+    expect(mockMutate).toHaveBeenCalledWith(
+      {
+        receiptId: 'r-1',
+        updates: { items: [{ id: 'item-1', quantity: 2 }], status: 'confirmed' },
+      },
+      expect.anything(),
+    );
+  });
+
+  it('reads a comma as the decimal separator', () => {
+    renderReview();
+
+    editQuantity('1,105');
+    save();
+
+    expect(mockMutate).toHaveBeenCalledWith(
+      {
+        receiptId: 'r-1',
+        updates: { items: [{ id: 'item-1', quantity: 1.105 }], status: 'confirmed' },
+      },
+      expect.anything(),
+    );
+  });
+
+  it.each(['0', '-1', 'abc', ''])('ignores a quantity of %p', (text) => {
+    renderReview();
+
+    editQuantity(text);
+    save();
+
+    expect(screen.getByText('Qty 1')).toBeTruthy();
     expect(mockMutate).toHaveBeenCalledWith(
       { receiptId: 'r-1', updates: { status: 'confirmed' } },
       expect.anything(),

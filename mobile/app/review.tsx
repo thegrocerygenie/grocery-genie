@@ -135,6 +135,23 @@ export default function ReviewScreen() {
     );
   };
 
+  // The line total is what was paid, so a quantity edit keeps it and
+  // recomputes the unit price (as the API does).
+  const updateItemQuantity = (itemId: string, quantity: number) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId && item.quantity !== quantity
+          ? {
+              ...item,
+              quantity,
+              unitPrice: Math.round((item.totalPrice / quantity) * 100) / 100,
+              isEdited: true,
+            }
+          : item,
+      ),
+    );
+  };
+
   const updateItemCategory = (itemId: string, categoryId: string) => {
     setItems((prev) =>
       prev.map((item) => (item.id === itemId ? { ...item, categoryId, isEdited: true } : item)),
@@ -301,6 +318,7 @@ export default function ReviewScreen() {
                 readOnly={isReadOnly}
                 categories={categories}
                 onChangePrice={(p) => updateItemPrice(item.id, p)}
+                onChangeQuantity={(q) => updateItemQuantity(item.id, q)}
                 onPickCategory={() => setCategoryPickerItemId(item.id)}
               />
             ))}
@@ -428,7 +446,21 @@ interface ItemRowProps {
   readOnly: boolean;
   categories?: CategoryResponse[];
   onChangePrice: (p: number | null) => void;
+  onChangeQuantity: (q: number) => void;
   onPickCategory: () => void;
+}
+
+/** Up to three decimals (weighed items), without trailing zeros. */
+function formatQuantity(quantity: number): string {
+  return String(Number(quantity.toFixed(3)));
+}
+
+/** A positive quantity, reading a comma as the decimal separator; else null. */
+function parseQuantity(text: string): number | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed.replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? Number(n.toFixed(3)) : null;
 }
 
 function ItemRow({
@@ -437,11 +469,14 @@ function ItemRow({
   readOnly,
   categories,
   onChangePrice,
+  onChangeQuantity,
   onPickCategory,
 }: ItemRowProps) {
   const lowConf = isLowConfidence(item.extractionConfidence);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(item.totalPrice.toFixed(2));
+  const [editingQuantity, setEditingQuantity] = useState(false);
+  const [quantityText, setQuantityText] = useState('');
   const meta = resolveCategoryMeta(item.categoryId, categories);
 
   return (
@@ -459,9 +494,41 @@ function ItemRow({
           tintColor="#fff"
         />
       </Pressable>
-      <Text style={[type.body, { flex: 1 }]} numberOfLines={1}>
-        {item.name}
-      </Text>
+      <View style={styles.itemInfo}>
+        <Text style={type.body} numberOfLines={1}>
+          {item.name}
+        </Text>
+        {editingQuantity && !readOnly ? (
+          <TextInput
+            autoFocus
+            keyboardType="decimal-pad"
+            value={quantityText}
+            onChangeText={setQuantityText}
+            onBlur={() => {
+              const q = parseQuantity(quantityText);
+              if (q !== null) onChangeQuantity(q);
+              setEditingQuantity(false);
+            }}
+            accessibilityLabel={`Edit quantity of ${item.name}`}
+            style={[type.caption1, styles.quantityInput]}
+          />
+        ) : (
+          <Pressable
+            onPress={() => {
+              setQuantityText(formatQuantity(item.quantity));
+              setEditingQuantity(true);
+            }}
+            disabled={readOnly}
+            hitSlop={{ top: 8, bottom: 8, right: 24 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Quantity of ${item.name}`}
+            accessibilityValue={{ text: formatQuantity(item.quantity) }}
+            accessibilityHint={readOnly ? undefined : 'Double-tap to change'}
+          >
+            <Text style={styles.quantityText}>{`Qty ${formatQuantity(item.quantity)}`}</Text>
+          </Pressable>
+        )}
+      </View>
       {editing && !readOnly ? (
         <TextInput
           autoFocus
@@ -552,6 +619,18 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
     paddingVertical: 0,
+  },
+
+  itemInfo: { flex: 1, gap: 2 },
+  quantityText: {
+    ...type.caption1,
+    color: colors.iosLabel2 as string,
+  },
+  quantityInput: {
+    color: colors.tint,
+    fontWeight: '600',
+    paddingVertical: 0,
+    minWidth: 60,
   },
 
   itemDot: {

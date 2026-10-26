@@ -83,6 +83,15 @@ describe('buildReceiptUpdate', () => {
     });
   });
 
+  it('sends an edited quantity', () => {
+    const items = editable([{ quantity: 3, unitPrice: 0.43, isEdited: true }]);
+
+    expect(buildReceiptUpdate(extraction, items, 'Test Grocery Store', extraction.date)).toEqual({
+      items: [{ id: 'item-1', quantity: 3 }],
+      status: 'confirmed',
+    });
+  });
+
   it('sends an edited date', () => {
     expect(buildReceiptUpdate(extraction, editable(), 'Test Grocery Store', '2026-03-20')).toEqual({
       date: '2026-03-20',

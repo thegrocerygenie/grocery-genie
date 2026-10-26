@@ -74,6 +74,7 @@ export interface LineItemCorrection {
   id: string;
   name?: string;
   category_id?: string;
+  quantity?: number;
   total_price?: number;
 }
 

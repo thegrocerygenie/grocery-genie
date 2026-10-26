@@ -27,6 +27,7 @@ export function buildReceiptUpdate(
     if (item.categoryId !== original.category_id) {
       correction.category_id = item.categoryId ?? undefined;
     }
+    if (item.quantity !== original.quantity) correction.quantity = item.quantity;
     if (item.totalPrice !== original.total_price) correction.total_price = item.totalPrice;
 
     if (Object.keys(correction).length > 1) corrections.push(correction);

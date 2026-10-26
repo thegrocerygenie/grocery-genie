@@ -83,6 +83,7 @@ class LineItemCorrection(BaseModel):
     id: uuid.UUID
     name: str | None = None
     category_id: uuid.UUID | None = None
+    quantity: float | None = Field(default=None, gt=0)
     total_price: float | None = Field(default=None, ge=0)
 
 

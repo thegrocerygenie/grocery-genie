@@ -742,3 +742,102 @@ async def test_scan_reports_the_stored_date_when_extracted_date_is_unreadable(
     stored = (await client.get(f"/api/receipts/{scan['receipt_id']}")).json()
     assert stored["date"] == date.today().isoformat()
     assert scan["extraction"]["date"] == stored["date"]
+
+
+# --- RC-02 AC 1: item quantity is editable ---
+# The line total is what was paid and what spend sums, so a quantity edit
+# keeps total_price and recomputes unit_price (user decision, 2026-10-26).
+
+
+async def test_update_receipt_corrects_quantity_and_keeps_the_total(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    scan = await _create_receipt(client, test_image_bytes)
+    receipt_id = scan["receipt_id"]
+    item_id = scan["extraction"]["items"][2]["id"]  # Paper Towels, 1 x 8.49
+
+    resp = await client.patch(
+        f"/api/receipts/{receipt_id}",
+        json={"items": [{"id": item_id, "quantity": 3}]},
+    )
+
+    assert resp.status_code == 200
+    item = next(i for i in resp.json()["items"] if i["id"] == item_id)
+    assert item["quantity"] == 3
+    assert item["total_price"] == 8.49
+    assert item["unit_price"] == 2.83
+    assert item["corrected"] is True
+    fetched = await client.get(f"/api/receipts/{receipt_id}")
+    item = next(i for i in fetched.json()["items"] if i["id"] == item_id)
+    assert item["quantity"] == 3
+
+
+async def test_quantity_and_price_corrected_together_set_the_unit_price(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    scan = await _create_receipt(client, test_image_bytes)
+    item_id = scan["extraction"]["items"][1]["id"]  # Whole Milk, 1 x 4.99
+
+    resp = await client.patch(
+        f"/api/receipts/{scan['receipt_id']}",
+        json={"items": [{"id": item_id, "quantity": 2, "total_price": 9.00}]},
+    )
+
+    item = next(i for i in resp.json()["items"] if i["id"] == item_id)
+    assert (item["quantity"], item["total_price"], item["unit_price"]) == (
+        2,
+        9.00,
+        4.50,
+    )
+
+
+async def test_quantity_correction_is_recorded_as_a_correction(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    calls = _install_analytics_spy()
+    scan = await _create_receipt(client, test_image_bytes)
+    item_id = scan["extraction"]["items"][0]["id"]
+
+    await client.patch(
+        f"/api/receipts/{scan['receipt_id']}",
+        json={"items": [{"id": item_id, "quantity": 1.105}]},
+    )
+
+    corrections = [p for name, p, _ in calls if name == "receipt_correction_made"]
+    assert {
+        "field": "quantity",
+        "original_value": "1",
+        "corrected_value": "1.105",
+    } in corrections
+
+
+async def test_unchanged_quantity_is_not_a_correction(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    calls = _install_analytics_spy()
+    scan = await _create_receipt(client, test_image_bytes)
+    item_id = scan["extraction"]["items"][0]["id"]
+
+    resp = await client.patch(
+        f"/api/receipts/{scan['receipt_id']}",
+        json={"items": [{"id": item_id, "quantity": 1}]},
+    )
+
+    item = next(i for i in resp.json()["items"] if i["id"] == item_id)
+    assert item["corrected"] is False
+    assert not [p for name, p, _ in calls if name == "receipt_correction_made"]
+
+
+@pytest.mark.parametrize("quantity", [0, -1])
+async def test_update_receipt_rejects_a_non_positive_quantity(
+    client: AsyncClient, test_image_bytes: bytes, quantity: float
+):
+    scan = await _create_receipt(client, test_image_bytes)
+    item_id = scan["extraction"]["items"][0]["id"]
+
+    resp = await client.patch(
+        f"/api/receipts/{scan['receipt_id']}",
+        json={"items": [{"id": item_id, "quantity": quantity}]},
+    )
+
+    assert resp.status_code == 422
