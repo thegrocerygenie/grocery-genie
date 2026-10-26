@@ -14,7 +14,7 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { name: 'index', label: 'Budget', symbol: 'cart.fill' },
+  { name: '(budget)', label: 'Budget', symbol: 'cart.fill' },
   { name: 'scan', label: 'Scan', symbol: 'camera.viewfinder' },
   { name: 'history', label: 'History', symbol: 'clock.fill' },
 ];

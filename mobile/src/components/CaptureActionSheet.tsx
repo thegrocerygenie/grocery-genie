@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
@@ -40,8 +40,24 @@ export function CaptureActionSheet({
     { key: 'manual', label: 'Manual Entry', symbol: 'plus', onPress: onManualEntry },
   ];
 
+  // The chosen action runs once the sheet has finished dismissing. iOS tears
+  // down anything presented above the sheet when it closes, so a picker opened
+  // in the same tick appeared and vanished.
+  const pendingAction = useRef<(() => void) | null>(null);
+  const runPendingAction = () => {
+    const action = pendingAction.current;
+    pendingAction.current = null;
+    action?.();
+  };
+
   return (
-    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
+    <Modal
+      animationType="fade"
+      transparent
+      visible={visible}
+      onRequestClose={onClose}
+      onDismiss={runPendingAction}
+    >
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button">
         <Pressable
           style={styles.wrap}
@@ -53,8 +69,8 @@ export function CaptureActionSheet({
               <Pressable
                 key={a.key}
                 onPress={() => {
+                  pendingAction.current = a.onPress;
                   onClose();
-                  a.onPress();
                 }}
                 style={({ pressed }) => [
                   styles.row,
