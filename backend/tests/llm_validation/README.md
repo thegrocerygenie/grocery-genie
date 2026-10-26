@@ -18,7 +18,11 @@ the skips as RED for launch purposes.
 3. **Locale coverage** (per CLAUDE.md / RC-05): US English, UK (DD/MM/YYYY),
    German (comma decimal), French, and one non-Latin (e.g. Serbian Cyrillic or
    Mandarin). Suggested ids: `en_us_*`, `en_gb_*`, `de_de_*`, `fr_fr_*`, `sr_rs_*`.
-4. **`GG_LLM_API_KEY`** set in the environment / CI secret store.
+4. **`GG_LLM_API_KEY`** set in the environment, in `backend/.env`, or in the CI secret store.
+   The harness reads it through `get_settings()`, as the app does. It is the key for
+   `GG_LLM_PROVIDER` (default `anthropic`), because every call goes through LiteLLM.
+   With the key in `backend/.env`, a plain `pytest` also runs the live harness once
+   fixtures exist, and each run calls the paid API.
 
 A single ground-truth example ships today: `ground_truth/en_us_01.json` — but its
 paired image `receipts/en_us_01.jpg` is **missing**, so even it is skipped.
