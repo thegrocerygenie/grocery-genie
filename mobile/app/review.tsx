@@ -99,6 +99,7 @@ export default function ReviewScreen() {
         unitPrice: item.unit_price,
         totalPrice: item.total_price,
         categoryId: item.category_id,
+        categoryConfidence: item.category_confidence,
         extractionConfidence: item.extraction_confidence,
         isEdited: false,
       })),
@@ -128,10 +129,20 @@ export default function ReviewScreen() {
 
   const canConfirm = storeName.trim().length > 0 && items.length > 0;
 
-  const updateItemPrice = (itemId: string, price: number | null) => {
+  const updateItemName = (itemId: string, name: string) => {
     setItems((prev) =>
       prev.map((item) =>
-        item.id === itemId ? { ...item, totalPrice: price ?? 0, isEdited: true } : item,
+        item.id === itemId && item.name !== name ? { ...item, name, isEdited: true } : item,
+      ),
+    );
+  };
+
+  const updateItemPrice = (itemId: string, price: number) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId && item.totalPrice !== price
+          ? { ...item, totalPrice: price, isEdited: true }
+          : item,
       ),
     );
   };
@@ -155,7 +166,9 @@ export default function ReviewScreen() {
 
   const updateItemCategory = (itemId: string, categoryId: string) => {
     setItems((prev) =>
-      prev.map((item) => (item.id === itemId ? { ...item, categoryId, isEdited: true } : item)),
+      prev.map((item) =>
+        item.id === itemId ? { ...item, categoryId, categoryConfidence: 1, isEdited: true } : item,
+      ),
     );
   };
 
@@ -207,9 +220,18 @@ export default function ReviewScreen() {
   }
 
   const extraction = activeScanResponse?.extraction;
-  const displaySubtotal = extraction?.subtotal ?? fetchedReceipt?.subtotal ?? null;
+  // Subtotal and total are not edited; like the API, they move by what the
+  // user's price edits changed.
+  const baselinePrices = new Map((baseline?.items ?? []).map((i) => [i.id, i.total_price]));
+  const priceDelta = items.reduce(
+    (sum, item) => sum + item.totalPrice - (baselinePrices.get(item.id) ?? item.totalPrice),
+    0,
+  );
+  const withPriceDelta = (amount: number | null) =>
+    amount == null ? null : Math.round((amount + priceDelta) * 100) / 100;
+  const displaySubtotal = withPriceDelta(extraction?.subtotal ?? fetchedReceipt?.subtotal ?? null);
   const displayTax = extraction?.tax ?? fetchedReceipt?.tax ?? null;
-  const displayTotal = extraction?.total ?? fetchedReceipt?.total ?? null;
+  const displayTotal = withPriceDelta(extraction?.total ?? fetchedReceipt?.total ?? null);
   const imageSource = receiptImageSource(
     capturedImageUri ?? fetchedReceipt?.image_url,
     API_BASE_URL,
@@ -322,6 +344,7 @@ export default function ReviewScreen() {
                 showDivider={i > 0}
                 readOnly={isReadOnly}
                 categories={categories}
+                onChangeName={(n) => updateItemName(item.id, n)}
                 onChangePrice={(p) => updateItemPrice(item.id, p)}
                 onChangeQuantity={(q) => updateItemQuantity(item.id, q)}
                 onPickCategory={() => setCategoryPickerItemId(item.id)}
@@ -383,7 +406,7 @@ interface ListRowProps {
 
 function ListRow({ label, value, chevron }: ListRowProps) {
   return (
-    <View style={styles.row}>
+    <View style={styles.row} accessible accessibilityLabel={`${label}, ${value}`}>
       <Text style={type.body}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
         <Text style={[type.body, { color: colors.iosLabel2 as string }]}>{value}</Text>
@@ -451,7 +474,8 @@ interface ItemRowProps {
   showDivider: boolean;
   readOnly: boolean;
   categories?: CategoryResponse[];
-  onChangePrice: (p: number | null) => void;
+  onChangeName: (n: string) => void;
+  onChangePrice: (p: number) => void;
   onChangeQuantity: (q: number) => void;
   onPickCategory: () => void;
 }
@@ -459,6 +483,14 @@ interface ItemRowProps {
 /** Up to three decimals (weighed items), without trailing zeros. */
 function formatQuantity(quantity: number): string {
   return String(Number(quantity.toFixed(3)));
+}
+
+/** A price of zero or more, reading a comma as the decimal separator; else null. */
+function parsePrice(text: string): number | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed.replace(',', '.'));
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
 }
 
 /** A positive quantity, reading a comma as the decimal separator; else null. */
@@ -474,13 +506,17 @@ function ItemRow({
   showDivider,
   readOnly,
   categories,
+  onChangeName,
   onChangePrice,
   onChangeQuantity,
   onPickCategory,
 }: ItemRowProps) {
   const lowConf = isLowConfidence(item.extractionConfidence);
+  const lowCategoryConf = isLowConfidence(item.categoryConfidence);
+  const [editingName, setEditingName] = useState(false);
+  const [nameText, setNameText] = useState('');
   const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(item.totalPrice.toFixed(2));
+  const [text, setText] = useState('');
   const [editingQuantity, setEditingQuantity] = useState(false);
   const [quantityText, setQuantityText] = useState('');
   const meta = resolveCategoryMeta(item.categoryId, categories);
@@ -490,9 +526,13 @@ function ItemRow({
       <Pressable
         onPress={onPickCategory}
         disabled={readOnly}
-        style={[styles.itemDot, { backgroundColor: meta.color }]}
+        style={[
+          styles.itemDot,
+          { backgroundColor: meta.color },
+          lowCategoryConf && styles.itemDotLowConfidence,
+        ]}
         accessibilityRole="button"
-        accessibilityLabel={`Category ${meta.name}, tap to change`}
+        accessibilityLabel={`Category ${meta.name}${lowCategoryConf ? ', low confidence' : ''}, tap to change`}
       >
         <SymbolView
           name={meta.symbol as Parameters<typeof SymbolView>[0]['name']}
@@ -501,9 +541,35 @@ function ItemRow({
         />
       </Pressable>
       <View style={styles.itemInfo}>
-        <Text style={type.body} numberOfLines={1}>
-          {item.name}
-        </Text>
+        {editingName && !readOnly ? (
+          <TextInput
+            autoFocus
+            value={nameText}
+            onChangeText={setNameText}
+            onBlur={() => {
+              const name = nameText.trim();
+              if (name) onChangeName(name);
+              setEditingName(false);
+            }}
+            accessibilityLabel={`Edit name of ${item.name}`}
+            style={[type.body, styles.nameInput]}
+          />
+        ) : (
+          <Pressable
+            onPress={() => {
+              setNameText(item.name);
+              setEditingName(true);
+            }}
+            disabled={readOnly}
+            accessibilityRole="button"
+            accessibilityLabel={`Name of ${item.name}`}
+            accessibilityHint={readOnly ? undefined : 'Double-tap to change'}
+          >
+            <Text style={type.body} numberOfLines={1}>
+              {item.name}
+            </Text>
+          </Pressable>
+        )}
         {editingQuantity && !readOnly ? (
           <TextInput
             autoFocus
@@ -542,10 +608,11 @@ function ItemRow({
           value={text}
           onChangeText={setText}
           onBlur={() => {
-            const n = parseFloat(text);
-            onChangePrice(Number.isFinite(n) ? n : null);
+            const price = parsePrice(text);
+            if (price !== null) onChangePrice(price);
             setEditing(false);
           }}
+          accessibilityLabel={`Edit price of ${item.name}`}
           style={[
             type.body,
             { color: colors.tint, fontWeight: '600', minWidth: 70, textAlign: 'right' },
@@ -553,9 +620,15 @@ function ItemRow({
         />
       ) : (
         <Pressable
-          onPress={() => !readOnly && setEditing(true)}
+          onPress={() => {
+            setText(item.totalPrice.toFixed(2));
+            setEditing(true);
+          }}
           disabled={readOnly}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+          accessibilityRole="button"
+          accessibilityLabel={`Price of ${item.name}`}
+          accessibilityHint={readOnly ? undefined : 'Double-tap to change'}
         >
           {lowConf ? <Text style={styles.verifyTag}>verify</Text> : null}
           <Text
@@ -632,6 +705,10 @@ const styles = StyleSheet.create({
     ...type.caption1,
     color: colors.iosLabel2 as string,
   },
+  nameInput: {
+    color: colors.tint,
+    paddingVertical: 0,
+  },
   quantityInput: {
     color: colors.tint,
     fontWeight: '600',
@@ -645,6 +722,11 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // RC-02 AC 2: a category assigned with low confidence.
+  itemDotLowConfidence: {
+    borderWidth: 2,
+    borderColor: colors.orange,
   },
 
   verifyTag: {

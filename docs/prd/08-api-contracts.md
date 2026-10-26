@@ -35,12 +35,21 @@ Submit receipt image for processing. Returns job ID for async polling or sync re
 Full receipt data including extraction, corrections, and original image URL.
 
 ### PATCH /api/receipts/{id} [MVP]
-Submit user corrections. Accepts partial updates. Triggers correction event recording.
+Submit user corrections. Accepts partial updates; send only the fields the user changed. Each changed field is stored in `receipt_corrections` with its original and corrected value, and triggers correction event recording.
 
 **Request:**
 ```json
-{ "items": [{ "id": "item-uuid", "name": "corrected name", "category_id": "cat-uuid" }], "status": "confirmed" }
+{
+  "store_name": "corrected store",
+  "date": "2026-03-15",
+  "items": [{ "id": "item-uuid", "name": "corrected name", "category_id": "cat-uuid", "quantity": 2, "total_price": 4.98 }],
+  "status": "confirmed"
+}
 ```
+
+- `date` later than today + 1 day returns 422. `quantity` must be > 0 and `total_price` >= 0, or 422.
+- A quantity edit keeps `total_price` (what was paid) and recomputes `unit_price`.
+- Subtotal and total are not editable. A `total_price` correction moves both by the same amount; tax is kept as extracted.
 
 ### GET /api/receipts?page=1&per_page=20&store=...&from=...&to=... [MVP]
 Paginated receipt history with optional filters.

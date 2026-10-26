@@ -199,6 +199,127 @@ describe('Review screen quantity edit', () => {
   });
 });
 
+function withItem(overrides: Partial<ReceiptScanResponse['extraction']['items'][number]>) {
+  useReceiptStore.getState().setActiveScanResponse({
+    ...scan,
+    extraction: {
+      ...scan.extraction,
+      items: [{ ...scan.extraction.items[0], ...overrides }],
+    },
+  });
+}
+
+describe('Review screen item name edit', () => {
+  function editName(text: string) {
+    fireEvent.press(screen.getByLabelText('Name of Organic Bananas'));
+    const input = screen.getByLabelText('Edit name of Organic Bananas');
+    fireEvent.changeText(input, text);
+    fireEvent(input, 'blur');
+  }
+
+  it('sends an edited item name when the user saves', () => {
+    renderReview();
+
+    editName('  Bananas  ');
+    save();
+
+    expect(screen.getByText('Bananas')).toBeTruthy();
+    expect(mockMutate).toHaveBeenCalledWith(
+      {
+        receiptId: 'r-1',
+        updates: { items: [{ id: 'item-1', name: 'Bananas' }], status: 'confirmed' },
+      },
+      expect.anything(),
+    );
+  });
+
+  it('ignores a blank name', () => {
+    renderReview();
+
+    editName('   ');
+    save();
+
+    expect(screen.getByText('Organic Bananas')).toBeTruthy();
+    expect(mockMutate).toHaveBeenCalledWith(
+      { receiptId: 'r-1', updates: { status: 'confirmed' } },
+      expect.anything(),
+    );
+  });
+});
+
+describe('Review screen price edit', () => {
+  function editPrice(text: string) {
+    fireEvent.press(screen.getByLabelText('Price of Organic Bananas'));
+    const input = screen.getByLabelText('Edit price of Organic Bananas');
+    fireEvent.changeText(input, text);
+    fireEvent(input, 'blur');
+  }
+
+  it('reads a comma as the decimal separator', () => {
+    renderReview();
+
+    editPrice('2,50');
+    save();
+
+    expect(mockMutate).toHaveBeenCalledWith(
+      {
+        receiptId: 'r-1',
+        updates: { items: [{ id: 'item-1', total_price: 2.5 }], status: 'confirmed' },
+      },
+      expect.anything(),
+    );
+  });
+
+  it.each(['abc', '', '-1'])('ignores a price of %p instead of zeroing it', (text) => {
+    renderReview();
+
+    editPrice(text);
+    save();
+
+    expect(screen.getByLabelText('Price of Organic Bananas')).toHaveTextContent('$1.29');
+    expect(mockMutate).toHaveBeenCalledWith(
+      { receiptId: 'r-1', updates: { status: 'confirmed' } },
+      expect.anything(),
+    );
+  });
+
+  it('moves the subtotal and total by the price change', () => {
+    renderReview();
+
+    editPrice('2.50');
+
+    expect(screen.getByLabelText('Subtotal, $2.50')).toBeTruthy();
+    expect(screen.getByLabelText('Total, $2.50')).toBeTruthy();
+  });
+});
+
+describe('Review screen low-confidence flags (AC 2)', () => {
+  it('flags the price of an item read with low confidence', () => {
+    withItem({ extraction_confidence: 0.5 });
+    renderReview();
+
+    expect(screen.getByText('verify')).toBeTruthy();
+  });
+
+  it('does not flag an item read with confidence at the threshold', () => {
+    withItem({ extraction_confidence: 0.7, category_confidence: 0.7 });
+    renderReview();
+
+    expect(screen.queryByText('verify')).toBeNull();
+    const category = screen.getByLabelText(/^Category .*, tap to change$/);
+    expect(category.props.accessibilityLabel).not.toMatch(/low confidence/);
+    expect(category).not.toHaveStyle({ borderColor: '#FF9500' });
+  });
+
+  it('rings the category of an item categorised with low confidence', () => {
+    withItem({ category_confidence: 0.5 });
+    renderReview();
+
+    const category = screen.getByLabelText(/^Category .*, low confidence, tap to change$/);
+    expect(category).toHaveStyle({ borderColor: '#FF9500' });
+  });
+});
+
 describe('Review opened from History', () => {
   function stored(status: string): ReceiptResponse {
     return {

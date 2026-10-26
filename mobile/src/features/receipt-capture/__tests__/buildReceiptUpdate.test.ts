@@ -41,6 +41,7 @@ function editable(overrides: Partial<EditableLineItem>[] = []): EditableLineItem
     unitPrice: item.unit_price,
     totalPrice: item.total_price,
     categoryId: item.category_id,
+    categoryConfidence: item.category_confidence,
     extractionConfidence: item.extraction_confidence,
     isEdited: false,
     ...overrides[i],

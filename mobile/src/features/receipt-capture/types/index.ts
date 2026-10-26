@@ -98,6 +98,7 @@ export interface EditableLineItem {
   unitPrice: number;
   totalPrice: number;
   categoryId: string | null;
+  categoryConfidence: number | null;
   extractionConfidence: number | null;
   isEdited: boolean;
 }
