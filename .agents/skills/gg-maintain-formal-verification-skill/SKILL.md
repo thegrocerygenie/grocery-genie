@@ -1,7 +1,6 @@
 ---
 name: gg-maintain-formal-verification-skill
-description: "Bring a project's formal verification back in line with the code after merges and refactors that touched verified code without rechecking it, and say whether each failure is drift in the verification or a bug in the code. Run by hand."
-disable-model-invocation: true
+description: "Bring a formal verify skill back in line after code it covers changed without a recheck, and tell drift in the model from bugs in the code. Use when covered code changed since the skill's sync commit, or the user asks whether a model is still true to the code."
 ---
 
 # Maintain a formal verification skill
