@@ -11,11 +11,13 @@ from app.models.database import User
 from app.models.schemas import (
     EmailChangeConfirmPayload,
     EmailChangeRequestPayload,
+    PushTokenPayload,
     UserPreferencesPublic,
     UserPreferencesUpdate,
     UserProfileResponse,
 )
 from app.services import auth as auth_service
+from app.services.push_token_service import PushTokenService
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -133,3 +135,21 @@ async def confirm_email_change(
     except auth_service.AuthError as e:
         _raise_auth(e)
     return {"email": user.email}
+
+
+@router.post("/me/push-tokens", status_code=204)
+async def register_push_token(
+    body: PushTokenPayload,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    await PushTokenService(db).register(user.id, body.token)
+
+
+@router.delete("/me/push-tokens", status_code=204)
+async def unregister_push_token(
+    body: PushTokenPayload,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    await PushTokenService(db).unregister(user.id, body.token)

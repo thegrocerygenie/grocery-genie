@@ -15,6 +15,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -232,6 +233,14 @@ class Budget(Base):
 
 class Notification(Base):
     __tablename__ = "notifications"
+    __table_args__ = (
+        # The push beat polls pending rows every minute.
+        Index(
+            "ix_notifications_push_pending",
+            "created_at",
+            postgresql_where=text("push_status IS NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
@@ -240,11 +249,35 @@ class Notification(Base):
     body: Mapped[str] = mapped_column(String(2000), nullable=False)
     data: Mapped[str | None] = mapped_column(String(5000))
     read: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Push delivery: NULL = pending; then sent | no_device | failed | expired.
+    push_status: Mapped[str | None] = mapped_column(String(20))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     user: Mapped["User"] = relationship(back_populates="notifications")
+
+
+class PushToken(Base):
+    """An Expo push token for one of the user's devices.
+
+    A token identifies a device install, so it belongs to at most one user:
+    signing in to another account on the same device moves it.
+    """
+
+    __tablename__ = "push_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class UserItemMapping(Base):

@@ -10,6 +10,7 @@ celery_app = Celery(
     broker=settings.redis_url,
     # Task modules the worker imports at startup so their tasks register.
     include=[
+        "app.tasks.push_tasks",
         "app.tasks.receipt_tasks",
         "app.tasks.summary_tasks",
     ],
@@ -27,5 +28,10 @@ celery_app.conf.beat_schedule = {
     "weekly-spending-summary": {
         "task": "app.tasks.summary_tasks.generate_weekly_summaries",
         "schedule": crontab(hour=9, minute=0),  # daily 9 AM UTC; users pick their day
+    },
+    # NFR: push delivered within 5 minutes of the trigger.
+    "deliver-pending-pushes": {
+        "task": "app.tasks.push_tasks.deliver_pending_pushes",
+        "schedule": 60.0,
     },
 }

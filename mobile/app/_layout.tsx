@@ -6,6 +6,7 @@ import 'react-native-reanimated';
 
 import { colors } from '@/constants/theme';
 import { useMe } from '@/features/auth/hooks/useAuth';
+import { usePushNotifications } from '@/features/notifications/hooks/usePushNotifications';
 import { useSyncQueue } from '@/hooks/useSyncQueue';
 import { useAuthStore } from '@/store/authStore';
 
@@ -13,6 +14,11 @@ const queryClient = new QueryClient();
 
 function SyncQueueProvider() {
   useSyncQueue();
+  return null;
+}
+
+function PushNotificationsProvider() {
+  usePushNotifications();
   return null;
 }
 
@@ -49,6 +55,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <SyncQueueProvider />
+      <PushNotificationsProvider />
       <OnboardingGate>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

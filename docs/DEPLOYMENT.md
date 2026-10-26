@@ -206,10 +206,12 @@ ENVIRONMENT=production
 STORAGE_PATH=/app/storage
 STORAGE_BASE_URL=https://api.grocerygenie.app/static/receipts
 
-# Notifications (configure when push delivery is implemented)
-# APNS_KEY_ID=
-# APNS_TEAM_ID=
-# APNS_AUTH_KEY_PATH=
+# Push notifications — sent through Expo's push service, which forwards to
+# APNs. The APNs key is uploaded to EAS (see 2.2), not configured here.
+# Set only if "Enhanced push security" is on for the Expo project:
+# GG_EXPO_PUSH_ACCESS_TOKEN=
+# Pending pushes older than this are dropped instead of sent late (default 60):
+# GG_PUSH_MAX_AGE_MINUTES=60
 ```
 
 **Important:** Never commit `.env.production`. Add it to `.gitignore`.
@@ -367,7 +369,41 @@ This creates `eas.json`. Update it:
 }
 ```
 
-### 2.2 Configure API URL
+### 2.2 Push Notifications
+
+The backend sends budget alerts and weekly summaries through Expo's push
+service. The `beat` service queues delivery every minute and the `worker`
+sends it, so both must run. Set up once:
+
+1. Link the app to an EAS project. This writes `extra.eas.projectId` into
+   `app.json`, which the app needs to get a push token:
+
+   ```bash
+   cd mobile
+   eas init
+   ```
+
+2. Give Expo an APNs key. Either let EAS create one when it asks during the
+   first `eas build`, or upload an existing key:
+
+   ```bash
+   eas credentials
+   ```
+
+   Choose iOS → your build profile → Push Notifications → set up a push key.
+
+3. Optional: in the Expo dashboard, turn on Enhanced push security and set
+   `GG_EXPO_PUSH_ACCESS_TOKEN` on the backend to the access token it gives.
+
+4. Test on a **physical device** with a development or TestFlight build.
+   Expo Go and simulator builds can't get a push token. The app asks for
+   notification permission after sign-in, registers the token with
+   `POST /api/users/me/push-tokens`, and unregisters it on sign-out.
+
+Notification text (spend amounts, category names) passes through Expo's
+servers on the way to Apple.
+
+### 2.3 Configure API URL
 
 In `mobile/src/constants/config.ts` (or `app.config.js`):
 
@@ -383,7 +419,7 @@ For EAS builds, set the production API URL as an environment variable:
 eas secret:create --name API_URL --value https://api.grocerygenie.app --type string
 ```
 
-### 2.3 Build for TestFlight (Internal Testing)
+### 2.4 Build for TestFlight (Internal Testing)
 
 ```bash
 # Build production iOS binary
@@ -398,7 +434,7 @@ eas build --platform ios --profile production --auto-submit
 
 EAS handles signing credentials automatically. On first run, it will prompt you to log into your Apple Developer account and generate the required certificates and provisioning profiles.
 
-### 2.4 TestFlight Distribution
+### 2.5 TestFlight Distribution
 
 After EAS Submit uploads the binary:
 1. Log into App Store Connect
@@ -407,7 +443,7 @@ After EAS Submit uploads the binary:
 4. Add internal testers (your Apple ID and any team members)
 5. Testers receive a TestFlight invite and can install the app
 
-### 2.5 App Store Submission
+### 2.6 App Store Submission
 
 When ready for public release:
 1. In App Store Connect, fill in app metadata: description, keywords, screenshots, privacy policy URL
@@ -415,7 +451,7 @@ When ready for public release:
 3. Click "Submit for Review"
 4. Apple review typically takes 1-3 days
 
-### 2.6 Over-the-Air Updates (Post-Launch)
+### 2.7 Over-the-Air Updates (Post-Launch)
 
 For non-native code changes (JS bundle updates), use EAS Update to push updates without a full App Store review:
 
@@ -426,7 +462,7 @@ eas update --branch production --message "Bug fix for budget calculation"
 
 This updates the JS bundle for all users on the production channel. Native code changes (new native modules, SDK version bumps) still require a full build + App Store review.
 
-### 2.7 CI/CD with GitHub Actions
+### 2.8 CI/CD with GitHub Actions
 
 Create `.github/workflows/deploy-ios.yml`:
 
@@ -493,7 +529,9 @@ Set `EXPO_TOKEN` in GitHub repository secrets (generate at expo.dev → Account 
 - [ ] Camera capture works on physical device
 - [ ] Receipt extraction returns results from production API
 - [ ] Budget dashboard loads with real data
-- [ ] Push notification permissions requested on first launch
+- [ ] Push notification permission requested after sign-in
+- [ ] `app.json` has `extra.eas.projectId` and EAS has an APNs push key
+- [ ] A budget alert arrives as a push on a physical device; tapping it opens the dashboard
 
 ### Supabase
 - [ ] pgvector extension enabled (for future V1.1 use)

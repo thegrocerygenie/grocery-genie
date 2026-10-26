@@ -114,7 +114,9 @@ npx tsc --noEmit
 | `GET` | `/api/dashboard/spending` | Full dashboard data |
 | `GET` | `/api/categories` | List spending categories |
 | `GET` | `/api/notifications` | List notifications (unread first) |
-| `PATCH` | `/api/notifications/{id}/read` | Mark notification as read |
+| `PATCH` | `/api/notifications/{id}/read` | Mark notification as read (`?source=push` when opened from a push) |
+| `POST` | `/api/users/me/push-tokens` | Register this device's Expo push token |
+| `DELETE` | `/api/users/me/push-tokens` | Unregister a device's Expo push token |
 | `GET` | `/health` | Health check |
 
 ## Key Design Decisions

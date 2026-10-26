@@ -349,3 +349,14 @@ class AnalyticsEventRequest(BaseModel):
 
     event_name: str = Field(..., min_length=1, max_length=64)
     properties: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+
+
+# --- Push tokens ---
+
+
+class PushTokenPayload(BaseModel):
+    # Expo push tokens look like ExponentPushToken[...] (older) or
+    # ExpoPushToken[...] (newer).
+    token: str = Field(
+        min_length=1, max_length=255, pattern=r"^Expo(nent)?PushToken\[.+\]$"
+    )

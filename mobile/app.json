@@ -21,6 +21,12 @@
         "NSPhotoLibraryUsageDescription": "Grocery Genie accesses your photo library to import receipt images."
       }
     },
-    "plugins": ["expo-router", "expo-camera", "expo-image-picker", "expo-build-properties"]
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      "expo-image-picker",
+      "expo-build-properties",
+      "expo-notifications"
+    ]
   }
 }

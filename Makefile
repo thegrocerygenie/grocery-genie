@@ -30,6 +30,7 @@ help:
 	@echo "  make backend-migrate      alembic upgrade head"
 	@echo "  make backend-migration M=\"msg\"  Generate alembic revision"
 	@echo "  make backend-worker       Run Celery worker"
+	@echo "  make backend-beat         Run Celery beat (weekly summaries, push delivery)"
 	@echo ""
 	@echo "Mobile (Expo):"
 	@echo "  make mobile-start         expo start"
@@ -91,6 +92,10 @@ backend-migration:
 
 backend-worker:
 	cd backend && celery -A app.tasks worker --loglevel=info
+
+# Scheduler for weekly summaries and push delivery; run alongside the worker.
+backend-beat:
+	cd backend && celery -A app.tasks beat --loglevel=info
 
 # ---------- Data tier (Postgres + Redis via docker compose) ----------
 

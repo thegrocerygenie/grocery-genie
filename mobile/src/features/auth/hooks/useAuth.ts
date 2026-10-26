@@ -2,7 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import * as authApi from '@/features/auth/services/authApi';
 import type { TokenPair, UserProfile } from '@/features/auth/types';
+import { releasePushToken } from '@/features/notifications/releasePushToken';
+import { unregisterPushToken } from '@/features/notifications/services/pushApi';
 import { useAuthStore } from '@/store/authStore';
+import { usePushStore } from '@/store/pushStore';
 
 export const ME_QUERY_KEY = ['auth', 'me'] as const;
 
@@ -49,6 +52,12 @@ export function useSignOut() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
+      // Before signOut: unregistering needs the still-valid session.
+      await releasePushToken({
+        token: usePushStore.getState().token,
+        unregister: unregisterPushToken,
+        clear: () => usePushStore.getState().setToken(null),
+      });
       try {
         await authApi.signOut();
       } catch {

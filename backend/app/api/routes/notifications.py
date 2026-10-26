@@ -1,5 +1,6 @@
 import json
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +37,8 @@ async def list_notifications(
 @router.patch("/{notification_id}/read", response_model=NotificationResponse)
 async def mark_notification_read(
     notification_id: str,
+    # "push" when the user opened the alert by tapping a push notification.
+    source: Literal["push", "in_app"] = Query("in_app"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
     analytics: AnalyticsService = Depends(get_analytics_service),
@@ -51,7 +54,7 @@ async def mark_notification_read(
             "budget_alert_opened",
             {
                 "threshold_percent": data.get("threshold"),
-                "notification_source": "in_app",
+                "notification_source": source,
             },
             user.id,
         )
