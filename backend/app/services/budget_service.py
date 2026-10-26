@@ -25,12 +25,17 @@ from app.models.schemas import (
     DashboardCategoryChange,
     DashboardSpendingResponse,
     DashboardTopItem,
+    DashboardTrendCategory,
     DashboardTrendMonth,
 )
 
 
 class BudgetConflictError(ValueError):
     """The change would leave two active budgets for one category."""
+
+
+# Label for line items with no category in the trend split.
+UNCATEGORIZED = "Uncategorized"
 
 
 def previous_period(period: str) -> str:
@@ -454,7 +459,24 @@ class BudgetService:
                 y -= 1
             p = f"{y:04d}-{m:02d}"
             p_start, p_end = await self.get_period_dates(user_id, p)
-            total = await self.get_total_spending(user_id, p_start, p_end)
+            by_category = await self.get_spending_by_category(user_id, p_start, p_end)
+            total = sum(by_category.values())
+            names = await self._get_category_names(
+                {cid for cid in by_category if cid is not None}
+            )
+            categories = sorted(
+                (
+                    DashboardTrendCategory(
+                        category_id=cid,
+                        name=names.get(cid, "Unknown")
+                        if cid is not None
+                        else UNCATEGORIZED,
+                        spent=round(spent, 2),
+                    )
+                    for cid, spent in by_category.items()
+                ),
+                key=lambda c: (-c.spent, c.name),
+            )
 
             # Get budget for this period
             result = await self.db.execute(
@@ -473,6 +495,7 @@ class BudgetService:
                     period=p,
                     spent=round(total, 2),
                     budget=float(budget.amount) if budget else None,
+                    categories=categories,
                 )
             )
 

@@ -24,10 +24,19 @@ export interface DashboardTopItem {
   count: number;
 }
 
+/** One category's share of a trend month; `category_id` is null for uncategorized spend. */
+export interface DashboardTrendCategory {
+  category_id: string | null;
+  name: string;
+  spent: number;
+}
+
 export interface DashboardTrendMonth {
   period: string;
   spent: number;
   budget: number | null;
+  /** Absent from servers older than the category split. */
+  categories?: DashboardTrendCategory[];
 }
 
 /** One category's spend in the period and in the month before it (BC-04). */

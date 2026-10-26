@@ -253,3 +253,46 @@ async def test_dashboard_without_spending_has_no_category_changes(
     data = response.json()
     assert data["previous_period"] == "2026-02"
     assert data["category_changes"] == []
+
+
+# --- BC-04 AC 4: the 3-month trend splits each month by category ---
+
+
+@pytest.mark.asyncio
+async def test_dashboard_trend_splits_each_month_by_category(
+    client: AsyncClient, seeded_db, db_session
+):
+    groceries = await _category_id(db_session, "Groceries")
+    beverages = await _category_id(db_session, "Beverages")
+
+    # January: nothing. February: groceries 20 + beverages 10.
+    # March: groceries 30 + 7 uncategorized, plus spend that must not count.
+    await _add_receipt(
+        db_session, date(2026, 2, 10), [(groceries, 20.0), (beverages, 10.0)]
+    )
+    await _add_receipt(db_session, date(2026, 3, 12), [(groceries, 30.0), (None, 7.0)])
+    await _add_receipt(
+        db_session, date(2026, 3, 13), [(beverages, 99.0)], user_id=USER_B_ID
+    )
+    await _add_receipt(
+        db_session, date(2026, 3, 14), [(groceries, 99.0)], status="pending"
+    )
+
+    response = await client.get("/api/dashboard/spending?period=2026-03")
+
+    trend = response.json()["trend"]
+    assert [(m["period"], m["spent"]) for m in trend] == [
+        ("2026-01", 0.0),
+        ("2026-02", 30.0),
+        ("2026-03", 37.0),
+    ]
+    assert trend[0]["categories"] == []
+    # Largest first; uncategorized spend is kept so the segments add up to the total.
+    assert trend[1]["categories"] == [
+        {"category_id": str(groceries), "name": "Groceries", "spent": 20.0},
+        {"category_id": str(beverages), "name": "Beverages", "spent": 10.0},
+    ]
+    assert trend[2]["categories"] == [
+        {"category_id": str(groceries), "name": "Groceries", "spent": 30.0},
+        {"category_id": None, "name": "Uncategorized", "spent": 7.0},
+    ]

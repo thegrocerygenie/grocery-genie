@@ -21,9 +21,25 @@ function dashboard(overrides: Partial<DashboardData> = {}): DashboardData {
     categories: [],
     top_items: [],
     trend: [
-      { period: '2026-01', spent: 0, budget: 500 },
-      { period: '2026-02', spent: 30, budget: 500 },
-      { period: '2026-03', spent: 35, budget: 500 },
+      { period: '2026-01', spent: 0, budget: 500, categories: [] },
+      {
+        period: '2026-02',
+        spent: 30,
+        budget: 500,
+        categories: [
+          { category_id: 'c1', name: 'Groceries', spent: 20 },
+          { category_id: 'c3', name: 'Beverages', spent: 10 },
+        ],
+      },
+      {
+        period: '2026-03',
+        spent: 35,
+        budget: 500,
+        categories: [
+          { category_id: 'c1', name: 'Groceries', spent: 30 },
+          { category_id: 'c2', name: 'Household', spent: 5 },
+        ],
+      },
     ],
     previous_period: '2026-02',
     category_changes: [
@@ -91,5 +107,40 @@ describe('Trend screen month-over-month', () => {
 
     expect(screen.getByText('March spending')).toBeTruthy();
     expect(screen.queryByLabelText(/percent from February/)).toBeNull();
+  });
+
+  it('stacks each month by category in the category colour (design: 3-month trend)', () => {
+    mockDashboard.data = dashboard();
+    renderTrend();
+
+    const groceries = screen.getByTestId('trend-segment-2026-03-c1');
+    const household = screen.getByTestId('trend-segment-2026-03-c2');
+    expect(groceries).toHaveStyle({ backgroundColor: '#34C759' });
+    expect(household).toHaveStyle({ backgroundColor: '#007AFF' });
+    // A category with no spend that month draws nothing.
+    expect(screen.queryByTestId('trend-segment-2026-03-c3')).toBeNull();
+    expect(screen.queryByTestId('trend-segment-2026-01-c1')).toBeNull();
+  });
+
+  it('lists each category with its 3-month average', () => {
+    mockDashboard.data = dashboard();
+    renderTrend();
+
+    expect(screen.getByLabelText('Groceries, 3-month average $17')).toBeTruthy();
+    expect(screen.getByLabelText('Beverages, 3-month average $3')).toBeTruthy();
+    expect(screen.getByLabelText('Household, 3-month average $2')).toBeTruthy();
+  });
+
+  it('draws plain bars when the server sends no category split', () => {
+    mockDashboard.data = dashboard({
+      trend: [
+        { period: '2026-02', spent: 30, budget: null },
+        { period: '2026-03', spent: 35, budget: null },
+      ],
+    });
+    renderTrend();
+
+    expect(screen.getByLabelText('March: $35')).toBeTruthy();
+    expect(screen.queryByLabelText(/3-month average \$/)).toBeNull();
   });
 });
