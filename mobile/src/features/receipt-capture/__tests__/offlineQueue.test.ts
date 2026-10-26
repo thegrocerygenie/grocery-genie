@@ -13,11 +13,15 @@ const CAPTURE = {
   capturedAt: '2026-10-26T10:00:00Z',
 };
 
-function queue(n: number) {
+const OWNER = 'user-a';
+
+function queue(n: number, ownerId: string = OWNER) {
   for (let i = 0; i < n; i++) {
-    useOfflineStore
-      .getState()
-      .addPendingReceipt({ ...CAPTURE, imageUri: `file:///doc/pending-receipts/${i}.jpg` });
+    useOfflineStore.getState().addPendingReceipt({
+      ...CAPTURE,
+      ownerId,
+      imageUri: `file:///doc/pending-receipts/${i}.jpg`,
+    });
   }
 }
 
@@ -45,7 +49,7 @@ describe('syncPendingReceipts', () => {
     const scan = jest.fn().mockResolvedValue({});
     const deleteImage = jest.fn();
 
-    const result = await syncPendingReceipts({ scan, deleteImage });
+    const result = await syncPendingReceipts({ scan, deleteImage, ownerId: OWNER });
 
     expect(result).toEqual({ synced: 2, failed: 0 });
     expect(scan).toHaveBeenCalledTimes(2);
@@ -62,7 +66,7 @@ describe('syncPendingReceipts', () => {
       .mockRejectedValueOnce(new TypeError('Network request failed'));
     const deleteImage = jest.fn();
 
-    const result = await syncPendingReceipts({ scan, deleteImage });
+    const result = await syncPendingReceipts({ scan, deleteImage, ownerId: OWNER });
 
     expect(result).toEqual({ synced: 1, failed: 0 });
     expect(scan).toHaveBeenCalledTimes(2);
@@ -81,7 +85,7 @@ describe('syncPendingReceipts', () => {
       .mockResolvedValueOnce({});
     const deleteImage = jest.fn();
 
-    const result = await syncPendingReceipts({ scan, deleteImage });
+    const result = await syncPendingReceipts({ scan, deleteImage, ownerId: OWNER });
 
     expect(result).toEqual({ synced: 1, failed: 1 });
     const left = useOfflineStore.getState().pendingReceipts;
@@ -96,7 +100,7 @@ describe('syncPendingReceipts', () => {
     useOfflineStore.getState().updateStatus(id, 'failed');
     const scan = jest.fn();
 
-    await syncPendingReceipts({ scan, deleteImage: jest.fn() });
+    await syncPendingReceipts({ scan, deleteImage: jest.fn(), ownerId: OWNER });
 
     expect(scan).not.toHaveBeenCalled();
   });
@@ -111,13 +115,43 @@ describe('syncPendingReceipts', () => {
         }),
     );
 
-    const first = syncPendingReceipts({ scan, deleteImage: jest.fn() });
-    const second = syncPendingReceipts({ scan, deleteImage: jest.fn() });
+    const first = syncPendingReceipts({ scan, deleteImage: jest.fn(), ownerId: OWNER });
+    const second = syncPendingReceipts({ scan, deleteImage: jest.fn(), ownerId: OWNER });
     await Promise.resolve();
     release();
     await Promise.all([first, second]);
 
     expect(scan).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('syncPendingReceipts only uploads the signed-in user’s photos', () => {
+  // Regression: the queue is shared by every session on the device. Another
+  // account (or, in dev, another app build on the same simulator) synced a
+  // photo it did not capture, and its server's 422 marked the photo failed.
+  it('leaves another user’s photo untouched', async () => {
+    queue(1, 'user-b');
+    queue(1, OWNER);
+    const scan = jest.fn().mockRejectedValue(new ApiError(422, { detail: 'too dark' }));
+
+    const result = await syncPendingReceipts({ scan, deleteImage: jest.fn(), ownerId: OWNER });
+
+    expect(scan).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ synced: 0, failed: 1 });
+    const statuses = useOfflineStore.getState().pendingReceipts.map((r) => [r.ownerId, r.status]);
+    expect(statuses).toEqual([
+      ['user-b', 'pending'],
+      [OWNER, 'failed'],
+    ]);
+  });
+
+  it('never uploads a photo that has no owner', async () => {
+    useOfflineStore.getState().addPendingReceipt(CAPTURE);
+    const scan = jest.fn();
+
+    await syncPendingReceipts({ scan, deleteImage: jest.fn(), ownerId: OWNER });
+
+    expect(scan).not.toHaveBeenCalled();
   });
 });
 

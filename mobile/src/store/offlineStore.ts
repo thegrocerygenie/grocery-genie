@@ -7,6 +7,11 @@ export interface PendingReceipt {
   imageUri: string;
   mimeType: string;
   capturedAt: string;
+  /**
+   * The user who captured it (the access token's `sub`). The queue is shared by
+   * every session on the device, so only this user's session may upload it.
+   */
+  ownerId?: string;
   status: 'pending' | 'syncing' | 'failed';
   /** An upload was tried and failed for a reason worth retrying (network, server). */
   lastAttemptFailed?: boolean;

@@ -3,7 +3,9 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 
+import { useAuthStore } from '@/store/authStore';
 import { useOfflineStore } from '@/store/offlineStore';
+import { fakeAccessToken } from '@/testing/jwt';
 
 import { useSyncQueue } from '../useSyncQueue';
 
@@ -19,8 +21,9 @@ jest.mock('@/features/receipt-capture/services/pendingImageFiles', () => ({
   deletePendingImage: jest.fn(),
 }));
 
-function queue(status: 'pending' | 'failed' = 'pending') {
+function queue(status: 'pending' | 'failed' = 'pending', ownerId = 'user-a') {
   useOfflineStore.getState().addPendingReceipt({
+    ownerId,
     imageUri: 'file:///doc/pending-receipts/a.jpg',
     mimeType: 'image/jpeg',
     capturedAt: '2026-10-26T10:00:00Z',
@@ -42,6 +45,7 @@ beforeEach(() => {
   mockConnected = true;
   mockSync.mockReset().mockResolvedValue({ synced: 0, failed: 0 });
   useOfflineStore.setState({ pendingReceipts: [] });
+  useAuthStore.setState({ accessToken: fakeAccessToken('user-a') });
 });
 
 afterEach(() => jest.restoreAllMocks());
@@ -55,6 +59,29 @@ describe('useSyncQueue', () => {
     await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['receipts'] }));
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['dashboard'] });
     expect(mockSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('uploads as the signed-in user', async () => {
+    queue();
+    renderSync();
+
+    await waitFor(() => expect(mockSync).toHaveBeenCalled());
+    expect(mockSync.mock.calls[0][0].ownerId).toBe('user-a');
+  });
+
+  it('does not sync another user’s photos', () => {
+    queue('pending', 'user-b');
+    renderSync();
+
+    expect(mockSync).not.toHaveBeenCalled();
+  });
+
+  it('does not sync while signed out', () => {
+    useAuthStore.setState({ accessToken: null });
+    queue();
+    renderSync();
+
+    expect(mockSync).not.toHaveBeenCalled();
   });
 
   it('waits while offline', () => {
