@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
+import { WORDMARK_FONT } from '@/constants/fonts';
 import { colors, radii, spacing, type } from '@/constants/theme';
 
 export default function OnboardingWelcome() {
@@ -65,11 +66,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 12 },
     elevation: 8,
   },
-  // TODO: load Instrument Serif via expo-font; placeholder uses Times New Roman.
   wordmark: {
     fontSize: 38,
     letterSpacing: -0.7,
-    fontFamily: 'Times New Roman',
+    fontFamily: WORDMARK_FONT,
     textAlign: 'center',
   },
   tagline: {

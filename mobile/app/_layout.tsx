@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useFonts } from 'expo-font';
 import { Redirect, Stack, useSegments } from 'expo-router';
 import 'react-native-reanimated';
 
+import { APP_FONTS } from '@/constants/fonts';
 import { colors } from '@/constants/theme';
 import { useMe } from '@/features/auth/hooks/useAuth';
 import { usePushNotifications } from '@/features/notifications/hooks/usePushNotifications';
@@ -52,6 +54,13 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  // The wordmark font ships in the bundle, so this resolves on the first frames.
+  // If it fails, render anyway: iOS falls back to the system font.
+  const [fontsLoaded, fontError] = useFonts(APP_FONTS);
+  if (!fontsLoaded && !fontError) {
+    return <View style={{ flex: 1, backgroundColor: colors.iosBg as string }} />;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <SyncQueueProvider />

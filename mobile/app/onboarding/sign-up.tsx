@@ -13,6 +13,7 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
+import { WORDMARK_FONT } from '@/constants/fonts';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { PASSWORD_MIN_LENGTH } from '@/features/auth/constants';
 import { useAppleSignIn, useGoogleSignIn, useSignUp } from '@/features/auth/hooks/useAuth';
@@ -237,7 +238,7 @@ const styles = StyleSheet.create({
   wordmark: {
     fontSize: 32,
     letterSpacing: -0.6,
-    fontFamily: Platform.select({ ios: 'Times New Roman', default: 'serif' }),
+    fontFamily: WORDMARK_FONT,
     color: colors.iosLabel as string,
     textAlign: 'center',
   },
