@@ -121,6 +121,8 @@ class BudgetOverallSummary(BaseModel):
 
 class BudgetUpdateRequest(BaseModel):
     amount: float = Field(gt=0)
+    # Moves the period start (and so the start day) when given (BC-02 AC 3).
+    period_start: date | None = None
 
 
 class BudgetCategorySummary(BaseModel):

@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
@@ -14,7 +14,7 @@ from app.models.schemas import (
     DeletedItemResponse,
 )
 from app.services.analytics_service import AnalyticsService, get_analytics_service
-from app.services.budget_service import BudgetService
+from app.services.budget_service import BudgetConflictError, BudgetService
 
 router = APIRouter(prefix="/api/budgets", tags=["budgets"])
 
@@ -22,22 +22,38 @@ router = APIRouter(prefix="/api/budgets", tags=["budgets"])
 @router.post("", response_model=BudgetResponse, status_code=201)
 async def create_budget(
     budget: BudgetCreateRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> BudgetResponse:
+    """Set a budget. 201 when new; 200 when it updated the category's budget."""
     service = BudgetService(db)
     try:
-        result = await service.create_budget(user.id, budget)
+        result, created = await service.save_budget(user.id, budget)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    budget_type = "overall" if budget.category_id is None else "category"
-    analytics.emit(
-        "budget_created",
-        {"type": budget_type, "amount": budget.amount},
-        user.id,
-    )
+    if created:
+        budget_type = "overall" if budget.category_id is None else "category"
+        analytics.emit(
+            "budget_created",
+            {"type": budget_type, "amount": budget.amount},
+            user.id,
+        )
+    else:
+        response.status_code = 200
     return BudgetResponse.model_validate(result)
+
+
+@router.get("", response_model=list[BudgetResponse])
+async def list_budgets(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[BudgetResponse]:
+    service = BudgetService(db)
+    return [
+        BudgetResponse.model_validate(b) for b in await service.list_budgets(user.id)
+    ]
 
 
 @router.get("/summary", response_model=BudgetSummaryResponse)
@@ -60,8 +76,10 @@ async def update_budget(
     service = BudgetService(db)
     try:
         result = await service.update_budget(
-            uuid.UUID(budget_id), user.id, updates.amount
+            uuid.UUID(budget_id), user.id, updates.amount, updates.period_start
         )
+    except BudgetConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     except ValueError as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail="Budget not found") from None
@@ -91,6 +109,8 @@ async def restore_budget(
     service = BudgetService(db)
     try:
         budget = await service.restore_budget(uuid.UUID(budget_id), user.id)
+    except BudgetConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     except ValueError as e:
         if "past 30-day" in str(e):
             raise HTTPException(status_code=410, detail=str(e)) from e

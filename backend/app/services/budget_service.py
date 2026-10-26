@@ -29,12 +29,23 @@ from app.models.schemas import (
 )
 
 
+class BudgetConflictError(ValueError):
+    """The change would leave two active budgets for one category."""
+
+
 def previous_period(period: str) -> str:
     """Return the 'YYYY-MM' period one month before ``period``."""
     year, month = int(period[:4]), int(period[5:7])
     if month == 1:
         return f"{year - 1:04d}-12"
     return f"{year:04d}-{month - 1:02d}"
+
+
+def _same_category(category_id: uuid.UUID | None):
+    """Match a category, treating None as the overall budget (SQL NULL)."""
+    if category_id is None:
+        return Budget.category_id.is_(None)
+    return Budget.category_id == category_id
 
 
 class BudgetService:
@@ -44,8 +55,21 @@ class BudgetService:
     async def create_budget(
         self, user_id: uuid.UUID, request: BudgetCreateRequest
     ) -> Budget:
-        """Create a new budget for a user."""
-        # Validate category exists if provided
+        """Set the user's budget for a category; see ``save_budget``."""
+        budget, _ = await self.save_budget(user_id, request)
+        return budget
+
+    async def save_budget(
+        self, user_id: uuid.UUID, request: BudgetCreateRequest
+    ) -> tuple[Budget, bool]:
+        """Set the user's budget for a category (or overall, when None).
+
+        A user has at most one active budget per category, so saving again
+        updates the active one instead of adding a duplicate (BC-02 AC 4).
+        A soft-deleted budget with the same (category, period start) comes
+        back, because the unique constraint still holds its key.
+        Returns the budget and whether it is new to the user.
+        """
         if request.category_id is not None:
             result = await self.db.execute(
                 select(Category).where(Category.id == request.category_id)
@@ -54,6 +78,31 @@ class BudgetService:
                 raise ValueError(f"Category {request.category_id} not found")
 
         period_start = date.fromisoformat(request.period_start)
+
+        active = await self._active_budget(user_id, request.category_id)
+        if active is not None:
+            active.amount = request.amount
+            active.period_type = request.period_type
+            if not await self._period_start_taken(active, period_start):
+                active.period_start = period_start
+            await self.db.flush()
+            return active, False
+
+        result = await self.db.execute(
+            select(Budget).where(
+                Budget.user_id == user_id,
+                _same_category(request.category_id),
+                Budget.period_start == period_start,
+                Budget.deleted_at.is_not(None),
+            )
+        )
+        deleted = result.scalars().first()
+        if deleted is not None:
+            deleted.deleted_at = None
+            deleted.amount = request.amount
+            deleted.period_type = request.period_type
+            await self.db.flush()
+            return deleted, True
 
         budget = Budget(
             user_id=user_id,
@@ -64,12 +113,28 @@ class BudgetService:
         )
         self.db.add(budget)
         await self.db.flush()
-        return budget
+        return budget, True
+
+    async def list_budgets(self, user_id: uuid.UUID) -> list[Budget]:
+        """The user's active budgets: overall first, then by category."""
+        result = await self.db.execute(
+            select(Budget)
+            .where(Budget.user_id == user_id, Budget.deleted_at.is_(None))
+            .order_by(Budget.category_id.is_not(None), Budget.created_at)
+        )
+        return list(result.scalars().all())
 
     async def update_budget(
-        self, budget_id: uuid.UUID, user_id: uuid.UUID, amount: float
+        self,
+        budget_id: uuid.UUID,
+        user_id: uuid.UUID,
+        amount: float,
+        period_start: date | None = None,
     ) -> Budget:
-        """Update a budget amount. Takes effect immediately."""
+        """Update a budget amount and, optionally, its period start.
+
+        Takes effect immediately.
+        """
         result = await self.db.execute(
             select(Budget).where(
                 Budget.id == budget_id,
@@ -80,9 +145,42 @@ class BudgetService:
         budget = result.scalar_one_or_none()
         if budget is None:
             raise ValueError(f"Budget {budget_id} not found")
+        if period_start is not None and period_start != budget.period_start:
+            if await self._period_start_taken(budget, period_start):
+                raise BudgetConflictError(
+                    "Another budget for this category already uses that start date"
+                )
+            budget.period_start = period_start
         budget.amount = amount
         await self.db.flush()
         return budget
+
+    async def _active_budget(
+        self, user_id: uuid.UUID, category_id: uuid.UUID | None
+    ) -> Budget | None:
+        result = await self.db.execute(
+            select(Budget)
+            .where(
+                Budget.user_id == user_id,
+                _same_category(category_id),
+                Budget.deleted_at.is_(None),
+            )
+            .order_by(Budget.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def _period_start_taken(self, budget: Budget, period_start: date) -> bool:
+        """True if another row (even a deleted one) holds this unique key."""
+        result = await self.db.execute(
+            select(Budget.id).where(
+                Budget.user_id == budget.user_id,
+                _same_category(budget.category_id),
+                Budget.period_start == period_start,
+                Budget.id != budget.id,
+            )
+        )
+        return result.first() is not None
 
     async def soft_delete_budget(
         self, budget_id: uuid.UUID, user_id: uuid.UUID
@@ -117,8 +215,13 @@ class BudgetService:
             raise ValueError(f"Budget {budget_id} not found")
         if budget.deleted_at is None:
             return budget
-        if budget.deleted_at < datetime.now(UTC) - timedelta(days=30):
+        deleted_at = budget.deleted_at
+        if deleted_at.tzinfo is None:  # SQLite drops the zone
+            deleted_at = deleted_at.replace(tzinfo=UTC)
+        if deleted_at < datetime.now(UTC) - timedelta(days=30):
             raise ValueError("Budget past 30-day restore window")
+        if await self._active_budget(user_id, budget.category_id) is not None:
+            raise BudgetConflictError("This category already has an active budget")
         budget.deleted_at = None
         await self.db.flush()
         return budget
