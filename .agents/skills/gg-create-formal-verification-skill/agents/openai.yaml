@@ -1,0 +1,5 @@
+interface:
+  display_name: "GG Create Formal Verification Skill"
+  short_description: "Generate a skill that formally checks risky code"
+policy:
+  allow_implicit_invocation: false

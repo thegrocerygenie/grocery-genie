@@ -1,0 +1,5 @@
+interface:
+  display_name: "GG Maintain Formal Verification Skill"
+  short_description: "Bring formal checks back in line with the code"
+policy:
+  allow_implicit_invocation: false
