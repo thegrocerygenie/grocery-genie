@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -14,9 +14,43 @@ import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
-import { DEFAULT_CATEGORIES } from '@/constants/categories';
-import { useBudgetCreate } from '@/features/budget/hooks/useBudget';
+import { DEFAULT_CATEGORIES, getCategoryMetaByName } from '@/constants/categories';
+import {
+  useBudgetCreate,
+  useBudgetDelete,
+  useBudgetUpdate,
+  useBudgets,
+} from '@/features/budget/hooks/useBudget';
 import { useCategories } from '@/features/budget/hooks/useCategories';
+import type { BudgetResponse } from '@/features/budget/types';
+
+/** Amount text for an input: "200", "12.5". */
+function amountText(amount: number): string {
+  return String(amount);
+}
+
+function parseAmount(text: string): number {
+  const value = parseFloat(text);
+  return Number.isFinite(value) ? value : 0;
+}
+
+/** The start day as saved: 1 to 28, so every month has it. */
+function clampedStartDay(startDay: string): number {
+  return Math.min(Math.max(parseInt(startDay, 10) || 1, 1), 28);
+}
+
+/** The start date this month for a start day. */
+function periodStartFor(startDay: string): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(clampedStartDay(startDay)).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function startDayOf(budget: BudgetResponse | undefined): string {
+  return budget ? String(Number(budget.period_start.slice(8, 10))) : '1';
+}
 
 function ordinal(n: number): string {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -27,17 +61,43 @@ function ordinal(n: number): string {
 export default function BudgetSettingsScreen() {
   const router = useRouter();
   const { data: serverCategories } = useCategories();
+  const { data: budgets } = useBudgets();
   const budgetCreate = useBudgetCreate();
+  const budgetUpdate = useBudgetUpdate();
+  const budgetDelete = useBudgetDelete();
 
   const [overall, setOverall] = useState('');
   const [startDay, setStartDay] = useState('1');
   const [catAmounts, setCatAmounts] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
 
+  // The saved budgets, by category id ('' = overall). Edits are compared with
+  // these so Save only touches what changed (BC-02 AC 4).
+  const saved = new Map((budgets ?? []).map((b) => [b.category_id ?? '', b]));
+  const savedOverall = saved.get('');
+
+  // Prefill once, when the saved budgets first arrive.
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current || !budgets) return;
+    prefilled.current = true;
+    const overallBudget = budgets.find((b) => b.category_id === null);
+    if (overallBudget) setOverall(amountText(overallBudget.amount));
+    setStartDay(startDayOf(overallBudget));
+    setCatAmounts(
+      Object.fromEntries(
+        budgets
+          .filter((b) => b.category_id !== null)
+          .map((b) => [b.category_id as string, amountText(b.amount)]),
+      ),
+    );
+  }, [budgets]);
+
   const categories =
     serverCategories && serverCategories.length > 0
       ? serverCategories.map((c) => {
-          const meta = DEFAULT_CATEGORIES.find((d) => d.id === c.id);
+          // Server ids are UUIDs; display meta is keyed by the category name.
+          const meta = getCategoryMetaByName(c.name);
           return {
             id: c.id,
             name: c.name,
@@ -55,26 +115,44 @@ export default function BudgetSettingsScreen() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(Math.min(parseInt(startDay, 10) || 1, 28)).padStart(2, '0');
-      const periodStart = `${year}-${month}-${day}`;
+      const periodStart = periodStartFor(startDay);
 
-      if (overall && parseFloat(overall) > 0) {
+      // Overall: update in place. A blank field leaves it alone, because a user
+      // with no monthly budget is sent back to onboarding.
+      const overallAmount = parseAmount(overall);
+      if (savedOverall) {
+        const startChanged =
+          clampedStartDay(startDay) !== clampedStartDay(startDayOf(savedOverall));
+        const amount = overallAmount > 0 ? overallAmount : savedOverall.amount;
+        if (amount !== savedOverall.amount || startChanged) {
+          await budgetUpdate.mutateAsync({
+            budgetId: savedOverall.id,
+            data: startChanged ? { amount, period_start: periodStart } : { amount },
+          });
+        }
+      } else if (overallAmount > 0) {
         await budgetCreate.mutateAsync({
           category_id: null,
-          amount: parseFloat(overall),
+          amount: overallAmount,
           period_type: 'monthly',
           period_start: periodStart,
         });
       }
 
-      for (const [categoryId, amount] of Object.entries(catAmounts)) {
-        if (amount && parseFloat(amount) > 0) {
+      // Categories: update changed limits, delete cleared ones, create new ones.
+      for (const [categoryId, text] of Object.entries(catAmounts)) {
+        const amount = parseAmount(text);
+        const existing = saved.get(categoryId);
+        if (existing) {
+          if (amount <= 0) {
+            await budgetDelete.mutateAsync(existing.id);
+          } else if (amount !== existing.amount) {
+            await budgetUpdate.mutateAsync({ budgetId: existing.id, data: { amount } });
+          }
+        } else if (amount > 0) {
           await budgetCreate.mutateAsync({
             category_id: categoryId,
-            amount: parseFloat(amount),
+            amount,
             period_type: 'monthly',
             period_start: periodStart,
           });
@@ -95,12 +173,24 @@ export default function BudgetSettingsScreen() {
           presentation: 'modal',
           title: 'Budget',
           headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
+            >
               <Text style={styles.headerBtn}>Cancel</Text>
             </Pressable>
           ),
           headerRight: () => (
-            <Pressable onPress={handleSave} hitSlop={12} disabled={isSaving}>
+            <Pressable
+              onPress={handleSave}
+              hitSlop={12}
+              disabled={isSaving}
+              accessibilityRole="button"
+              accessibilityLabel="Save"
+              accessibilityState={{ disabled: isSaving }}
+            >
               <Text style={[styles.headerBtn, { fontWeight: '600' }, isSaving && { opacity: 0.4 }]}>
                 Save
               </Text>
@@ -120,7 +210,10 @@ export default function BudgetSettingsScreen() {
             paddingBottom: 80,
           }}
         >
-          <Section header="OVERALL" footer="Resets on the 1st of each month.">
+          <Section
+            header="OVERALL"
+            footer={`Resets on the ${ordinal(clampedStartDay(startDay))} of each month.`}
+          >
             <RowAmountInput
               label="Monthly limit"
               value={overall}

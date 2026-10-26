@@ -48,12 +48,26 @@ Paginated receipt history with optional filters.
 ## Budget
 
 ### POST /api/budgets [MVP]
-Create a budget.
+Set a budget. A user has at most one active budget per category (`null` = overall). If one exists, POST updates its amount and period start and returns 200; otherwise it creates one and returns 201.
 
 **Request:**
 ```json
 { "category_id": "cat-uuid | null", "amount": 500.00, "period_type": "monthly", "period_start": "2026-03-01" }
 ```
+
+### GET /api/budgets [MVP]
+The user's active budgets, overall first. Response: a list of `{ "id", "category_id", "amount", "period_type", "period_start", "rollover_enabled" }`.
+
+### PATCH /api/budgets/{id} [MVP]
+Edit a budget; takes effect immediately. `period_start` is optional and moves the start day.
+
+**Request:**
+```json
+{ "amount": 650.00, "period_start": "2026-03-15" }
+```
+
+### DELETE /api/budgets/{id} [MVP] · POST /api/budgets/{id}/restore [MVP]
+Soft-delete, and restore within 30 days. Restore returns 409 when the category already has another active budget.
 
 ### GET /api/budgets/summary?period=2026-02 [MVP]
 Budget vs. actual for specified period.

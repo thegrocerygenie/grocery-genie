@@ -62,6 +62,8 @@ export interface BudgetCreateRequest {
 
 export interface BudgetUpdateRequest {
   amount: number;
+  /** 'YYYY-MM-DD'; moves the period start day. */
+  period_start?: string;
 }
 
 export interface BudgetResponse {

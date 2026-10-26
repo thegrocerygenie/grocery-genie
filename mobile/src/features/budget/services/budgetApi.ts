@@ -14,6 +14,14 @@ export async function createBudget(data: BudgetCreateRequest): Promise<BudgetRes
   });
 }
 
+export async function listBudgets(): Promise<BudgetResponse[]> {
+  return apiClient<BudgetResponse[]>('/api/budgets');
+}
+
+export async function deleteBudget(budgetId: string): Promise<void> {
+  await apiClient<void>(`/api/budgets/${budgetId}`, { method: 'DELETE' });
+}
+
 export async function updateBudget(
   budgetId: string,
   data: BudgetUpdateRequest,

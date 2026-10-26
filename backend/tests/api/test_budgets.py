@@ -154,3 +154,162 @@ async def test_update_budget_not_found(client: AsyncClient, seeded_db):
     budget_id = uuid.uuid4()
     response = await client.patch(f"/api/budgets/{budget_id}", json={"amount": 100.0})
     assert response.status_code == 404
+
+
+# --- BC-02 AC 4: editing a budget never creates a duplicate ---
+
+
+async def _category_id(db_session: AsyncSession, name: str) -> str:
+    from sqlalchemy import select
+
+    result = await db_session.execute(select(Category).where(Category.name == name))
+    return str(result.scalar_one().id)
+
+
+def _budget(category_id: str | None, amount: float, start: str = "2026-03-01") -> dict:
+    return {
+        "category_id": category_id,
+        "amount": amount,
+        "period_type": "monthly",
+        "period_start": start,
+    }
+
+
+@pytest.mark.asyncio
+async def test_post_for_a_category_with_a_budget_updates_it(
+    client: AsyncClient, seeded_db, db_session
+):
+    groceries = await _category_id(db_session, "Groceries")
+    first = await client.post("/api/budgets", json=_budget(groceries, 200.0))
+
+    second = await client.post("/api/budgets", json=_budget(groceries, 250.0))
+
+    assert second.status_code == 200
+    assert second.json()["id"] == first.json()["id"]
+    assert second.json()["amount"] == 250.0
+    listed = (await client.get("/api/budgets")).json()
+    assert [(b["category_id"], b["amount"]) for b in listed] == [(groceries, 250.0)]
+
+
+@pytest.mark.asyncio
+async def test_post_overall_twice_keeps_one_overall_budget(
+    client: AsyncClient, seeded_db
+):
+    first = await client.post("/api/budgets", json=_budget(None, 500.0))
+
+    second = await client.post("/api/budgets", json=_budget(None, 650.0, "2026-03-15"))
+
+    assert second.status_code == 200
+    assert second.json()["id"] == first.json()["id"]
+    assert second.json()["period_start"] == "2026-03-15"
+    listed = (await client.get("/api/budgets")).json()
+    assert [(b["category_id"], b["amount"]) for b in listed] == [(None, 650.0)]
+
+
+@pytest.mark.asyncio
+async def test_summary_lists_each_category_once_after_repeat_saves(
+    client: AsyncClient, seeded_db, db_session
+):
+    groceries = await _category_id(db_session, "Groceries")
+    await client.post("/api/budgets", json=_budget(groceries, 200.0))
+    await client.post("/api/budgets", json=_budget(groceries, 300.0))
+
+    summary = (await client.get("/api/budgets/summary?period=2026-03")).json()
+
+    rows = [c for c in summary["categories"] if c["category_id"] == groceries]
+    assert [r["budget"] for r in rows] == [300.0]
+
+
+@pytest.mark.asyncio
+async def test_list_budgets_returns_only_the_users_active_budgets(
+    client: AsyncClient, seeded_db, db_session
+):
+    from app.models.database import Budget
+    from tests.conftest import USER_B_ID
+
+    groceries = await _category_id(db_session, "Groceries")
+    household = await _category_id(db_session, "Household")
+    overall = (await client.post("/api/budgets", json=_budget(None, 500.0))).json()
+    kept = (await client.post("/api/budgets", json=_budget(groceries, 200.0))).json()
+    dropped = (await client.post("/api/budgets", json=_budget(household, 50.0))).json()
+    await client.delete(f"/api/budgets/{dropped['id']}")
+    db_session.add(
+        Budget(
+            user_id=USER_B_ID,
+            category_id=uuid.UUID(groceries),
+            amount=999.0,
+            period_start=date(2026, 3, 1),
+            period_type="monthly",
+        )
+    )
+    await db_session.commit()
+
+    response = await client.get("/api/budgets")
+
+    assert response.status_code == 200
+    assert sorted(b["id"] for b in response.json()) == sorted(
+        [overall["id"], kept["id"]]
+    )
+
+
+@pytest.mark.asyncio
+async def test_patch_can_change_the_start_day(client: AsyncClient, seeded_db):
+    created = (await client.post("/api/budgets", json=_budget(None, 500.0))).json()
+
+    response = await client.patch(
+        f"/api/budgets/{created['id']}",
+        json={"amount": 500.0, "period_start": "2026-03-15"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["period_start"] == "2026-03-15"
+
+
+@pytest.mark.asyncio
+async def test_post_after_delete_creates_a_new_budget(
+    client: AsyncClient, seeded_db, db_session
+):
+    groceries = await _category_id(db_session, "Groceries")
+    old = (await client.post("/api/budgets", json=_budget(groceries, 200.0))).json()
+    await client.delete(f"/api/budgets/{old['id']}")
+
+    response = await client.post("/api/budgets", json=_budget(groceries, 120.0))
+
+    # Same (user, category, start) as the deleted row, so it comes back as the
+    # new budget rather than tripping the unique constraint.
+    assert response.status_code == 201
+    listed = (await client.get("/api/budgets")).json()
+    assert [(b["category_id"], b["amount"]) for b in listed] == [(groceries, 120.0)]
+    deleted = (await client.get("/api/budgets/recently-deleted")).json()
+    assert old["id"] not in [d["id"] for d in deleted]
+
+
+@pytest.mark.asyncio
+async def test_restore_refuses_when_the_category_has_a_new_budget(
+    client: AsyncClient, seeded_db, db_session
+):
+    groceries = await _category_id(db_session, "Groceries")
+    old = (await client.post("/api/budgets", json=_budget(groceries, 200.0))).json()
+    await client.delete(f"/api/budgets/{old['id']}")
+    await client.post("/api/budgets", json=_budget(groceries, 120.0, "2026-04-01"))
+
+    response = await client.post(f"/api/budgets/{old['id']}/restore")
+
+    assert response.status_code == 409
+    listed = (await client.get("/api/budgets")).json()
+    assert [b["amount"] for b in listed] == [120.0]
+
+
+@pytest.mark.asyncio
+async def test_restore_brings_back_a_deleted_budget(
+    client: AsyncClient, seeded_db, db_session
+):
+    groceries = await _category_id(db_session, "Groceries")
+    old = (await client.post("/api/budgets", json=_budget(groceries, 200.0))).json()
+    await client.delete(f"/api/budgets/{old['id']}")
+
+    response = await client.post(f"/api/budgets/{old['id']}/restore")
+
+    assert response.status_code == 200
+    listed = (await client.get("/api/budgets")).json()
+    assert [(b["id"], b["amount"]) for b in listed] == [(old["id"], 200.0)]
