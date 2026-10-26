@@ -99,4 +99,20 @@ describe('offlineStore', () => {
     const statuses = useOfflineStore.getState().pendingReceipts.map((r) => r.status);
     expect(statuses).toEqual(['pending', 'failed']);
   });
+
+  it('marks a failed attempt and puts the receipt back in the queue', () => {
+    useOfflineStore.getState().addPendingReceipt({
+      imageUri: 'file:///a.jpg',
+      mimeType: 'image/jpeg',
+      capturedAt: '2026-03-22T10:00:00Z',
+    });
+    const id = useOfflineStore.getState().pendingReceipts[0].id;
+    useOfflineStore.getState().updateStatus(id, 'syncing');
+
+    useOfflineStore.getState().markAttemptFailed(id);
+
+    const [receipt] = useOfflineStore.getState().pendingReceipts;
+    expect(receipt.status).toBe('pending');
+    expect(receipt.lastAttemptFailed).toBe(true);
+  });
 });
