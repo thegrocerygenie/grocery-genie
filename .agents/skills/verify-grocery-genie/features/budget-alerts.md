@@ -38,4 +38,4 @@ Preconditions:
 - Alert titles are `Budget 50% Reached`, `Budget 80% Reached`, and `Budget Exceeded` (100%). Match on these, not on a percentage field.
 - The March 2026 period has ended, so the alert body says `0 days left`. Do not assert the day count.
 - A user who turns a threshold off gets no alert for it. The `notif_threshold_*` columns on `users` hold the settings; read them with `$G sql` when an alert is missing.
-- `alert-manual` fails on the code as of 2026-10-26, proven on Postgres: at 87.3% spend the user has no notifications and no `budget_alerts_sent` rows. `create_manual_receipt` saves the receipt as `confirmed` without dispatching `ReceiptConfirmed` or checking thresholds, and the Manual entry screen never sends the confirming `PATCH`. Report it as a product gap until the code changes. Never add a `PATCH` to make it pass, because the app does not send one.
+- `alert-manual` drives `POST /api/receipts` only, because the Manual entry screen sends no confirming `PATCH`. Never add one to make it pass. It failed until fix `4d81efa` (2026-10-26), which runs the same alert path (`_after_confirm`) when a manual receipt is saved.
