@@ -32,6 +32,8 @@ export const colors = {
   pink: '#FF2D55',
   teal: '#30B0C7',
   gray: '#8E8E93',
+  /** systemOrange at 12% — warning banner background. */
+  orangeBg: 'rgba(255,149,0,0.12)',
 
   cat: {
     groceries: '#34C759',

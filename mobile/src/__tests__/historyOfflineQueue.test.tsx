@@ -1,0 +1,149 @@
+/**
+ * NFR reliability 3 / design "Offline · sync queue": receipts captured offline
+ * show in History under Pending, with a banner while the phone is offline.
+ */
+import React from 'react';
+import { Alert } from 'react-native';
+import { Stack, router } from 'expo-router';
+import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
+
+import HistoryScreen from '../../app/(tabs)/history/index';
+import { useOfflineStore } from '@/store/offlineStore';
+import type { ReceiptResponse } from '@/features/receipt-capture/types';
+
+jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+jest.mock('@react-native-segmented-control/segmented-control', () => () => null);
+jest.mock('@/features/budget/hooks/useCategories', () => ({
+  useCategories: () => ({ data: [] }),
+}));
+jest.mock('@/features/lifecycle/hooks/useLifecycle', () => ({
+  useDeleteReceipt: () => ({ mutate: jest.fn() }),
+}));
+jest.mock('@/features/receipt-capture/hooks/useReceiptImport', () => ({
+  useReceiptImport: () => ({ importFrom: jest.fn(), progress: null }),
+}));
+jest.mock('@/features/receipt-capture/services/pendingImageFiles', () => ({
+  deletePendingImage: jest.fn(),
+}));
+
+let mockConnected = false;
+jest.mock('@/hooks/useNetworkStatus', () => ({
+  useNetworkStatus: () => ({ isConnected: mockConnected }),
+}));
+
+const synced: ReceiptResponse = {
+  id: 'r-1',
+  user_id: 'u-1',
+  store_name: 'Whole Foods',
+  date: '2026-10-17',
+  subtotal: 73.91,
+  tax: null,
+  total: 73.91,
+  currency: 'USD',
+  image_url: null,
+  extraction_confidence: 0.9,
+  status: 'confirmed',
+  items: [],
+  created_at: null,
+};
+
+jest.mock('@/features/receipt-capture/hooks/useReceipts', () => ({
+  useReceipts: () => ({
+    data: { items: [synced], total: 1, page: 1, per_page: 20 },
+    isLoading: false,
+    isRefetching: false,
+    refetch: jest.fn(),
+  }),
+}));
+
+const TWO_HOURS_AGO = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
+function queue(status: 'pending' | 'failed' = 'pending') {
+  useOfflineStore.getState().addPendingReceipt({
+    imageUri: 'file:///doc/pending-receipts/a.jpg',
+    mimeType: 'image/jpeg',
+    capturedAt: TWO_HOURS_AGO,
+  });
+  const id = useOfflineStore.getState().pendingReceipts.at(-1)!.id;
+  useOfflineStore.getState().updateStatus(id, status);
+}
+
+function renderHistory() {
+  const routerScreen = renderRouter(
+    {
+      _layout: () => <Stack />,
+      index: () => null,
+      history: HistoryScreen,
+      'manual-entry': () => null,
+    },
+    { initialUrl: '/' },
+  );
+  act(() => router.push('/history'));
+  return routerScreen;
+}
+
+beforeEach(() => {
+  mockConnected = false;
+  useOfflineStore.setState({ pendingReceipts: [] });
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+describe('History offline queue', () => {
+  it('shows the offline banner and a Pending group for queued receipts', () => {
+    queue();
+    queue();
+    renderHistory();
+
+    expect(screen.getByText('Offline · 2 receipts queued')).toBeTruthy();
+    expect(screen.getByText('Will sync')).toBeTruthy();
+    expect(screen.getByText('Pending')).toBeTruthy();
+    expect(screen.getAllByText('Captured 2h ago · waiting for connection')).toHaveLength(2);
+    expect(screen.getByText('Synced')).toBeTruthy();
+    expect(screen.getByText('Whole Foods')).toBeTruthy();
+  });
+
+  it('says it is uploading once the phone is back online', () => {
+    mockConnected = true;
+    queue();
+    renderHistory();
+
+    expect(screen.getByText('Uploading 1 receipt…')).toBeTruthy();
+    expect(screen.getByText('Captured 2h ago · uploading')).toBeTruthy();
+  });
+
+  it('shows nothing extra when the queue is empty', () => {
+    renderHistory();
+
+    expect(screen.queryByText(/receipts? queued/)).toBeNull();
+    expect(screen.queryByText('Pending')).toBeNull();
+    expect(screen.queryByText('Synced')).toBeNull();
+  });
+
+  it('lets the user discard a photo the server could not read', () => {
+    queue('failed');
+    const alert = jest.spyOn(Alert, 'alert');
+    renderHistory();
+
+    fireEvent.press(screen.getByText('Couldn’t read this photo'));
+    const buttons = alert.mock.calls[0][2]!;
+    act(() => buttons.find((b) => b.text === 'Discard')!.onPress!());
+
+    expect(useOfflineStore.getState().pendingReceipts).toHaveLength(0);
+  });
+
+  it('lets the user enter a failed photo by hand', () => {
+    queue('failed');
+    const alert = jest.spyOn(Alert, 'alert');
+    const routerScreen = renderHistory();
+
+    fireEvent.press(screen.getByText('Couldn’t read this photo'));
+    const buttons = alert.mock.calls[0][2]!;
+    act(() => buttons.find((b) => b.text === 'Enter manually')!.onPress!());
+
+    expect(routerScreen.getPathname()).toBe('/manual-entry');
+    expect(useOfflineStore.getState().pendingReceipts).toHaveLength(0);
+  });
+});
