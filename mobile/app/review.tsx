@@ -566,8 +566,12 @@ function ItemRow({
 }: ItemRowProps) {
   const lowConf = isLowConfidence(item.extractionConfidence);
   const lowCategoryConf = isLowConfidence(item.categoryConfidence);
+  // Each editor commits every valid keystroke, not on blur: Save does not
+  // blur an open editor, so an edit still open when Save is tapped was lost.
   const [editingName, setEditingName] = useState(false);
   const [nameText, setNameText] = useState('');
+  // The name as editing began, so the field's label holds still while typing.
+  const [nameBeforeEdit, setNameBeforeEdit] = useState('');
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState('');
   const [editingQuantity, setEditingQuantity] = useState(false);
@@ -598,19 +602,20 @@ function ItemRow({
           <TextInput
             autoFocus
             value={nameText}
-            onChangeText={setNameText}
-            onBlur={() => {
-              const name = nameText.trim();
+            onChangeText={(value) => {
+              setNameText(value);
+              const name = value.trim();
               if (name) onChangeName(name);
-              setEditingName(false);
             }}
-            accessibilityLabel={`Edit name of ${item.name}`}
+            onBlur={() => setEditingName(false)}
+            accessibilityLabel={`Edit name of ${nameBeforeEdit}`}
             style={[type.body, styles.nameInput]}
           />
         ) : (
           <Pressable
             onPress={() => {
               setNameText(item.name);
+              setNameBeforeEdit(item.name);
               setEditingName(true);
             }}
             disabled={readOnly}
@@ -628,12 +633,12 @@ function ItemRow({
             autoFocus
             keyboardType="decimal-pad"
             value={quantityText}
-            onChangeText={setQuantityText}
-            onBlur={() => {
-              const q = parseQuantity(quantityText);
+            onChangeText={(value) => {
+              setQuantityText(value);
+              const q = parseQuantity(value);
               if (q !== null) onChangeQuantity(q);
-              setEditingQuantity(false);
             }}
+            onBlur={() => setEditingQuantity(false)}
             accessibilityLabel={`Edit quantity of ${item.name}`}
             style={[type.caption1, styles.quantityInput]}
           />
@@ -659,12 +664,12 @@ function ItemRow({
           autoFocus
           keyboardType="decimal-pad"
           value={text}
-          onChangeText={setText}
-          onBlur={() => {
-            const price = parsePrice(text);
+          onChangeText={(value) => {
+            setText(value);
+            const price = parsePrice(value);
             if (price !== null) onChangePrice(price);
-            setEditing(false);
           }}
+          onBlur={() => setEditing(false)}
           accessibilityLabel={`Edit price of ${item.name}`}
           style={[
             type.body,
