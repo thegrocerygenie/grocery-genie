@@ -258,6 +258,30 @@ class Notification(Base):
     user: Mapped["User"] = relationship(back_populates="notifications")
 
 
+class BudgetAlertSent(Base):
+    """One row per budget threshold alert sent, so each fires once a period."""
+
+    __tablename__ = "budget_alerts_sent"
+    __table_args__ = (
+        UniqueConstraint(
+            "budget_id",
+            "period_start",
+            "threshold_percent",
+            name="uq_budget_alert_sent",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    budget_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("budgets.id", ondelete="CASCADE"), nullable=False
+    )
+    period_start: Mapped[date] = mapped_column(Date, nullable=False)
+    threshold_percent: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class PushToken(Base):
     """An Expo push token for one of the user's devices.
 

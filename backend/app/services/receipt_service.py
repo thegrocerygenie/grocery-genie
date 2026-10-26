@@ -304,6 +304,8 @@ class ReceiptService:
         notification_service = NotificationService(self.db)
         breaches = await budget_service.check_thresholds(user_id, receipt.date)
         for breach in breaches:
+            if not await budget_service.claim_alert(breach):
+                continue  # already alerted for this threshold this period
             if breach.threshold_percent >= 100:
                 overage = breach.current_spend - breach.budget_amount
                 title = "Budget Exceeded"
