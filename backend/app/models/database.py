@@ -13,6 +13,7 @@ from sqlalchemy import (
     Numeric,
     SmallInteger,
     String,
+    Text,
     UniqueConstraint,
     func,
     text,
@@ -196,6 +197,37 @@ class LineItem(Base):
 
     receipt: Mapped["Receipt"] = relationship(back_populates="line_items")
     category: Mapped["Category | None"] = relationship(back_populates="line_items")
+
+
+class ReceiptCorrection(Base):
+    """One user edit of one extracted field (RC-02 AC 3). Append-only.
+
+    Corrections overwrite receipts and line_items, so this row keeps the
+    replaced value; the oldest row for a field holds the value as extracted.
+    Receipt fields (store_name, date) have no line item.
+    """
+
+    __tablename__ = "receipt_corrections"
+    __table_args__ = (
+        Index("ix_receipt_corrections_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    receipt_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("receipts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    line_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("line_items.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    household_id: Mapped[uuid.UUID | None] = mapped_column()
+    # store_name | date | name | category_id | quantity | total_price
+    field: Mapped[str] = mapped_column(String(32), nullable=False)
+    original_value: Mapped[str] = mapped_column(Text, nullable=False)
+    corrected_value: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class Budget(Base):
