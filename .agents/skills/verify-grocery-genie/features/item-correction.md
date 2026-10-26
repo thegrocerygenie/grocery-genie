@@ -20,14 +20,16 @@ Preconditions:
 
 - Debug-mode instance; `$G doctor` shows no `FAIL`.
 
-- **Sign up and pick a category.** Run `$G signup correct` and `cat_id=$($G api GET /api/categories | jq -r '.[] | select(.name != "Groceries") | .id' | head -1)`. Record the category name too.
+- **Sign up.** Run `$G signup correct`.
 - **Earlier receipt.** Run `old=$($G scan | jq -r .receipt_id)` and confirm it with `$G api PATCH /api/receipts/$old '{"status":"confirmed"}'`.
-- **Correct (`correct-item`).** Run `rid=$($G scan | jq -r .receipt_id)`, then `item=$($G api GET /api/receipts/$rid | jq -r '.items[] | select(.raw_name=="Paper Towels 6pk") | .id')`, then `$G api PATCH /api/receipts/$rid "{\"items\":[{\"id\":\"$item\",\"category_id\":\"$cat_id\"}],\"status\":\"confirmed\"}"`. In the response, that item has `category_id` `$cat_id` and `corrected` `true`.
-- **Mapping (`correct-mapping`).** `$G sql "SELECT raw_text_pattern, category_id FROM user_item_mappings"` shows one row for `Paper Towels 6pk` with `$cat_id`.
+- **Pick a different category.** Run `rid=$($G scan | jq -r .receipt_id)`, then `read -r item cur < <($G api GET /api/receipts/$rid | jq -r '.items[] | select(.raw_name=="Paper Towels 6pk") | "\(.id) \(.category_id)"')`, then `cat_id=$($G api GET /api/categories | jq -r --arg cur "$cur" '.[] | select(.id != $cur and .name != "Groceries") | .id' | head -1)`. Record the category name too.
+- **Correct (`correct-item`).** Run `body=$(jq -nc --arg i "$item" --arg c "$cat_id" '{items:[{id:$i,category_id:$c}],status:"confirmed"}')` and `$G api PATCH /api/receipts/$rid "$body"`. In the response, that item has `category_id` `$cat_id` and `corrected` `true`.
+- **Mapping (`correct-mapping`).** `$G sql "SELECT raw_text_pattern, category_id FROM user_item_mappings"` shows one row, `paper towels 6pk` (stored lowercase), with `$cat_id`.
 - **Retroactive (`correct-retroactive`).** `$G api GET /api/receipts/$old | jq '.items[] | select(.raw_name=="Paper Towels 6pk") | .category_id'` is `$cat_id`.
 - **Next scan (`correct-next-scan`).** Run `next=$($G scan | jq -r .receipt_id)` and `$G api GET /api/receipts/$next | jq '.items[] | select(.raw_name=="Paper Towels 6pk") | .category_id'`. It is `$cat_id`.
 
 ## Gotchas
 
 - The mapping is keyed on the name as extracted, not on a corrected name. Correcting the name and the category in one `PATCH` still keys the mapping on the old name.
-- `GET /api/categories` returns the seeded defaults plus the user's own. Pick by name, never by position, and avoid the item's current category so the change is real.
+- `GET /api/categories` returns the seeded defaults plus the user's own. The mock scan already puts `Paper Towels 6pk` in Household, the first category that isn't Groceries. A "correction" to Household changes nothing (`corrected` stays `false`, no mapping row), and the retroactive and next-scan steps then pass for the wrong reason. Always pick a category other than the item's current one, as above.
+- Build the PATCH body with `jq -nc`, not by hand. A hand-escaped body nested inside `$(...)` can reach the API mangled (422 `json_invalid`).
