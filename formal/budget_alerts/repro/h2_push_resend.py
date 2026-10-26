@@ -14,7 +14,7 @@ Each scenario runs the task once with a fault, then once more with Expo healthy:
   lost    Expo accepts the request, then the response times out (httpx.ReadTimeout)
   chunks  60 notifications x 2 devices = 120 messages, so two Expo requests;
           the second gets HTTP 503
-  crash   Expo answers ok, then db.commit() fails (worker killed, DB error)
+  crash   Expo answers ok, then the next db.commit() fails (worker killed, DB error)
 A message Expo accepts twice is a duplicate push on the user's phone.
 """
 
@@ -75,9 +75,14 @@ def expo(mode: str):
 def run_task(client: ExpoPushClient, fail_commit: bool = False) -> None:
     with Session() as db:
         if fail_commit:
+            real_commit, before = db.commit, sum(accepted.values())
 
+            # The first commit after Expo took a message fails, as if the
+            # worker died between the POST and its commit.
             def commit() -> None:
-                raise RuntimeError("worker died before commit")
+                if sum(accepted.values()) > before:
+                    raise RuntimeError("worker died before commit")
+                real_commit()
 
             db.commit = commit
         try:

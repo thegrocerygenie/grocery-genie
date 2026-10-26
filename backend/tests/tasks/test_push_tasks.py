@@ -2,6 +2,7 @@
 
 import json
 import uuid
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -10,7 +11,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from app.models.database import Base, Notification, PushToken, User
-from app.services.push_service import PushMessage, PushTicket
+from app.services.push_service import ExpoPushClient, PushMessage, PushTicket
 from app.tasks.push_tasks import deliver_pending_pushes
 
 USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
@@ -163,6 +164,115 @@ def test_stale_notification_expires_instead_of_sending_late(db):
     assert client.sent == []
     db.refresh(n)
     assert n.push_status == "expired"
+
+
+# --- At most once under faults (findings H2 and H2b, formal/budget_alerts) ---
+# These drive the real ExpoPushClient; only the network is an httpx.MockTransport.
+# `accepted` counts each (notification id, token) message Expo took: above 1 is a
+# duplicate push on the user's phone.
+
+
+def _expo(accepted: Counter, mode: str = "ok") -> ExpoPushClient:
+    """Stand-in for Expo. mode: ok | lost | second-request-503."""
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if mode == "second-request-503" and calls["n"] >= 2:
+            return httpx.Response(503, json={"errors": [{"message": "unavailable"}]})
+        messages = json.loads(request.content)
+        for m in messages:
+            accepted[(m["data"]["notification_id"], m["to"])] += 1
+        if mode == "lost":
+            raise httpx.ReadTimeout("Expo took it; response lost", request=request)
+        return httpx.Response(
+            200, json={"data": [{"status": "ok", "id": "t"} for _ in messages]}
+        )
+
+    return ExpoPushClient(http=httpx.Client(transport=httpx.MockTransport(handler)))
+
+
+def test_lost_response_is_not_sent_again(db):
+    _devices(db, TOKEN_A)
+    n = _notify(db)
+    accepted: Counter = Counter()
+
+    deliver_pending_pushes(db, _expo(accepted, "lost"), now=_now())
+    deliver_pending_pushes(db, _expo(accepted), now=_now())
+
+    assert accepted == {(str(n.id), TOKEN_A): 1}
+    db.refresh(n)
+    assert n.push_status == "failed"  # outcome unknown: never retried
+
+
+def test_failed_chunk_keeps_earlier_chunks_and_retries_only_the_rest(db):
+    # 60 notifications x 2 devices = 120 messages: two Expo requests.
+    _devices(db, TOKEN_A, TOKEN_B)
+    ids = {str(_notify(db).id) for _ in range(60)}
+    accepted: Counter = Counter()
+
+    deliver_pending_pushes(db, _expo(accepted, "second-request-503"), now=_now())
+    deliver_pending_pushes(db, _expo(accepted), now=_now())
+
+    assert {nid for nid, _ in accepted} == ids
+    assert len(accepted) == 120
+    assert max(accepted.values()) == 1
+    statuses = db.execute(select(Notification.push_status)).scalars().all()
+    assert set(statuses) == {"sent"}
+
+
+def test_failed_commit_after_send_is_not_sent_again(db):
+    _devices(db, TOKEN_A)
+    n = _notify(db)
+    accepted: Counter = Counter()
+    real_commit = db.commit
+
+    def commit_then_die() -> None:
+        if accepted:  # the first commit after Expo took the message fails
+            raise RuntimeError("worker died before commit")
+        real_commit()
+
+    db.commit = commit_then_die
+    with pytest.raises(RuntimeError):
+        deliver_pending_pushes(db, _expo(accepted), now=_now())
+    db.rollback()
+    db.commit = real_commit
+    deliver_pending_pushes(db, _expo(accepted), now=_now())
+
+    assert accepted == {(str(n.id), TOKEN_A): 1}
+
+
+def test_row_left_sending_by_a_dead_run_settles_as_failed(db):
+    _devices(db, TOKEN_A)
+    n = _notify(db, created_at=_now() - timedelta(hours=2))
+    n.push_status = "sending"
+    db.commit()
+    accepted: Counter = Counter()
+
+    deliver_pending_pushes(db, _expo(accepted), now=_now())
+
+    assert accepted == {}
+    db.refresh(n)
+    assert n.push_status == "failed"
+
+
+def test_refused_request_is_retried_next_run(db):
+    _devices(db, TOKEN_A)
+    n = _notify(db)
+    accepted: Counter = Counter()
+
+    def refuse(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, json={"errors": [{"message": "slow down"}]})
+
+    refusing = ExpoPushClient(http=httpx.Client(transport=httpx.MockTransport(refuse)))
+    deliver_pending_pushes(db, refusing, now=_now())
+    db.refresh(n)
+    assert n.push_status is None
+
+    deliver_pending_pushes(db, _expo(accepted), now=_now())
+    assert accepted == {(str(n.id), TOKEN_A): 1}
+    db.refresh(n)
+    assert n.push_status == "sent"
 
 
 def test_beat_runs_push_delivery_every_minute():
