@@ -63,7 +63,7 @@ Tokens and passwords are never written. `server.log` can hold the app's dev-only
 
 Proof standards:
 - Drive the real user path: the routes the iOS app calls, in its order. For scan that is `scan`, then `PATCH /api/receipts/{id}` with `{"status":"confirmed"}`. Never insert rows through `sql` or call internal services.
-- Capture the action and the resulting state. Read the change back through the API, and check the side effect in the database (`receipts`, `line_items`, `notifications`, `budget_alerts_sent`, `user_item_mappings`).
+- Capture the action and the resulting state. Read the change back through the API, and check the side effect in the database (`receipts`, `line_items`, `notifications`, `budget_alerts_sent`, `user_item_mappings`, `receipt_corrections`).
 - A journey that fails stays failed. Report the failing step, the expected and actual values, and the evidence file. A behavior the code no longer has is either drift in the feature map or a product bug. Never change the journey to make it pass.
 - Report the mode. A debug-mode pass proves everything except real extraction.
 
