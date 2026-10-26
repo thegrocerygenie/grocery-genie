@@ -74,6 +74,7 @@ export default function RootLayout() {
           />
           <Stack.Screen name="settings" options={{ title: 'Settings', presentation: 'modal' }} />
           <Stack.Screen name="language-settings" options={{ title: 'Language' }} />
+          <Stack.Screen name="about" options={{ title: 'About' }} />
           <Stack.Screen
             name="manual-entry"
             options={{ title: 'Manual Entry', presentation: 'modal' }}
