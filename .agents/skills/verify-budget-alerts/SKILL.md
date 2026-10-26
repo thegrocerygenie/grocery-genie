@@ -1,6 +1,6 @@
 ---
 name: verify-budget-alerts
-description: "Model-check Grocery Genie's budget alert and push delivery pipeline with TLA+: one alert per threshold, no missed alert, each push sent at most once, every push settles. Use when a change touches confirm_receipt, create_manual_receipt, check_thresholds, claim_alert, budget_alerts_sent, create_notification, deliver_pending_pushes, ExpoPushClient.send, or the request transaction in get_db."
+description: "Model-check Grocery Genie's budget alert and push delivery pipeline with TLA+: one alert per threshold, no missed alert, each push sent at most once, every push settles. Use when a change touches confirm_receipt, create_manual_receipt, check_thresholds, claim_alert, budget_alerts_sent, create_notification, deliver_pending_pushes, ExpoPushClient.send, expo_rejected, or the request transaction in get_db."
 ---
 
 # Verify budget alerts
@@ -14,7 +14,7 @@ Tests check the orders of events someone thought to write. This skill checks eve
 | `OneAlertPerThreshold` | `ConfirmAlerts.tla` | Each threshold makes at most one notification per budget period. | The user gets the same "Budget 80% Reached" alert twice. |
 | `NoMissedAlert` | `ConfirmAlerts.tla` | Once every confirm has committed, each threshold the committed spend has reached has an alert. | The user overspends and never hears about it. |
 | `PushAtMostOnce` | `PushDelivery.tla` | Expo delivers each notification at most once (the promise in `push_tasks.py`'s docstring). | The user's phone shows the same alert twice. |
-| `EveryPushSettles` | `PushDelivery.tla` | Every notification eventually leaves pending (`sent`, `failed`, or `expired`). | A row stays pending forever, and every beat run retries it. |
+| `EveryPushSettles` | `PushDelivery.tla` | Every notification eventually settles: `sent`, `failed`, or `expired`. | A row stays pending or `sending` forever, and nobody learns its outcome. |
 
 ## Run
 
@@ -32,13 +32,15 @@ Expected rows as of the sync commit:
 | `confirm` | pass | The code: 3 receipts, thresholds 50/80/100, any interleaving, 1 rollback |
 | `confirm-missed` | pass | **Finding H1**, fixed: the H1 trace's setup, with the budget row lock |
 | `confirm-fix-rowlock` | pass | The H1 fix with 3 receipts, both confirm properties |
-| `push` | pass | The code: 3 notifications, 2 workers, Expo may refuse, no faults |
-| `push-crash` | violation PushAtMostOnce | **Finding H2**, the code as it is, with one fault |
-| `push-chunks` | violation PushAtMostOnce | **Finding H2b**, the code as it is, with no fault |
+| `push` | pass | The code: 3 notifications, 2 workers, Expo may reject, no faults |
+| `push-crash` | pass | **Finding H2, fixed**: the code with one fault |
+| `push-chunks` | pass | **Finding H2b, fixed**: the code with two Expo requests per batch |
 | `break-confirm-no-rowlock` | violation NoMissedAlert | Broken variant: the code before the H1 fix |
 | `break-confirm-no-unique` | violation OneAlertPerThreshold | Broken variant: proves the property can fail |
 | `break-push-no-lock` | violation PushAtMostOnce | Broken variant: proves the property can fail |
 | `break-push-no-expiry` | violation EveryPushSettles | Broken variant: proves the property can fail |
+| `break-push-retry-unknown` | violation PushAtMostOnce | Broken variant: H2 comes back if an unknown outcome is retried |
+| `break-push-drop-chunks` | violation PushAtMostOnce | Broken variant: H2b comes back if a rejected request retries the whole batch |
 
 In Codex, the first run needs network access to download the jar. Run it outside the sandbox once, or copy the jar to `~/.cache/tla/tla2tools-1.7.4.jar`.
 
@@ -64,7 +66,7 @@ A change that only edits formatting, logging, analytics, or message text does no
 
 ## Updating the verification
 
-1. Change the model from the code first, before you rerun, never from the result. Each step in the model keeps pointing to a step a reviewer can open, and each step indivisible in the code stays one step in the model. Model a new design choice as a constant, the way `RowLock`, `Expiry`, `UniqueLedger`, and `BudgetRowLock` are. Set it in the configs that describe the code as it is (`confirm*`, `push*`, but not `break-*`).
+1. Change the model from the code first, before you rerun, never from the result. Each step in the model keeps pointing to a step a reviewer can open, and each step indivisible in the code stays one step in the model. Model a new design choice as a constant, the way `RowLock`, `Expiry`, `UnknownOutcome`, `KeepChunks`, `UniqueLedger`, and `BudgetRowLock` are. Set it in the configs that describe the code as it is (`confirm*`, `push*`, but not `break-*`).
 2. Change a property only for a promise that changed on purpose, with evidence: a docstring, a test, the PRD, or the commit message. Write down the old wording, the new wording, and the evidence.
 3. Keep the bounds. If you must lower one, say so in your report.
 4. Rerun. On a pass, prove the check can still fail: break the new code's guard in the model (a removed lock, a reordered step) and see the property fail, then put it back. On a violation, replay the trace as described above.
@@ -73,7 +75,7 @@ A change that only edits formatting, logging, analytics, or message text does no
 
 ## Findings
 
-All three were found and reproduced against the real code on 2026-10-26, using the scripts in `formal/budget_alerts/repro/`. Both scripts need a running `verify-grocery-genie` instance (`.agents/skills/verify-grocery-genie/scripts/gg-verify launch`).
+All three were found and reproduced against the real code on 2026-10-26, using the scripts in `formal/budget_alerts/repro/`. All three are fixed. Both scripts need a running `verify-grocery-genie` instance (`.agents/skills/verify-grocery-genie/scripts/gg-verify launch`).
 
 **H1: concurrent confirms miss alerts** (`confirm-missed`). **Fixed 2026-10-26.** Two receipts confirmed at the same moment could push spend past a threshold with no alert. The shortest trace, before the fix, with a budget of 2 units and thresholds 50/100:
 1. Request B runs `confirm_receipt`, which sets its receipt to `confirmed` and flushes.
@@ -89,7 +91,7 @@ Reproduction: `backend/.venv/bin/python formal/budget_alerts/repro/h1_concurrent
 
 The fix: `check_thresholds` selects all of the user's live budgets `ORDER BY id FOR UPDATE` before the spend read, and holds the locks until the request commits. A second confirm for the same user waits there, and its spend read, a new statement at READ COMMITTED, sees the first receipt. It locks every budget because any receipt can move overall and category spend, and it locks in id order so that two requests never deadlock. After the fix, the script missed 0 of 20. Keep it as the regression check: pytest runs on SQLite, which drops `FOR UPDATE`, so `test_check_thresholds_locks_budgets_before_reading_spend` checks only the SQL. `break-confirm-no-rowlock` keeps the trace.
 
-**H2: a fault after the Expo send pushes again** (`push-crash`). The trace:
+**H2: a fault after the Expo send pushed again** (`push-crash`). Fixed on 2026-10-26. The trace on the old code:
 1. `deliver_pending_pushes` locks n1 and n2 with `FOR UPDATE SKIP LOCKED`.
 2. `ExpoPushClient.send` posts them, and Expo delivers both.
 3. The response is lost: `httpx` times out, raising `httpx.HTTPError`. The `except` branch commits only the expire updates, so both rows stay `push_status IS NULL`.
@@ -97,25 +99,34 @@ The fix: `check_thresholds` selects all of the user's live budgets `ORDER BY id 
 
 A worker that dies, or a `db.commit()` that fails, after step 2 gives the same result.
 
-**H2b: a multi-chunk batch resends its first chunk, with no fault** (`push-chunks`). A run with more than 100 messages needs two Expo requests. For example, 60 notifications to users with 2 devices each make 120 messages.
+**H2b: a multi-chunk batch resent its first chunk, with no fault** (`push-chunks`). Fixed on 2026-10-26. A run with more than 100 messages needs two Expo requests. For example, 60 notifications to users with 2 devices each make 120 messages.
 1. Chunk 1 is delivered.
 2. Chunk 2 gets a 5xx or 429 response, so `send` raises and the tickets for chunk 1 are lost.
 3. The whole batch stays pending.
 4. The next run sends chunk 1 again.
 
-Reproduction for both: `backend/.venv/bin/python formal/budget_alerts/repro/h2_push_resend.py`. It ran the real `deliver_pending_pushes` and `ExpoPushClient` against Postgres, with Expo stubbed by `httpx.MockTransport`. Every scenario pushed messages twice: lost response 2 of 2, chunks 100 of 120, failed commit 2 of 2. All rows still ended as `push_status = 'sent'`.
+**The fix keeps at most once.** The user chose at most once over at least once with deduplication, so `PushAtMostOnce` is unchanged. Each step below is in `push_tasks.py`:
+- The claim: the run commits its batch as `sending` before the first POST. Only `NULL` rows are selected, so a claimed row is never sent again.
+- The task sends one Expo request per chunk and commits `sent` for its ok tickets before the next request.
+- On an `httpx.HTTPError`, `expo_rejected()` decides. A 4xx/5xx or a connect or pool error means Expo took nothing, so the chunk and the rest go back to `NULL`. Any other error leaves the outcome unknown: the chunk ends `failed`, and only the rest goes back.
+- A run that dies leaves rows `sending`. A later run's expire step sets them `failed` once they are older than `push_max_age`.
+
+The cost: an alert whose outcome is unknown is never retried, so the user may miss it.
+
+Before the fix, `repro/h2_push_resend.py` pushed messages twice in every scenario: lost response 2 of 2, chunks 100 of 120, failed commit 2 of 2. After the fix, it pushes none twice: lost ends `failed`, chunks ends all `sent`, and crash leaves `sending` until the expire step. The same script still finds 3 of 3 on the old code (`a7a60f8`). Run it as `backend/.venv/bin/python formal/budget_alerts/repro/h2_push_resend.py`, against Postgres, with Expo stubbed by `httpx.MockTransport`. The unit tests in `backend/tests/tasks/test_push_tasks.py` cover the same faults on SQLite.
 
 ## Scope and assumptions
 
 Verified, within the bounds in each config:
 - **Confirm side:** one user, one overall budget, one period. Each receipt adds one unit of spend; up to 3 receipts, thresholds 50/80/100, 1 injected rollback. Postgres runs at READ COMMITTED, the default, since no isolation level is set.
-- **Push side:** up to 3 notifications, 2 workers, `BATCH_SIZE` and the chunk size as set in each config. Expo may refuse any request, any number of times. Up to 1 crash or lost response.
+- **Push side:** up to 3 notifications, 2 workers, `BATCH_SIZE` and the chunk size as set in each config. Expo may reject any request, any number of times. Up to 1 crash, failed commit, or lost response.
 
 Left out:
 - category budgets (same steps, another budget row);
 - editing a budget during a period (`save_budget` updates the active budget in place, `update_budget` can move `period_start`). The model holds one budget at a fixed amount. An in-place save waits on the confirm's budget row lock (`check_thresholds` locks the user's active budgets), so it cannot interleave with `Read` and `Claim`. Creating or reviving a budget takes no such wait, and a confirm already in flight checks only the budgets it locked. Thresholds already in `budget_alerts_sent` for the period stay claimed after a raise, so they do not alert again at the new amount;
 - two requests confirming the same receipt;
 - the `no_device` path and `DeviceNotRegistered` token deletion;
+- a notification sent to several devices, whose messages can fall in different chunks. The model gives each user one device. `test_failed_chunk_keeps_earlier_chunks_and_retries_only_the_rest` covers two devices;
 - Expo push receipts (the second-phase delivery report);
 - creating the notification in the same transaction as the alert. The model merges `claim_alert` and `create_notification` into one step, which is sound because nothing sees either write before commit;
 - weekly summaries;
@@ -134,14 +145,14 @@ The verification was last confirmed to describe these files and functions at the
 | File | Functions | Model steps |
 | --- | --- | --- |
 | `backend/app/core/dependencies.py` | `get_db`, `engine` (no isolation level) | `ConfirmAlerts`: `Commit`, `Abort` |
-| `backend/app/services/receipt_service.py` | `confirm_receipt`, `update_receipt` (status branch), `create_manual_receipt` (no alert path yet) | `ConfirmAlerts`: `Flush` |
+| `backend/app/services/receipt_service.py` | `confirm_receipt`, `update_receipt` (status branch), `create_manual_receipt`, `_after_confirm` (both confirm paths share it) | `ConfirmAlerts`: `Flush` |
 | `backend/app/services/budget_service.py` | `check_thresholds` (budget row lock), `get_spending_by_category`, `_active_thresholds`, `claim_alert`; watched, not modeled: `save_budget`, `update_budget`, `restore_budget` (they write budget rows the `Read` step locks) | `ConfirmAlerts`: `Read`, `Claim` |
 | `backend/app/services/notification_service.py` | `create_notification` | `ConfirmAlerts`: `Claim` |
-| `backend/app/models/database.py` | `BudgetAlertSent` unique key, `Notification.push_status`, `ix_notifications_push_pending` | `UniqueLedger`, `PushDelivery` statuses |
-| `backend/app/tasks/push_tasks.py` | `deliver_pending_pushes`, `BATCH_SIZE` | `PushDelivery`: `Expire`, `Select`, `Finish`, `Crash`, `HttpErrorCommon` |
-| `backend/app/services/push_service.py` | `ExpoPushClient.send`, `EXPO_MAX_BATCH` | `PushDelivery`: `SendChunk` |
+| `backend/app/models/database.py` | `BudgetAlertSent` unique key, `Notification.push_status`, `ix_notifications_push_pending`, `ix_notifications_push_sending` | `UniqueLedger`, `PushDelivery` statuses |
+| `backend/app/tasks/push_tasks.py` | `deliver_pending_pushes`, `BATCH_SIZE` | `PushDelivery`: `Expire`, `Select`, `Claim`, `Record`, `Finish`, `Crash` |
+| `backend/app/services/push_service.py` | `ExpoPushClient.send`, `expo_rejected`, `EXPO_MAX_BATCH` | `PushDelivery`: `SendChunk` |
 | `backend/app/tasks/celery_app.py` | `deliver-pending-pushes` beat schedule | `PushDelivery`: workers and fairness |
 
-`create_manual_receipt` is watched because the open fix for manual receipts will give it the confirm path. If it reuses `confirm_receipt`'s steps in the same transaction, it is one more `Flush` request, and the model needs no change. Confirm that from the code, then move the sync commit.
+`create_manual_receipt` inserts the receipt as `confirmed`, flushes, then runs `_after_confirm`, the same lock, read, and claim steps as `confirm_receipt`, in the same transaction (fix `4d81efa`). In the model it is one more `Flush` request, so a manual entry needs no model change.
 
 To bring the verification back in line after changes that skipped this skill, use `gg-maintain-formal-verification-skill`.
