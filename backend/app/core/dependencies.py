@@ -19,8 +19,8 @@ engine = create_async_engine(
 
 
 def _get_sync_database_url(async_url: str) -> str:
-    """Convert async database URL to sync equivalent."""
-    return async_url.replace("+asyncpg", "").replace("+aiosqlite", "")
+    """Convert async database URL to sync equivalent (for Celery tasks)."""
+    return async_url.replace("+asyncpg", "+psycopg").replace("+aiosqlite", "")
 
 
 def get_sync_session_factory():

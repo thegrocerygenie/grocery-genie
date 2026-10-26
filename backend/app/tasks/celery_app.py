@@ -5,7 +5,15 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-celery_app = Celery("grocery_genie", broker=settings.redis_url)
+celery_app = Celery(
+    "grocery_genie",
+    broker=settings.redis_url,
+    # Task modules the worker imports at startup so their tasks register.
+    include=[
+        "app.tasks.receipt_tasks",
+        "app.tasks.summary_tasks",
+    ],
+)
 celery_app.config_from_object(
     {
         "task_serializer": "json",
