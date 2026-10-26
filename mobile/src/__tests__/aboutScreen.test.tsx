@@ -1,6 +1,6 @@
 import { renderRouter, screen } from 'expo-router/testing-library';
 
-import AboutScreen from '../../app/about';
+import AboutScreen from '../../app/settings/about';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('expo-constants', () => ({
