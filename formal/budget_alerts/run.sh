@@ -75,8 +75,8 @@ sync_check() {
     echo "covered code: unchanged since sync commit $sync"
   else
     echo "WARNING covered code changed since sync commit $sync; confirm the models still describe it:"
-    [ -n "$changed" ] && echo "$changed" | sed 's/^/  commit /'
-    [ -n "$dirty" ] && echo "$dirty" | sed 's/^/  uncommitted /'
+    if [ -n "$changed" ]; then echo "$changed" | sed 's/^/  commit /'; fi
+    if [ -n "$dirty" ]; then echo "$dirty" | sed 's/^/  uncommitted /'; fi
   fi
 }
 

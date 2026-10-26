@@ -113,6 +113,7 @@ Verified, within the bounds in each config:
 
 Left out:
 - category budgets (same steps, another budget row);
+- editing a budget during a period (`save_budget` updates the active budget in place, `update_budget` can move `period_start`). The model holds one budget at a fixed amount. An in-place save waits on the confirm's budget row lock (`check_thresholds` locks the user's active budgets), so it cannot interleave with `Read` and `Claim`. Creating or reviving a budget takes no such wait, and a confirm already in flight checks only the budgets it locked. Thresholds already in `budget_alerts_sent` for the period stay claimed after a raise, so they do not alert again at the new amount;
 - two requests confirming the same receipt;
 - the `no_device` path and `DeviceNotRegistered` token deletion;
 - Expo push receipts (the second-phase delivery report);
@@ -126,7 +127,7 @@ A pass covers the model within its bounds, not the whole system.
 
 ## Coverage record
 
-Sync commit: `0c2554d`
+Sync commit: `9003ec4`
 
 The verification was last confirmed to describe these files and functions at the sync commit. `run.sh` reads this table and the sync commit.
 
@@ -134,7 +135,7 @@ The verification was last confirmed to describe these files and functions at the
 | --- | --- | --- |
 | `backend/app/core/dependencies.py` | `get_db`, `engine` (no isolation level) | `ConfirmAlerts`: `Commit`, `Abort` |
 | `backend/app/services/receipt_service.py` | `confirm_receipt`, `update_receipt` (status branch), `create_manual_receipt` (no alert path yet) | `ConfirmAlerts`: `Flush` |
-| `backend/app/services/budget_service.py` | `check_thresholds` (budget row lock), `get_spending_by_category`, `_active_thresholds`, `claim_alert` | `ConfirmAlerts`: `Read`, `Claim` |
+| `backend/app/services/budget_service.py` | `check_thresholds` (budget row lock), `get_spending_by_category`, `_active_thresholds`, `claim_alert`; watched, not modeled: `save_budget`, `update_budget`, `restore_budget` (they write budget rows the `Read` step locks) | `ConfirmAlerts`: `Read`, `Claim` |
 | `backend/app/services/notification_service.py` | `create_notification` | `ConfirmAlerts`: `Claim` |
 | `backend/app/models/database.py` | `BudgetAlertSent` unique key, `Notification.push_status`, `ix_notifications_push_pending` | `UniqueLedger`, `PushDelivery` statuses |
 | `backend/app/tasks/push_tasks.py` | `deliver_pending_pushes`, `BATCH_SIZE` | `PushDelivery`: `Expire`, `Select`, `Finish`, `Crash`, `HttpErrorCommon` |
