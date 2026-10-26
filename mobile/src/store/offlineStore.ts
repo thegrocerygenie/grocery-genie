@@ -36,9 +36,7 @@ export const useOfflineStore = create<OfflineState>()(
 
       updateStatus: (id, status) =>
         set((state) => ({
-          pendingReceipts: state.pendingReceipts.map((r) =>
-            r.id === id ? { ...r, status } : r,
-          ),
+          pendingReceipts: state.pendingReceipts.map((r) => (r.id === id ? { ...r, status } : r)),
         })),
 
       removePendingReceipt: (id) =>

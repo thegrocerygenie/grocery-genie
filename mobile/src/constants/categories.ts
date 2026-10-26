@@ -58,9 +58,7 @@ export const DEFAULT_CATEGORIES: readonly CategoryMeta[] = [
 const FALLBACK_CATEGORY = DEFAULT_CATEGORIES[DEFAULT_CATEGORIES.length - 1];
 
 const CATEGORY_BY_ID = new Map(DEFAULT_CATEGORIES.map((c) => [c.id, c]));
-const CATEGORY_BY_NAME = new Map(
-  DEFAULT_CATEGORIES.map((c) => [c.name.toLowerCase(), c]),
-);
+const CATEGORY_BY_NAME = new Map(DEFAULT_CATEGORIES.map((c) => [c.name.toLowerCase(), c]));
 
 /**
  * Minimal shape of a backend category. Matches the relevant fields of the

@@ -10,8 +10,7 @@ export function useSyncQueue() {
   const { isConnected } = useNetworkStatus();
   const wasDisconnected = useRef(false);
   const queryClient = useQueryClient();
-  const { pendingReceipts, updateStatus, removePendingReceipt } =
-    useOfflineStore();
+  const { pendingReceipts, updateStatus, removePendingReceipt } = useOfflineStore();
 
   useEffect(() => {
     if (!isConnected) {

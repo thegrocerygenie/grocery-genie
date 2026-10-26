@@ -30,9 +30,7 @@ describe('offlineStore', () => {
     const id = useOfflineStore.getState().pendingReceipts[0].id;
     useOfflineStore.getState().updateStatus(id, 'syncing');
 
-    expect(useOfflineStore.getState().pendingReceipts[0].status).toBe(
-      'syncing',
-    );
+    expect(useOfflineStore.getState().pendingReceipts[0].status).toBe('syncing');
   });
 
   it('removes a pending receipt', () => {
@@ -65,8 +63,6 @@ describe('offlineStore', () => {
     useOfflineStore.getState().removePendingReceipt(id);
 
     expect(useOfflineStore.getState().pendingReceipts).toHaveLength(1);
-    expect(useOfflineStore.getState().pendingReceipts[0].imageUri).toBe(
-      'file:///b.jpg',
-    );
+    expect(useOfflineStore.getState().pendingReceipts[0].imageUri).toBe('file:///b.jpg');
   });
 });
