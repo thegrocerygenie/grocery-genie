@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -13,6 +13,7 @@ import { useReceiptImport } from '@/features/receipt-capture/hooks/useReceiptImp
 import { useReceiptScan } from '@/features/receipt-capture/hooks/useReceiptScan';
 import { isRetryableScanError } from '@/features/receipt-capture/services/offlineQueue';
 import { persistCapturedImage } from '@/features/receipt-capture/services/pendingImageFiles';
+import { scanErrorHint } from '@/features/receipt-capture/utils/scanErrorHint';
 import { useOfflineStore } from '@/store/offlineStore';
 import { useReceiptStore } from '@/store/receiptStore';
 import { useAnalytics } from '@/hooks/useAnalytics';
@@ -26,6 +27,8 @@ export default function ScanScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const [flowState, setFlowState] = useState<ScanFlowState>('detected');
+  const [processingUri, setProcessingUri] = useState<string | null>(null);
+  const [errorHint, setErrorHint] = useState(() => scanErrorHint(undefined));
   const cameraRef = useRef<CameraView>(null);
 
   const scanMutation = useReceiptScan();
@@ -79,6 +82,11 @@ export default function ScanScreen() {
 
   // NFR reliability 3: keep a photo that cannot upload now; useSyncQueue
   // uploads it when the connection or the server comes back.
+  const fail = (error?: unknown) => {
+    setErrorHint(scanErrorHint(error));
+    setFlowState('low-quality');
+  };
+
   const queuePhoto = (uri: string) => {
     try {
       addPendingReceipt({
@@ -87,7 +95,7 @@ export default function ScanScreen() {
         capturedAt: new Date().toISOString(),
       });
     } catch {
-      setFlowState('low-quality');
+      fail();
       return;
     }
     setFlowState('queued');
@@ -105,7 +113,7 @@ export default function ScanScreen() {
         skipProcessing: false,
       });
       if (!photo?.uri) {
-        setFlowState('low-quality');
+        fail();
         return;
       }
 
@@ -119,6 +127,7 @@ export default function ScanScreen() {
         return;
       }
 
+      setProcessingUri(photo.uri);
       setFlowState('processing');
       scanMutation.mutate(
         { imageUri: photo.uri, mimeType: 'image/jpeg', source: 'camera' },
@@ -133,15 +142,18 @@ export default function ScanScreen() {
             if (isRetryableScanError(error)) {
               queuePhoto(photo.uri);
             } else {
-              setFlowState('low-quality');
+              fail(error);
             }
           },
         },
       );
     } catch {
-      setFlowState('low-quality');
+      fail();
     }
   };
+
+  // Keep the camera mounted under the overlay so a retake is instant.
+  const processing = flowState === 'processing' && processingUri !== null;
 
   return (
     <>
@@ -149,29 +161,38 @@ export default function ScanScreen() {
       <View style={styles.root}>
         <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
 
-        <Brackets />
+        {processing ? (
+          <ProcessingOverlay uri={processingUri} />
+        ) : (
+          <>
+            <Brackets />
 
-        <View style={styles.topHintRow}>
-          <HintPill state={flowState} />
-        </View>
+            <View style={styles.topHintRow}>
+              <HintPill state={flowState} errorHint={errorHint} />
+            </View>
 
-        <View style={styles.bottomBar}>
-          <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button">
-            <Text style={styles.cancelLabel}>Cancel</Text>
-          </Pressable>
+            <View style={styles.bottomBar}>
+              <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button">
+                <Text style={styles.cancelLabel}>Cancel</Text>
+              </Pressable>
 
-          <Pressable
-            onPress={onShutter}
-            disabled={flowState === 'capturing' || flowState === 'processing'}
-            style={({ pressed }) => [styles.shutter, pressed && { transform: [{ scale: 0.94 }] }]}
-            accessibilityRole="button"
-            accessibilityLabel="Capture receipt"
-          >
-            <View style={styles.shutterInner} />
-          </Pressable>
+              <Pressable
+                onPress={onShutter}
+                disabled={flowState === 'capturing' || flowState === 'processing'}
+                style={({ pressed }) => [
+                  styles.shutter,
+                  pressed && { transform: [{ scale: 0.94 }] },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Capture receipt"
+              >
+                <View style={styles.shutterInner} />
+              </Pressable>
 
-          <Text style={styles.modeLabel}>Auto</Text>
-        </View>
+              <Text style={styles.modeLabel}>Auto</Text>
+            </View>
+          </>
+        )}
       </View>
     </>
   );
@@ -288,18 +309,45 @@ function Brackets() {
   );
 }
 
-interface HintPillProps {
-  state: ScanFlowState;
+/** Design "Scan · processing": the frozen photo, blurred, under a reading state. */
+function ProcessingOverlay({ uri }: { uri: string }) {
+  return (
+    <View
+      style={styles.processingRoot}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Reading receipt. This takes a few seconds."
+    >
+      <Image
+        testID="scan-processing-photo"
+        source={{ uri }}
+        blurRadius={12}
+        resizeMode="cover"
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.processingScrim} />
+      <View style={styles.processingCenter}>
+        <View style={styles.processingSpinner}>
+          <ActivityIndicator size="large" color="#fff" />
+        </View>
+        <Text style={styles.processingTitle}>Reading receipt…</Text>
+        <Text style={styles.processingSub}>This takes a few seconds.</Text>
+      </View>
+    </View>
+  );
 }
 
-function HintPill({ state }: HintPillProps) {
+interface HintPillProps {
+  state: ScanFlowState;
+  errorHint: string;
+}
+
+function HintPill({ state, errorHint }: HintPillProps) {
   if (state === 'low-quality') {
     return (
       <View style={[styles.pill, { backgroundColor: colors.orange }]}>
         <SymbolView name="exclamationmark.triangle.fill" size={14} tintColor="#fff" />
-        <Text style={[type.footnote, { color: '#fff', fontWeight: '600' }]}>
-          Couldn&apos;t read that — try again
-        </Text>
+        <Text style={[type.footnote, { color: '#fff', fontWeight: '600' }]}>{errorHint}</Text>
       </View>
     );
   }
@@ -315,9 +363,7 @@ function HintPill({ state }: HintPillProps) {
     return (
       <View style={[styles.pill, styles.pillGlass]}>
         <ActivityIndicator size="small" color="#fff" />
-        <Text style={[type.footnote, { color: '#fff' }]}>
-          {state === 'processing' ? 'Reading receipt…' : 'Capturing…'}
-        </Text>
+        <Text style={[type.footnote, { color: '#fff' }]}>Capturing…</Text>
       </View>
     );
   }
@@ -349,6 +395,31 @@ const styles = StyleSheet.create({
   pillGlass: {
     backgroundColor: 'rgba(255,255,255,0.18)',
   },
+
+  processingRoot: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
+  },
+  processingScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  processingCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+  },
+  processingSpinner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  processingTitle: { ...type.headline, color: '#fff' },
+  processingSub: { ...type.footnote, color: 'rgba(255,255,255,0.7)' },
 
   bracket: {
     position: 'absolute',
