@@ -35,6 +35,26 @@ async def _alert_thresholds(client: AsyncClient) -> list[int]:
     )
 
 
+async def _manual_entry(client: AsyncClient, amount: float) -> None:
+    resp = await client.post(
+        "/api/receipts",
+        json={
+            "store_name": "Corner Shop",
+            "date": "2026-03-20",
+            "total": amount,
+            "items": [
+                {
+                    "name": "Groceries",
+                    "quantity": 1,
+                    "unit_price": amount,
+                    "total_price": amount,
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 201
+
+
 async def _overall_budget(client: AsyncClient, amount: float) -> None:
     resp = await client.post(
         "/api/budgets",
@@ -57,6 +77,17 @@ async def test_each_threshold_alerts_once_per_period(
 
     await _scan_and_confirm(client, test_image_bytes)  # 261%
     assert await _alert_thresholds(client) == [50, 80, 100]
+
+
+async def test_manual_entry_alerts_once_per_threshold(client: AsyncClient):
+    # Manual entry saves the receipt as confirmed, with no confirm step after.
+    await _overall_budget(client, 20.0)
+
+    await _manual_entry(client, 17.0)  # 85%
+    assert await _alert_thresholds(client) == [50, 80]
+
+    await _manual_entry(client, 1.0)  # 90%
+    assert await _alert_thresholds(client) == [50, 80]
 
 
 async def test_zero_budget_alerts_once_per_period(
