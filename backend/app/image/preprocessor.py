@@ -21,8 +21,13 @@ class ImageQualityResult:
     issues: list[str] = field(default_factory=list)
 
 
-def assess_image_quality(image_data: bytes) -> ImageQualityResult:
-    """Assess receipt image quality using Pillow and OpenCV."""
+def assess_image_quality(image_data: bytes, photo: bool = True) -> ImageQualityResult:
+    """Assess receipt image quality using Pillow and OpenCV.
+
+    ``photo=False`` skips the blur and brightness checks, for images rendered
+    from a digital document (a PDF receipt is mostly white and perfectly sharp,
+    so the photo thresholds would reject it). The width check always applies.
+    """
     issues: list[str] = []
 
     # Get dimensions via Pillow
@@ -40,15 +45,15 @@ def assess_image_quality(image_data: bytes) -> ImageQualityResult:
     laplacian = cv2.Laplacian(gray, cv2.CV_64F)
     blur_score = float(laplacian.var())
 
-    if blur_score < BLUR_THRESHOLD:
+    if photo and blur_score < BLUR_THRESHOLD:
         issues.append(f"Image appears blurry (score: {blur_score:.1f})")
 
     # Brightness check from histogram mean
     brightness_score = float(gray.mean())
 
-    if brightness_score < BRIGHTNESS_MIN:
+    if photo and brightness_score < BRIGHTNESS_MIN:
         issues.append(f"Image is too dark (brightness: {brightness_score:.1f})")
-    elif brightness_score > BRIGHTNESS_MAX:
+    elif photo and brightness_score > BRIGHTNESS_MAX:
         issues.append(f"Image is too bright (brightness: {brightness_score:.1f})")
 
     is_acceptable = len(issues) == 0

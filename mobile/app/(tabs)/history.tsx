@@ -16,6 +16,8 @@ import SegmentedControl from '@react-native-segmented-control/segmented-control'
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { resolveCategoryMeta } from '@/constants/categories';
 import { CaptureActionSheet } from '@/components/CaptureActionSheet';
+import { ImportProgressOverlay } from '@/features/receipt-capture/components/ImportProgressOverlay';
+import { useReceiptImport } from '@/features/receipt-capture/hooks/useReceiptImport';
 import { useReceipts } from '@/features/receipt-capture/hooks/useReceipts';
 import { useCategories } from '@/features/budget/hooks/useCategories';
 import { useDeleteReceipt } from '@/features/lifecycle/hooks/useLifecycle';
@@ -165,6 +167,7 @@ export default function HistoryScreen() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [actionSheetOpen, setActionSheetOpen] = useState(false);
+  const receiptImport = useReceiptImport();
   const deleteReceipt = useDeleteReceipt();
 
   const onDelete = (id: string, label: string) => {
@@ -287,11 +290,13 @@ export default function HistoryScreen() {
         visible={actionSheetOpen}
         onClose={() => setActionSheetOpen(false)}
         onTakePhoto={() => router.push('/(tabs)/scan')}
-        onChooseFromLibrary={() =>
-          Alert.alert('Coming soon', 'Photo library import is on the roadmap.')
-        }
-        onChooseFiles={() => Alert.alert('Coming soon', 'File import is on the roadmap.')}
+        onChooseFromLibrary={() => receiptImport.importFrom('library')}
+        onChooseFiles={() => receiptImport.importFrom('files')}
         onManualEntry={() => router.push('/manual-entry')}
+      />
+      <ImportProgressOverlay
+        visible={receiptImport.progress !== null}
+        previewUri={receiptImport.progress?.previewUri ?? null}
       />
     </>
   );

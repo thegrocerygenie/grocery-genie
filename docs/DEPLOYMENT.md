@@ -527,6 +527,7 @@ Set `EXPO_TOKEN` in GitHub repository secrets (generate at expo.dev → Account 
 - [ ] App connects to production API URL
 - [ ] TestFlight build installs and runs on physical device
 - [ ] Camera capture works on physical device
+- [ ] History → "Choose from Library" imports a HEIC photo, and "Choose Files" imports a single-page PDF, both reaching the review screen with the image shown
 - [ ] Receipt extraction returns results from production API
 - [ ] Budget dashboard loads with real data
 - [ ] Push notification permission requested after sign-in
