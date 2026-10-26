@@ -30,6 +30,8 @@ export default function TopItemsScreen() {
       <Stack.Screen
         options={{
           title: 'Top items',
+          // Opened from the Budget tab; otherwise iOS shows the group name "(tabs)".
+          headerBackTitle: 'Budget',
           headerLargeTitle: true,
           headerBlurEffect: 'systemChromeMaterial',
         }}
