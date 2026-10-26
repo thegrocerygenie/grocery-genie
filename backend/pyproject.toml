@@ -13,6 +13,9 @@ dependencies = [
     "litellm>=1.50.0",
     "pillow>=10.4.0",
     "opencv-python-headless>=4.10.0",
+    # RC-03: decode HEIC uploads and render single-page PDFs to an image.
+    "pillow-heif>=0.18.0",
+    "pypdfium2>=4.30.0",
     "sqlalchemy[asyncio]>=2.0.35",
     "asyncpg>=0.30.0",
     # Sync driver for Celery tasks (get_sync_session_factory).

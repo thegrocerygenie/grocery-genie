@@ -9,17 +9,27 @@ import type {
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
 
+const UPLOAD_EXTENSIONS: Record<string, string> = {
+  'image/png': 'png',
+  'image/heic': 'heic',
+  'image/heif': 'heic',
+  'application/pdf': 'pdf',
+};
+
+export function uploadFileName(mimeType: string): string {
+  return `receipt.${UPLOAD_EXTENSIONS[mimeType] ?? 'jpg'}`;
+}
+
 export async function scanReceipt(
   imageUri: string,
   mimeType: string,
   source: ScanSource = 'camera',
 ): Promise<ReceiptScanResponse> {
   const formData = new FormData();
-  const extension = mimeType === 'image/png' ? 'png' : 'jpg';
   formData.append('file', {
     uri: imageUri,
     type: mimeType,
-    name: `receipt.${extension}`,
+    name: uploadFileName(mimeType),
   } as unknown as Blob);
   // Drives the receipt_scan_started analytics event emitted server-side.
   formData.append('source', source);

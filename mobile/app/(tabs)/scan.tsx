@@ -7,6 +7,8 @@ import { Stack, useRouter } from 'expo-router';
 
 import { ANALYTICS_EVENTS } from '@/constants/analyticsEvents';
 import { colors, radii, spacing, type } from '@/constants/theme';
+import { ImportProgressOverlay } from '@/features/receipt-capture/components/ImportProgressOverlay';
+import { useReceiptImport } from '@/features/receipt-capture/hooks/useReceiptImport';
 import { useReceiptScan } from '@/features/receipt-capture/hooks/useReceiptScan';
 import { useReceiptStore } from '@/store/receiptStore';
 import { useAnalytics } from '@/hooks/useAnalytics';
@@ -20,6 +22,7 @@ export default function ScanScreen() {
   const cameraRef = useRef<CameraView>(null);
 
   const scanMutation = useReceiptScan();
+  const receiptImport = useReceiptImport();
   const { setCapturedImageUri, setActiveScanResponse } = useReceiptStore();
   const analytics = useAnalytics();
 
@@ -44,7 +47,20 @@ export default function ScanScreen() {
   }
 
   if (!permission.granted) {
-    return <PermissionScreen denied={!permission.canAskAgain} onRequest={requestPermission} />;
+    // NFR: without camera access, fall back to importing from the photo library.
+    return (
+      <>
+        <PermissionScreen
+          denied={!permission.canAskAgain}
+          onRequest={requestPermission}
+          onChooseFromLibrary={() => receiptImport.importFrom('library')}
+        />
+        <ImportProgressOverlay
+          visible={receiptImport.progress !== null}
+          previewUri={receiptImport.progress?.previewUri ?? null}
+        />
+      </>
+    );
   }
 
   const onShutter = async () => {
@@ -123,9 +139,10 @@ export default function ScanScreen() {
 interface PermissionScreenProps {
   denied: boolean;
   onRequest: () => void;
+  onChooseFromLibrary: () => void;
 }
 
-function PermissionScreen({ denied, onRequest }: PermissionScreenProps) {
+function PermissionScreen({ denied, onRequest, onChooseFromLibrary }: PermissionScreenProps) {
   return (
     <View style={styles.permissionRoot}>
       <View style={styles.permissionIcon}>
@@ -155,6 +172,14 @@ function PermissionScreen({ denied, onRequest }: PermissionScreenProps) {
         accessibilityRole="button"
       >
         <Text style={styles.primaryBtnLabel}>{denied ? 'Open Settings' : 'Continue'}</Text>
+      </Pressable>
+      <Pressable
+        style={({ pressed }) => [styles.secondaryBtn, pressed && styles.secondaryBtnPressed]}
+        onPress={onChooseFromLibrary}
+        accessibilityRole="button"
+        accessibilityLabel="Choose a receipt from your photo library"
+      >
+        <Text style={styles.secondaryBtnLabel}>Choose from Library</Text>
       </Pressable>
     </View>
   );
@@ -335,4 +360,12 @@ const styles = StyleSheet.create({
     minWidth: 200,
   },
   primaryBtnLabel: { color: '#fff', ...type.headline },
+  secondaryBtn: {
+    minHeight: 44,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryBtnPressed: { opacity: 0.5 },
+  secondaryBtnLabel: { color: colors.tint, ...type.headline },
 });

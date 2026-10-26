@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.dependencies import get_db
 from app.core.security import get_current_user
+from app.image.normalize import PDF_TYPE, UnreadableUploadError, normalize_upload
 from app.image.preprocessor import assess_image_quality
 from app.image.storage import (
     RECEIPT_EXTS,
@@ -45,13 +46,12 @@ ALLOWED_CONTENT_TYPES = {
     "image/jpeg",
     "image/png",
     "image/heic",
+    "image/heif",
     "application/pdf",
 }
 
 # Valid values for the receipt_scan_started analytics `source` property.
 SCAN_SOURCES = {"camera", "library", "pdf", "manual"}
-
-QUALITY_CHECKABLE_TYPES = {"image/jpeg", "image/png"}
 
 # Hard ceiling on a single receipt upload (defends against OOM via huge bodies).
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
@@ -60,6 +60,7 @@ _CONTENT_TYPE_EXTS = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
     "image/heic": ".heic",
+    "image/heif": ".heic",
     "application/pdf": ".pdf",
 }
 
@@ -138,14 +139,26 @@ async def scan_receipt(
     if not image_data:
         raise HTTPException(status_code=422, detail="Empty file uploaded.")
 
-    # Image quality check (JPEG/PNG only — Pillow doesn't support HEIC)
-    if file.content_type in QUALITY_CHECKABLE_TYPES:
-        quality = await asyncio.to_thread(assess_image_quality, image_data)
-        if not quality.is_acceptable:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Image quality insufficient: {'; '.join(quality.issues)}",
-            )
+    # HEIC and PDF become a JPEG here, so every format gets the same quality
+    # check, thumbnail and extraction input. The original upload is still stored.
+    try:
+        normalized = await asyncio.to_thread(
+            normalize_upload, image_data, file.content_type
+        )
+    except UnreadableUploadError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    # A rendered PDF is a digital document, not a photo: only the width applies.
+    quality = await asyncio.to_thread(
+        assess_image_quality,
+        normalized.data,
+        photo=file.content_type != PDF_TYPE,
+    )
+    if not quality.is_acceptable:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Image quality insufficient: {'; '.join(quality.issues)}",
+        )
 
     service = ReceiptService(
         db=db,
@@ -155,8 +168,8 @@ async def scan_receipt(
     )
     result = await service.process_receipt(
         user_id=user.id,
-        image_data=image_data,
-        content_type=file.content_type or "image/jpeg",
+        image_data=normalized.data,
+        content_type=normalized.content_type,
     )
 
     # Reject if extraction confidence is too low (likely not a receipt)
@@ -171,22 +184,23 @@ async def scan_receipt(
     storage = LocalFileStorage(settings.storage_path)
 
     ext = _content_type_to_ext(file.content_type or "image/jpeg")
-    image_path = generate_receipt_path(result.receipt_id, ext)
-    await storage.save(image_data, image_path)
+    await storage.save(image_data, generate_receipt_path(result.receipt_id, ext))
+    if normalized.converted:
+        # The image route serves .jpg first, so a HEIC or PDF receipt displays
+        # as this JPEG while the original stays on disk for re-processing.
+        await storage.save(
+            normalized.data, generate_receipt_path(result.receipt_id, ".jpg")
+        )
     # Serve through an authenticated, ownership-checked route — never a raw
     # static path (which would let any user fetch another's receipt by UUID).
     image_url = f"/api/receipts/{result.receipt_id}/image"
 
-    # Generate thumbnail for JPEG/PNG
-    if file.content_type in QUALITY_CHECKABLE_TYPES:
-        thumb_data = await asyncio.to_thread(
-            create_thumbnail, image_data, settings.thumbnail_width
-        )
-        thumb_path = generate_thumbnail_path(result.receipt_id, ".jpg")
-        await storage.save(thumb_data, thumb_path)
-        thumbnail_url = f"/api/receipts/{result.receipt_id}/thumbnail"
-    else:
-        thumbnail_url = image_url
+    thumb_data = await asyncio.to_thread(
+        create_thumbnail, normalized.data, settings.thumbnail_width
+    )
+    thumb_path = generate_thumbnail_path(result.receipt_id, ".jpg")
+    await storage.save(thumb_data, thumb_path)
+    thumbnail_url = f"/api/receipts/{result.receipt_id}/thumbnail"
 
     # Update receipt with image URLs
     receipt_result = await db.execute(
@@ -243,7 +257,8 @@ async def get_receipt_thumbnail(
 ) -> Response:
     """Stream a receipt's thumbnail — only to its owner.
 
-    Falls back to the original image when no thumbnail exists (e.g. HEIC/PDF).
+    Falls back to the original image when no thumbnail exists (HEIC/PDF
+    receipts uploaded before those formats were converted on upload).
     """
     await _owned_receipt_or_404(receipt_id, user.id, db)
     candidates = [generate_thumbnail_path(receipt_id, THUMBNAIL_EXT)]
