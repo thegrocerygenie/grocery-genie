@@ -30,11 +30,12 @@ Expected rows as of the sync commit:
 | Config | Expected | What it is |
 | --- | --- | --- |
 | `confirm` | pass | The code: 3 receipts, thresholds 50/80/100, any interleaving, 1 rollback |
-| `confirm-missed` | violation NoMissedAlert | **Finding H1**, the code as it is |
-| `confirm-fix-rowlock` | pass | Candidate fix for H1 (not in the code) |
+| `confirm-missed` | pass | **Finding H1**, fixed: the H1 trace's setup, with the budget row lock |
+| `confirm-fix-rowlock` | pass | The H1 fix with 3 receipts, both confirm properties |
 | `push` | pass | The code: 3 notifications, 2 workers, Expo may refuse, no faults |
 | `push-crash` | violation PushAtMostOnce | **Finding H2**, the code as it is, with one fault |
 | `push-chunks` | violation PushAtMostOnce | **Finding H2b**, the code as it is, with no fault |
+| `break-confirm-no-rowlock` | violation NoMissedAlert | Broken variant: the code before the H1 fix |
 | `break-confirm-no-unique` | violation OneAlertPerThreshold | Broken variant: proves the property can fail |
 | `break-push-no-lock` | violation PushAtMostOnce | Broken variant: proves the property can fail |
 | `break-push-no-expiry` | violation EveryPushSettles | Broken variant: proves the property can fail |
@@ -72,9 +73,9 @@ A change that only edits formatting, logging, analytics, or message text does no
 
 ## Findings
 
-All three were reproduced against the real code on 2026-10-26, using the scripts in `formal/budget_alerts/repro/`. Both scripts need a running `verify-grocery-genie` instance (`.agents/skills/verify-grocery-genie/scripts/gg-verify launch`).
+All three were found and reproduced against the real code on 2026-10-26, using the scripts in `formal/budget_alerts/repro/`. Both scripts need a running `verify-grocery-genie` instance (`.agents/skills/verify-grocery-genie/scripts/gg-verify launch`).
 
-**H1: concurrent confirms miss alerts** (`confirm-missed`). Two receipts confirmed at the same moment can push spend past a threshold with no alert. The shortest trace, with a budget of 2 units and thresholds 50/100:
+**H1: concurrent confirms miss alerts** (`confirm-missed`). **Fixed 2026-10-26.** Two receipts confirmed at the same moment could push spend past a threshold with no alert. The shortest trace, before the fix, with a budget of 2 units and thresholds 50/100:
 1. Request B runs `confirm_receipt`, which sets its receipt to `confirmed` and flushes.
 2. B's `check_thresholds` reads spend: its own receipt only, 50%.
 3. B's `claim_alert` inserts the 50% ledger row, and `create_notification` adds the alert (uncommitted).
@@ -84,7 +85,9 @@ All three were reproduced against the real code on 2026-10-26, using the scripts
 7. A's `claim_alert` for 50% hits B's row, so `ON CONFLICT DO NOTHING` skips it. A commits.
 8. Spend is 100%, and no 100% alert is ever sent.
 
-Reproduction: `backend/.venv/bin/python formal/budget_alerts/repro/h1_concurrent_confirm.py 20`. In 20 of 20 trials, two concurrent confirms reached 100% of a 29.54 budget with no alert at all. The control run with `--serial` missed 0 of 5. `confirm-fix-rowlock` shows one fix that holds in the model: lock the budget row (`SELECT ... FOR UPDATE`) before the spend read.
+Reproduction: `backend/.venv/bin/python formal/budget_alerts/repro/h1_concurrent_confirm.py 20`. Before the fix, 20 of 20 trials (and 18 of 20 on a rerun) had two concurrent confirms reach 100% of a 29.54 budget with no alert at all. The control run with `--serial` missed 0 of 5.
+
+The fix: `check_thresholds` selects all of the user's live budgets `ORDER BY id FOR UPDATE` before the spend read, and holds the locks until the request commits. A second confirm for the same user waits there, and its spend read, a new statement at READ COMMITTED, sees the first receipt. It locks every budget because any receipt can move overall and category spend, and it locks in id order so that two requests never deadlock. After the fix, the script missed 0 of 20. Keep it as the regression check: pytest runs on SQLite, which drops `FOR UPDATE`, so `test_check_thresholds_locks_budgets_before_reading_spend` checks only the SQL. `break-confirm-no-rowlock` keeps the trace.
 
 **H2: a fault after the Expo send pushes again** (`push-crash`). The trace:
 1. `deliver_pending_pushes` locks n1 and n2 with `FOR UPDATE SKIP LOCKED`.
@@ -131,7 +134,7 @@ The verification was last confirmed to describe these files and functions at the
 | --- | --- | --- |
 | `backend/app/core/dependencies.py` | `get_db`, `engine` (no isolation level) | `ConfirmAlerts`: `Commit`, `Abort` |
 | `backend/app/services/receipt_service.py` | `confirm_receipt`, `update_receipt` (status branch), `create_manual_receipt` (no alert path yet) | `ConfirmAlerts`: `Flush` |
-| `backend/app/services/budget_service.py` | `check_thresholds`, `get_spending_by_category`, `_active_thresholds`, `claim_alert` | `ConfirmAlerts`: `Read`, `Claim` |
+| `backend/app/services/budget_service.py` | `check_thresholds` (budget row lock), `get_spending_by_category`, `_active_thresholds`, `claim_alert` | `ConfirmAlerts`: `Read`, `Claim` |
 | `backend/app/services/notification_service.py` | `create_notification` | `ConfirmAlerts`: `Claim` |
 | `backend/app/models/database.py` | `BudgetAlertSent` unique key, `Notification.push_status`, `ix_notifications_push_pending` | `UniqueLedger`, `PushDelivery` statuses |
 | `backend/app/tasks/push_tasks.py` | `deliver_pending_pushes`, `BATCH_SIZE` | `PushDelivery`: `Expire`, `Select`, `Finish`, `Crash`, `HttpErrorCommon` |

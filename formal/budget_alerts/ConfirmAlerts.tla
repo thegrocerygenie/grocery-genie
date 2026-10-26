@@ -10,9 +10,13 @@
 (* Code map (backend/app/...):                                             *)
 (*   Flush   services/receipt_service.py confirm_receipt:                  *)
 (*           receipt.status = "confirmed"; await self.db.flush()           *)
-(*   Read    services/budget_service.py check_thresholds ->                *)
-(*           get_spending_by_category: one SELECT; sees committed rows     *)
-(*           plus this transaction's own flushed write                     *)
+(*   Read    services/budget_service.py check_thresholds: SELECT the       *)
+(*           user's budgets ORDER BY id FOR UPDATE (held until Commit or   *)
+(*           Abort), then get_spending_by_category: one SELECT; sees       *)
+(*           committed rows plus this transaction's own flushed write.     *)
+(*           Lock and spend read are one step: while one request holds     *)
+(*           the lock no other confirm can commit, and the spend SELECT    *)
+(*           is a new statement, so it sees every commit before the lock.  *)
 (*   Claim   services/budget_service.py claim_alert: INSERT ... ON         *)
 (*           CONFLICT DO NOTHING on budget_alerts_sent (budget_id,         *)
 (*           period_start, threshold_percent), then                        *)
@@ -31,7 +35,7 @@ CONSTANTS
     Budget,         \* budget amount in the same units
     Thresholds,     \* active thresholds in percent, claimed in ascending order
     UniqueLedger,   \* TRUE = code: unique key + ON CONFLICT DO NOTHING
-    BudgetRowLock,  \* FALSE = code; TRUE = candidate fix: lock the budget row before Read
+    BudgetRowLock,  \* TRUE = code: check_thresholds locks the budget rows before Read (H1 fix)
     MaxAborts       \* how many request rollbacks the model may inject
 
 VARIABLES
