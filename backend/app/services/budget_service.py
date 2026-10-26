@@ -3,11 +3,20 @@ import uuid
 from datetime import date, timedelta
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.events.types import BudgetThresholdBreached
-from app.models.database import Budget, Category, LineItem, Receipt, User
+from app.models.database import (
+    Budget,
+    BudgetAlertSent,
+    Category,
+    LineItem,
+    Receipt,
+    User,
+)
 from app.models.schemas import (
     BudgetCategorySummary,
     BudgetCreateRequest,
@@ -432,6 +441,7 @@ class BudgetService:
                             budget_amount=0,
                             remaining_amount=round(-current_spend, 2),
                             days_left_in_period=days_left,
+                            period_start=period_start,
                         )
                     )
                 continue
@@ -455,10 +465,35 @@ class BudgetService:
                             budget_amount=budget_amount,
                             remaining_amount=round(remaining, 2),
                             days_left_in_period=days_left,
+                            period_start=period_start,
                         )
                     )
 
         return breaches
+
+    async def claim_alert(self, breach: BudgetThresholdBreached) -> bool:
+        """Record that this threshold alert is being sent for this period.
+
+        Returns False if it was already sent, so each threshold alerts once
+        per budget period. The unique key makes this safe when two receipts
+        are confirmed at the same time: only one insert wins.
+        """
+        dialect = self.db.bind.dialect.name
+        insert = pg_insert if dialect == "postgresql" else sqlite_insert
+        result = await self.db.execute(
+            insert(BudgetAlertSent)
+            .values(
+                id=uuid.uuid4(),
+                budget_id=breach.budget_id,
+                period_start=breach.period_start,
+                threshold_percent=breach.threshold_percent,
+            )
+            .on_conflict_do_nothing(
+                index_elements=["budget_id", "period_start", "threshold_percent"]
+            )
+            .returning(BudgetAlertSent.id)
+        )
+        return result.scalar_one_or_none() is not None
 
     async def _active_thresholds(self, user_id: uuid.UUID) -> list[int]:
         """Configured alert thresholds the user has not opted out of.
