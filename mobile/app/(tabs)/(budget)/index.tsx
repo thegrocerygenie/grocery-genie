@@ -17,6 +17,7 @@ import { BudgetRing } from '@/components/BudgetRing';
 import { headerBlurFor } from '@/utils/headerBlur';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { getCategoryMetaByName } from '@/constants/categories';
+import { capBreachMessage } from '@/features/budget/utils/capBreach';
 import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
 import { useBudgetStore } from '@/store/budgetStore';
 import type { DashboardData as ApiDashboardData } from '@/features/budget/types';
@@ -248,6 +249,7 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
   const noBudget = data.cap <= 0;
   const progress = noBudget ? 0 : data.spent / data.cap;
   const over = data.state === 'over';
+  const breachMessage = capBreachMessage(data.categories, over);
   const remaining = noBudget ? 0 : Math.max(0, data.cap - data.spent);
   const overBy = data.spent - data.cap;
 
@@ -311,12 +313,10 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
         </View>
       </View>
 
-      {over && (
+      {breachMessage && (
         <View style={styles.alertBanner}>
           <SymbolView name="bell.fill" size={16} tintColor={colors.red} />
-          <Text style={[type.footnote, { color: colors.red, flex: 1 }]}>
-            Some categories crossed their caps. Adjust limits or pause alerts.
-          </Text>
+          <Text style={[type.footnote, { color: colors.red, flex: 1 }]}>{breachMessage}</Text>
         </View>
       )}
 
