@@ -238,6 +238,10 @@ export default function ReviewScreen() {
     getAuthHeaders(),
   );
   const dominantCategoryId = items.find((i) => i.categoryId)?.categoryId ?? null;
+  // RC-02 AC 2: store, date and total each carry their own read confidence.
+  const lowStoreConf = isLowConfidence(baseline?.store_name_confidence);
+  const lowDateConf = isLowConfidence(baseline?.date_confidence);
+  const lowTotalConf = isLowConfidence(baseline?.total_confidence);
   const dominantCategoryName = resolveCategoryMeta(dominantCategoryId, categories).name;
 
   const isHighValueReceipt =
@@ -321,15 +325,26 @@ export default function ReviewScreen() {
             onChangeText={setStoreName}
             editable={!isReadOnly}
             placeholder="Store name"
+            lowConfidence={lowStoreConf}
           />
           {isReadOnly ? (
-            <ListRow label="Date" value={formatLongDate(receiptDate) || receiptDate} />
+            <ListRow
+              label="Date"
+              value={formatLongDate(receiptDate) || receiptDate}
+              lowConfidence={lowDateConf}
+            />
           ) : (
-            <ListDateRow label="Date" value={receiptDate} onChange={setReceiptDate} />
+            <ListDateRow
+              label="Date"
+              value={receiptDate}
+              onChange={setReceiptDate}
+              lowConfidence={lowDateConf}
+            />
           )}
           <ListRow
             label="Total"
             value={displayTotal != null ? `$${displayTotal.toFixed(2)}` : '—'}
+            lowConfidence={lowTotalConf}
           />
           <ListRow label="Category" value={dominantCategoryName} chevron />
         </ListGroup>
@@ -398,18 +413,39 @@ function ListGroup({ children }: ListGroupProps) {
   );
 }
 
+const LOW_CONFIDENCE_HINT = 'Low confidence, please verify';
+
+/** RC-02 AC 2: the amber tag beside a value read with low confidence. */
+function VerifyTag() {
+  return <Text style={styles.verifyTag}>verify</Text>;
+}
+
 interface ListRowProps {
   label: string;
   value: string;
   chevron?: boolean;
+  lowConfidence?: boolean;
 }
 
-function ListRow({ label, value, chevron }: ListRowProps) {
+function ListRow({ label, value, chevron, lowConfidence }: ListRowProps) {
   return (
-    <View style={styles.row} accessible accessibilityLabel={`${label}, ${value}`}>
+    <View
+      style={styles.row}
+      accessible
+      accessibilityLabel={`${label}, ${value}${lowConfidence ? ', low confidence' : ''}`}
+    >
       <Text style={type.body}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        <Text style={[type.body, { color: colors.iosLabel2 as string }]}>{value}</Text>
+        {lowConfidence ? <VerifyTag /> : null}
+        <Text
+          style={[
+            type.body,
+            { color: colors.iosLabel2 as string },
+            lowConfidence && styles.lowConfidenceValue,
+          ]}
+        >
+          {value}
+        </Text>
         {chevron ? (
           <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3 as string} />
         ) : null}
@@ -424,19 +460,29 @@ interface ListInputRowProps {
   onChangeText: (v: string) => void;
   editable: boolean;
   placeholder?: string;
+  lowConfidence?: boolean;
 }
 
-function ListInputRow({ label, value, onChangeText, editable, placeholder }: ListInputRowProps) {
+function ListInputRow({
+  label,
+  value,
+  onChangeText,
+  editable,
+  placeholder,
+  lowConfidence,
+}: ListInputRowProps) {
   return (
     <View style={styles.row}>
       <Text style={type.body}>{label}</Text>
+      {lowConfidence ? <VerifyTag /> : null}
       <TextInput
-        style={[type.body, styles.inputValue]}
+        style={[type.body, styles.inputValue, lowConfidence && styles.lowConfidenceValue]}
         value={value}
         onChangeText={onChangeText}
         editable={editable}
         placeholder={placeholder}
         accessibilityLabel={label}
+        accessibilityHint={lowConfidence ? LOW_CONFIDENCE_HINT : undefined}
         placeholderTextColor={colors.iosLabel3 as string}
       />
     </View>
@@ -448,12 +494,18 @@ interface ListDateRowProps {
   /** YYYY-MM-DD. */
   value: string;
   onChange: (iso: string) => void;
+  lowConfidence?: boolean;
 }
 
-function ListDateRow({ label, value, onChange }: ListDateRowProps) {
+function ListDateRow({ label, value, onChange, lowConfidence }: ListDateRowProps) {
   return (
     <View style={styles.row}>
       <Text style={type.body}>{label}</Text>
+      {lowConfidence ? (
+        <View style={styles.dateFlag}>
+          <VerifyTag />
+        </View>
+      ) : null}
       <DateTimePicker
         mode="date"
         display="compact"
@@ -464,6 +516,7 @@ function ListDateRow({ label, value, onChange }: ListDateRowProps) {
         }}
         accentColor={colors.tint}
         accessibilityLabel="Receipt date"
+        accessibilityHint={lowConfidence ? LOW_CONFIDENCE_HINT : undefined}
       />
     </View>
   );
@@ -630,7 +683,7 @@ function ItemRow({
           accessibilityLabel={`Price of ${item.name}`}
           accessibilityHint={readOnly ? undefined : 'Double-tap to change'}
         >
-          {lowConf ? <Text style={styles.verifyTag}>verify</Text> : null}
+          {lowConf ? <VerifyTag /> : null}
           <Text
             style={[
               type.body,
@@ -734,6 +787,9 @@ const styles = StyleSheet.create({
     color: colors.orange,
     fontWeight: '500',
   },
+  lowConfidenceValue: { color: colors.orange },
+  // The native date picker sits flush right; keep the tag beside it.
+  dateFlag: { flex: 1, alignItems: 'flex-end' },
 
   highValueBanner: {
     backgroundColor: 'rgba(255,149,0,0.12)',

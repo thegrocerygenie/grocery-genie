@@ -24,5 +24,8 @@ export function extractionFromReceipt(receipt: ReceiptResponse): ReceiptExtracti
     total: receipt.total,
     currency: receipt.currency,
     confidence: receipt.extraction_confidence ?? 0,
+    store_name_confidence: receipt.store_name_confidence,
+    date_confidence: receipt.date_confidence,
+    total_confidence: receipt.total_confidence,
   };
 }

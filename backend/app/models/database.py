@@ -162,6 +162,9 @@ class Receipt(Base):
     image_url: Mapped[str | None] = mapped_column(String(1000))
     thumbnail_url: Mapped[str | None] = mapped_column(String(1000))
     extraction_confidence: Mapped[float | None] = mapped_column(Float)
+    store_name_confidence: Mapped[float | None] = mapped_column(Float)
+    date_confidence: Mapped[float | None] = mapped_column(Float)
+    total_confidence: Mapped[float | None] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), index=True

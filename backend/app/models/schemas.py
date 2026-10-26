@@ -27,6 +27,9 @@ class ReceiptExtraction(BaseModel):
     total: float | None = None
     currency: str = "USD"
     confidence: float
+    store_name_confidence: float | None = None
+    date_confidence: float | None = None
+    total_confidence: float | None = None
 
 
 class ReceiptScanResponse(BaseModel):
@@ -67,6 +70,9 @@ class ReceiptResponse(BaseModel):
     currency: str
     image_url: str | None = None
     extraction_confidence: float | None = None
+    store_name_confidence: float | None = None
+    date_confidence: float | None = None
+    total_confidence: float | None = None
     status: str
     items: list[LineItemResponse] = []
     created_at: datetime | None = None

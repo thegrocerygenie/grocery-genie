@@ -26,13 +26,18 @@ Submit receipt image for processing. Returns job ID for async polling or sync re
       { "id": "item-uuid", "name": "Organic Bananas", "quantity": 1.105, "unit_price": 280.00, "total_price": 309.40, "category_id": "cat-uuid", "category_confidence": 0.92, "extraction_confidence": 0.88 }
     ],
     "subtotal": 609.40,
-    "confidence": 0.85
+    "confidence": 0.85,
+    "store_name_confidence": 0.95,
+    "date_confidence": 0.90,
+    "total_confidence": 0.88
   }
 }
 ```
 
+- `store_name_confidence`, `date_confidence`, and `total_confidence` are 0.0–1.0, or `null` when the model gave no score. The review screen flags each one below 0.7. A future or unreadable date gives a `date_confidence` of 0.5 or less.
+
 ### GET /api/receipts/{id} [MVP]
-Full receipt data including extraction, corrections, and original image URL.
+Full receipt data including extraction, corrections, and original image URL. It also returns the stored `store_name_confidence`, `date_confidence`, and `total_confidence`, so a scan reopened from History is flagged the same way. The list endpoint returns them too.
 
 ### PATCH /api/receipts/{id} [MVP]
 Submit user corrections. Accepts partial updates; send only the fields the user changed. Each changed field is stored in `receipt_corrections` with its original and corrected value, and triggers correction event recording.
