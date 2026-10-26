@@ -30,6 +30,14 @@ export interface DashboardTrendMonth {
   budget: number | null;
 }
 
+/** One category's spend in the period and in the month before it (BC-04). */
+export interface DashboardCategoryChange {
+  category_id: string;
+  name: string;
+  spent: number;
+  previous_spent: number;
+}
+
 export interface DashboardData {
   period: string;
   overall: {
@@ -41,6 +49,8 @@ export interface DashboardData {
   categories: BudgetCategorySummary[];
   top_items: DashboardTopItem[];
   trend: DashboardTrendMonth[];
+  previous_period: string;
+  category_changes: DashboardCategoryChange[];
 }
 
 export interface BudgetCreateRequest {

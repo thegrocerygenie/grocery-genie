@@ -6,7 +6,9 @@ import { SymbolView } from 'expo-symbols';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
 import { useBudgetStore } from '@/store/budgetStore';
-import { DEFAULT_CATEGORIES } from '@/constants/categories';
+import { getCategoryMetaByName } from '@/constants/categories';
+import { percentChange } from '@/features/budget/utils/monthOverMonth';
+import type { DashboardCategoryChange } from '@/features/budget/types';
 
 const MONTH_SHORT = [
   'Jan',
@@ -23,9 +25,54 @@ const MONTH_SHORT = [
   'Dec',
 ];
 
+const MONTH_LONG = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
 function periodLabel(period: string): string {
   const [, m] = period.split('-').map(Number);
   return MONTH_SHORT[(m ?? 1) - 1] ?? period;
+}
+
+function monthName(period: string): string {
+  const [, m] = period.split('-').map(Number);
+  return MONTH_LONG[(m ?? 1) - 1] ?? period;
+}
+
+/** "+17%", "−17%" (minus sign), or "0%". */
+function changeText(change: number): string {
+  if (change > 0) return `+${change}%`;
+  if (change < 0) return `\u2212${Math.abs(change)}%`;
+  return '0%';
+}
+
+/** "up 17 percent", "down 17 percent", or "no change", for VoiceOver. */
+function changeWords(change: number): string {
+  if (change > 0) return `up ${change} percent`;
+  if (change < 0) return `down ${Math.abs(change)} percent`;
+  return 'no change';
+}
+
+/** Spending more is the warning direction; spending less is good news. */
+function changeColor(change: number): string {
+  if (change > 0) return colors.red;
+  if (change < 0) return colors.tint;
+  return colors.iosLabel2 as string;
+}
+
+function money(amount: number): string {
+  return `$${amount.toFixed(0)}`;
 }
 
 export default function TrendScreen() {
@@ -35,6 +82,7 @@ export default function TrendScreen() {
   const months = useMemo(() => {
     const list = data?.trend ?? [];
     return list.slice(0, 3).map((m) => ({
+      period: m.period,
       label: periodLabel(m.period),
       total: m.spent,
     }));
@@ -43,8 +91,14 @@ export default function TrendScreen() {
   const max = months.length > 0 ? Math.max(...months.map((m) => m.total), 1) : 1;
   const avg =
     months.length > 0 ? Math.round(months.reduce((s, m) => s + m.total, 0) / months.length) : 0;
-  const priorAvg = avg > 0 ? avg * 1.15 : 0; // illustrative comparison
-  const delta = priorAvg > 0 ? Math.round(((avg - priorAvg) / priorAvg) * 100) : 0;
+
+  // BC-04 AC 2: this month vs last month, for the total and per category.
+  const period = data?.period ?? selectedPeriod;
+  const previousPeriod = data?.previous_period ?? '';
+  const spentIn = (p: string) => data?.trend.find((m) => m.period === p)?.spent ?? 0;
+  const current = spentIn(period);
+  const totalChange = percentChange(current, spentIn(previousPeriod));
+  const categoryChanges = data?.category_changes ?? [];
 
   return (
     <>
@@ -79,30 +133,35 @@ export default function TrendScreen() {
         ) : (
           <>
             <View style={styles.summaryCard}>
-              <Text style={[type.caption1, { color: colors.iosLabel2 as string }]}>
-                {months.length}-month average
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-                <Text style={[type.money, { fontSize: 28, color: colors.iosLabel as string }]}>
-                  ${avg}
-                </Text>
-                {delta !== 0 ? (
+              <Text style={styles.caption}>{monthName(period)} spending</Text>
+              <View style={styles.totalRow}>
+                <Text style={styles.total}>{money(current)}</Text>
+                {totalChange !== null ? (
                   <Text
-                    style={[
-                      type.footnote,
-                      { color: delta < 0 ? colors.tint : colors.red, fontWeight: '600' },
-                    ]}
+                    style={[styles.totalChange, { color: changeColor(totalChange) }]}
+                    accessibilityLabel={
+                      totalChange === 0
+                        ? `Same as ${monthName(previousPeriod)}`
+                        : `${changeWords(totalChange).replace(/^./, (c) => c.toUpperCase())} from ${monthName(previousPeriod)}`
+                    }
                   >
-                    {delta > 0 ? '+' : ''}
-                    {delta}% vs prior
+                    {changeText(totalChange)} vs {periodLabel(previousPeriod)}
                   </Text>
                 ) : null}
               </View>
+              <Text style={styles.caption}>
+                {months.length}-month average {money(avg)}
+              </Text>
               <View style={styles.chart}>
                 {months.map((m) => {
                   const h = (m.total / max) * 130;
                   return (
-                    <View key={m.label} style={styles.chartCol}>
+                    <View
+                      key={m.label}
+                      style={styles.chartCol}
+                      accessible
+                      accessibilityLabel={`${monthName(m.period)}: ${money(m.total)}`}
+                    >
                       <Text
                         style={[
                           type.caption1,
@@ -131,21 +190,23 @@ export default function TrendScreen() {
               </View>
             </View>
 
-            <Text style={styles.sectionLabel}>LEGEND</Text>
-            <View style={styles.legendCard}>
-              {DEFAULT_CATEGORIES.slice(0, 4).map((c, i) => (
-                <View key={c.id} style={[styles.legendRow, i > 0 && styles.legendDivider]}>
-                  <View style={[styles.iconSquare, { backgroundColor: c.color }]}>
-                    <SymbolView
-                      name={c.symbol as Parameters<typeof SymbolView>[0]['name']}
-                      size={13}
-                      tintColor="#fff"
+            {categoryChanges.length > 0 ? (
+              <>
+                <Text style={styles.sectionLabel}>
+                  BY CATEGORY · VS {periodLabel(previousPeriod).toUpperCase()}
+                </Text>
+                <View style={styles.legendCard}>
+                  {categoryChanges.map((c, i) => (
+                    <CategoryChangeRow
+                      key={c.category_id}
+                      change={c}
+                      previousPeriod={previousPeriod}
+                      divider={i > 0}
                     />
-                  </View>
-                  <Text style={[type.body, { flex: 1 }]}>{c.name}</Text>
+                  ))}
                 </View>
-              ))}
-            </View>
+              </>
+            ) : null}
           </>
         )}
       </ScrollView>
@@ -153,9 +214,87 @@ export default function TrendScreen() {
   );
 }
 
+interface CategoryChangeRowProps {
+  change: DashboardCategoryChange;
+  previousPeriod: string;
+  divider: boolean;
+}
+
+function CategoryChangeRow({ change, previousPeriod, divider }: CategoryChangeRowProps) {
+  const meta = getCategoryMetaByName(change.name);
+  const pct = percentChange(change.spent, change.previous_spent);
+  const detail =
+    pct === null
+      ? 'New this month'
+      : `${changeText(pct)} · ${money(change.previous_spent)} in ${periodLabel(previousPeriod)}`;
+  const label =
+    pct === null
+      ? `${change.name}: ${money(change.spent)} this month, new this month`
+      : `${change.name}: ${money(change.spent)} this month, ${money(change.previous_spent)} in ${monthName(previousPeriod)}, ${changeWords(pct)}`;
+
+  return (
+    <View
+      style={[styles.legendRow, divider && styles.legendDivider]}
+      accessible
+      accessibilityLabel={label}
+    >
+      <View style={[styles.iconSquare, { backgroundColor: meta.color }]}>
+        <SymbolView
+          name={meta.symbol as Parameters<typeof SymbolView>[0]['name']}
+          size={13}
+          tintColor="#fff"
+        />
+      </View>
+      <Text style={[type.body, { flex: 1 }]}>{change.name}</Text>
+      <View style={styles.changeValues}>
+        <Text style={styles.changeAmount}>{money(change.spent)}</Text>
+        <Text
+          style={[
+            styles.changeDetail,
+            pct !== null && pct !== 0 ? { color: changeColor(pct) } : null,
+          ]}
+        >
+          {detail}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
   loading: { paddingTop: 80, alignItems: 'center' },
+
+  caption: {
+    ...type.caption1,
+    color: colors.iosLabel2 as string,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+  },
+  total: {
+    ...type.money,
+    fontSize: 28,
+    color: colors.iosLabel as string,
+  },
+  totalChange: {
+    ...type.footnote,
+    fontWeight: '600',
+  },
+  changeValues: {
+    alignItems: 'flex-end',
+  },
+  changeAmount: {
+    ...type.money,
+    ...type.body,
+    color: colors.iosLabel as string,
+  },
+  changeDetail: {
+    ...type.footnote,
+    color: colors.iosLabel2 as string,
+  },
 
   summaryCard: {
     backgroundColor: colors.iosBg2,
