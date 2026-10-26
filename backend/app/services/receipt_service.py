@@ -278,6 +278,15 @@ class ReceiptService:
                 user_id,
             )
 
+        await self._after_confirm(receipt)
+
+    async def _after_confirm(self, receipt: Receipt) -> None:
+        """Dispatch ReceiptConfirmed and alert on budget thresholds now crossed.
+
+        Every receipt that becomes confirmed runs this: a scan the user confirms
+        and a manual entry, which is saved as confirmed.
+        """
+        user_id = receipt.user_id
         dispatcher.dispatch(
             ReceiptConfirmed(
                 receipt_id=receipt.id,
@@ -649,7 +658,9 @@ class ReceiptService:
         await self.db.flush()
 
         # Re-fetch with eager loading
-        return await self._get_receipt(receipt.id, user_id)
+        receipt = await self._get_receipt(receipt.id, user_id)
+        await self._after_confirm(receipt)
+        return receipt
 
     async def _get_user_mappings(
         self, user_id: uuid.UUID
