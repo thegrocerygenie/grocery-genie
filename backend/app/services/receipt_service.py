@@ -41,6 +41,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _format_quantity(quantity: Decimal) -> str:
+    """Write a quantity without the column's trailing zeros: 1.000 -> "1"."""
+    return format(quantity.normalize(), "f")
+
+
 class ReceiptService:
     def __init__(
         self,
@@ -424,15 +429,50 @@ class ReceiptService:
                     line_item.raw_name = correction.name
                     line_item.corrected = True
 
-                # Price columns are Numeric; compare and divide as Decimal.
+                # Quantity and price columns are Numeric; compare and divide
+                # as Decimal. The line total is what was paid, so a quantity
+                # edit keeps total_price and recomputes unit_price.
+                new_quantity = (
+                    Decimal(str(correction.quantity)).quantize(Decimal("0.001"))
+                    if correction.quantity is not None
+                    else None
+                )
+                old_quantity = Decimal(str(line_item.quantity or 0))
+                quantity_changed = (
+                    new_quantity is not None and new_quantity != old_quantity
+                )
+                if quantity_changed:
+                    dispatcher.dispatch(
+                        ItemCorrected(
+                            line_item_id=line_item.id,
+                            field="quantity",
+                            old_value=_format_quantity(old_quantity),
+                            new_value=_format_quantity(new_quantity),
+                            user_id=user_id,
+                        )
+                    )
+                    if self.analytics:
+                        self.analytics.emit(
+                            "receipt_correction_made",
+                            {
+                                "field": "quantity",
+                                "original_value": _format_quantity(old_quantity),
+                                "corrected_value": _format_quantity(new_quantity),
+                            },
+                            user_id,
+                        )
+                    line_item.quantity = new_quantity
+                    line_item.corrected = True
+
                 new_price = (
                     Decimal(str(correction.total_price)).quantize(Decimal("0.01"))
                     if correction.total_price is not None
                     else None
                 )
-                if new_price is not None and new_price != Decimal(
+                price_changed = new_price is not None and new_price != Decimal(
                     str(line_item.total_price)
-                ):
+                )
+                if price_changed:
                     dispatcher.dispatch(
                         ItemCorrected(
                             line_item_id=line_item.id,
@@ -453,12 +493,14 @@ class ReceiptService:
                             user_id,
                         )
                     line_item.total_price = new_price
+                    line_item.corrected = True
+
+                if quantity_changed or price_changed:
                     quantity = Decimal(str(line_item.quantity or 0))
                     if quantity > 0:
-                        line_item.unit_price = (new_price / quantity).quantize(
-                            Decimal("0.01")
-                        )
-                    line_item.corrected = True
+                        line_item.unit_price = (
+                            Decimal(str(line_item.total_price)) / quantity
+                        ).quantize(Decimal("0.01"))
 
                 if (
                     correction.category_id is not None
