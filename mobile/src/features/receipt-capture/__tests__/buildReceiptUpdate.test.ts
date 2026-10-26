@@ -31,6 +31,9 @@ const extraction: ReceiptExtraction = {
   total: 6.28,
   currency: 'USD',
   confidence: 0.91,
+  store_name_confidence: null,
+  date_confidence: null,
+  total_confidence: null,
 };
 
 function editable(overrides: Partial<EditableLineItem>[] = []): EditableLineItem[] {

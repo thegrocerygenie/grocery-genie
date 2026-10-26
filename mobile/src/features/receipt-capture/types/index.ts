@@ -20,6 +20,10 @@ export interface ReceiptExtraction {
   total: number | null;
   currency: string;
   confidence: number;
+  /** RC-02 AC 2: each scored on its own; null when the model gave no score. */
+  store_name_confidence: number | null;
+  date_confidence: number | null;
+  total_confidence: number | null;
 }
 
 export interface ReceiptScanResponse {
@@ -54,6 +58,9 @@ export interface ReceiptResponse {
   currency: string;
   image_url: string | null;
   extraction_confidence: number | null;
+  store_name_confidence: number | null;
+  date_confidence: number | null;
+  total_confidence: number | null;
   status: string;
   items: LineItemResponse[];
   created_at: string | null;

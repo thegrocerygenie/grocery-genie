@@ -81,6 +81,71 @@ def test_clean_receipt_has_no_warnings():
     assert result.confidence == 0.95
 
 
+# --- RC-02 AC 2: store, date and total carry their own confidence ---
+
+
+def test_field_confidences_default_to_none_when_the_model_omits_them():
+    result = ReceiptExtractionResult(
+        store_name="S", date="2026-03-15", items=[_item()], confidence=0.95
+    )
+    assert result.store_name_confidence is None
+    assert result.date_confidence is None
+    assert result.total_confidence is None
+
+
+def test_field_confidences_in_range_are_kept():
+    result = ReceiptExtractionResult(
+        store_name="S",
+        date="2026-03-15",
+        items=[_item()],
+        confidence=0.95,
+        store_name_confidence=0.7,
+        date_confidence=0.0,
+        total_confidence=1.0,
+    )
+    assert result.store_name_confidence == 0.7
+    assert result.date_confidence == 0.0
+    assert result.total_confidence == 1.0
+    assert result.warnings == []
+
+
+def test_out_of_range_field_confidences_are_clamped_with_a_warning():
+    """One bad field score must not fail the whole scan (user decision,
+    2026-10-26): clamp to 0-1 and record it."""
+    result = ReceiptExtractionResult(
+        store_name="S",
+        date="2026-03-15",
+        items=[_item()],
+        confidence=0.95,
+        store_name_confidence=1.3,
+        total_confidence=-0.1,
+    )
+    assert result.store_name_confidence == 1.0
+    assert result.total_confidence == 0.0
+    assert any("store_name_confidence" in w for w in result.warnings)
+    assert any("total_confidence" in w for w in result.warnings)
+
+
+def test_future_date_lowers_date_confidence():
+    result = ReceiptExtractionResult(
+        store_name="S",
+        date="2999-01-01",
+        items=[_item()],
+        confidence=0.95,
+        date_confidence=0.98,
+    )
+    assert result.date_confidence <= 0.5
+
+
+def test_unparseable_date_sets_a_low_date_confidence_when_none_was_given():
+    """The server stores today in its place, so the Date row must be flagged."""
+    result = ReceiptExtractionResult(
+        store_name="S", date="15/03/2026", items=[_item()], confidence=0.95
+    )
+    assert result.date_confidence is not None
+    assert result.date_confidence <= 0.5
+
+
 # --- Category-assignment output validation ---
 
 

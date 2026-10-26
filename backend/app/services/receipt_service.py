@@ -143,6 +143,9 @@ class ReceiptService:
             total=extraction.total,
             currency=extraction.currency,
             extraction_confidence=extraction.confidence,
+            store_name_confidence=extraction.store_name_confidence,
+            date_confidence=extraction.date_confidence,
+            total_confidence=extraction.total_confidence,
             status="pending_review",
         )
         self.db.add(receipt)
@@ -260,6 +263,9 @@ class ReceiptService:
                 total=extraction.total,
                 currency=extraction.currency,
                 confidence=extraction.confidence,
+                store_name_confidence=extraction.store_name_confidence,
+                date_confidence=extraction.date_confidence,
+                total_confidence=extraction.total_confidence,
             ),
             duplicate_warning=is_duplicate,
         )
