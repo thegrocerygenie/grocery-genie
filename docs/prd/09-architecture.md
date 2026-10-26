@@ -44,7 +44,7 @@ All LLM interactions go through LiteLLM as the provider-agnostic abstraction lay
 
 **All LLM calls include:**
 - System prompt versioning (prompts stored in `backend/app/llm/prompts/` as versioned Python modules)
-- Temperature = 0 for extraction tasks
+- Default sampling: the default model (Claude Sonnet 5.5) accepts no other `temperature`
 - Pydantic model validation on all structured outputs before persistence
 - Fallback to manual/rule-based processing if LLM unavailable or returns invalid output
 - Logging of prompt version, input hash, latency, and token usage for every call

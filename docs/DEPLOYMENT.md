@@ -194,8 +194,8 @@ REDIS_URL=redis://redis:6379/0
 
 # LLM
 ANTHROPIC_API_KEY=sk-ant-...
-GG_LLM_MODEL=claude-sonnet-4-20250514
-GG_LLM_TEMPERATURE=0
+GG_LLM_MODEL=claude-sonnet-5-5
+# Leave GG_LLM_TEMPERATURE unset: Claude Sonnet 5.5 rejects any non-default value.
 
 # App
 SECRET_KEY=<generate with: python -c "import secrets; print(secrets.token_hex(32))">

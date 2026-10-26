@@ -25,14 +25,26 @@ class ReceiptExtractor(Protocol):
     ) -> ReceiptExtractionResult: ...
 
 
+def _call_options(settings: Settings) -> dict:
+    """LiteLLM options every call sends, built from settings."""
+    options: dict = {
+        "model": f"{settings.llm_provider}/{settings.llm_model}",
+        "max_tokens": settings.llm_max_tokens,
+        "api_key": settings.llm_api_key or None,
+        "api_base": settings.llm_api_base or None,
+    }
+    # Only when set: LiteLLM refuses any temperature but 1 for a model without
+    # sampling settings, such as Claude Sonnet 5.5.
+    if settings.llm_temperature is not None:
+        options["temperature"] = settings.llm_temperature
+    return options
+
+
 class LiteLLMReceiptExtractor:
     """Production implementation using LiteLLM."""
 
     def __init__(self, settings: Settings) -> None:
-        self.model = f"{settings.llm_provider}/{settings.llm_model}"
-        self.temperature = settings.llm_temperature
-        self.api_key = settings.llm_api_key
-        self.api_base = settings.llm_api_base
+        self.options = _call_options(settings)
 
     async def extract(
         self, image_data: bytes, content_type: str
@@ -42,10 +54,7 @@ class LiteLLMReceiptExtractor:
 
         start = time.monotonic()
         response = await litellm.acompletion(
-            model=self.model,
-            temperature=self.temperature,
-            api_key=self.api_key or None,
-            api_base=self.api_base or None,
+            **self.options,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {
@@ -172,20 +181,14 @@ class LiteLLMCategoryAssigner:
     """Production implementation for batch category assignment."""
 
     def __init__(self, settings: Settings) -> None:
-        self.model = f"{settings.llm_provider}/{settings.llm_model}"
-        self.temperature = settings.llm_temperature
-        self.api_key = settings.llm_api_key
-        self.api_base = settings.llm_api_base
+        self.options = _call_options(settings)
 
     async def assign(self, item_names: list[str]) -> list[dict]:
         items_text = "\n".join(f"- {name}" for name in item_names)
 
         start = time.monotonic()
         response = await litellm.acompletion(
-            model=self.model,
-            temperature=self.temperature,
-            api_key=self.api_key or None,
-            api_base=self.api_base or None,
+            **self.options,
             messages=[
                 {"role": "system", "content": CAT_SYSTEM_PROMPT},
                 {

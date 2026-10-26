@@ -2,7 +2,7 @@
 	install install-backend install-mobile \
 	backend-dev backend-test backend-lint backend-format backend-typecheck \
 	backend-migrate backend-migration backend-worker kill-port \
-	db-up db-down db-reset \
+	db-up db-down db-reset llm-up llm-down \
 	mobile-start mobile-ios mobile-test mobile-lint mobile-format mobile-typecheck \
 	test lint format typecheck validate validate-backend validate-mobile \
 	clean
@@ -31,6 +31,8 @@ help:
 	@echo "  make backend-migration M=\"msg\"  Generate alembic revision"
 	@echo "  make backend-worker       Run Celery worker"
 	@echo "  make backend-beat         Run Celery beat (weekly summaries, push delivery)"
+	@echo "  make llm-up               Start the LiteLLM proxy on :54442 (needs backend/llm-proxy/.env)"
+	@echo "  make llm-down             Stop the LiteLLM proxy"
 	@echo ""
 	@echo "Mobile (Expo):"
 	@echo "  make mobile-start         expo start"
@@ -116,6 +118,22 @@ db-reset:
 	cd backend && docker compose down -v
 	$(MAKE) db-up
 	$(MAKE) backend-migrate
+
+# ---------- LLM proxy (LiteLLM via docker compose, profile "llm") ----------
+
+llm-up:
+	@test -f backend/llm-proxy/.env || { echo "Missing backend/llm-proxy/.env: copy backend/llm-proxy/.env.example and fill it in."; exit 1; }
+	# Recreate so an edit to llm-proxy/config.yaml takes effect.
+	cd backend && docker compose --profile llm up -d --force-recreate litellm
+	@echo "Waiting for the LiteLLM proxy..."
+	@for i in $$(seq 1 60); do \
+		if curl -fsS http://localhost:54442/health/liveliness >/dev/null 2>&1; then echo "LiteLLM proxy up on http://localhost:54442"; exit 0; fi; \
+		sleep 1; \
+	done; \
+	echo "LiteLLM proxy did not answer in 60s: docker logs grocery_genie_litellm"; exit 1
+
+llm-down:
+	cd backend && docker compose --profile llm stop litellm
 
 # ---------- Mobile ----------
 
