@@ -28,7 +28,7 @@ const RECEIPT_ROWS: RowDef[] = [
     iconBg: colors.indigo,
     title: 'Language',
     value: 'English',
-    href: '/language-settings',
+    href: '/settings/language-settings',
   },
 ];
 
@@ -63,7 +63,7 @@ export default function SettingsScreen() {
         hundred: prefs?.notification_thresholds.hundred ?? localAlerts.hundredPercent,
         weekly: prefs?.weekly_summary.enabled ?? localAlerts.weeklySummaryEnabled,
       }),
-      href: '/notification-settings',
+      href: '/settings/notification-settings',
     },
   ];
   const version = Constants.expoConfig?.version;
@@ -79,7 +79,6 @@ export default function SettingsScreen() {
     <>
       <Stack.Screen
         options={{
-          presentation: 'modal',
           title: 'Settings',
           headerLargeTitle: true,
           headerRight: () => (
@@ -145,7 +144,7 @@ export default function SettingsScreen() {
           <SettingsLinkRow
             title="About"
             detail={version ? `v${version}` : undefined}
-            onPress={() => router.push('/about')}
+            onPress={() => router.push('/settings/about')}
           />
         </Section>
 
