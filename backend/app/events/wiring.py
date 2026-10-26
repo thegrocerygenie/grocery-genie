@@ -5,7 +5,7 @@ real consequence instead of dispatching into the void. Call ``register_handlers`
 once at application startup.
 
 Note on scope: the budget-recalc + notification work for ``ReceiptConfirmed``
-deliberately stays inline in ``ReceiptService.confirm_receipt`` for the MVP — it
+deliberately stays inline in ``ReceiptService._after_confirm`` for the MVP — it
 must run inside the request's async DB transaction. These handlers provide
 cross-cutting observability today and a seam for async/out-of-band handlers
 (Celery/Redis) later.
