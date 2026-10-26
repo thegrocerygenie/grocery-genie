@@ -27,4 +27,4 @@ Preconditions:
 ## Gotchas
 
 - The app sends `total` as the sum of item prices. Keep the two consistent so spend matches what the app would show.
-- A manual receipt does not trigger budget alerts; `budget-alerts.md` (`alert-manual`) tracks that gap.
+- Saving a manual receipt runs the budget alert check, like confirming a scan; `budget-alerts.md` (`alert-manual`) covers it.

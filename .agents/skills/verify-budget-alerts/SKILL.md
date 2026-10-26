@@ -138,7 +138,7 @@ A pass covers the model within its bounds, not the whole system.
 
 ## Coverage record
 
-Sync commit: `9003ec4`
+Sync commit: `5bb8fa9`
 
 The verification was last confirmed to describe these files and functions at the sync commit. `run.sh` reads this table and the sync commit.
 
