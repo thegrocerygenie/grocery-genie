@@ -19,12 +19,16 @@ import { resolveCategoryMeta } from '@/constants/categories';
 import { CaptureActionSheet } from '@/components/CaptureActionSheet';
 import { headerBlurFor } from '@/utils/headerBlur';
 import { ImportProgressOverlay } from '@/features/receipt-capture/components/ImportProgressOverlay';
+import { OfflineQueueSection } from '@/features/receipt-capture/components/OfflineQueueSection';
+import { deletePendingImage } from '@/features/receipt-capture/services/pendingImageFiles';
 import { useReceiptImport } from '@/features/receipt-capture/hooks/useReceiptImport';
 import { useReceipts } from '@/features/receipt-capture/hooks/useReceipts';
 import { useCategories } from '@/features/budget/hooks/useCategories';
 import { useDeleteReceipt } from '@/features/lifecycle/hooks/useLifecycle';
 import type { ReceiptResponse } from '@/features/receipt-capture/types';
 import type { CategoryResponse } from '@/features/budget/types';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { useOfflineStore, type PendingReceipt } from '@/store/offlineStore';
 
 type FilterIndex = 0 | 1 | 2;
 
@@ -172,6 +176,32 @@ export default function HistoryScreen() {
   const [actionSheetOpen, setActionSheetOpen] = useState(false);
   const receiptImport = useReceiptImport();
   const deleteReceipt = useDeleteReceipt();
+  const { isConnected } = useNetworkStatus();
+  const pendingReceipts = useOfflineStore((s) => s.pendingReceipts);
+  const removePendingReceipt = useOfflineStore((s) => s.removePendingReceipt);
+
+  const dropPending = (receipt: PendingReceipt) => {
+    removePendingReceipt(receipt.id);
+    deletePendingImage(receipt.imageUri);
+  };
+
+  const onPressFailed = (receipt: PendingReceipt) => {
+    Alert.alert(
+      'Couldn’t read this receipt',
+      'The photo may be blurry or not a receipt. Enter it by hand or discard the photo.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Enter manually',
+          onPress: () => {
+            dropPending(receipt);
+            router.push('/manual-entry');
+          },
+        },
+        { text: 'Discard', style: 'destructive', onPress: () => dropPending(receipt) },
+      ],
+    );
+  };
 
   const onDelete = (id: string, label: string) => {
     Alert.alert(
@@ -248,15 +278,25 @@ export default function HistoryScreen() {
         data={receipts}
         keyExtractor={(r) => r.id}
         ListHeaderComponent={
-          <View style={{ marginBottom: spacing.md }}>
-            <SegmentedControl
-              values={['Week', 'Month', 'All']}
-              selectedIndex={filter}
-              onChange={(e) => {
-                setFilter(e.nativeEvent.selectedSegmentIndex as FilterIndex);
-                setPage(1);
-              }}
+          <View>
+            <View style={{ marginBottom: spacing.md }}>
+              <SegmentedControl
+                values={['Week', 'Month', 'All']}
+                selectedIndex={filter}
+                onChange={(e) => {
+                  setFilter(e.nativeEvent.selectedSegmentIndex as FilterIndex);
+                  setPage(1);
+                }}
+              />
+            </View>
+            <OfflineQueueSection
+              pending={pendingReceipts}
+              isConnected={isConnected}
+              onPressFailed={onPressFailed}
             />
+            {pendingReceipts.length > 0 && receipts.length > 0 ? (
+              <Text style={styles.sectionLabel}>Synced</Text>
+            ) : null}
           </View>
         }
         ListEmptyComponent={
@@ -358,6 +398,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
+  },
+  sectionLabel: {
+    ...type.footnote,
+    color: colors.iosLabel2 as string,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 6,
   },
   loading: {
     paddingTop: 80,

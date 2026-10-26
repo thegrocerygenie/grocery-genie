@@ -47,6 +47,17 @@ export const useOfflineStore = create<OfflineState>()(
     {
       name: 'grocery-genie-offline',
       storage: createJSONStorage(() => AsyncStorage),
+      // An upload cut off by a crash or force-quit stays 'syncing' on disk and
+      // would never be retried. On launch nothing is uploading yet, so put it back.
+      merge: (persisted, current) => {
+        const saved = (persisted as Partial<OfflineState> | undefined)?.pendingReceipts ?? [];
+        return {
+          ...current,
+          pendingReceipts: saved.map((r) =>
+            r.status === 'syncing' ? { ...r, status: 'pending' as const } : r,
+          ),
+        };
+      },
     },
   ),
 );

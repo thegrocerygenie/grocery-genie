@@ -3,6 +3,7 @@ import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'r
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
+import NetInfo from '@react-native-community/netinfo';
 import { Stack, useRouter } from 'expo-router';
 
 import { ANALYTICS_EVENTS } from '@/constants/analyticsEvents';
@@ -10,10 +11,16 @@ import { colors, radii, spacing, type } from '@/constants/theme';
 import { ImportProgressOverlay } from '@/features/receipt-capture/components/ImportProgressOverlay';
 import { useReceiptImport } from '@/features/receipt-capture/hooks/useReceiptImport';
 import { useReceiptScan } from '@/features/receipt-capture/hooks/useReceiptScan';
+import { isRetryableScanError } from '@/features/receipt-capture/services/offlineQueue';
+import { persistCapturedImage } from '@/features/receipt-capture/services/pendingImageFiles';
+import { useOfflineStore } from '@/store/offlineStore';
 import { useReceiptStore } from '@/store/receiptStore';
 import { useAnalytics } from '@/hooks/useAnalytics';
 
-type ScanFlowState = 'detected' | 'capturing' | 'processing' | 'low-quality';
+type ScanFlowState = 'detected' | 'capturing' | 'processing' | 'low-quality' | 'queued';
+
+/** How long the "Saved" pill stays before the camera is ready again. */
+const QUEUED_PILL_MS = 2500;
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -24,11 +31,18 @@ export default function ScanScreen() {
   const scanMutation = useReceiptScan();
   const receiptImport = useReceiptImport();
   const { setCapturedImageUri, setActiveScanResponse } = useReceiptStore();
+  const addPendingReceipt = useOfflineStore((s) => s.addPendingReceipt);
   const analytics = useAnalytics();
 
   // Tracks whether a scan was submitted, so leaving the camera without ever
   // capturing is recorded as a capture-stage abandonment.
   const scanSubmitted = useRef(false);
+
+  useEffect(() => {
+    if (flowState !== 'queued') return;
+    const timer = setTimeout(() => setFlowState('detected'), QUEUED_PILL_MS);
+    return () => clearTimeout(timer);
+  }, [flowState]);
 
   useEffect(() => {
     return () => {
@@ -63,6 +77,22 @@ export default function ScanScreen() {
     );
   }
 
+  // NFR reliability 3: keep a photo that cannot upload now; useSyncQueue
+  // uploads it when the connection or the server comes back.
+  const queuePhoto = (uri: string) => {
+    try {
+      addPendingReceipt({
+        imageUri: persistCapturedImage(uri),
+        mimeType: 'image/jpeg',
+        capturedAt: new Date().toISOString(),
+      });
+    } catch {
+      setFlowState('low-quality');
+      return;
+    }
+    setFlowState('queued');
+  };
+
   const onShutter = async () => {
     if (flowState === 'capturing' || flowState === 'processing') return;
 
@@ -82,6 +112,13 @@ export default function ScanScreen() {
       // A scan is being submitted — this is no longer a capture abandonment.
       // The server emits receipt_scan_started from the request's source field.
       scanSubmitted.current = true;
+
+      const network = await NetInfo.fetch();
+      if (network.isConnected === false) {
+        queuePhoto(photo.uri);
+        return;
+      }
+
       setFlowState('processing');
       scanMutation.mutate(
         { imageUri: photo.uri, mimeType: 'image/jpeg', source: 'camera' },
@@ -92,8 +129,12 @@ export default function ScanScreen() {
             setFlowState('detected');
             router.push('/review');
           },
-          onError: () => {
-            setFlowState('low-quality');
+          onError: (error) => {
+            if (isRetryableScanError(error)) {
+              queuePhoto(photo.uri);
+            } else {
+              setFlowState('low-quality');
+            }
           },
         },
       );
@@ -259,6 +300,14 @@ function HintPill({ state }: HintPillProps) {
         <Text style={[type.footnote, { color: '#fff', fontWeight: '600' }]}>
           Couldn&apos;t read that — try again
         </Text>
+      </View>
+    );
+  }
+  if (state === 'queued') {
+    return (
+      <View style={[styles.pill, styles.pillGlass]}>
+        <SymbolView name="checkmark.circle.fill" size={14} tintColor="#fff" />
+        <Text style={[type.footnote, { color: '#fff' }]}>Saved · will upload automatically</Text>
       </View>
     );
   }
