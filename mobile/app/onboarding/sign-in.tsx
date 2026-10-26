@@ -145,10 +145,7 @@ export default function SignInScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholderTextColor={colors.iosLabel3 as string}
-                style={[
-                  styles.input,
-                  { flex: 1, color: error ? colors.red : (colors.iosLabel as string) },
-                ]}
+                style={[styles.input, { color: error ? colors.red : (colors.iosLabel as string) }]}
                 accessibilityLabel="Password"
               />
               <Pressable
@@ -309,6 +306,7 @@ const styles = StyleSheet.create({
     ...type.subheadline,
     color: colors.iosLabel as string,
     paddingVertical: 13,
+    flex: 1,
   },
   separator: {
     height: StyleSheet.hairlineWidth,

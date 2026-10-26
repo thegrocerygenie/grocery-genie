@@ -14,6 +14,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
+import { PASSWORD_MIN_LENGTH } from '@/features/auth/constants';
 import { useResetPassword } from '@/features/auth/hooks/useAuth';
 import { ApiError } from '@/services/api';
 
@@ -25,7 +26,8 @@ export default function ResetPasswordScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const reset = useResetPassword();
 
-  const canSubmit = !!token && password.length >= 12 && password === confirm && !reset.isPending;
+  const canSubmit =
+    !!token && password.length >= PASSWORD_MIN_LENGTH && password === confirm && !reset.isPending;
 
   const onSubmit = async () => {
     if (!canSubmit || !token) return;
@@ -79,7 +81,7 @@ export default function ResetPasswordScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholderTextColor={colors.iosLabel3 as string}
-                style={[styles.input, { flex: 1 }]}
+                style={styles.input}
                 accessibilityLabel="New password"
               />
               <Pressable
@@ -172,6 +174,7 @@ const styles = StyleSheet.create({
     ...type.subheadline,
     color: colors.iosLabel as string,
     paddingVertical: 13,
+    flex: 1,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
