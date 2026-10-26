@@ -964,3 +964,58 @@ async def test_a_correction_records_who_made_it(
     row = await db_session.scalar(select(ReceiptCorrection))
     assert row.user_id == DEV_USER_ID
     assert row.created_at is not None
+
+
+# --- RC-02 AC 1: subtotal and total follow item price corrections ---
+
+
+async def test_price_correction_moves_subtotal_and_total_by_the_same_amount(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    """Totals stay in step with the items; tax is kept as extracted."""
+    scan = await _create_receipt(client, test_image_bytes)
+    item = scan["extraction"]["items"][0]
+    assert item["total_price"] == 1.29
+
+    resp = await client.patch(
+        f"/api/receipts/{scan['receipt_id']}",
+        json={"items": [{"id": item["id"], "total_price": 2.50}]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["subtotal"] == 15.98  # 14.77 + 1.21
+    assert body["tax"] == 1.18
+    assert body["total"] == 17.16  # 15.95 + 1.21
+
+    fetched = (await client.get(f"/api/receipts/{scan['receipt_id']}")).json()
+    assert fetched["subtotal"] == 15.98
+    assert fetched["total"] == 17.16
+
+
+async def test_corrections_without_a_price_change_keep_the_totals(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    scan = await _create_receipt(client, test_image_bytes)
+    item = scan["extraction"]["items"][0]
+
+    resp = await client.patch(
+        f"/api/receipts/{scan['receipt_id']}",
+        json={"items": [{"id": item["id"], "name": "Milk", "quantity": 2}]},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["subtotal"] == 14.77
+    assert resp.json()["total"] == 15.95
+
+
+async def test_a_repeated_price_correction_moves_the_totals_once(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    """A retried save must not shift the totals a second time."""
+    scan = await _create_receipt(client, test_image_bytes)
+    item = scan["extraction"]["items"][0]
+    body = {"items": [{"id": item["id"], "total_price": 2.50}]}
+
+    await client.patch(f"/api/receipts/{scan['receipt_id']}", json=body)
+    resp = await client.patch(f"/api/receipts/{scan['receipt_id']}", json=body)
+    assert resp.json()["subtotal"] == 15.98
+    assert resp.json()["total"] == 17.16

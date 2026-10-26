@@ -389,6 +389,9 @@ class ReceiptService:
 
         if updates.items:
             line_items_by_id = {li.id: li for li in receipt.line_items}
+            # Subtotal and total are not edited; they move by what price
+            # corrections changed, which keeps any unitemised discount.
+            price_delta = Decimal("0")
 
             for correction in updates.items:
                 line_item = line_items_by_id.get(correction.id)
@@ -454,6 +457,7 @@ class ReceiptService:
                         str(new_price),
                         line_item,
                     )
+                    price_delta += new_price - Decimal(str(line_item.total_price))
                     line_item.total_price = new_price
                     line_item.corrected = True
 
@@ -489,6 +493,12 @@ class ReceiptService:
                     await self._retroactive_category_update(
                         user_id, extracted_name, correction.category_id
                     )
+
+            if price_delta:
+                if receipt.subtotal is not None:
+                    receipt.subtotal = Decimal(str(receipt.subtotal)) + price_delta
+                if receipt.total is not None:
+                    receipt.total = Decimal(str(receipt.total)) + price_delta
 
         if updates.status == "confirmed":
             await self.confirm_receipt(receipt_id, user_id)
