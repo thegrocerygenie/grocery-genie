@@ -66,6 +66,7 @@ function renderHistory() {
       index: () => null,
       history: HistoryScreen,
       review: () => null,
+      'receipt/[id]': () => null,
     },
     { initialUrl: '/' },
   );
@@ -89,5 +90,13 @@ describe('History lists unconfirmed scans as needing review', () => {
 
     expect(routerScreen.getPathname()).toBe('/review');
     expect(routerScreen.getSearchParams()).toEqual({ receiptId: 'r-pending' });
+  });
+
+  it('opens the read-only detail for a confirmed receipt', () => {
+    const routerScreen = renderHistory();
+
+    fireEvent.press(screen.getByLabelText(/^No Frills,/));
+
+    expect(routerScreen.getPathname()).toBe('/receipt/r-done');
   });
 });
