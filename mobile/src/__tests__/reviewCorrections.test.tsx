@@ -296,6 +296,44 @@ describe('Review screen price edit', () => {
   });
 });
 
+// Save does not blur an open editor, and the price and quantity keyboards
+// have no Return key, so a user often taps Save with an editor still open.
+describe('Review screen Save with an editor still open', () => {
+  function typeWithoutBlur(field: 'name' | 'quantity' | 'price', text: string) {
+    const label = field[0].toUpperCase() + field.slice(1);
+    fireEvent.press(screen.getByLabelText(`${label} of Organic Bananas`));
+    fireEvent.changeText(screen.getByLabelText(`Edit ${field} of Organic Bananas`), text);
+  }
+
+  it.each([
+    ['name', 'Bananas', { name: 'Bananas' }],
+    ['quantity', '2', { quantity: 2 }],
+    ['price', '2.50', { total_price: 2.5 }],
+  ] as const)('sends the %s being edited', (field, text, change) => {
+    renderReview();
+
+    typeWithoutBlur(field, text);
+    save();
+
+    expect(mockMutate).toHaveBeenCalledWith(
+      {
+        receiptId: 'r-1',
+        updates: { items: [{ id: 'item-1', ...change }], status: 'confirmed' },
+      },
+      expect.anything(),
+    );
+  });
+
+  it('moves the subtotal and total while the price is typed', () => {
+    renderReview();
+
+    typeWithoutBlur('price', '2.50');
+
+    expect(screen.getByLabelText('Subtotal, $2.50')).toBeTruthy();
+    expect(screen.getByLabelText('Total, $2.50')).toBeTruthy();
+  });
+});
+
 describe('Review screen low-confidence flags (AC 2)', () => {
   it('flags the price of an item read with low confidence', () => {
     withItem({ extraction_confidence: 0.5 });
