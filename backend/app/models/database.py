@@ -240,6 +240,12 @@ class Notification(Base):
             "created_at",
             postgresql_where=text("push_status IS NULL"),
         ),
+        # ...and settles rows a dead run left `sending`.
+        Index(
+            "ix_notifications_push_sending",
+            "created_at",
+            postgresql_where=text("push_status = 'sending'"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -249,7 +255,8 @@ class Notification(Base):
     body: Mapped[str] = mapped_column(String(2000), nullable=False)
     data: Mapped[str | None] = mapped_column(String(5000))
     read: Mapped[bool] = mapped_column(Boolean, default=False)
-    # Push delivery: NULL = pending; then sent | no_device | failed | expired.
+    # Push delivery: NULL = pending; sending = claimed by a run; then
+    # sent | failed, or no_device | expired. See app/tasks/push_tasks.py.
     push_status: Mapped[str | None] = mapped_column(String(20))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

@@ -46,25 +46,43 @@ class ExpoPushClient:
         self.url = url
 
     def send(self, messages: list[PushMessage]) -> list[PushTicket]:
-        """Send messages; return one ticket per message, in order.
+        """Send up to EXPO_MAX_BATCH messages in one request; return one ticket
+        per message, in order.
 
-        Raises httpx.HTTPError on transport failure or a non-2xx response, so
-        the caller can leave the work pending and retry.
+        The caller chunks, so it can record each request's tickets before it
+        sends the next. Raises httpx.HTTPError on transport failure or a non-2xx
+        response; expo_rejected() says whether a retry is safe.
         """
+        if len(messages) > EXPO_MAX_BATCH:
+            raise ValueError(
+                f"{len(messages)} messages; Expo takes at most {EXPO_MAX_BATCH}"
+            )
         headers = {"Accept": "application/json", "Content-Type": "application/json"}
         if self.access_token:
             headers["Authorization"] = f"Bearer {self.access_token}"
 
-        tickets: list[PushTicket] = []
-        for start in range(0, len(messages), EXPO_MAX_BATCH):
-            batch = messages[start : start + EXPO_MAX_BATCH]
-            response = self.http.post(
-                self.url,
-                headers=headers,
-                json=[m.model_dump() for m in batch],
-            )
-            response.raise_for_status()
-            tickets.extend(
-                PushTicket.model_validate(t) for t in response.json()["data"]
-            )
-        return tickets
+        response = self.http.post(
+            self.url,
+            headers=headers,
+            json=[m.model_dump() for m in messages],
+        )
+        response.raise_for_status()
+        return [PushTicket.model_validate(t) for t in response.json()["data"]]
+
+
+def expo_rejected(error: httpx.HTTPError) -> bool:
+    """True when Expo surely took none of the request's messages, so sending
+    them again cannot push twice.
+
+    Expo documents a 4xx or 5xx response as "the entire request failed". The
+    connect and pool errors fail before the request leaves this process. Any
+    other error (a read timeout, a dropped connection) may come after Expo
+    delivered, so the outcome is unknown.
+    """
+    return isinstance(
+        error,
+        httpx.HTTPStatusError
+        | httpx.ConnectError
+        | httpx.ConnectTimeout
+        | httpx.PoolTimeout,
+    )
