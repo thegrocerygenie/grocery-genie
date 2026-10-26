@@ -30,6 +30,7 @@ import {
   fromIsoDate,
   latestReceiptDate,
   toIsoDate,
+  formatLongDate,
 } from '@/features/receipt-capture/utils/receiptDate';
 import { receiptImageSource } from '@/features/receipt-capture/utils/receiptImageSource';
 import { API_BASE_URL, getAuthHeaders } from '@/services/api';
@@ -39,30 +40,9 @@ import type { CategoryResponse } from '@/features/budget/types';
 const HIGH_VALUE_TOTAL = 500;
 const HIGH_VALUE_ITEM = 100;
 
-function formatLongDate(iso: string): string {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-').map(Number);
-  if (!y || !m || !d) return iso;
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  return `${months[m - 1]} ${d}, ${y}`;
-}
-
 export default function ReviewScreen() {
   const router = useRouter();
-  const { receiptId } = useLocalSearchParams<{ receiptId?: string }>();
+  const { receiptId, edit } = useLocalSearchParams<{ receiptId?: string; edit?: string }>();
   const { capturedImageUri, activeScanResponse, clearScanSession } = useReceiptStore();
   const confirmMutation = useReceiptConfirm();
   const analytics = useAnalytics();
@@ -79,7 +59,9 @@ export default function ReviewScreen() {
     enabled: isFromHistory,
   });
 
-  const isReadOnly = isFromHistory && fetchedReceipt?.status !== 'pending_review';
+  // A confirmed receipt is read-only, unless its detail screen opened it to edit.
+  const alreadyConfirmed = isFromHistory && fetchedReceipt?.status === 'confirmed';
+  const isReadOnly = isFromHistory && fetchedReceipt?.status !== 'pending_review' && edit !== '1';
   const editingReceiptId = activeScanResponse?.receipt_id ?? fetchedReceipt?.id;
 
   // What edits are compared against: the scan's extraction, or the stored receipt.
@@ -182,7 +164,9 @@ export default function ReviewScreen() {
     confirmMutation.mutate(
       {
         receiptId: editingReceiptId,
-        updates: buildReceiptUpdate(baseline, items, storeName, receiptDate),
+        updates: buildReceiptUpdate(baseline, items, storeName, receiptDate, {
+          confirm: !alreadyConfirmed,
+        }),
       },
       {
         onSuccess: () => {

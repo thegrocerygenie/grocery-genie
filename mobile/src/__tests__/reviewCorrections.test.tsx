@@ -510,6 +510,26 @@ describe('Review opened from History', () => {
     expect(screen.getByLabelText('Store')).toHaveStyle({ color: '#FF9500' });
   });
 
+  it('edits a confirmed receipt from its detail screen without confirming it again', async () => {
+    mockGetReceipt.mockResolvedValue(stored('confirmed'));
+    mockMutate.mockImplementationOnce((_vars, options: { onSuccess: () => void }) =>
+      options.onSuccess(),
+    );
+    useReceiptStore.getState().clearScanSession();
+    renderReview();
+    act(() => router.back());
+    act(() => router.push({ pathname: '/review', params: { receiptId: 'r-2', edit: '1' } }));
+
+    fireEvent.changeText(await screen.findByLabelText('Store'), 'Corner Market');
+    save();
+
+    // A second "confirmed" would dispatch ReceiptConfirmed again.
+    expect(mockMutate).toHaveBeenCalledWith(
+      { receiptId: 'r-2', updates: { store_name: 'Corner Market' } },
+      expect.anything(),
+    );
+  });
+
   it('shows a confirmed receipt read-only', async () => {
     mockGetReceipt.mockResolvedValue(stored('confirmed'));
     openFromHistory();

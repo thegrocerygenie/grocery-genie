@@ -328,7 +328,13 @@ export default function HistoryScreen() {
               receipt={item}
               showDivider={index > 0}
               categories={categories}
-              onPress={() => router.push({ pathname: '/review', params: { receiptId: item.id } })}
+              onPress={() =>
+                // An unconfirmed scan opens review to confirm it; a saved receipt
+                // opens its read-only detail (design: RC-04 · Receipt detail).
+                item.status === 'pending_review'
+                  ? router.push({ pathname: '/review', params: { receiptId: item.id } })
+                  : router.push({ pathname: '/receipt/[id]', params: { id: item.id } })
+              }
               onDelete={() => onDelete(item.id, item.store_name ?? 'Receipt')}
             />
           </View>

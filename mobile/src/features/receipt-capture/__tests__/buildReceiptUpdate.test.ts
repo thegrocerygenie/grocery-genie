@@ -52,6 +52,14 @@ function editable(overrides: Partial<EditableLineItem>[] = []): EditableLineItem
 }
 
 describe('buildReceiptUpdate', () => {
+  it('sends only the corrections when editing an already confirmed receipt', () => {
+    const update = buildReceiptUpdate(extraction, editable(), ' Corner Market ', '2026-03-15', {
+      confirm: false,
+    });
+
+    expect(update).toEqual({ store_name: 'Corner Market' });
+  });
+
   it('confirms with no corrections when nothing was edited', () => {
     expect(
       buildReceiptUpdate(extraction, editable(), 'Test Grocery Store', extraction.date),
