@@ -3,8 +3,16 @@ from pathlib import Path
 
 import pytest
 
+from app.core.config import get_settings
+
 RECEIPTS_DIR = Path(__file__).parent / "receipts"
 GROUND_TRUTH_DIR = Path(__file__).parent / "ground_truth"
+
+
+def llm_configured() -> bool:
+    """True when an LLM key is set, read the way the app reads it: from the
+    environment or from backend/.env."""
+    return bool(get_settings().llm_api_key)
 
 
 def _load_ground_truth() -> list[dict]:

@@ -1,8 +1,8 @@
-import os
-
 import pytest
 
-LLM_CONFIGURED = bool(os.environ.get("GG_LLM_API_KEY"))
+from tests.llm_validation.conftest import llm_configured
+
+LLM_CONFIGURED = llm_configured()
 
 
 @pytest.mark.skipif(not LLM_CONFIGURED, reason="LLM API key not configured")
