@@ -1,0 +1,17 @@
+# LiteLLM proxy for local development: `make llm-up`, then point the backend
+# at it (see backend/.env.example). The backend asks for the alias below; the
+# real model and its provider key live only here.
+#
+# Changing `model` changes receipt extraction. Run the extraction harness
+# against the proxy first (AGENTS.md: LLM changes need validate-extraction).
+model_list:
+  # Receipt extraction and category assignment both use this alias, so the
+  # model must read images.
+  - model_name: receipt-vision
+    litellm_params:
+      model: anthropic/claude-sonnet-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+general_settings:
+  # The key the backend sends as GG_LLM_API_KEY.
+  master_key: os.environ/LITELLM_MASTER_KEY

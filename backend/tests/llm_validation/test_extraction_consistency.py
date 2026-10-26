@@ -9,13 +9,14 @@ LLM_CONFIGURED = llm_configured()
 class TestExtractionConsistency:
     """Run each receipt through extraction multiple times.
 
-    With temperature=0, outputs should be identical across runs.
+    Outputs should be identical across runs with the configured model
+    settings (default sampling for Claude Sonnet 5.5).
     Target: >=95% of receipts produce identical output across 5 runs.
     """
 
     RUNS_PER_RECEIPT = 5
 
-    async def test_consistent_output_at_temperature_zero(self, receipt_test_set):
+    async def test_consistent_output_across_runs(self, receipt_test_set):
         if not receipt_test_set:
             pytest.skip("No receipt test images available")
 

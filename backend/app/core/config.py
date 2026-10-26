@@ -28,8 +28,12 @@ class Settings(BaseSettings):
 
     # LLM
     llm_provider: str = "anthropic"
-    llm_model: str = "claude-sonnet-4-20250514"
-    llm_temperature: float = 0.0
+    llm_model: str = "claude-sonnet-5-5"
+    # Sent only when set. Claude Sonnet 5.5 rejects any non-default value, so
+    # leave it unset for that model; set it for a model that accepts it.
+    llm_temperature: float | None = None
+    # The model thinks before it answers, and thinking counts against this.
+    llm_max_tokens: int = 16000
     llm_api_key: str = ""
     # Base URL for a LiteLLM proxy or other OpenAI-compatible gateway, e.g.
     # http://litellm:4000 with llm_provider "litellm_proxy". Empty calls the

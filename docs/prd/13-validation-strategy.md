@@ -85,7 +85,7 @@ For each receipt in the test set:
 **Target (MVP launch):** ≥90% field-level accuracy, 0% hallucination rate, ≥95% item recall.
 
 **Consistency validation:**
-- Run each test receipt through extraction 5 times with temperature=0.
+- Run each test receipt through extraction 5 times with the configured model settings.
 - Flag any receipt where outputs vary across runs.
 - Track consistency rate per prompt version.
 
