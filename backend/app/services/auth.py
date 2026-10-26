@@ -573,13 +573,20 @@ async def _upsert_social_user(
 
 
 async def user_needs_onboarding(db: AsyncSession, user_id: uuid.UUID) -> bool:
-    """True iff the user has no active monthly budget yet.
+    """True iff the user never finished onboarding and has no active monthly
+    budget.
 
     Used by sign-up / sign-in routes to tell the mobile client whether
     to send the user through the budget + camera onboarding screens.
     Covers fresh sign-ups, brand-new social accounts, and accounts that
-    were linked or that abandoned onboarding mid-flow.
+    were linked or that abandoned onboarding mid-flow. A budget is
+    optional: Skip finishes onboarding through `complete_onboarding`.
     """
+    completed = await db.execute(
+        select(User.onboarding_completed_at).where(User.id == user_id)
+    )
+    if completed.scalar_one_or_none() is not None:
+        return False
     result = await db.execute(
         select(Budget.id)
         .where(Budget.user_id == user_id)
@@ -588,6 +595,13 @@ async def user_needs_onboarding(db: AsyncSession, user_id: uuid.UUID) -> bool:
         .limit(1)
     )
     return result.scalar_one_or_none() is None
+
+
+async def complete_onboarding(db: AsyncSession, user: User) -> None:
+    """Mark onboarding finished. Idempotent: keeps the first completion time."""
+    if user.onboarding_completed_at is None:
+        user.onboarding_completed_at = datetime.now(tz=UTC)
+        await db.flush()
 
 
 # ── Internal lookups ─────────────────────────────────────────────

@@ -5,15 +5,24 @@ import { SymbolView } from 'expo-symbols';
 import { useCameraPermissions } from 'expo-camera';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
+import { useCompleteOnboarding } from '@/features/auth/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
 
 export default function OnboardingCamera() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const markFirstRunCompleted = useAuthStore((s) => s.markFirstRunCompleted);
+  const completeOnboarding = useCompleteOnboarding();
 
-  const finish = () => {
+  // Onboarding ends here, with or without a budget (Skip). The root layout's
+  // gate reads needs_onboarding from /me, so it must be false before we leave.
+  const finish = async () => {
     void markFirstRunCompleted();
+    try {
+      await completeOnboarding.mutateAsync();
+    } catch {
+      // useCompleteOnboarding lets the user in offline; the server asks again later.
+    }
     router.replace('/(tabs)');
   };
 
@@ -21,7 +30,7 @@ export default function OnboardingCamera() {
     if (!permission?.granted) {
       await requestPermission();
     }
-    finish();
+    await finish();
   };
 
   return (

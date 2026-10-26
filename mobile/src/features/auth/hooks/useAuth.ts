@@ -133,3 +133,15 @@ export function useUpdatePreferences() {
     onSuccess: (profile) => qc.setQueryData(ME_QUERY_KEY, profile),
   });
 }
+
+export function useCompleteOnboarding() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: authApi.completeOnboarding,
+    onSuccess: (profile) => qc.setQueryData(ME_QUERY_KEY, profile),
+    // Offline: let the user in now. The server still says onboarding is due,
+    // so a later /me load brings them back to finish it.
+    onError: () =>
+      qc.setQueryData<UserProfile>(ME_QUERY_KEY, (me) => me && { ...me, needs_onboarding: false }),
+  });
+}
