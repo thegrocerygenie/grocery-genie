@@ -1,7 +1,6 @@
 ---
 name: gg-create-verification-skill
-description: "Generate a project-local verification skill that drives the app the way a user does and captures evidence. Run by hand when a surface has no scripted way to prove its behavior."
-disable-model-invocation: true
+description: "Generate a project-local verify-<app> skill that launches the app, drives it the way a user does, and captures evidence. Use when a surface (API, iOS app) has no scripted way to prove its behavior, or the user asks for a verification or control skill."
 ---
 
 # Create a verification skill

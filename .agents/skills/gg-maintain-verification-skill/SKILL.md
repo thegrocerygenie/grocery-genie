@@ -1,7 +1,6 @@
 ---
 name: gg-maintain-verification-skill
-description: "Periodic pass that keeps a project's verification skill and feature map honest: a source reader per feature, one live session driving every feature, at most one change of proven corrections. Run by hand."
-disable-model-invocation: true
+description: "Audit a verify-<app> skill and its feature map against the source and the running app, and ship proven corrections. Use when the user asks to maintain or audit a verify skill, or changes have moved features its map describes."
 ---
 
 # Maintain a verification skill

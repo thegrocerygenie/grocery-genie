@@ -46,10 +46,10 @@ Claude Code runs a personal skill over a project skill with the same name ([docs
 
 **Files:** everything in the file map marked done.
 
-- [ ] **Step 1: Claude Code.** Partly proved: once `.claude/skills/` existed, the running session picked up the project symlinks and listed `building-native-ui` (model-invoked, so visible to the model). The four generators are user-invoked, so they are hidden from the model, and headless `claude -p` failed with `401 Invalid bearer token`. Start a fresh session in the repo and type `/skills`. Expected: the four generators and `building-native-ui` are listed from the project. Type `/gg-create-verification-skill` and stop at its first paragraph. Expected: it names `.agents/skills/verify-<app>/`, not the fleet path.
+- [x] **Step 1: Claude Code.** Partly proved: once `.claude/skills/` existed, the running session picked up the project symlinks and listed `building-native-ui` (model-invoked, so visible to the model). On 2026-10-26 the Skill tool recognised `gg-create-verification-skill` from the project; it refused it only because it was then hand-run. The four generators were then made model-invoked (frontmatter flag and Codex policy lock dropped, model-facing descriptions written), so an agent runs them itself.
 - [ ] **Step 2: Codex.** Already proved: `codex exec` quoted the `AGENTS.md` commit gate verbatim and listed `building-native-ui` from the repo. With the policy flipped to implicit in a scratch copy, it listed all four generators at their `.agents/skills/` paths. In the Codex TUI, type `$gg-create-verification-skill` and confirm the same first paragraph.
-- [ ] **Step 3:** Run `PATH="$PWD/backend/.venv/bin:$PATH" make validate` (the venv tools are not on PATH). On 2026-10-25 it gave backend `235 passed, 6 skipped`, mobile `98 passed`, all linters clean. That count includes uncommitted receipt-import work from another session. This change touches no product code.
-- [ ] **Step 4: Commit (ask first).**
+- [x] **Step 3:** Run `PATH="$PWD/backend/.venv/bin:$PATH" make validate` (the venv tools are not on PATH). On 2026-10-25 it gave backend `235 passed, 6 skipped`, mobile `98 passed`, all linters clean. That count includes uncommitted receipt-import work from another session. This change touches no product code.
+- [x] **Step 4: Commit (ask first).**
 
 ```bash
 git add AGENTS.md CLAUDE.md .agents/skills .claude/skills docs/agents scripts/check-agent-skills.py .planning/2026-10-25-verification-skills-plan.md
@@ -58,9 +58,9 @@ git commit -m "chore(agents): share skills and instructions across Claude Code a
 
 ### Task 2: Install the verification prerequisites
 
-- [ ] **Step 1:** `brew install openjdk@21`, then `java -version`. Expected: a 21.x runtime. (Today: "Unable to locate a Java Runtime".)
-- [ ] **Step 2:** Start Docker. Run `make db-up && make backend-migrate`. Expected: `Postgres healthy.` and Alembic at head.
-- [ ] **Step 3:** Confirm the backend venv (`backend/.venv`) and `GG_DATABASE_URL` per the "Environment gotchas" in `.planning/HANDOFF-2026-10-25.md`.
+- [x] **Step 1:** `brew install openjdk@21`. Installed 2026-10-26: `openjdk version "21.0.13.0.2"`. Homebrew keeps it off PATH, so call `/opt/homebrew/opt/openjdk@21/bin/java`.
+- [x] **Step 2:** Start Docker. Run `make db-up && make backend-migrate`. Expected: `Postgres healthy.` and Alembic at head.
+- [x] **Step 3:** Confirm the backend venv (`backend/.venv`) and `GG_DATABASE_URL` per the "Environment gotchas" in `.planning/HANDOFF-2026-10-25.md`.
 
 ### Task 3: Generate `verify-grocery-genie` (behavioral, API surface)
 
@@ -82,10 +82,20 @@ git commit -m "chore(agents): share skills and instructions across Claude Code a
 4. `delete-restore.md` — soft-delete a receipt; spend drops; `POST /api/receipts/{id}/restore` brings it back.
 5. `receipt-scan.md` — scan with a fixture image when a key is present; otherwise `verified-unreachable`.
 
-- [ ] **Step 1:** Run the generator through its §1–§3.
-- [ ] **Step 2:** Its §4 proof: launch, doctor, drive `budget-alerts.md`, capture evidence (request/response bodies plus `psql` counts), clean up. Confirm the evidence survives cleanup at the named location, and that no uvicorn the run started is left (`lsof -i :<port>` is empty).
-- [ ] **Step 3:** Add the evidence dir to `.gitignore`. Run `scripts/check-agent-skills.py`. Expected: `0 problems`.
+- [x] **Step 1:** Run the generator through its §1–§3.
+- [x] **Step 2:** Its §4 proof: launch, doctor, drive `budget-alerts.md`, capture evidence (request/response bodies plus `psql` counts), clean up. Confirm the evidence survives cleanup at the named location, and that no uvicorn the run started is left (`lsof -i :<port>` is empty).
+- [x] **Step 3:** Add the evidence dir to `.gitignore`. Run `scripts/check-agent-skills.py`. Expected: `0 problems`.
 - [ ] **Step 4:** Run `make validate`, then commit (ask first): `feat(agents): add verify-grocery-genie behavioral verification skill`.
+
+**Results (2026-10-26):**
+- The skill is at `.agents/skills/verify-grocery-genie/`. The helper is `scripts/gg-verify` (launch, doctor, signup, api, scan, sql, cleanup, last). There are five feature files. Evidence goes to `.verification/runs/<run-id>/` (gitignored).
+- The proof run `20261026-112148` drove every `budget-alerts` sub-feature from a fresh launch. All passed except `alert-manual`. Cleanup freed port 8011 and dropped `gg_verify`, and the 33 evidence files were kept.
+- Corrections the proof forced: the 50% alert is opt-in (`notif_threshold_50` defaults to false), and spend sums line items without tax (`14.77` per mock scan, not `15.95`).
+- **Product finding (not fixed):** a manual receipt never triggers budget alerts. `create_manual_receipt` (`backend/app/services/receipt_service.py:607`) saves `status="confirmed"` without dispatching `ReceiptConfirmed` or calling `check_thresholds`, and `mobile/app/manual-entry.tsx` sends no confirming `PATCH`. Proven on Postgres: at 87.3% spend there are no notifications and no `budget_alerts_sent` rows. This breaks BC-03 #1. The fix is a separate, test-first change.
+- **Observation for the product owner:** budget spend leaves out tax, because it sums `LineItem.total_price`, not `Receipt.total`. The PRD does not say which is intended.
+- Codex: in the default `workspace-write` sandbox, `gg-verify doctor` reports false FAILs (it cannot signal processes, reach localhost, or reach Docker). The skill tells Codex agents to run `$G` outside the sandbox.
+- Not yet driven live: `scan-confirm`, `manual-receipt`, `item-correction`, `delete-restore`, and `scan-live` (needs `GG_LLM_API_KEY`). Task 5's maintain pass covers them.
+
 
 ### Task 4: Generate `verify-budget-alerts` (formal, TLA+)
 
@@ -109,10 +119,19 @@ git commit -m "chore(agents): share skills and instructions across Claude Code a
 
 **Bounds to start:** 1 budget, thresholds {50, 100}, 2 confirm requests, 2 push workers, at most 1 crash.
 
-- [ ] **Step 1:** The generator writes `formal/budget_alerts/` and `run.sh`. `run.sh` downloads a pinned `tla2tools.jar` to `~/.cache/tla/` and checks its sha256. The skill records the version and hash.
-- [ ] **Step 2: Able to fail.** For each property, show a failing run on a scratch break: model `claim_alert` without the unique key (expect `OneAlertPerThreshold` to fail), and drop `SKIP LOCKED` from the model (expect `PushAtMostOnce` to fail). Then revert.
-- [ ] **Step 3:** Report H1 and H2 as found or refuted, each as a step-by-step trace in the code's words. Leave product code alone. A real finding becomes its own ticket.
+- [x] **Step 1:** The generator writes `formal/budget_alerts/` and `run.sh`. `run.sh` downloads a pinned `tla2tools.jar` to `~/.cache/tla/` and checks its sha256. The skill records the version and hash.
+- [x] **Step 2: Able to fail.** For each property, show a failing run on a scratch break: model `claim_alert` without the unique key (expect `OneAlertPerThreshold` to fail), and drop `SKIP LOCKED` from the model (expect `PushAtMostOnce` to fail). Then revert.
+- [x] **Step 3:** Report H1 and H2 as found or refuted, each as a step-by-step trace in the code's words. Leave product code alone. A real finding becomes its own ticket.
 - [ ] **Step 4:** The skill records covered files, functions, and the sync commit. Run `scripts/check-agent-skills.py` and `make validate`, then commit (ask first): `feat(agents): add verify-budget-alerts TLA+ verification skill`.
+
+**Results (2026-10-26):**
+- The models are two TLA+ modules, not one: `formal/budget_alerts/ConfirmAlerts.tla` (confirm, claim, alert) and `PushDelivery.tla` (expire, `SKIP LOCKED` select, chunked Expo send, faults). There are nine configs, each with a `\* EXPECT:` line. `run.sh` pins tla2tools v1.7.4 by sha256, checks the skill's sync commit, and exits 0 when every result matches its EXPECT line (about 10 s).
+- Every property fails on a broken variant: `break-confirm-no-unique`, `break-push-no-lock`, `break-push-no-expiry`. The configs for the code as it is pass at 3 receipts with thresholds 50/80/100, and at 3 notifications with 2 workers.
+- **H1 found** (`confirm-missed`): two concurrent confirms read spend without each other, so the alerts for the threshold their sum crosses are never sent. On the real backend, `repro/h1_concurrent_confirm.py` missed every alert in 20 of 20 concurrent trials, and 0 of 5 with `--serial`. A candidate fix holds in the model (`confirm-fix-rowlock`): lock the budget row before the spend read.
+- **H2 found** (`push-crash`): a lost Expo response, a worker crash, or a failed commit after the send leaves rows pending, and the next run pushes them again. **H2b found** (`push-chunks`): with more than 100 messages, a refused second Expo request resends the first chunk, with no fault at all. On the real `deliver_pending_pushes`, `repro/h2_push_resend.py` gave duplicates in every scenario: lost 2/2, chunks 100/120, failed commit 2/2. Rows still end as `sent`.
+- The skill is `.agents/skills/verify-budget-alerts/`, sync commit `42293ac`. It was proved on a scratch break (`.with_for_update(skip_locked=True)` removed). `run.sh` warned that the covered file changed, setting `RowLock = "none"` turned `push` into a MISMATCH, the trace replayed against the code as a real bug, and after reverting, all 9 configs matched again.
+- Not product-fixed. H1 and H2/H2b each need their own test-first change. H2 also needs a decision: at-most-once (the docstring's promise) or at-least-once with deduplication.
+
 
 ### Task 5: Close the loop
 

@@ -399,9 +399,18 @@ class BudgetService:
         period_start, period_end = await self.get_period_dates(user_id, period)
         days_left = max(0, (period_end - today).days)
 
-        # Get all budgets
+        # Lock all of the user's budgets until the request commits, before the
+        # spend read below. Two receipts confirmed at once then take turns: the
+        # second waits here, and its spend read sees the first one's receipt.
+        # Without the lock each sees only its own receipt, and a threshold
+        # their sum crosses never alerts (finding H1, formal/budget_alerts).
+        # Lock every budget, since any receipt can move overall and category
+        # spend. Lock in id order, so two requests never deadlock.
         result = await self.db.execute(
-            select(Budget).where(Budget.user_id == user_id, Budget.deleted_at.is_(None))
+            select(Budget)
+            .where(Budget.user_id == user_id, Budget.deleted_at.is_(None))
+            .order_by(Budget.id)
+            .with_for_update()
         )
         budgets = list(result.scalars().all())
         if not budgets:
