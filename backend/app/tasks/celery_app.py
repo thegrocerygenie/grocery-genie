@@ -18,6 +18,6 @@ celery_app.config_from_object(
 celery_app.conf.beat_schedule = {
     "weekly-spending-summary": {
         "task": "app.tasks.summary_tasks.generate_weekly_summaries",
-        "schedule": crontab(hour=9, minute=0, day_of_week=0),  # Sunday 9 AM UTC
+        "schedule": crontab(hour=9, minute=0),  # daily 9 AM UTC; users pick their day
     },
 }

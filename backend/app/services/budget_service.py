@@ -174,6 +174,7 @@ class BudgetService:
             .where(
                 Receipt.user_id == user_id,
                 Receipt.status == "confirmed",
+                Receipt.deleted_at.is_(None),
                 Receipt.date >= start,
                 Receipt.date <= end,
             )
@@ -192,6 +193,7 @@ class BudgetService:
             .where(
                 Receipt.user_id == user_id,
                 Receipt.status == "confirmed",
+                Receipt.deleted_at.is_(None),
                 Receipt.date >= start,
                 Receipt.date <= end,
             )
@@ -298,6 +300,7 @@ class BudgetService:
             .where(
                 Receipt.user_id == user_id,
                 Receipt.status == "confirmed",
+                Receipt.deleted_at.is_(None),
                 Receipt.date >= start,
                 Receipt.date <= end,
             )

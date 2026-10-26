@@ -82,9 +82,11 @@ class LineItemCorrection(BaseModel):
     id: uuid.UUID
     name: str | None = None
     category_id: uuid.UUID | None = None
+    total_price: float | None = Field(default=None, ge=0)
 
 
 class ReceiptUpdateRequest(BaseModel):
+    store_name: str | None = Field(default=None, min_length=1, max_length=255)
     items: list[LineItemCorrection] | None = None
     status: str | None = None
 

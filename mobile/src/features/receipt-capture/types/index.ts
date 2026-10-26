@@ -74,9 +74,11 @@ export interface LineItemCorrection {
   id: string;
   name?: string;
   category_id?: string;
+  total_price?: number;
 }
 
 export interface ReceiptUpdateRequest {
+  store_name?: string;
   items?: LineItemCorrection[];
   status?: string;
 }

@@ -22,10 +22,13 @@ import { getReceipt } from '@/features/receipt-capture/services/receiptApi';
 import { useCategories } from '@/features/budget/hooks/useCategories';
 import { useReceiptStore } from '@/store/receiptStore';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import type { EditableLineItem, LineItemCorrection } from '@/features/receipt-capture/types';
+import { buildReceiptUpdate } from '@/features/receipt-capture/utils/buildReceiptUpdate';
+import { isLowConfidence } from '@/features/receipt-capture/utils/confidence';
+import { receiptImageSource } from '@/features/receipt-capture/utils/receiptImageSource';
+import { API_BASE_URL, getAuthHeaders } from '@/services/api';
+import type { EditableLineItem } from '@/features/receipt-capture/types';
 import type { CategoryResponse } from '@/features/budget/types';
 
-const LOW_CONFIDENCE_THRESHOLD = 0.6;
 const HIGH_VALUE_TOTAL = 500;
 const HIGH_VALUE_ITEM = 100;
 
@@ -139,25 +142,10 @@ export default function ReviewScreen() {
     }
     if (!activeScanResponse || !canConfirm) return;
 
-    const corrections: LineItemCorrection[] = items
-      .filter((item) => item.isEdited)
-      .map((item) => {
-        const correction: LineItemCorrection = { id: item.id };
-        const original = activeScanResponse.extraction.items.find((i) => i.id === item.id);
-        if (original && item.name !== original.name) correction.name = item.name;
-        if (original && item.categoryId !== original.category_id) {
-          correction.category_id = item.categoryId ?? undefined;
-        }
-        return correction;
-      });
-
     confirmMutation.mutate(
       {
         receiptId: activeScanResponse.receipt_id,
-        updates: {
-          items: corrections.length > 0 ? corrections : undefined,
-          status: 'confirmed',
-        },
+        updates: buildReceiptUpdate(activeScanResponse.extraction, items, storeName),
       },
       {
         onSuccess: () => {
@@ -194,7 +182,11 @@ export default function ReviewScreen() {
   const displaySubtotal = extraction?.subtotal ?? fetchedReceipt?.subtotal ?? null;
   const displayTax = extraction?.tax ?? fetchedReceipt?.tax ?? null;
   const displayTotal = extraction?.total ?? fetchedReceipt?.total ?? null;
-  const imageUri = capturedImageUri ?? fetchedReceipt?.image_url ?? null;
+  const imageSource = receiptImageSource(
+    capturedImageUri ?? fetchedReceipt?.image_url,
+    API_BASE_URL,
+    getAuthHeaders(),
+  );
   const dominantCategoryId = items.find((i) => i.categoryId)?.categoryId ?? null;
   const dominantCategoryName = resolveCategoryMeta(dominantCategoryId, categories).name;
 
@@ -266,8 +258,8 @@ export default function ReviewScreen() {
           </View>
         ) : null}
 
-        {imageUri ? (
-          <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" />
+        {imageSource ? (
+          <Image source={imageSource} style={styles.image} resizeMode="cover" />
         ) : null}
 
         <ListGroup>
@@ -415,8 +407,7 @@ function ItemRow({
   onChangePrice,
   onPickCategory,
 }: ItemRowProps) {
-  const conf = item.extractionConfidence ?? 1;
-  const lowConf = conf < LOW_CONFIDENCE_THRESHOLD;
+  const lowConf = isLowConfidence(item.extractionConfidence);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(item.totalPrice.toFixed(2));
   const meta = resolveCategoryMeta(item.categoryId, categories);

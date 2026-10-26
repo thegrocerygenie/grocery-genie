@@ -16,7 +16,7 @@ class ReceiptConfirmed:
 @dataclass(frozen=True)
 class ItemCorrected:
     line_item_id: uuid.UUID
-    field: str  # "name" | "category_id"
+    field: str  # "name" | "category_id" | "total_price"
     old_value: str
     new_value: str
     user_id: uuid.UUID

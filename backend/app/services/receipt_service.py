@@ -4,6 +4,7 @@ import logging
 import time
 import uuid
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
@@ -343,6 +344,23 @@ class ReceiptService:
         """Apply corrections to a receipt."""
         receipt = await self._get_receipt(receipt_id, user_id)
 
+        current_store_name = receipt.store.name if receipt.store else None
+        if (
+            updates.store_name is not None
+            and updates.store_name.strip() != current_store_name
+        ):
+            if self.analytics:
+                self.analytics.emit(
+                    "receipt_correction_made",
+                    {
+                        "field": "store_name",
+                        "original_value": current_store_name or "",
+                        "corrected_value": updates.store_name.strip(),
+                    },
+                    user_id,
+                )
+            receipt.store = await self.store_service.find_or_create(updates.store_name)
+
         if updates.items:
             line_items_by_id = {li.id: li for li in receipt.line_items}
 
@@ -350,6 +368,9 @@ class ReceiptService:
                 line_item = line_items_by_id.get(correction.id)
                 if line_item is None:
                     continue
+                # Key mappings on the name as extracted: the next scan of this
+                # item produces that name, not the user's corrected one.
+                extracted_name = line_item.raw_name
 
                 if (
                     correction.name is not None
@@ -375,6 +396,42 @@ class ReceiptService:
                             user_id,
                         )
                     line_item.raw_name = correction.name
+                    line_item.corrected = True
+
+                # Price columns are Numeric; compare and divide as Decimal.
+                new_price = (
+                    Decimal(str(correction.total_price)).quantize(Decimal("0.01"))
+                    if correction.total_price is not None
+                    else None
+                )
+                if new_price is not None and new_price != Decimal(
+                    str(line_item.total_price)
+                ):
+                    dispatcher.dispatch(
+                        ItemCorrected(
+                            line_item_id=line_item.id,
+                            field="total_price",
+                            old_value=str(line_item.total_price),
+                            new_value=str(new_price),
+                            user_id=user_id,
+                        )
+                    )
+                    if self.analytics:
+                        self.analytics.emit(
+                            "receipt_correction_made",
+                            {
+                                "field": "total_price",
+                                "original_value": str(line_item.total_price),
+                                "corrected_value": str(new_price),
+                            },
+                            user_id,
+                        )
+                    line_item.total_price = new_price
+                    quantity = Decimal(str(line_item.quantity or 0))
+                    if quantity > 0:
+                        line_item.unit_price = (new_price / quantity).quantize(
+                            Decimal("0.01")
+                        )
                     line_item.corrected = True
 
                 if (
@@ -414,12 +471,12 @@ class ReceiptService:
 
                     # Update user item mapping for future scans
                     await self._update_item_mapping(
-                        user_id, line_item.raw_name, correction.category_id
+                        user_id, extracted_name, correction.category_id
                     )
 
                     # Retroactive update: apply to all historical instances
                     await self._retroactive_category_update(
-                        user_id, line_item.raw_name, correction.category_id
+                        user_id, extracted_name, correction.category_id
                     )
 
         if updates.status == "confirmed":
