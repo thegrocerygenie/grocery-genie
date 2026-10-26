@@ -84,6 +84,19 @@ uvicorn main:app --reload
 pytest
 ```
 
+#### LLM settings
+
+You can put these in `backend/.env` instead of exporting them. Every call goes through LiteLLM.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `GG_LLM_PROVIDER` | `anthropic` | LiteLLM provider prefix |
+| `GG_LLM_MODEL` | `claude-sonnet-4-20250514` | Model name for that provider |
+| `GG_LLM_API_KEY` | empty | Key for that provider, or the proxy's key |
+| `GG_LLM_API_BASE` | empty | Base URL of a LiteLLM proxy or gateway. Empty calls the provider's own API. |
+
+To call a LiteLLM proxy, set `GG_LLM_PROVIDER=litellm_proxy`, `GG_LLM_MODEL` to the model name the proxy serves, `GG_LLM_API_BASE` to the proxy URL (for example `http://localhost:4000`), and `GG_LLM_API_KEY` to the proxy's key. The provider keys stay on the proxy.
+
 ### Mobile
 
 ```bash

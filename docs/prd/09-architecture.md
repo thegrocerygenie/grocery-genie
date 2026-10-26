@@ -35,7 +35,7 @@ Downstream features react to domain events asynchronously. This decouples servic
 
 ## LLM Integration Architecture
 
-All LLM interactions go through LiteLLM as the provider-agnostic abstraction layer. Backend model swappable without code changes.
+All LLM interactions go through LiteLLM as the provider-agnostic abstraction layer. Backend model swappable without code changes. The backend calls the provider directly by default. With `GG_LLM_API_BASE` set, it calls a LiteLLM proxy instead, which holds the provider keys.
 
 **Three model types used:**
 - **Vision model** (receipt image → structured JSON): Receipt Ingestion Service, called via LiteLLM. Default: Claude Sonnet.
