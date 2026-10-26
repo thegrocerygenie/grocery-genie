@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -16,6 +17,7 @@ import SegmentedControl from '@react-native-segmented-control/segmented-control'
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { resolveCategoryMeta } from '@/constants/categories';
 import { CaptureActionSheet } from '@/components/CaptureActionSheet';
+import { headerBlurFor } from '@/utils/headerBlur';
 import { ImportProgressOverlay } from '@/features/receipt-capture/components/ImportProgressOverlay';
 import { useReceiptImport } from '@/features/receipt-capture/hooks/useReceiptImport';
 import { useReceipts } from '@/features/receipt-capture/hooks/useReceipts';
@@ -215,9 +217,12 @@ export default function HistoryScreen() {
           title: 'History',
           headerLargeTitle: true,
           headerTransparent: true,
-          headerBlurEffect: 'systemChromeMaterial',
+          headerBlurEffect: headerBlurFor(Platform.Version),
           headerSearchBarOptions: {
             placeholder: 'Search by store',
+            // Keep the field under the title. iOS 26+ otherwise moves it to the
+            // bottom toolbar, where the floating tab bar covers it.
+            placement: 'stacked',
             onChangeText: (e) => {
               setSearch(e.nativeEvent.text);
               setPage(1);

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -13,6 +14,7 @@ import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 
 import { BudgetRing } from '@/components/BudgetRing';
+import { headerBlurFor } from '@/utils/headerBlur';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { getCategoryMetaByName } from '@/constants/categories';
 import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
@@ -152,7 +154,7 @@ export default function DashboardScreen() {
           title: 'Budget',
           headerLargeTitle: true,
           headerTransparent: true,
-          headerBlurEffect: 'systemChromeMaterial',
+          headerBlurEffect: headerBlurFor(Platform.Version),
           headerRight: () => (
             <Pressable
               onPress={onSettings}
