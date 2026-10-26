@@ -14,6 +14,7 @@ import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
+import { PASSWORD_MIN_LENGTH } from '@/features/auth/constants';
 import { useAppleSignIn, useGoogleSignIn, useSignUp } from '@/features/auth/hooks/useAuth';
 import { ApiError } from '@/services/api';
 import {
@@ -35,7 +36,8 @@ export default function SignUpScreen() {
   const googleAvailable = isGoogleSignInAvailable();
   const showSocial = appleAvailable || googleAvailable;
 
-  const canSubmit = email.includes('@') && password.length >= 12 && !signUp.isPending;
+  const passwordTooShort = password.length < PASSWORD_MIN_LENGTH;
+  const canSubmit = email.includes('@') && !passwordTooShort && !signUp.isPending;
 
   const onSubmit = async () => {
     if (!canSubmit) return;
@@ -48,7 +50,7 @@ export default function SignUpScreen() {
       } else if (err instanceof ApiError && err.status === 422) {
         Alert.alert(
           'Password too weak',
-          'Use at least 12 characters with letters and a number or symbol.',
+          `Use at least ${PASSWORD_MIN_LENGTH} characters with letters and a number or symbol.`,
         );
       } else {
         Alert.alert('Sign up failed', 'Please try again in a moment.');
@@ -152,14 +154,14 @@ export default function SignUpScreen() {
             <View style={styles.separator} />
             <View style={styles.inputRow}>
               <TextInput
-                placeholder="Password · 8+ characters"
+                placeholder={`Password · ${PASSWORD_MIN_LENGTH}+ characters`}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholderTextColor={colors.iosLabel3 as string}
-                style={[styles.input, { flex: 1 }]}
+                style={styles.input}
                 accessibilityLabel="Password"
               />
               <Pressable
@@ -176,6 +178,12 @@ export default function SignUpScreen() {
               </Pressable>
             </View>
           </View>
+
+          {password.length > 0 && passwordTooShort && (
+            <Text style={styles.hint} accessibilityLiveRegion="polite">
+              {`Use at least ${PASSWORD_MIN_LENGTH} characters.`}
+            </Text>
+          )}
 
           <Pressable
             style={({ pressed }) => [
@@ -302,11 +310,18 @@ const styles = StyleSheet.create({
     ...type.subheadline,
     color: colors.iosLabel as string,
     paddingVertical: 13,
+    flex: 1,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.iosSeparator,
     marginLeft: 16,
+  },
+  hint: {
+    ...type.footnote,
+    color: colors.iosLabel2 as string,
+    marginTop: -spacing.sm,
+    paddingHorizontal: 16,
   },
 
   primaryBtn: {
