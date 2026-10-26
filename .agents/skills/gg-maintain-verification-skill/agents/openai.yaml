@@ -1,0 +1,5 @@
+interface:
+  display_name: "GG Maintain Verification Skill"
+  short_description: "Keep the verify skill and feature map honest"
+policy:
+  allow_implicit_invocation: false
