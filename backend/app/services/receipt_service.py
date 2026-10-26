@@ -22,6 +22,7 @@ from app.models.database import (
     Category,
     LineItem,
     Receipt,
+    ReceiptCorrection,
     Store,
     UserItemMapping,
 )
@@ -367,29 +368,23 @@ class ReceiptService:
             updates.store_name is not None
             and updates.store_name.strip() != current_store_name
         ):
-            if self.analytics:
-                self.analytics.emit(
-                    "receipt_correction_made",
-                    {
-                        "field": "store_name",
-                        "original_value": current_store_name or "",
-                        "corrected_value": updates.store_name.strip(),
-                    },
-                    user_id,
-                )
+            self._record_correction(
+                receipt,
+                user_id,
+                "store_name",
+                current_store_name or "",
+                updates.store_name.strip(),
+            )
             receipt.store = await self.store_service.find_or_create(updates.store_name)
 
         if updates.date is not None and updates.date != receipt.date:
-            if self.analytics:
-                self.analytics.emit(
-                    "receipt_correction_made",
-                    {
-                        "field": "date",
-                        "original_value": receipt.date.isoformat(),
-                        "corrected_value": updates.date.isoformat(),
-                    },
-                    user_id,
-                )
+            self._record_correction(
+                receipt,
+                user_id,
+                "date",
+                receipt.date.isoformat(),
+                updates.date.isoformat(),
+            )
             receipt.date = updates.date
 
         if updates.items:
@@ -407,25 +402,14 @@ class ReceiptService:
                     correction.name is not None
                     and correction.name != line_item.raw_name
                 ):
-                    dispatcher.dispatch(
-                        ItemCorrected(
-                            line_item_id=line_item.id,
-                            field="name",
-                            old_value=line_item.raw_name,
-                            new_value=correction.name,
-                            user_id=user_id,
-                        )
+                    self._record_correction(
+                        receipt,
+                        user_id,
+                        "name",
+                        line_item.raw_name,
+                        correction.name,
+                        line_item,
                     )
-                    if self.analytics:
-                        self.analytics.emit(
-                            "receipt_correction_made",
-                            {
-                                "field": "name",
-                                "original_value": line_item.raw_name,
-                                "corrected_value": correction.name,
-                            },
-                            user_id,
-                        )
                     line_item.raw_name = correction.name
                     line_item.corrected = True
 
@@ -442,25 +426,14 @@ class ReceiptService:
                     new_quantity is not None and new_quantity != old_quantity
                 )
                 if quantity_changed:
-                    dispatcher.dispatch(
-                        ItemCorrected(
-                            line_item_id=line_item.id,
-                            field="quantity",
-                            old_value=_format_quantity(old_quantity),
-                            new_value=_format_quantity(new_quantity),
-                            user_id=user_id,
-                        )
+                    self._record_correction(
+                        receipt,
+                        user_id,
+                        "quantity",
+                        _format_quantity(old_quantity),
+                        _format_quantity(new_quantity),
+                        line_item,
                     )
-                    if self.analytics:
-                        self.analytics.emit(
-                            "receipt_correction_made",
-                            {
-                                "field": "quantity",
-                                "original_value": _format_quantity(old_quantity),
-                                "corrected_value": _format_quantity(new_quantity),
-                            },
-                            user_id,
-                        )
                     line_item.quantity = new_quantity
                     line_item.corrected = True
 
@@ -473,25 +446,14 @@ class ReceiptService:
                     str(line_item.total_price)
                 )
                 if price_changed:
-                    dispatcher.dispatch(
-                        ItemCorrected(
-                            line_item_id=line_item.id,
-                            field="total_price",
-                            old_value=str(line_item.total_price),
-                            new_value=str(new_price),
-                            user_id=user_id,
-                        )
+                    self._record_correction(
+                        receipt,
+                        user_id,
+                        "total_price",
+                        str(line_item.total_price),
+                        str(new_price),
+                        line_item,
                     )
-                    if self.analytics:
-                        self.analytics.emit(
-                            "receipt_correction_made",
-                            {
-                                "field": "total_price",
-                                "original_value": str(line_item.total_price),
-                                "corrected_value": str(new_price),
-                            },
-                            user_id,
-                        )
                     line_item.total_price = new_price
                     line_item.corrected = True
 
@@ -506,33 +468,14 @@ class ReceiptService:
                     correction.category_id is not None
                     and correction.category_id != line_item.category_id
                 ):
-                    dispatcher.dispatch(
-                        ItemCorrected(
-                            line_item_id=line_item.id,
-                            field="category_id",
-                            old_value=(
-                                str(line_item.category_id)
-                                if line_item.category_id
-                                else ""
-                            ),
-                            new_value=str(correction.category_id),
-                            user_id=user_id,
-                        )
+                    self._record_correction(
+                        receipt,
+                        user_id,
+                        "category_id",
+                        str(line_item.category_id) if line_item.category_id else "",
+                        str(correction.category_id),
+                        line_item,
                     )
-                    if self.analytics:
-                        self.analytics.emit(
-                            "receipt_correction_made",
-                            {
-                                "field": "category_id",
-                                "original_value": (
-                                    str(line_item.category_id)
-                                    if line_item.category_id
-                                    else ""
-                                ),
-                                "corrected_value": str(correction.category_id),
-                            },
-                            user_id,
-                        )
                     line_item.category_id = correction.category_id
                     line_item.category_confidence = 1.0
                     line_item.corrected = True
@@ -554,6 +497,53 @@ class ReceiptService:
 
         await self.db.flush()
         return receipt
+
+    def _record_correction(
+        self,
+        receipt: Receipt,
+        user_id: uuid.UUID,
+        field: str,
+        original_value: str,
+        corrected_value: str,
+        line_item: LineItem | None = None,
+    ) -> None:
+        """Log one changed field before it is overwritten (RC-02 AC 3).
+
+        The row keeps the value being replaced; across repeated edits the
+        oldest row for a field holds the value as extracted. Callers record
+        only real changes, so a retried save adds no rows.
+        """
+        self.db.add(
+            ReceiptCorrection(
+                receipt_id=receipt.id,
+                line_item_id=line_item.id if line_item else None,
+                user_id=user_id,
+                household_id=receipt.household_id,
+                field=field,
+                original_value=original_value,
+                corrected_value=corrected_value,
+            )
+        )
+        if line_item is not None:
+            dispatcher.dispatch(
+                ItemCorrected(
+                    line_item_id=line_item.id,
+                    field=field,
+                    old_value=original_value,
+                    new_value=corrected_value,
+                    user_id=user_id,
+                )
+            )
+        if self.analytics:
+            self.analytics.emit(
+                "receipt_correction_made",
+                {
+                    "field": field,
+                    "original_value": original_value,
+                    "corrected_value": corrected_value,
+                },
+                user_id,
+            )
 
     async def list_receipts(
         self,

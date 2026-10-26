@@ -11,6 +11,7 @@ Technology-agnostic entity model. Describes entities, relationships, and access 
 | **HouseholdMember** | household_id, user_id, role (admin/contributor/viewer), joined_at | Belongs to Household and User | V1.5 |
 | **Receipt** | id, user_id, household_id (nullable), store_id, date, subtotal, tax, total, currency, image_url, extraction_confidence, status (pending/confirmed), created_at | Belongs to User; has many LineItems; belongs to Store | MVP |
 | **LineItem** | id, receipt_id, raw_name, canonical_item_id (nullable), quantity, unit_price, total_price, unit_of_measure, category_id, category_confidence, corrected (bool) | Belongs to Receipt; belongs to CanonicalItem; belongs to Category | MVP |
+| **ReceiptCorrection** | id, receipt_id, line_item_id (nullable for store/date), user_id, household_id (nullable), field (store_name/date/name/category_id/quantity/total_price), original_value, corrected_value, created_at | Belongs to Receipt; optionally to LineItem; belongs to User. Append-only: one row per changed field per save; the oldest row for a field holds the extracted value (RC-02 AC 3) | MVP |
 | **Category** | id, name, is_default (bool), user_id (nullable for defaults), sort_order | Has many LineItems | MVP |
 | **Store** | id, name, normalized_name, location (optional) | Has many Receipts | MVP |
 | **Budget** | id, user_id, household_id (nullable), category_id (nullable for overall), amount, period_start, period_type (monthly), rollover_enabled | Belongs to User or Household; optionally to Category | MVP |

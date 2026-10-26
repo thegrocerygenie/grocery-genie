@@ -9,6 +9,7 @@ from app.llm.provider import (
     LowConfidenceMockExtractor,
     get_receipt_extractor,
 )
+from tests.conftest import DEV_USER_ID
 
 # --- Helper ---
 
@@ -841,3 +842,125 @@ async def test_update_receipt_rejects_a_non_positive_quantity(
     )
 
     assert resp.status_code == 422
+
+
+# --- RC-02 AC 3: corrections keep the original extracted value ---
+# Each changed field is one row in receipt_corrections (user decision,
+# 2026-10-26), so the value as extracted survives the overwrite.
+
+
+async def _corrections(db_session, receipt_id: str) -> set[tuple]:
+    from sqlalchemy import select
+
+    from app.models.database import ReceiptCorrection
+
+    rows = await db_session.scalars(
+        select(ReceiptCorrection).where(
+            ReceiptCorrection.receipt_id == uuid.UUID(receipt_id)
+        )
+    )
+    return {
+        (
+            r.field,
+            str(r.line_item_id) if r.line_item_id else None,
+            r.original_value,
+            r.corrected_value,
+        )
+        for r in rows
+    }
+
+
+async def test_every_corrected_field_keeps_its_original_value(
+    client: AsyncClient, test_image_bytes: bytes, seeded_categories, db_session
+):
+    scan = await _create_receipt(client, test_image_bytes)
+    receipt_id = scan["receipt_id"]
+    item = scan["extraction"]["items"][0]  # Organic Bananas, 1 x 1.29
+    household = await _category_id(client, "Household")
+
+    resp = await client.patch(
+        f"/api/receipts/{receipt_id}",
+        json={
+            "store_name": "Corner Market",
+            "date": "2026-03-20",
+            "items": [
+                {
+                    "id": item["id"],
+                    "name": "Bananas",
+                    "category_id": household,
+                    "quantity": 2,
+                    "total_price": 2.58,
+                }
+            ],
+        },
+    )
+
+    assert resp.status_code == 200
+    assert await _corrections(db_session, receipt_id) == {
+        ("store_name", None, "Test Grocery Store", "Corner Market"),
+        ("date", None, "2026-03-15", "2026-03-20"),
+        ("name", item["id"], "Organic Bananas", "Bananas"),
+        ("category_id", item["id"], str(item["category_id"] or ""), household),
+        ("quantity", item["id"], "1", "2"),
+        ("total_price", item["id"], "1.29", "2.58"),
+    }
+
+
+async def test_a_second_edit_keeps_the_extracted_value(
+    client: AsyncClient, test_image_bytes: bytes, db_session
+):
+    scan = await _create_receipt(client, test_image_bytes)
+    receipt_id = scan["receipt_id"]
+    item_id = scan["extraction"]["items"][0]["id"]
+
+    for name in ("Banana", "Bananas"):
+        await client.patch(
+            f"/api/receipts/{receipt_id}",
+            json={"items": [{"id": item_id, "name": name}]},
+        )
+
+    assert await _corrections(db_session, receipt_id) == {
+        ("name", item_id, "Organic Bananas", "Banana"),
+        ("name", item_id, "Banana", "Bananas"),
+    }
+
+
+async def test_a_repeated_save_records_no_new_correction(
+    client: AsyncClient, test_image_bytes: bytes, db_session
+):
+    """A retried PATCH (the app re-sends on a dropped response) is a no-op."""
+    scan = await _create_receipt(client, test_image_bytes)
+    receipt_id = scan["receipt_id"]
+    body = {"store_name": "Corner Market", "date": "2026-03-20"}
+
+    await client.patch(f"/api/receipts/{receipt_id}", json=body)
+    await client.patch(f"/api/receipts/{receipt_id}", json=body)
+
+    from sqlalchemy import func, select
+
+    from app.models.database import ReceiptCorrection
+
+    count = await db_session.scalar(
+        select(func.count()).where(
+            ReceiptCorrection.receipt_id == uuid.UUID(receipt_id)
+        )
+    )
+    assert count == 2
+
+
+async def test_a_correction_records_who_made_it(
+    client: AsyncClient, test_image_bytes: bytes, db_session
+):
+    from sqlalchemy import select
+
+    from app.models.database import ReceiptCorrection
+
+    scan = await _create_receipt(client, test_image_bytes)
+
+    await client.patch(
+        f"/api/receipts/{scan['receipt_id']}", json={"store_name": "Corner Market"}
+    )
+
+    row = await db_session.scalar(select(ReceiptCorrection))
+    assert row.user_id == DEV_USER_ID
+    assert row.created_at is not None
