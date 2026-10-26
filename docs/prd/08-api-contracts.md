@@ -69,6 +69,24 @@ Budget vs. actual for specified period.
 }
 ```
 
+### GET /api/dashboard/spending?period=2026-03 [MVP]
+Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-month trend (oldest first, ending at `period`), and a month-over-month comparison per category. `category_changes` lists every category with spend in `period` or `previous_period`, largest current spend first; uncategorized spend is left out.
+
+**Response:**
+```json
+{
+  "period": "2026-03",
+  "overall": { "budget": 500, "spent": 35.0, "remaining": 465.0, "percent": 7.0 },
+  "categories": [ "…as in /api/budgets/summary" ],
+  "top_items": [ { "name": "Bananas", "total_spent": 5.0, "count": 1 } ],
+  "trend": [ { "period": "2026-01", "spent": 0.0, "budget": 500 }, "…", { "period": "2026-03", "spent": 35.0, "budget": 500 } ],
+  "previous_period": "2026-02",
+  "category_changes": [
+    { "category_id": "uuid", "name": "Groceries", "spent": 30.0, "previous_spent": 20.0 }
+  ]
+}
+```
+
 ## Price Intelligence [V1.1]
 
 ### GET /api/items/{canonical_id}/prices?store=...&from=...&to=...

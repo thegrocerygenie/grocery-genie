@@ -22,10 +22,19 @@ from app.models.schemas import (
     BudgetCreateRequest,
     BudgetOverallSummary,
     BudgetSummaryResponse,
+    DashboardCategoryChange,
     DashboardSpendingResponse,
     DashboardTopItem,
     DashboardTrendMonth,
 )
+
+
+def previous_period(period: str) -> str:
+    """Return the 'YYYY-MM' period one month before ``period``."""
+    year, month = int(period[:4]), int(period[5:7])
+    if month == 1:
+        return f"{year - 1:04d}-12"
+    return f"{year:04d}-{month - 1:02d}"
 
 
 class BudgetService:
@@ -366,6 +375,35 @@ class BudgetService:
 
         return trend
 
+    async def get_category_changes(
+        self, user_id: uuid.UUID, period: str
+    ) -> list[DashboardCategoryChange]:
+        """Compare each category's spend in ``period`` with the month before.
+
+        Covers every category with spend in either month, largest current spend
+        first. Uncategorized spend has no category to compare and is left out.
+        """
+        start, end = await self.get_period_dates(user_id, period)
+        prev_start, prev_end = await self.get_period_dates(
+            user_id, previous_period(period)
+        )
+        current = await self.get_spending_by_category(user_id, start, end)
+        previous = await self.get_spending_by_category(user_id, prev_start, prev_end)
+
+        cat_ids = {cid for cid in current.keys() | previous.keys() if cid is not None}
+        names = await self._get_category_names(cat_ids)
+        changes = [
+            DashboardCategoryChange(
+                category_id=cid,
+                name=names.get(cid, "Unknown"),
+                spent=round(current.get(cid, 0.0), 2),
+                previous_spent=round(previous.get(cid, 0.0), 2),
+            )
+            for cid in cat_ids
+        ]
+        changes.sort(key=lambda c: (-c.spent, -c.previous_spent, c.name))
+        return changes
+
     async def get_dashboard_data(
         self, user_id: uuid.UUID, period: str | None = None
     ) -> DashboardSpendingResponse:
@@ -378,6 +416,7 @@ class BudgetService:
         period_start, period_end = await self.get_period_dates(user_id, period)
         top_items = await self.get_top_items(user_id, period_start, period_end)
         trend = await self.get_spending_trend(user_id, period)
+        category_changes = await self.get_category_changes(user_id, period)
 
         return DashboardSpendingResponse(
             period=period,
@@ -385,6 +424,8 @@ class BudgetService:
             categories=summary.categories,
             top_items=top_items,
             trend=trend,
+            previous_period=previous_period(period),
+            category_changes=category_changes,
         )
 
     async def check_thresholds(

@@ -153,12 +153,23 @@ class DashboardTrendMonth(BaseModel):
     budget: float | None = None
 
 
+class DashboardCategoryChange(BaseModel):
+    """One category's spend in the period and in the month before it (BC-04)."""
+
+    category_id: uuid.UUID
+    name: str
+    spent: float
+    previous_spent: float
+
+
 class DashboardSpendingResponse(BaseModel):
     period: str
     overall: BudgetOverallSummary
     categories: list[BudgetCategorySummary]
     top_items: list[DashboardTopItem]
     trend: list[DashboardTrendMonth]
+    previous_period: str
+    category_changes: list[DashboardCategoryChange]
 
 
 # --- Notification ---
