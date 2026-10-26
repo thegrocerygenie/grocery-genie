@@ -165,6 +165,9 @@ class DashboardTopItem(BaseModel):
     name: str
     total_spent: float
     count: int
+    # The category holding most of the item's spend; None when uncategorized.
+    category_id: uuid.UUID | None = None
+    category_name: str | None = None
 
 
 class DashboardTrendCategory(BaseModel):

@@ -296,3 +296,71 @@ async def test_dashboard_trend_splits_each_month_by_category(
         {"category_id": str(groceries), "name": "Groceries", "spent": 30.0},
         {"category_id": None, "name": "Uncategorized", "spent": 7.0},
     ]
+
+
+async def _add_named_items(
+    db_session: AsyncSession, on: date, items: list[tuple[str, uuid.UUID | None, float]]
+) -> None:
+    receipt = Receipt(user_id=DEV_USER_ID, date=on, status="confirmed", currency="USD")
+    db_session.add(receipt)
+    await db_session.flush()
+    for name, category_id, price in items:
+        db_session.add(
+            LineItem(
+                receipt_id=receipt.id,
+                raw_name=name,
+                quantity=1,
+                unit_price=price,
+                total_price=price,
+                category_id=category_id,
+            )
+        )
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_dashboard_top_items_carry_their_category(
+    client: AsyncClient, seeded_db, db_session
+):
+    groceries = await _category_id(db_session, "Groceries")
+    beverages = await _category_id(db_session, "Beverages")
+
+    # "Cold brew" was filed under Groceries once and Beverages twice; the
+    # category with the most spend wins. "Gift card" has no category.
+    await _add_named_items(
+        db_session,
+        date(2026, 3, 3),
+        [("Cold brew", groceries, 4.0), ("Avocado", groceries, 6.0)],
+    )
+    await _add_named_items(
+        db_session,
+        date(2026, 3, 9),
+        [("Cold brew", beverages, 5.0), ("Cold brew", beverages, 5.0)],
+    )
+    await _add_named_items(db_session, date(2026, 3, 10), [("Gift card", None, 3.0)])
+
+    response = await client.get("/api/dashboard/spending?period=2026-03")
+
+    assert response.json()["top_items"] == [
+        {
+            "name": "Cold brew",
+            "total_spent": 14.0,
+            "count": 3,
+            "category_id": str(beverages),
+            "category_name": "Beverages",
+        },
+        {
+            "name": "Avocado",
+            "total_spent": 6.0,
+            "count": 1,
+            "category_id": str(groceries),
+            "category_name": "Groceries",
+        },
+        {
+            "name": "Gift card",
+            "total_spent": 3.0,
+            "count": 1,
+            "category_id": None,
+            "category_name": None,
+        },
+    ]
