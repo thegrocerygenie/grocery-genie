@@ -38,7 +38,7 @@ from app.models.schemas import (
     ReceiptUpdateRequest,
 )
 from app.services.analytics_service import AnalyticsService, get_analytics_service
-from app.services.receipt_service import ReceiptService
+from app.services.receipt_service import ReceiptAlreadyConfirmedError, ReceiptService
 
 router = APIRouter(prefix="/api/receipts", tags=["receipts"])
 
@@ -328,6 +328,8 @@ async def update_receipt(
     service = ReceiptService(db=db, analytics=analytics)
     try:
         receipt = await service.update_receipt(uuid.UUID(receipt_id), user.id, updates)
+    except ReceiptAlreadyConfirmedError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except ValueError as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail="Receipt not found") from None
