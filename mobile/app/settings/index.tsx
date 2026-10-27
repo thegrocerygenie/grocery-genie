@@ -309,7 +309,9 @@ const styles = StyleSheet.create({
   },
 
   signOut: {
-    height: 44,
+    // minHeight, not height: the label wraps at large text sizes.
+    minHeight: 44,
+    paddingVertical: spacing.sm,
     borderRadius: radii.list,
     backgroundColor: colors.iosBg2,
     alignItems: 'center',

@@ -120,7 +120,9 @@ const styles = StyleSheet.create({
   note: { ...type.footnote, color: colors.iosLabel2, paddingHorizontal: spacing.lg },
   error: { ...type.footnote, color: colors.red, paddingHorizontal: spacing.lg },
   button: {
-    height: 44,
+    // minHeight, not height: the label wraps at large text sizes.
+    minHeight: 44,
+    paddingVertical: spacing.sm,
     borderRadius: radii.list,
     backgroundColor: colors.iosBg2,
     alignItems: 'center',
