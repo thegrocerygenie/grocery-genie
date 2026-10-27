@@ -25,6 +25,19 @@ export async function signOut(): Promise<void> {
   await apiClient<void>('/api/auth/sign-out', { method: 'POST' });
 }
 
+/**
+ * Delete the signed-in account and everything it owns, on the server. A Sign
+ * in with Apple account must send a fresh authorization code.
+ */
+export async function deleteAccount(appleAuthorizationCode?: string): Promise<void> {
+  await apiClient<void>('/api/users/me', {
+    method: 'DELETE',
+    ...(appleAuthorizationCode
+      ? { body: JSON.stringify({ apple_authorization_code: appleAuthorizationCode }) }
+      : {}),
+  });
+}
+
 export async function verifyEmail(token: string): Promise<{ verified_at: string | null }> {
   return apiClient('/api/auth/verify-email', {
     method: 'POST',
