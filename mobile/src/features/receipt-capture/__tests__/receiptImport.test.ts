@@ -231,4 +231,46 @@ describe('importReceipt', () => {
     });
     expect(result).toEqual({ status: 'error', message: "This doesn't appear to be a receipt." });
   });
+
+  it.each([
+    ['a network failure', new TypeError('Network request failed')],
+    ['a server error', new ApiError(503, {})],
+  ])('queues the file to upload later after %s', async (_label, error) => {
+    const queue = jest.fn();
+    const result = await importReceipt({
+      pick: async () => ({ status: 'picked', receipt: picked }),
+      upload: async () => {
+        throw error;
+      },
+      queue,
+    });
+    expect(queue).toHaveBeenCalledWith(picked);
+    expect(result).toEqual({ status: 'queued' });
+  });
+
+  it('does not queue a file the server rejected', async () => {
+    const queue = jest.fn();
+    const result = await importReceipt({
+      pick: async () => ({ status: 'picked', receipt: picked }),
+      upload: async () => {
+        throw new ApiError(422, { detail: 'Image quality insufficient' });
+      },
+      queue,
+    });
+    expect(queue).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: 'error', message: 'Image quality insufficient' });
+  });
+
+  it('reports the error when saving to the queue fails', async () => {
+    const result = await importReceipt({
+      pick: async () => ({ status: 'picked', receipt: picked }),
+      upload: async () => {
+        throw new TypeError('Network request failed');
+      },
+      queue: () => {
+        throw new Error('disk full');
+      },
+    });
+    expect(result).toMatchObject({ status: 'error' });
+  });
 });
