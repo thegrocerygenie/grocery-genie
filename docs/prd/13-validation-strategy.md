@@ -308,6 +308,25 @@ Physical device only:
 
 Simulator run on 2026-10-27: iPhone 17e, iOS 27, Expo Go, backend on Postgres. Every item marked [x] passed. The run found that the Delete account and Sign out buttons clipped their labels at the largest accessibility text size; they now grow with the text. For the Apple cancel item, the test account was marked as Apple-linked directly in the scratch database, because the local backend has no Apple keys. The Simulator had no Apple Account, so iOS showed "Sign in to your Apple Account", which the app handled as a cancel. Not run: the Pending-receipt item. Its logic is covered by `clearLocalAccountData.test.ts`.
 
+**Native Back button (H3):**
+
+On iOS 26 and later, react-native-screens 4.16 left the native Back button dead on the second screen pushed over the tabs: the tap scrolled the screen to the top instead. `patches/react-native-screens+4.16.0.patch` fixes this in the app's own build. Expo Go has its own compiled copy of the library, so the bug stays in Expo Go. Run these checks on a development or release build (`npx expo run:ios`), not in Expo Go.
+
+- [x] Budget → See 3-month trend → Back → See 3-month trend → Back. Both Back taps return to Budget.
+- [x] Same with Top items, and with History → a receipt → Back, twice each.
+- [x] Trend → edge swipe back (start at the left edge) → Trend → Back. Back returns to Budget.
+- [x] Trend → start an edge swipe, then release it halfway so Trend stays → Back. Back returns to Budget.
+- [x] Tap Back twice fast on Trend: one screen pops, not two.
+- [x] After all of the above, the tab bar and the History rows respond to taps.
+
+Simulator run on 2026-10-27 (iPhone 18 Pro, iOS 27). In Expo Go, and in a debug build without the patch, the second Back was dead every time, with or without an edge swipe. Showing a header on the `(tabs)` screen made it work, which matches react-native-screens#3294. In a debug build with the patch, every item marked [x] passed. The app-wide freeze in the H3 report did not happen in 6 tries; the cancelled edge swipe only blanked Trend's large title.
+
+That debug build needed three local changes to the generated, gitignored `ios/` project. Without them, `npx expo run:ios` fails or the app does not open on iOS 27:
+- `pod install` fails: Google Sign-In's `AppCheckCore` needs modular headers for `GoogleUtilities` and `RecaptchaInterop`.
+- Xcode 27 rejects pod targets with an iOS deployment target below 15.0.
+- iOS 27 stops the app at launch, because the Expo SDK 54 app delegate does not use the UIScene lifecycle.
+Also, `expo run:ios` treats an Xcode 27 Simulator as a physical device, so the build ran through `xcodebuild` and `simctl install`.
+
 **Accessibility:**
 - [ ] VoiceOver reads all screen elements in logical order.
 - [ ] Receipt review screen: each field announced with label and value.
