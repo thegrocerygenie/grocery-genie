@@ -53,3 +53,6 @@ backend/uploads/
 
 # Verification runs (verify-* skills): state and evidence
 .verification/
+
+# Production secrets (docker/.env.production.example is the committed template)
+docker/.env.production
