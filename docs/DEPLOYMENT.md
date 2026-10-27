@@ -184,27 +184,55 @@ Caddy handles automatic HTTPS certificate provisioning via Let's Encrypt. No man
 ### 1.5 Environment Variables (.env.production)
 
 ```bash
+# Settings reads only GG_-prefixed names (app/core/config.py, env_prefix="GG_").
+# A name without the prefix is ignored, and the setting keeps its default.
+
 # Database — Supabase connection string
 # Get from: Supabase Dashboard → Settings → Database → Connection string → URI
 # Use the "Session pooler" connection string for long-lived connections
-DATABASE_URL=postgresql+asyncpg://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
+GG_DATABASE_URL=postgresql+asyncpg://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
 
 # Redis — local container
-REDIS_URL=redis://redis:6379/0
+GG_REDIS_URL=redis://redis:6379/0
 
-# LLM
-ANTHROPIC_API_KEY=sk-ant-...
+# LLM — the app passes GG_LLM_API_KEY to LiteLLM as api_key.
+GG_LLM_PROVIDER=anthropic
 GG_LLM_MODEL=claude-sonnet-5-5
+GG_LLM_API_KEY=sk-ant-...
 # Leave GG_LLM_TEMPERATURE unset: Claude Sonnet 5.5 rejects any non-default value.
 
 # App
-SECRET_KEY=<generate with: python -c "import secrets; print(secrets.token_hex(32))">
-ALLOWED_ORIGINS=https://grocerygenie.app
-ENVIRONMENT=production
+# Signs access and refresh tokens. Startup fails if it is the dev default or
+# shorter than 32 characters.
+GG_JWT_SECRET=<generate with: python -c "import secrets; print(secrets.token_hex(32))">
+# A JSON list. GG_DEBUG defaults to false, which is production mode.
+GG_CORS_ORIGINS=["https://grocerygenie.app"]
 
-# Image storage
-STORAGE_PATH=/app/storage
-STORAGE_BASE_URL=https://api.grocerygenie.app/static/receipts
+# Image storage — must be the receipt_images volume mount (/app/storage) that
+# the api and worker share. Any other path puts images on each container's own
+# disk: a rebuild loses them, the backup misses them, and the purge task cannot
+# delete them. Images are served only through authenticated API routes, so
+# there is no public base URL to set.
+GG_STORAGE_PATH=/app/storage
+
+# Email — Resend. Without the key, verify and reset emails are only logged.
+# The sender must be on a domain verified in Resend.
+GG_RESEND_API_KEY=re_...
+GG_RESEND_FROM=Grocery Genie <noreply@grocerygenie.app>
+
+# Sign in with Apple — from Apple Developer → Certificates, IDs & Profiles → Keys
+# (a key with Sign in with Apple enabled). The client ID is the iOS bundle ID.
+GG_APPLE_TEAM_ID=<10-character Team ID>
+GG_APPLE_KEY_ID=<10-character Key ID>
+GG_APPLE_CLIENT_ID=com.grocerygenie.app
+# The .p8 file contents on one line, in double quotes: join its lines with
+# the two characters \n. Compose turns each \n back into a newline.
+GG_APPLE_PRIVATE_KEY="<.p8 file lines joined with \n>"
+
+# Sign in with Google — the app passes webClientId, so Google's ID tokens carry
+# the web client ID as audience. Use the same value as the mobile build's
+# EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.
+GG_GOOGLE_CLIENT_ID=<web client ID>.apps.googleusercontent.com
 
 # Push notifications — sent through Expo's push service, which forwards to
 # APNs. The APNs key is uploaded to EAS (see 2.2), not configured here.
@@ -231,7 +259,7 @@ STORAGE_BASE_URL=https://api.grocerygenie.app/static/receipts
 
 4. **Run migrations from your local machine or VPS:**
    ```bash
-   # Set DATABASE_URL to your Supabase connection string
+   # Set GG_DATABASE_URL to your Supabase connection string
    cd backend
    alembic upgrade head
    ```
