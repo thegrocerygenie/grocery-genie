@@ -3,7 +3,7 @@
  * once more in a destructive alert, then deletes and leaves for onboarding.
  */
 import React from 'react';
-import { Alert, type AlertButton } from 'react-native';
+import { Alert, StyleSheet, type AlertButton, type ViewStyle } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 
@@ -120,5 +120,15 @@ describe('Delete account screen', () => {
 
     expect(screen.getByText(/your account was not deleted/i)).toBeTruthy();
     expect(screen.getByText(message)).toBeTruthy();
+  });
+
+  it('lets the Delete button grow with large text instead of clipping its label', () => {
+    renderScreen();
+
+    const style = StyleSheet.flatten(
+      screen.getByLabelText('Delete account', { exact: true }).props.style,
+    ) as ViewStyle;
+    expect(style.height).toBeUndefined();
+    expect(style.minHeight).toBeGreaterThanOrEqual(44);
   });
 });
