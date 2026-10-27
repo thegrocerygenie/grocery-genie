@@ -134,9 +134,7 @@ function PendingRow({ receipt, isConnected, showDivider, onPressFailed }: Pendin
         <Text style={type.body}>Scanned receipt</Text>
         <Text style={[styles.detail, failed && styles.detailFailed]}>{detail}</Text>
       </View>
-      {failed ? (
-        <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3 as string} />
-      ) : null}
+      {failed ? <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} /> : null}
     </Pressable>
   );
 }
@@ -164,7 +162,7 @@ const styles = StyleSheet.create({
   bannerAction: { ...type.caption1, color: colors.orange, fontWeight: '600' },
   sectionLabel: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     paddingHorizontal: spacing.lg,
@@ -198,6 +196,6 @@ const styles = StyleSheet.create({
   iconQueued: { backgroundColor: colors.orange },
   iconFailed: { backgroundColor: colors.red },
   rowText: { flex: 1, minWidth: 0 },
-  detail: { ...type.caption1, color: colors.iosLabel2 as string, marginTop: 1 },
+  detail: { ...type.caption1, color: colors.iosLabel2, marginTop: 1 },
   detailFailed: { color: colors.red },
 });

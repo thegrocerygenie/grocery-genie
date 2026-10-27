@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   draftText: { ...type.footnote, color: colors.orange, fontWeight: '600' },
-  updated: { ...type.footnote, color: colors.iosLabel2 as string },
+  updated: { ...type.footnote, color: colors.iosLabel2 },
   section: {
     backgroundColor: colors.iosBg2,
     borderRadius: radii.list,
@@ -56,5 +56,5 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   heading: { ...type.headline },
-  paragraph: { ...type.subheadline, color: colors.iosLabel as string, lineHeight: 21 },
+  paragraph: { ...type.subheadline, color: colors.iosLabel, lineHeight: 21 },
 });

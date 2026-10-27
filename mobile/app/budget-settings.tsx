@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
   View,
+  type ColorValue,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -284,14 +285,14 @@ function RowAmountInput({ label, value, onChangeText, placeholder }: RowAmountIn
     <View style={styles.row}>
       <Text style={type.body}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {value ? <Text style={[type.body, { color: colors.iosLabel as string }]}>$</Text> : null}
+        {value ? <Text style={[type.body, { color: colors.iosLabel }]}>$</Text> : null}
         <TextInput
-          style={[type.body, styles.input, { color: colors.iosLabel as string }]}
+          style={[type.body, styles.input, { color: colors.iosLabel }]}
           value={value}
           onChangeText={onChangeText}
           keyboardType="decimal-pad"
           placeholder={placeholder ?? ''}
-          placeholderTextColor={colors.iosLabel3 as string}
+          placeholderTextColor={colors.iosLabel3}
           accessibilityLabel={label}
         />
       </View>
@@ -312,23 +313,21 @@ function RowNumericInput({ label, value, onChangeText, suffix }: RowNumericInput
       <Text style={type.body}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
         <TextInput
-          style={[type.body, styles.input, { color: colors.iosLabel as string, minWidth: 30 }]}
+          style={[type.body, styles.input, { color: colors.iosLabel, minWidth: 30 }]}
           value={value}
           onChangeText={onChangeText}
           keyboardType="number-pad"
           maxLength={2}
           accessibilityLabel={label}
         />
-        {suffix ? (
-          <Text style={[type.body, { color: colors.iosLabel2 as string }]}>{suffix}</Text>
-        ) : null}
+        {suffix ? <Text style={[type.body, { color: colors.iosLabel2 }]}>{suffix}</Text> : null}
       </View>
     </View>
   );
 }
 
 interface RowCategoryInputProps {
-  cat: { id: string; name: string; color: string; symbol: string };
+  cat: { id: string; name: string; color: ColorValue; symbol: string };
   value: string;
   onChangeText: (v: string) => void;
   showDivider: boolean;
@@ -346,14 +345,14 @@ function RowCategoryInput({ cat, value, onChangeText, showDivider }: RowCategory
       </View>
       <Text style={[type.body, { flex: 1 }]}>{cat.name}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {value ? <Text style={[type.body, { color: colors.iosLabel2 as string }]}>$</Text> : null}
+        {value ? <Text style={[type.body, { color: colors.iosLabel2 }]}>$</Text> : null}
         <TextInput
-          style={[type.body, styles.input, { color: colors.iosLabel2 as string, minWidth: 60 }]}
+          style={[type.body, styles.input, { color: colors.iosLabel2, minWidth: 60 }]}
           value={value}
           onChangeText={onChangeText}
           keyboardType="decimal-pad"
           placeholder="$0.00"
-          placeholderTextColor={colors.iosLabel3 as string}
+          placeholderTextColor={colors.iosLabel3}
           accessibilityLabel={`${cat.name} budget amount`}
         />
       </View>
@@ -362,19 +361,19 @@ function RowCategoryInput({ cat, value, onChangeText, showDivider }: RowCategory
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.iosBg as string },
+  root: { flex: 1, backgroundColor: colors.iosBg },
   headerBtn: { ...type.body, color: colors.tint },
 
   sectionLabel: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     letterSpacing: 0.5,
     paddingHorizontal: 16,
     paddingBottom: 6,
   },
   sectionFooter: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     paddingHorizontal: 16,
     paddingTop: 6,
   },

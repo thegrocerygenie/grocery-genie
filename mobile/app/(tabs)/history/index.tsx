@@ -124,7 +124,7 @@ function ReceiptRow({ receipt, showDivider, categories, onPress, onDelete }: Rec
           style={[
             type.caption1,
             {
-              color: needsReview ? colors.orange : (colors.iosLabel2 as string),
+              color: needsReview ? colors.orange : colors.iosLabel2,
               marginTop: 1,
             },
           ]}
@@ -133,7 +133,7 @@ function ReceiptRow({ receipt, showDivider, categories, onPress, onDelete }: Rec
         </Text>
       </View>
       <Text style={[type.money, { fontSize: 15 }]}>${total.toFixed(2)}</Text>
-      <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3 as string} />
+      <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
     </Pressable>
   );
 }
@@ -149,7 +149,7 @@ function EmptyState({ hasQuery }: EmptyStateProps) {
         <SymbolView
           name={hasQuery ? 'magnifyingglass' : 'clock.fill'}
           size={26}
-          tintColor={colors.iosLabel2 as string}
+          tintColor={colors.iosLabel2}
         />
       </View>
       <Text style={type.headline}>{hasQuery ? 'No matches' : 'No receipts yet'}</Text>
@@ -157,7 +157,7 @@ function EmptyState({ hasQuery }: EmptyStateProps) {
         style={[
           type.footnote,
           {
-            color: colors.iosLabel2 as string,
+            color: colors.iosLabel2,
             textAlign: 'center',
             maxWidth: 220,
             lineHeight: 19,
@@ -363,7 +363,7 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.iosBg as string },
+  root: { flex: 1, backgroundColor: colors.iosBg },
   listContent: {
     padding: spacing.lg,
     paddingBottom: 120,
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     paddingHorizontal: spacing.lg,

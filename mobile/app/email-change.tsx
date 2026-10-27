@@ -103,10 +103,7 @@ export default function EmailChangeScreen() {
             <View style={styles.row}>
               <Text style={styles.rowLabel}>Current</Text>
               <Text
-                style={[
-                  type.body,
-                  { color: colors.iosLabel2 as string, flex: 1, textAlign: 'right' },
-                ]}
+                style={[type.body, { color: colors.iosLabel2, flex: 1, textAlign: 'right' }]}
                 numberOfLines={1}
               >
                 {profile?.email ?? '—'}
@@ -122,7 +119,7 @@ export default function EmailChangeScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
-                placeholderTextColor={colors.iosLabel3 as string}
+                placeholderTextColor={colors.iosLabel3}
                 style={[type.body, styles.input]}
                 accessibilityLabel="New email"
               />
@@ -137,7 +134,7 @@ export default function EmailChangeScreen() {
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
-                placeholderTextColor={colors.iosLabel3 as string}
+                placeholderTextColor={colors.iosLabel3}
                 style={[type.body, styles.input]}
                 accessibilityLabel="Current password"
               />
@@ -168,7 +165,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     ...type.subheadline,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     textAlign: 'center',
     lineHeight: 21,
     maxWidth: 320,
@@ -194,8 +191,8 @@ const styles = StyleSheet.create({
     minHeight: 48,
     gap: 10,
   },
-  rowLabel: { ...type.body, color: colors.iosLabel as string, width: 92 },
-  input: { flex: 1, color: colors.iosLabel as string, paddingVertical: 13, textAlign: 'right' },
+  rowLabel: { ...type.body, color: colors.iosLabel, width: 92 },
+  input: { flex: 1, color: colors.iosLabel, paddingVertical: 13, textAlign: 'right' },
   separator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.iosSeparator,

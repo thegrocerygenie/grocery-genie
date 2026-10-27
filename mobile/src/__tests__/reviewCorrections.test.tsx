@@ -10,6 +10,7 @@ import { act, fireEvent, renderRouter, screen, within } from 'expo-router/testin
 import ReviewScreen from '../../app/review';
 import { useReceiptStore } from '@/store/receiptStore';
 import type { ReceiptResponse, ReceiptScanResponse } from '@/features/receipt-capture/types';
+import { colors } from '@/constants/theme';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 // The native picker has no JS renderer in Jest; stand in a view that keeps
@@ -349,7 +350,7 @@ describe('Review screen low-confidence flags (AC 2)', () => {
     expect(screen.queryByText('verify')).toBeNull();
     const category = screen.getByLabelText(/^Category .*, tap to change$/);
     expect(category.props.accessibilityLabel).not.toMatch(/low confidence/);
-    expect(category).not.toHaveStyle({ borderColor: '#FF9500' });
+    expect(category).not.toHaveStyle({ borderColor: colors.orange });
   });
 
   it('rings the category of an item categorised with low confidence', () => {
@@ -357,7 +358,7 @@ describe('Review screen low-confidence flags (AC 2)', () => {
     renderReview();
 
     const category = screen.getByLabelText(/^Category .*, low confidence, tap to change$/);
-    expect(category).toHaveStyle({ borderColor: '#FF9500' });
+    expect(category).toHaveStyle({ borderColor: colors.orange });
   });
 });
 
@@ -384,13 +385,13 @@ describe('Review screen store, date and total flags (AC 2)', () => {
 
     expect(screen.getAllByText('verify')).toHaveLength(3);
     const store = screen.getByLabelText('Store');
-    expect(store).toHaveStyle({ color: '#FF9500' });
+    expect(store).toHaveStyle({ color: colors.orange });
     expect(store.props.accessibilityHint).toMatch(/low confidence/i);
     expect(screen.getByLabelText('Receipt date').props.accessibilityHint).toMatch(
       /low confidence/i,
     );
     const total = screen.getByLabelText('Total, $1.29, low confidence');
-    expect(within(total).getByText('$1.29')).toHaveStyle({ color: '#FF9500' });
+    expect(within(total).getByText('$1.29')).toHaveStyle({ color: colors.orange });
   });
 
   it('does not flag store, date or total at the threshold', () => {
@@ -403,7 +404,7 @@ describe('Review screen store, date and total flags (AC 2)', () => {
 
     expect(screen.queryByText('verify')).toBeNull();
     const store = screen.getByLabelText('Store');
-    expect(store).not.toHaveStyle({ color: '#FF9500' });
+    expect(store).not.toHaveStyle({ color: colors.orange });
     expect(store.props.accessibilityHint).toBeUndefined();
     expect(screen.getByLabelText('Receipt date').props.accessibilityHint).toBeUndefined();
     expect(screen.getByLabelText('Total, $1.29')).toBeTruthy();
@@ -430,7 +431,7 @@ describe('Review screen store, date and total flags (AC 2)', () => {
 
     expect(screen.getAllByText('verify')).toHaveLength(1);
     expect(screen.getByLabelText('Total, $1.29, low confidence')).toBeTruthy();
-    expect(screen.getByLabelText('Store')).not.toHaveStyle({ color: '#FF9500' });
+    expect(screen.getByLabelText('Store')).not.toHaveStyle({ color: colors.orange });
   });
 });
 
@@ -507,7 +508,7 @@ describe('Review opened from History', () => {
 
     expect(await screen.findByLabelText('Total, $1.29, low confidence')).toBeTruthy();
     expect(screen.getAllByText('verify')).toHaveLength(3);
-    expect(screen.getByLabelText('Store')).toHaveStyle({ color: '#FF9500' });
+    expect(screen.getByLabelText('Store')).toHaveStyle({ color: colors.orange });
   });
 
   it('edits a confirmed receipt from its detail screen without confirming it again', async () => {

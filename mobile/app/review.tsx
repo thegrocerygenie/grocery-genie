@@ -9,13 +9,14 @@ import {
   Text,
   TextInput,
   View,
+  useColorScheme,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useQuery } from '@tanstack/react-query';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
-import { colors, radii, spacing, type } from '@/constants/theme';
+import { TINT_HEX, colors, radii, spacing, type } from '@/constants/theme';
 import { resolveCategoryMeta } from '@/constants/categories';
 import { CategoryPickerSheet } from '@/components/CategoryPickerSheet';
 import { useReceiptConfirm } from '@/features/receipt-capture/hooks/useReceiptReview';
@@ -196,7 +197,7 @@ export default function ReviewScreen() {
   if (!activeScanResponse && !fetchedReceipt) {
     return (
       <View style={[styles.root, styles.center]}>
-        <Text style={[type.body, { color: colors.iosLabel2 as string, textAlign: 'center' }]}>
+        <Text style={[type.body, { color: colors.iosLabel2, textAlign: 'center' }]}>
           No receipt data. Please scan a receipt first.
         </Text>
       </View>
@@ -284,10 +285,7 @@ export default function ReviewScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[type.footnote, { fontWeight: '600' }]}>Confirm before saving</Text>
               <Text
-                style={[
-                  type.caption1,
-                  { color: colors.iosLabel2 as string, marginTop: 2, lineHeight: 16 },
-                ]}
+                style={[type.caption1, { color: colors.iosLabel2, marginTop: 2, lineHeight: 16 }]}
               >
                 {(displayTotal ?? 0) >= HIGH_VALUE_TOTAL
                   ? 'This receipt is over $500.'
@@ -424,14 +422,14 @@ function ListRow({ label, value, chevron, lowConfidence }: ListRowProps) {
         <Text
           style={[
             type.body,
-            { color: colors.iosLabel2 as string },
+            { color: colors.iosLabel2 },
             lowConfidence && styles.lowConfidenceValue,
           ]}
         >
           {value}
         </Text>
         {chevron ? (
-          <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3 as string} />
+          <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
         ) : null}
       </View>
     </View>
@@ -467,7 +465,7 @@ function ListInputRow({
         placeholder={placeholder}
         accessibilityLabel={label}
         accessibilityHint={lowConfidence ? LOW_CONFIDENCE_HINT : undefined}
-        placeholderTextColor={colors.iosLabel3 as string}
+        placeholderTextColor={colors.iosLabel3}
       />
     </View>
   );
@@ -482,6 +480,7 @@ interface ListDateRowProps {
 }
 
 function ListDateRow({ label, value, onChange, lowConfidence }: ListDateRowProps) {
+  const scheme = useColorScheme();
   return (
     <View style={styles.row}>
       <Text style={type.body}>{label}</Text>
@@ -498,7 +497,8 @@ function ListDateRow({ label, value, onChange, lowConfidence }: ListDateRowProps
         onChange={(event, picked) => {
           if (event.type === 'set' && picked) onChange(toIsoDate(picked));
         }}
-        accentColor={colors.tint}
+        // The picker takes only a string, so pick the brand green per appearance.
+        accentColor={scheme === 'dark' ? TINT_HEX.dark : TINT_HEX.light}
         accessibilityLabel="Receipt date"
         accessibilityHint={lowConfidence ? LOW_CONFIDENCE_HINT : undefined}
       />
@@ -678,7 +678,7 @@ function ItemRow({
               type.body,
               {
                 fontWeight: '600',
-                color: lowConf ? colors.orange : (colors.iosLabel as string),
+                color: lowConf ? colors.orange : colors.iosLabel,
               },
             ]}
           >
@@ -691,7 +691,7 @@ function ItemRow({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.iosBg as string },
+  root: { flex: 1, backgroundColor: colors.iosBg },
   center: { alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
 
   headerBtn: { ...type.body, color: colors.tint },
@@ -704,7 +704,7 @@ const styles = StyleSheet.create({
 
   sectionLabel: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     letterSpacing: 0.5,
     paddingHorizontal: 16,
     paddingBottom: 6,
@@ -736,7 +736,7 @@ const styles = StyleSheet.create({
   },
 
   inputValue: {
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     flex: 1,
     textAlign: 'right',
     paddingVertical: 0,
@@ -745,7 +745,7 @@ const styles = StyleSheet.create({
   itemInfo: { flex: 1, gap: 2 },
   quantityText: {
     ...type.caption1,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
   },
   nameInput: {
     color: colors.tint,
@@ -781,7 +781,7 @@ const styles = StyleSheet.create({
   dateFlag: { flex: 1, alignItems: 'flex-end' },
 
   highValueBanner: {
-    backgroundColor: 'rgba(255,149,0,0.12)',
+    backgroundColor: colors.orangeBg,
     borderRadius: radii.list,
     padding: spacing.md,
     flexDirection: 'row',

@@ -84,6 +84,6 @@ const styles = StyleSheet.create({
   },
   previewImage: { width: '100%', height: '100%' },
   title: { ...type.headline, color: colors.iosLabel, textAlign: 'center' },
-  caption: { ...type.footnote, color: colors.iosLabel2 as string, textAlign: 'center' },
+  caption: { ...type.footnote, color: colors.iosLabel2, textAlign: 'center' },
   spinner: { marginTop: spacing.md },
 });

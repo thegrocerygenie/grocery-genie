@@ -107,7 +107,7 @@ export default function SignUpScreen() {
               accessibilityRole="button"
               accessibilityLabel="Continue with Apple"
             >
-              <SymbolView name="apple.logo" size={18} tintColor="#fff" />
+              <SymbolView name="apple.logo" size={18} tintColor={colors.appleButtonLabel} />
               <Text style={styles.appleBtnLabel}>Continue with Apple</Text>
             </Pressable>
           )}
@@ -147,7 +147,7 @@ export default function SignUpScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
-                placeholderTextColor={colors.iosLabel3 as string}
+                placeholderTextColor={colors.iosLabel3}
                 style={styles.input}
                 accessibilityLabel="Email"
               />
@@ -161,7 +161,7 @@ export default function SignUpScreen() {
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
-                placeholderTextColor={colors.iosLabel3 as string}
+                placeholderTextColor={colors.iosLabel3}
                 style={styles.input}
                 accessibilityLabel="Password"
               />
@@ -174,7 +174,7 @@ export default function SignUpScreen() {
                 <SymbolView
                   name={showPassword ? 'eye.slash' : 'eye'}
                   size={16}
-                  tintColor={colors.iosLabel2 as string}
+                  tintColor={colors.iosLabel2}
                 />
               </Pressable>
             </View>
@@ -239,12 +239,12 @@ const styles = StyleSheet.create({
     fontSize: 32,
     letterSpacing: -0.6,
     fontFamily: WORDMARK_FONT,
-    color: colors.iosLabel as string,
+    color: colors.iosLabel,
     textAlign: 'center',
   },
   subhead: {
     ...type.subheadline,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: 280,
@@ -253,13 +253,13 @@ const styles = StyleSheet.create({
   appleBtn: {
     height: 50,
     borderRadius: radii.button,
-    backgroundColor: '#000',
+    backgroundColor: colors.appleButton,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  appleBtnLabel: { color: '#fff', ...type.headline, fontWeight: '500' },
+  appleBtnLabel: { ...type.headline, color: colors.appleButtonLabel, fontWeight: '500' },
 
   googleBtn: {
     height: 50,
@@ -272,14 +272,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  googleBtnLabel: { color: colors.iosLabel as string, ...type.headline, fontWeight: '500' },
+  googleBtnLabel: { ...type.headline, color: colors.iosLabel, fontWeight: '500' },
   googleGlyph: {
     width: 18,
     height: 18,
     borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#fff', // fixed: Google's mark sits on white in both appearances
   },
   googleGlyphText: {
     fontSize: 13,
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.iosSeparator },
-  dividerText: { ...type.caption1, color: colors.iosLabel2 as string },
+  dividerText: { ...type.caption1, color: colors.iosLabel2 },
 
   listCard: {
     backgroundColor: colors.iosBg2,
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   },
   input: {
     ...type.subheadline,
-    color: colors.iosLabel as string,
+    color: colors.iosLabel,
     paddingVertical: 13,
     flex: 1,
   },
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
   },
   hint: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     marginTop: -spacing.sm,
     paddingHorizontal: 16,
   },
@@ -332,11 +332,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnLabel: { color: '#fff', ...type.headline },
+  primaryBtnLabel: { ...type.headline, color: colors.onTint },
 
   legal: {
     ...type.caption2,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     textAlign: 'center',
     lineHeight: 16,
   },
@@ -347,6 +347,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  footerText: { ...type.footnote, color: colors.iosLabel2 as string },
+  footerText: { ...type.footnote, color: colors.iosLabel2 },
   footerLink: { ...type.footnote, color: colors.tint, fontWeight: '600' },
 });

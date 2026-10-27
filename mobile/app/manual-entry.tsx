@@ -134,7 +134,7 @@ export default function ManualEntryScreen() {
 
           <View style={styles.listCard}>
             <View style={styles.row}>
-              <Text style={[type.body, { color: colors.iosLabel2 as string }]}>Store</Text>
+              <Text style={[type.body, { color: colors.iosLabel2 }]}>Store</Text>
               <TextInput
                 value={storeName}
                 onChangeText={setStoreName}
@@ -146,15 +146,13 @@ export default function ManualEntryScreen() {
             </View>
             <View style={styles.separator} />
             <View style={styles.row}>
-              <Text style={[type.body, { color: colors.iosLabel2 as string }]}>Date</Text>
-              <Text style={[type.body, { color: colors.iosLabel as string }]}>
-                {formatDate(date)}
-              </Text>
+              <Text style={[type.body, { color: colors.iosLabel2 }]}>Date</Text>
+              <Text style={[type.body, { color: colors.iosLabel }]}>{formatDate(date)}</Text>
             </View>
             <View style={styles.separator} />
             <View style={styles.row}>
-              <Text style={[type.body, { color: colors.iosLabel2 as string }]}>Total</Text>
-              <Text style={[type.money, { fontSize: 17, color: colors.iosLabel as string }]}>
+              <Text style={[type.body, { color: colors.iosLabel2 }]}>Total</Text>
+              <Text style={[type.money, { fontSize: 17, color: colors.iosLabel }]}>
                 ${total.toFixed(2)}
               </Text>
             </View>
@@ -168,7 +166,7 @@ export default function ManualEntryScreen() {
                     value={item.name}
                     onChangeText={(v) => updateItem(item.id, { name: v })}
                     placeholder={`Item ${i + 1}`}
-                    placeholderTextColor={colors.iosLabel3 as string}
+                    placeholderTextColor={colors.iosLabel3}
                     style={[type.body, styles.itemNameInput]}
                     accessibilityLabel={`Item ${i + 1} name`}
                   />
@@ -176,7 +174,7 @@ export default function ManualEntryScreen() {
                     value={item.price}
                     onChangeText={(v) => updateItem(item.id, { price: v })}
                     placeholder="$0.00"
-                    placeholderTextColor={colors.iosLabel3 as string}
+                    placeholderTextColor={colors.iosLabel3}
                     keyboardType="decimal-pad"
                     style={[type.body, styles.itemPriceInput]}
                     accessibilityLabel={`Item ${i + 1} price`}
@@ -187,11 +185,7 @@ export default function ManualEntryScreen() {
                     accessibilityRole="button"
                     accessibilityLabel="Remove item"
                   >
-                    <SymbolView
-                      name="minus.circle.fill"
-                      size={18}
-                      tintColor={colors.iosLabel3 as string}
-                    />
+                    <SymbolView name="minus.circle.fill" size={18} tintColor={colors.iosLabel3} />
                   </Pressable>
                 </View>
               ))}
@@ -214,7 +208,7 @@ export default function ManualEntryScreen() {
           </Pressable>
 
           <View style={styles.tip}>
-            <Text style={[type.caption1, { color: colors.iosLabel2 as string, lineHeight: 18 }]}>
+            <Text style={[type.caption1, { color: colors.iosLabel2, lineHeight: 18 }]}>
               You can also retake the photo with better lighting. Manual receipts work like scanned
               ones.
             </Text>
@@ -231,7 +225,7 @@ const styles = StyleSheet.create({
 
   intro: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     paddingHorizontal: 4,
   },
 
@@ -257,7 +251,7 @@ const styles = StyleSheet.create({
   },
   input: {
     ...type.body,
-    color: colors.iosLabel as string,
+    color: colors.iosLabel,
     flex: 1,
     textAlign: 'right',
     paddingVertical: 0,
@@ -277,12 +271,12 @@ const styles = StyleSheet.create({
   },
   itemNameInput: {
     flex: 1,
-    color: colors.iosLabel as string,
+    color: colors.iosLabel,
     paddingVertical: 0,
   },
   itemPriceInput: {
     minWidth: 80,
-    color: colors.iosLabel as string,
+    color: colors.iosLabel,
     textAlign: 'right',
     paddingVertical: 0,
   },
@@ -298,7 +292,7 @@ const styles = StyleSheet.create({
   },
 
   tip: {
-    backgroundColor: 'rgba(0,122,255,0.08)',
+    backgroundColor: colors.blueBg,
     borderRadius: radii.card,
     padding: 12,
   },

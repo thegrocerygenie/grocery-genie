@@ -103,12 +103,12 @@ export default function OnboardingBudget() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.iosBg as string },
+  root: { flex: 1, backgroundColor: colors.iosBg },
   headerBtn: { ...type.body, color: colors.tint },
 
   sectionLabel: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     letterSpacing: 0.5,
     paddingHorizontal: 16,
     paddingTop: 8,
@@ -124,19 +124,19 @@ const styles = StyleSheet.create({
   amountCurrency: {
     ...type.money,
     fontSize: 32,
-    color: colors.iosLabel3 as string,
+    color: colors.iosLabel3,
   },
   amountInput: {
     ...type.money,
     fontSize: 56,
-    color: colors.iosLabel as string,
+    color: colors.iosLabel,
     minWidth: 120,
     textAlign: 'center',
     padding: 0,
   },
   amountHint: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     textAlign: 'center',
   },
 
@@ -147,5 +147,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnLabel: { color: '#fff', ...type.headline },
+  primaryBtnLabel: { ...type.headline, color: colors.onTint },
 });

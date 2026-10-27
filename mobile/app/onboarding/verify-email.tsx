@@ -70,7 +70,7 @@ export default function VerifyEmailScreen() {
           </Text>
           {secondsLeft > 0 ? (
             <View style={styles.timerPill}>
-              <SymbolView name="clock" size={13} tintColor={colors.iosLabel2 as string} />
+              <SymbolView name="clock" size={13} tintColor={colors.iosLabel2} />
               <Text style={styles.timerText}>
                 Resend available in <Text style={styles.timerValue}>{formatted}</Text>
               </Text>
@@ -139,12 +139,12 @@ const styles = StyleSheet.create({
   },
   tagline: {
     ...type.subheadline,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     textAlign: 'center',
     lineHeight: 21,
     maxWidth: 280,
   },
-  email: { color: colors.iosLabel as string, fontWeight: '600' },
+  email: { color: colors.iosLabel, fontWeight: '600' },
 
   timerPill: {
     backgroundColor: colors.iosBg2,
@@ -156,9 +156,9 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 4,
   },
-  timerText: { ...type.caption1, color: colors.iosLabel2 as string },
+  timerText: { ...type.caption1, color: colors.iosLabel2 },
   timerValue: {
-    color: colors.iosLabel as string,
+    color: colors.iosLabel,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
@@ -175,10 +175,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnLabel: { color: '#fff', ...type.headline },
+  primaryBtnLabel: { ...type.headline, color: colors.onTint },
   tertiaryBtn: {
-    color: colors.tint,
     ...type.subheadline,
+    color: colors.tint,
     fontWeight: '500',
     textAlign: 'center',
     paddingVertical: 8,
