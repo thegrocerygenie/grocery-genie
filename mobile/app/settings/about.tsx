@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   name: { ...type.title2 },
   tagline: {
     ...type.subheadline,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     textAlign: 'center',
     maxWidth: 280,
     marginBottom: spacing.lg,
@@ -82,5 +82,5 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.iosSeparator,
   },
-  value: { ...type.body, color: colors.iosLabel2 as string },
+  value: { ...type.body, color: colors.iosLabel2 },
 });

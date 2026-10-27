@@ -81,7 +81,7 @@ export function CategoryPickerSheet({
             <View style={styles.itemCard}>
               <Text style={styles.eyebrow}>ITEM</Text>
               <Text style={type.headline}>{itemName}</Text>
-              <Text style={[type.caption1, { color: colors.iosLabel2 as string, marginTop: 2 }]}>
+              <Text style={[type.caption1, { color: colors.iosLabel2, marginTop: 2 }]}>
                 This change applies to all past and future receipts.
               </Text>
             </View>
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     ...type.caption2,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     letterSpacing: 0.6,
     marginBottom: 4,
   },

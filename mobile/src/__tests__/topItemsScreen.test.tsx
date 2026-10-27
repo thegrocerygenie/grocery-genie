@@ -6,6 +6,7 @@ import { renderRouter, screen } from 'expo-router/testing-library';
 
 import TopItemsScreen from '../../app/top-items';
 import type { DashboardData } from '@/features/budget/types';
+import { colors } from '@/constants/theme';
 
 const mockDashboard: { data: DashboardData | undefined } = { data: undefined };
 jest.mock('@/features/budget/hooks/useDashboard', () => ({
@@ -56,8 +57,12 @@ describe('Top items', () => {
     ]);
     renderTopItems();
 
-    expect(screen.getByTestId('top-item-bar-0')).toHaveStyle({ backgroundColor: '#5856D6' });
-    expect(screen.getByTestId('top-item-bar-1')).toHaveStyle({ backgroundColor: '#007AFF' });
-    expect(screen.getByTestId('top-item-bar-2')).toHaveStyle({ backgroundColor: '#8E8E93' });
+    expect(screen.getByTestId('top-item-bar-0')).toHaveStyle({
+      backgroundColor: colors.cat.beverages,
+    });
+    expect(screen.getByTestId('top-item-bar-1')).toHaveStyle({
+      backgroundColor: colors.cat.household,
+    });
+    expect(screen.getByTestId('top-item-bar-2')).toHaveStyle({ backgroundColor: colors.cat.other });
   });
 });

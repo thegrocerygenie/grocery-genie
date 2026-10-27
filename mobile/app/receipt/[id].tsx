@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 80 },
   headerBtn: { ...type.body, color: colors.tint },
-  muted: { ...type.footnote, color: colors.iosLabel2 as string },
+  muted: { ...type.footnote, color: colors.iosLabel2 },
   photoCard: {
     alignSelf: 'center',
     width: '78%',
@@ -168,10 +168,10 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.iosSeparator,
   },
-  value: { ...type.body, color: colors.iosLabel2 as string, flexShrink: 1, textAlign: 'right' },
+  value: { ...type.body, color: colors.iosLabel2, flexShrink: 1, textAlign: 'right' },
   sectionLabel: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     paddingHorizontal: spacing.xs,

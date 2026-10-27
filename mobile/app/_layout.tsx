@@ -39,7 +39,7 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
   }, [hydrated, hydrate]);
 
   if (!hydrated) {
-    return <View style={{ flex: 1, backgroundColor: colors.iosBg as string }} />;
+    return <View style={{ flex: 1, backgroundColor: colors.iosBg }} />;
   }
 
   if (!accessToken && !inOnboarding) {
@@ -58,7 +58,7 @@ export default function RootLayout() {
   // If it fails, render anyway: iOS falls back to the system font.
   const [fontsLoaded, fontError] = useFonts(APP_FONTS);
   if (!fontsLoaded && !fontError) {
-    return <View style={{ flex: 1, backgroundColor: colors.iosBg as string }} />;
+    return <View style={{ flex: 1, backgroundColor: colors.iosBg }} />;
   }
 
   return (

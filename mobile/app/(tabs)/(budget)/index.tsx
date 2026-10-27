@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type ColorValue,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -26,7 +27,7 @@ interface CategorySpend {
   id: string;
   name: string;
   symbol: string;
-  color: string;
+  color: ColorValue;
   spent: number;
   cap: number;
 }
@@ -208,14 +209,11 @@ function EmptyState({ onScan, onSetBudget }: EmptyStateProps) {
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIcon}>
-        <SymbolView name="camera.viewfinder" size={28} tintColor={colors.iosLabel2 as string} />
+        <SymbolView name="camera.viewfinder" size={28} tintColor={colors.iosLabel2} />
       </View>
       <Text style={[type.headline, { textAlign: 'center' }]}>Scan your first receipt</Text>
       <Text
-        style={[
-          type.subheadline,
-          { color: colors.iosLabel2 as string, textAlign: 'center', maxWidth: 240 },
-        ]}
+        style={[type.subheadline, { color: colors.iosLabel2, textAlign: 'center', maxWidth: 240 }]}
       >
         Your budget will fill in as you snap receipts.
       </Text>
@@ -228,7 +226,7 @@ function EmptyState({ onScan, onSetBudget }: EmptyStateProps) {
         accessibilityRole="button"
         accessibilityLabel="Scan receipt"
       >
-        <SymbolView name="camera.viewfinder" size={16} tintColor="#fff" />
+        <SymbolView name="camera.viewfinder" size={16} tintColor={colors.onTint} />
         <Text style={styles.primaryBtnLabel}>Scan Receipt</Text>
       </Pressable>
       <Pressable onPress={onSetBudget} hitSlop={8} accessibilityRole="button">
@@ -268,17 +266,10 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
           />
         )}
         <View style={{ flex: 1 }}>
-          <Text style={[type.caption1, { color: colors.iosLabel2 as string }]}>
-            {data.monthLabel}
-          </Text>
+          <Text style={[type.caption1, { color: colors.iosLabel2 }]}>{data.monthLabel}</Text>
           {noBudget ? (
             <>
-              <Text
-                style={[
-                  type.money,
-                  { fontSize: 20, color: colors.iosLabel as string, marginTop: 2 },
-                ]}
-              >
+              <Text style={[type.money, { fontSize: 20, color: colors.iosLabel, marginTop: 2 }]}>
                 ${data.spent.toFixed(0)}
               </Text>
               <Pressable onPress={onSetBudget} hitSlop={8}>
@@ -294,7 +285,7 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
                   type.money,
                   {
                     fontSize: 20,
-                    color: over ? colors.red : (colors.iosLabel as string),
+                    color: over ? colors.red : colors.iosLabel,
                     marginTop: 2,
                   },
                 ]}
@@ -394,7 +385,7 @@ function CategoryRow({ cat, showDivider }: CategoryRowProps) {
           type.money,
           {
             fontSize: 15,
-            color: over ? colors.red : (colors.iosLabel as string),
+            color: over ? colors.red : colors.iosLabel,
           },
         ]}
       >
@@ -405,7 +396,7 @@ function CategoryRow({ cat, showDivider }: CategoryRowProps) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.iosBg as string },
+  root: { flex: 1, backgroundColor: colors.iosBg },
   center: { alignItems: 'center', justifyContent: 'center' },
 
   empty: {
@@ -434,7 +425,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  primaryBtnLabel: { color: '#fff', ...type.headline },
+  primaryBtnLabel: { ...type.headline, color: colors.onTint },
 
   heroCard: {
     backgroundColor: colors.iosBg2,
@@ -454,7 +445,7 @@ const styles = StyleSheet.create({
   },
 
   alertBanner: {
-    backgroundColor: 'rgba(255,59,48,0.12)',
+    backgroundColor: colors.redBg,
     borderRadius: 12,
     padding: spacing.md,
     flexDirection: 'row',
@@ -464,7 +455,7 @@ const styles = StyleSheet.create({
 
   sectionLabel: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     letterSpacing: 0.5,
   },
   sectionHeaderRow: {

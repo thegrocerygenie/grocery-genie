@@ -1,5 +1,12 @@
 import React, { useMemo } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ColorValue,
+} from 'react-native';
 import { Stack } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
@@ -66,10 +73,10 @@ function changeWords(change: number): string {
 }
 
 /** Spending more is the warning direction; spending less is good news. */
-function changeColor(change: number): string {
+function changeColor(change: number): ColorValue {
   if (change > 0) return colors.red;
   if (change < 0) return colors.tint;
-  return colors.iosLabel2 as string;
+  return colors.iosLabel2;
 }
 
 function money(amount: number): string {
@@ -134,7 +141,7 @@ export default function TrendScreen() {
             <Text
               style={[
                 type.footnote,
-                { color: colors.iosLabel2 as string, textAlign: 'center', maxWidth: 240 },
+                { color: colors.iosLabel2, textAlign: 'center', maxWidth: 240 },
               ]}
             >
               Once you have receipts across multiple months, your trend will show here.
@@ -186,20 +193,13 @@ export default function TrendScreen() {
                       accessible
                       accessibilityLabel={`${monthName(m.period)}: ${money(m.total)}`}
                     >
-                      <Text
-                        style={[
-                          type.caption1,
-                          { fontWeight: '600', color: colors.iosLabel as string },
-                        ]}
-                      >
+                      <Text style={[type.caption1, { fontWeight: '600', color: colors.iosLabel }]}>
                         ${m.total.toFixed(0)}
                       </Text>
                       <View style={[styles.bar, { height: Math.max(h, 6) }]}>
                         <StackedFill period={m.period} total={m.total} segments={m.segments} />
                       </View>
-                      <Text style={[type.caption1, { color: colors.iosLabel2 as string }]}>
-                        {m.label}
-                      </Text>
+                      <Text style={[type.caption1, { color: colors.iosLabel2 }]}>{m.label}</Text>
                     </View>
                   );
                 })}
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
 
   caption: {
     ...type.caption1,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
   },
   totalRow: {
     flexDirection: 'row',
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
   total: {
     ...type.money,
     fontSize: 28,
-    color: colors.iosLabel as string,
+    color: colors.iosLabel,
   },
   averageRow: {
     flexDirection: 'row',
@@ -364,11 +364,11 @@ const styles = StyleSheet.create({
   changeAmount: {
     ...type.money,
     ...type.body,
-    color: colors.iosLabel as string,
+    color: colors.iosLabel,
   },
   changeDetail: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
   },
 
   summaryCard: {
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
 
   sectionLabel: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     letterSpacing: 0.5,
     paddingHorizontal: 4,
   },

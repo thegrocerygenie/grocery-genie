@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, type ColorValue } from 'react-native';
 import Constants from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -13,7 +13,7 @@ import { useNotificationStore } from '@/store/notificationStore';
 interface RowDef {
   key: string;
   symbol: string;
-  iconBg: string;
+  iconBg: ColorValue;
   title: string;
   detail?: string;
   value?: string;
@@ -103,11 +103,11 @@ export default function SettingsScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={type.headline}>{profile?.name ?? 'Grocery Genie'}</Text>
-            <Text style={[type.footnote, { color: colors.iosLabel2 as string }]}>
+            <Text style={[type.footnote, { color: colors.iosLabel2 }]}>
               {profile?.email ?? 'Loading…'} · Free plan
             </Text>
           </View>
-          <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3 as string} />
+          <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
         </Pressable>
 
         <Section header="SPENDING">
@@ -206,15 +206,13 @@ function SettingsRow({ row, onPress }: SettingsRowProps) {
       <View style={{ flex: 1 }}>
         <Text style={type.body}>{row.title}</Text>
         {row.detail ? (
-          <Text style={[type.caption1, { color: colors.iosLabel2 as string, marginTop: 1 }]}>
+          <Text style={[type.caption1, { color: colors.iosLabel2, marginTop: 1 }]}>
             {row.detail}
           </Text>
         ) : null}
       </View>
-      {row.value ? (
-        <Text style={[type.body, { color: colors.iosLabel2 as string }]}>{row.value}</Text>
-      ) : null}
-      <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3 as string} />
+      {row.value ? <Text style={[type.body, { color: colors.iosLabel2 }]}>{row.value}</Text> : null}
+      <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
     </Pressable>
   );
 }
@@ -234,10 +232,8 @@ function SettingsLinkRow({ title, detail, onPress }: SettingsLinkRowProps) {
       accessibilityLabel={title}
     >
       <Text style={[type.body, { flex: 1 }]}>{title}</Text>
-      {detail ? (
-        <Text style={[type.body, { color: colors.iosLabel2 as string }]}>{detail}</Text>
-      ) : null}
-      <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3 as string} />
+      {detail ? <Text style={[type.body, { color: colors.iosLabel2 }]}>{detail}</Text> : null}
+      <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
     </Pressable>
   );
 }
@@ -264,13 +260,13 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     ...type.headline,
-    color: '#fff',
+    color: colors.onTint,
     fontFamily: 'System',
   },
 
   sectionLabel: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     letterSpacing: 0.5,
     paddingHorizontal: 16,
     paddingBottom: 6,

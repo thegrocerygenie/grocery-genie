@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.iosSeparator,
   },
   question: { ...type.headline },
-  answer: { ...type.subheadline, color: colors.iosLabel2 as string, lineHeight: 20 },
+  answer: { ...type.subheadline, color: colors.iosLabel2, lineHeight: 20 },
   feedback: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -79,5 +79,5 @@ const styles = StyleSheet.create({
   },
   feedbackPressed: { backgroundColor: colors.iosFill3 },
   feedbackLabel: { ...type.headline, color: colors.tint },
-  footnote: { ...type.footnote, color: colors.iosLabel2 as string, textAlign: 'center' },
+  footnote: { ...type.footnote, color: colors.iosLabel2, textAlign: 'center' },
 });

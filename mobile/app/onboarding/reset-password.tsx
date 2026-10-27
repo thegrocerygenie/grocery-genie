@@ -85,7 +85,7 @@ export default function ResetPasswordScreen() {
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
-                placeholderTextColor={colors.iosLabel3 as string}
+                placeholderTextColor={colors.iosLabel3}
                 style={styles.input}
                 accessibilityLabel="New password"
               />
@@ -98,7 +98,7 @@ export default function ResetPasswordScreen() {
                 <SymbolView
                   name={showPassword ? 'eye.slash' : 'eye'}
                   size={16}
-                  tintColor={colors.iosLabel2 as string}
+                  tintColor={colors.iosLabel2}
                 />
               </Pressable>
             </View>
@@ -111,7 +111,7 @@ export default function ResetPasswordScreen() {
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
-                placeholderTextColor={colors.iosLabel3 as string}
+                placeholderTextColor={colors.iosLabel3}
                 style={styles.input}
                 accessibilityLabel="Confirm password"
               />
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     ...type.subheadline,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     textAlign: 'center',
     lineHeight: 21,
     maxWidth: 280,
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   },
   input: {
     ...type.subheadline,
-    color: colors.iosLabel as string,
+    color: colors.iosLabel,
     paddingVertical: 13,
     flex: 1,
   },
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   },
   hint: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     marginTop: -spacing.sm,
     paddingHorizontal: 16,
   },
@@ -212,5 +212,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnLabel: { color: '#fff', ...type.headline },
+  primaryBtnLabel: { ...type.headline, color: colors.onTint },
 });

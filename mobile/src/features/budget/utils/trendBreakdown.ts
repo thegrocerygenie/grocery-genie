@@ -1,3 +1,5 @@
+import type { ColorValue } from 'react-native';
+
 import { getCategoryMetaByName } from '@/constants/categories';
 
 import type { DashboardTrendMonth } from '../types';
@@ -6,14 +8,14 @@ export interface TrendCategory {
   /** Category id, or 'uncategorized'. */
   key: string;
   name: string;
-  color: string;
+  color: ColorValue;
   /** Mean monthly spend across the months shown. */
   average: number;
 }
 
 export interface TrendSegment {
   key: string;
-  color: string;
+  color: ColorValue;
   spent: number;
 }
 

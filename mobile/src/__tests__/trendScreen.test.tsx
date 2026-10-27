@@ -6,6 +6,7 @@ import { renderRouter, screen } from 'expo-router/testing-library';
 
 import TrendScreen from '../../app/trend';
 import type { DashboardData } from '@/features/budget/types';
+import { colors } from '@/constants/theme';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 
@@ -115,8 +116,8 @@ describe('Trend screen month-over-month', () => {
 
     const groceries = screen.getByTestId('trend-segment-2026-03-c1');
     const household = screen.getByTestId('trend-segment-2026-03-c2');
-    expect(groceries).toHaveStyle({ backgroundColor: '#34C759' });
-    expect(household).toHaveStyle({ backgroundColor: '#007AFF' });
+    expect(groceries).toHaveStyle({ backgroundColor: colors.cat.groceries });
+    expect(household).toHaveStyle({ backgroundColor: colors.cat.household });
     // A category with no spend that month draws nothing.
     expect(screen.queryByTestId('trend-segment-2026-03-c3')).toBeNull();
     expect(screen.queryByTestId('trend-segment-2026-01-c1')).toBeNull();

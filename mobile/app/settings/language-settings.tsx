@@ -56,9 +56,7 @@ export default function LanguageSettingsScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={[type.subheadline, { fontWeight: '500' }]}>{l.english}</Text>
-                <Text style={[type.caption1, { color: colors.iosLabel2 as string }]}>
-                  {l.native}
-                </Text>
+                <Text style={[type.caption1, { color: colors.iosLabel2 }]}>{l.native}</Text>
               </View>
               <Switch
                 value={!!enabled[l.id]}
@@ -83,7 +81,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
   intro: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     paddingHorizontal: 4,
   },
   listCard: {
@@ -105,7 +103,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     paddingHorizontal: 4,
   },
 });
