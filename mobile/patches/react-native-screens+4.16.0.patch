@@ -1,0 +1,21 @@
+diff --git a/node_modules/react-native-screens/ios/RNSScreenStack.mm b/node_modules/react-native-screens/ios/RNSScreenStack.mm
+index 229dc58..a285f16 100644
+--- a/node_modules/react-native-screens/ios/RNSScreenStack.mm
++++ b/node_modules/react-native-screens/ios/RNSScreenStack.mm
+@@ -230,13 +230,9 @@ - (BOOL)navigationBar:(UINavigationBar *)navigationBar shouldPopItem:(UINavigati
+     // which we check indirectly by checking if transitionCoordinator is set.
+     // If it's not, we are safe to proceed.
+     if (self.transitionCoordinator == nil) {
+-      // We still need to disable interactions for back button so click effects are not applied,
+-      // and there is unfortunately no better place for it currently
+-      UIView *button = [navigationBar rnscreens_findBackButtonWrapperView];
+-      if (button != nil) {
+-        button.userInteractionEnabled = false;
+-      }
+-
++      // Grocery Genie patch (H3): do not disable the back button here. didPopItem re-enables it
++      // only when the screen popped to shows a back button, so a pop onto a screen with a hidden
++      // header left the next screen's back button dead (react-native-screens#3294, fixed in 4.17).
+       return true;
+     }
+ 
