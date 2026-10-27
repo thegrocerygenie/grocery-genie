@@ -15,6 +15,14 @@ Sources:
 - [ ] **App Store privacy label** filled in from the table in the privacy review.
 - [ ] **Sign-up "Privacy Policy" and "Terms" links work.** Today they are plain text (`mobile/app/onboarding/sign-up.tsx`), and no Terms document exists. Card: "Privacy minimization and sign-up policy link".
 - [ ] **Legal sign-off** on `privacy.ts`, then set `reviewed: true` to remove the draft banner. Replace the placeholder company name ("The Grocery Genie Inc.").
+- [x] **A native build opens on iOS 27.** Expo Go hid three native problems with Xcode 27 and the iOS 27 SDK. Committed config now fixes all three, so `npx expo prebuild --clean` makes a working `ios/` with no hand edits:
+  - `pod install` failed: Google Sign-In's `AppCheckCore` needs modular headers for `GoogleUtilities` and `RecaptchaInterop`. Fix: `extraPods` in the `expo-build-properties` entry in `mobile/app.json`.
+  - Xcode 27 rejects pod targets below iOS 15.0. Fix: `mobile/plugins/withPodsMinDeploymentTarget.js` raises them to the app's target (15.1).
+  - The app stopped at launch on iOS 27 (`_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`), because the Expo template has no UIScene lifecycle. An Expo upgrade does not help: the SDK 55, 56, and 57 templates have the same AppDelegate. A Release build stops the same way (checked on the iOS 27 Simulator), so this blocks any App Store build made with the iOS 27 SDK. Fix: `mobile/plugins/ios-scene-lifecycle/` adds a scene manifest and a `SceneDelegate`. The delegate forwards links to `AppDelegate`, so deep links work from a cold start and while the app runs. Remove the plugin when the Expo template adopts UIScene; it fails prebuild if the template's AppDelegate changes.
+- [ ] **Native build setup still to do:**
+  - There is no `eas.json` yet, so no store build profile.
+  - `npx expo run:ios` treats Xcode 27 Simulators as physical devices ("No code signing certificates"). For now, build with `xcodebuild -sdk iphonesimulator`, then use `xcrun simctl install`.
+  - Google Sign-In has no config plugin in `app.json`, so the Info.plist has no reversed-client-ID URL scheme. Expo Go hides the button, but a native build shows it. Check that "Continue with Google" works on a native build before launch.
 
 ## 2. Claims the privacy text makes that code doesn't enforce yet
 
