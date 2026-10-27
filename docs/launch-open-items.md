@@ -13,14 +13,14 @@ Sources:
 - [ ] **Public privacy policy URL** for App Store Connect (5.1.1(i)), for example on the `marketing/` site. It must match the in-app text.
 - [ ] **Marketing FAQ makes a false privacy claim.** `marketing/index.html` (the "Will my receipts be private?" answer) says receipts are "processed on-device for OCR" and that "we never sell or share your data". Receipts are uploaded to our servers, and Anthropic reads them. The same answer promises an opt-in community-pricing feature, which is a later-phase feature. Rewrite it to match `privacy.ts` before the site goes public.
 - [ ] **App Store privacy label** filled in from the table in the privacy review.
-- [ ] **Sign-up "Privacy Policy" and "Terms" links work.** Today they are plain text (`mobile/app/onboarding/sign-up.tsx`), and no Terms document exists. Card: "Privacy minimization and sign-up policy link".
+- [x] **Sign-up "Privacy Policy" link works.** It opens the in-app policy at `onboarding/privacy`. "Terms" was dropped: no Terms document exists.
 - [ ] **Legal sign-off** on `privacy.ts`, then set `reviewed: true` to remove the draft banner. Replace the placeholder company name ("The Grocery Genie Inc.").
 
 ## 2. Claims the privacy text makes that code doesn't enforce yet
 
-- [ ] **Sign-in security records kept up to 12 months:** `auth_events` has no purge. This is in the minimization card.
+- [x] **Sign-in security records kept up to 12 months:** a daily beat task purges `auth_events` older than `GG_AUTH_EVENT_RETENTION_DAYS` (default 365).
 - [ ] **Server logs kept up to 30 days:** set Docker log rotation or the host's retention (`docker/docker-compose.yml` has no `logging:`), or change the text.
-- [ ] **The other minimization fixes** (same card):
+- [x] **The other minimization fixes:**
   - stop requesting the unused Apple full name;
   - drop raw receipt values from the analytics logs;
   - block the email-logging fallback in production.
