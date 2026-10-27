@@ -122,7 +122,7 @@ Verified, within the bounds in each config:
 - **Push side:** up to 3 notifications, 2 workers, `BATCH_SIZE` and the chunk size as set in each config. Expo may reject any request, any number of times. Up to 1 crash, failed commit, or lost response.
 
 Left out:
-- category budgets (same steps, another budget row);
+- category budgets (same steps, another budget row). A category correction recategorizes same-named items on the user's other receipts (`_retroactive_category_update`), which moves category spend in their periods. `update_receipt` passes every such date, with the receipt's own, to one `check_thresholds` call: it locks the budgets once, then reads and claims per period. Per period that is the same `Flush`, `Read`, `Claim`. One call keeps one lock pass: a second pass in the same transaction could lock a budget created in between after a concurrent confirm took it, and deadlock;
 - an edit that lowers a confirmed receipt's spend, or moves its date to another period: spend in the model only grows. Neither can break a property: the old period reaches fewer thresholds, and an edit to a confirmed receipt runs the alert check for its new date (`update_receipt` → `_alert_on_thresholds`);
 - editing a budget during a period (`save_budget` updates the active budget in place, `update_budget` can move `period_start`). The model holds one budget at a fixed amount. An in-place save waits on the confirm's budget row lock (`check_thresholds` locks the user's active budgets), so it cannot interleave with `Read` and `Claim`. Creating or reviving a budget takes no such wait, and a confirm already in flight checks only the budgets it locked. Thresholds already in `budget_alerts_sent` for the period stay claimed after a raise, so they do not alert again at the new amount;
 - two requests confirming the same receipt;
@@ -131,6 +131,7 @@ Left out:
 - Expo push receipts (the second-phase delivery report);
 - creating the notification in the same transaction as the alert. The model merges `claim_alert` and `create_notification` into one step, which is sound because nothing sees either write before commit;
 - weekly summaries;
+- the daily purge (`purge_tasks.py`), which erases a budget soft-deleted longer than the restore window, its `budget_alerts_sent` rows (ON DELETE CASCADE), and the `budget_threshold` notifications that name it. `check_thresholds` neither locks nor reads a deleted budget, so a confirm never claims on it. The purge holds the budget row lock and rechecks `deleted_at` in its delete, so a revive in `create_budget` cannot keep the row and lose its ledger. Those notifications are far older than `push_max_age`, so the push beat has already settled them;
 - anything outside these files.
 
 The model's `Select` may take any subset of the right size, while the code takes the oldest rows (`ORDER BY created_at`). That over-approximates the code. When you replay a trace, check that the result does not depend on which rows were picked.
@@ -139,15 +140,15 @@ A pass covers the model within its bounds, not the whole system.
 
 ## Coverage record
 
-Sync commit: `2a3d5ed`
+Sync commit: `7f67c0f`
 
 The verification was last confirmed to describe these files and functions at the sync commit. `run.sh` reads this table and the sync commit.
 
 | File | Functions | Model steps |
 | --- | --- | --- |
 | `backend/app/core/dependencies.py` | `get_db`, `engine` (no isolation level) | `ConfirmAlerts`: `Commit`, `Abort` |
-| `backend/app/services/receipt_service.py` | `confirm_receipt`, `update_receipt` (date and status branches: the date is set before the status branch, in the same transaction; an already confirmed receipt is not confirmed again, and an edit to one flushes, then runs `_alert_on_thresholds`), `create_manual_receipt`, `_after_confirm` and `_alert_on_thresholds` (every alert path shares them) | `ConfirmAlerts`: `Flush` |
-| `backend/app/services/budget_service.py` | `check_thresholds` (budget row lock), `get_spending_by_category`, `_active_thresholds`, `claim_alert`; watched, not modeled: `get_period_containing` (picks the period whose spend `Read` sums; the model holds one period), `save_budget`, `update_budget`, `restore_budget` (they write budget rows the `Read` step locks) | `ConfirmAlerts`: `Read`, `Claim` |
+| `backend/app/services/receipt_service.py` | `confirm_receipt`, `update_receipt` (date and status branches: the date is set before the status branch, in the same transaction; an already confirmed receipt is not confirmed again and cannot leave `confirmed` (422), an edit to one flushes, then runs `_alert_on_thresholds`, and every edit alerts in the periods `_retroactive_category_update` changed), `create_manual_receipt`, `_after_confirm` and `_alert_on_thresholds` (every alert path shares them) | `ConfirmAlerts`: `Flush` |
+| `backend/app/services/budget_service.py` | `check_thresholds` (budget row lock, taken once for every period it checks), `get_spending_by_category`, `_active_thresholds`, `claim_alert`; watched, not modeled: `get_period_containing` (picks the period whose spend `Read` sums; the model holds one period), `save_budget`, `update_budget`, `restore_budget` (they write budget rows the `Read` step locks) | `ConfirmAlerts`: `Read`, `Claim` |
 | `backend/app/services/notification_service.py` | `create_notification` | `ConfirmAlerts`: `Claim` |
 | `backend/app/models/database.py` | `BudgetAlertSent` unique key, `Notification.push_status`, `ix_notifications_push_pending`, `ix_notifications_push_sending` | `UniqueLedger`, `PushDelivery` statuses |
 | `backend/app/tasks/push_tasks.py` | `deliver_pending_pushes`, `BATCH_SIZE` | `PushDelivery`: `Expire`, `Select`, `Claim`, `Record`, `Finish`, `Crash` |

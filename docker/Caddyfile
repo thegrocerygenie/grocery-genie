@@ -1,0 +1,13 @@
+# Caddy gets and renews the TLS certificate from Let's Encrypt on its own.
+# Rate limiting is done in the app (app/core/rate_limit.py): the stock
+# caddy image has no rate_limit directive.
+api.grocerygenie.app {
+	reverse_proxy api:8000
+	encode gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}

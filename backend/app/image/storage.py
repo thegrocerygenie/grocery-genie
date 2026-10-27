@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import io
 import logging
 import os
@@ -32,6 +33,7 @@ class FileStorage(Protocol):
     async def save(self, data: bytes, path: str) -> str: ...
     async def get_url(self, path: str) -> str: ...
     async def read(self, path: str) -> bytes | None: ...
+    async def delete(self, path: str) -> None: ...
 
 
 class LocalFileStorage:
@@ -62,6 +64,16 @@ class LocalFileStorage:
                 return f.read()
 
         return await asyncio.to_thread(_read)
+
+    async def delete(self, path: str) -> None:
+        """Remove the file at ``path``. A missing file is not an error."""
+        full_path = os.path.join(self.base_path, path)
+
+        def _delete() -> None:
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(full_path)
+
+        await asyncio.to_thread(_delete)
 
 
 def generate_receipt_path(receipt_id: uuid.UUID, suffix: str = ".jpg") -> str:

@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -57,6 +58,11 @@ class Settings(BaseSettings):
     # legitimate retries and tight enough to deter brute-force/JWKS-fetch abuse.
     auth_ip_rate_limit_per_minute: int = 30
 
+    # Where the rate limit counts live. "redis" (at redis_url) shares them
+    # across API workers; "memory" keeps them per process, so each worker
+    # allows the full limit. Tests use "memory".
+    rate_limit_storage: Literal["redis", "memory"] = "redis"
+
     # Free-tier quota (overview: 20 receipts/month). Set to 0 to disable.
     free_tier_receipts_per_month: int = 20
 
@@ -81,9 +87,6 @@ class Settings(BaseSettings):
     signin_lockout_window_seconds: int = 3600
     signin_lockout_duration_seconds: int = 3600
 
-    # Soft-delete retention
-    soft_delete_retention_days: int = 30
-
     # Email — Resend
     resend_api_key: str = ""
     resend_from: str = "Grocery Genie <noreply@onresend.dev>"
@@ -95,10 +98,11 @@ class Settings(BaseSettings):
     # Pending pushes older than this are marked expired instead of sent late.
     push_max_age_minutes: int = 60
 
-    # Deep links
+    # Deep links — each path is an Expo Router route (mobile/app/<path>.tsx).
+    # Signed-out users can open only onboarding/* routes.
     app_scheme: str = "grocerygenie"
-    verify_email_path: str = "verify"
-    reset_password_path: str = "reset"
+    verify_email_path: str = "onboarding/verify-email"
+    reset_password_path: str = "onboarding/reset-password"
     email_change_path: str = "email-change"
 
     # Apple Sign In

@@ -119,6 +119,22 @@ export async function runAppleSignIn(): Promise<AppleCredential | null> {
   }
 }
 
+/**
+ * Sign in with Apple again, only to get a fresh authorization code: account
+ * deletion sends it so the server can revoke the app's Apple grant. Asks for
+ * no name or email. Null when the user cancels or Apple is unavailable.
+ */
+export async function runAppleReauth(): Promise<string | null> {
+  if (Platform.OS !== 'ios') return null;
+  try {
+    if (!(await AppleAuthentication.isAvailableAsync())) return null;
+    const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });
+    return credential.authorizationCode ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function runGoogleSignIn(): Promise<string | null> {
   try {
     const sdk = loadGoogleSdk();

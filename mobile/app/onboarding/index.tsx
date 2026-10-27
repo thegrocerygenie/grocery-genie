@@ -67,6 +67,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   wordmark: {
+    color: colors.iosLabel,
     fontSize: 38,
     letterSpacing: -0.7,
     fontFamily: WORDMARK_FONT,

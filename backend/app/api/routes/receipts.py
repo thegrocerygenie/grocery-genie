@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.dependencies import get_db
+from app.core.retention import days_remaining
 from app.core.security import get_current_user
 from app.image.normalize import PDF_TYPE, UnreadableUploadError, normalize_upload
 from app.image.preprocessor import assess_image_quality
@@ -38,7 +39,7 @@ from app.models.schemas import (
     ReceiptUpdateRequest,
 )
 from app.services.analytics_service import AnalyticsService, get_analytics_service
-from app.services.receipt_service import ReceiptService
+from app.services.receipt_service import ReceiptAlreadyConfirmedError, ReceiptService
 
 router = APIRouter(prefix="/api/receipts", tags=["receipts"])
 
@@ -286,7 +287,7 @@ async def recently_deleted(
         deleted_at = r.deleted_at
         if deleted_at.tzinfo is None:
             deleted_at = deleted_at.replace(tzinfo=UTC)
-        days_left = max(0, 30 - (now - deleted_at).days)
+        days_left = days_remaining(deleted_at, now)
         store_label = r.store.name if r.store else "Receipt"
         total_label = f"${float(r.total):.2f}" if r.total else ""
         out.append(
@@ -328,6 +329,8 @@ async def update_receipt(
     service = ReceiptService(db=db, analytics=analytics)
     try:
         receipt = await service.update_receipt(uuid.UUID(receipt_id), user.id, updates)
+    except ReceiptAlreadyConfirmedError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except ValueError as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail="Receipt not found") from None

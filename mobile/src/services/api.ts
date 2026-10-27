@@ -11,6 +11,13 @@ export class ApiError extends Error {
   }
 }
 
+/** The server's error code, from `{"detail": {"code": ...}}`. */
+export function apiErrorCode(error: unknown): string | undefined {
+  if (!(error instanceof ApiError)) return undefined;
+  const detail = (error.data as { detail?: { code?: unknown } } | null)?.detail;
+  return typeof detail?.code === 'string' ? detail.code : undefined;
+}
+
 let inFlightRefresh: Promise<string | null> | null = null;
 
 async function refreshTokens(): Promise<string | null> {

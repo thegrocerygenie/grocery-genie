@@ -6,11 +6,14 @@ import { colors, radii, spacing, type } from '@/constants/theme';
 import type { PendingReceipt } from '@/store/offlineStore';
 
 import { formatQueuedAgo } from '../services/offlineQueue';
+import { QUOTA_HINT } from '../utils/scanQuota';
 
 interface OfflineQueueSectionProps {
   pending: PendingReceipt[];
   isConnected: boolean;
   onPressFailed: (receipt: PendingReceipt) => void;
+  /** Upload the queue now; offered after a failed attempt while online. */
+  onRetry: () => void;
 }
 
 function plural(n: number): string {
@@ -25,6 +28,7 @@ export function OfflineQueueSection({
   pending,
   isConnected,
   onPressFailed,
+  onRetry,
 }: OfflineQueueSectionProps) {
   if (pending.length === 0) return null;
 
@@ -36,12 +40,23 @@ export function OfflineQueueSection({
   return (
     <View style={styles.root}>
       {banner ? (
-        <View style={styles.banner} accessible accessibilityRole="summary">
+        // Grouped for VoiceOver, unless that would hide the retry button inside.
+        <View style={styles.banner} accessible={!banner.retry} accessibilityRole="summary">
           <View style={styles.bannerIcon}>
             <SymbolView name={banner.symbol} size={12} tintColor="#fff" />
           </View>
           <Text style={styles.bannerText}>{banner.text}</Text>
-          {banner.action ? (
+          {banner.retry ? (
+            <Pressable
+              onPress={onRetry}
+              hitSlop={12}
+              style={({ pressed }) => [styles.retryButton, pressed && styles.retryPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Retry upload now"
+            >
+              <Text style={styles.bannerAction}>{banner.action}</Text>
+            </Pressable>
+          ) : banner.action ? (
             <Text style={styles.bannerAction}>{banner.action}</Text>
           ) : (
             <ActivityIndicator size="small" color={colors.orange} />
@@ -70,12 +85,15 @@ interface BannerState {
   text: string;
   /** Right-hand label; null while an upload runs, so a spinner shows instead. */
   action: string | null;
+  /** The label is a button that uploads now. */
+  retry?: boolean;
 }
 
 /**
  * Offline: waiting for a connection. Online: uploading while an upload runs or
- * before any has been tried; after a failed attempt, waiting to retry, so the
- * banner never claims an upload is running while the server is down.
+ * before any has been tried; after a failed attempt, waiting to retry (useSyncQueue
+ * retries on a timer) with a button to retry now, so the banner never claims an
+ * upload is running while the server is down.
  */
 function bannerState(queued: PendingReceipt[], isConnected: boolean): BannerState | null {
   if (queued.length === 0) return null;
@@ -85,7 +103,12 @@ function bannerState(queued: PendingReceipt[], isConnected: boolean): BannerStat
   }
   const uploading = queued.some((r) => r.status === 'syncing');
   if (!uploading && queued.some((r) => r.lastAttemptFailed)) {
-    return { symbol: 'arrow.clockwise', text: `${count} waiting to upload`, action: 'Will retry' };
+    return {
+      symbol: 'arrow.clockwise',
+      text: `${count} waiting to upload`,
+      action: 'Retry Now',
+      retry: true,
+    };
   }
   return { symbol: 'arrow.up', text: `Uploading ${count}…`, action: null };
 }
@@ -95,6 +118,11 @@ function rowState(receipt: PendingReceipt, isConnected: boolean): string {
   if (!isConnected) return 'waiting for connection';
   if (receipt.status !== 'syncing' && receipt.lastAttemptFailed) return 'will retry';
   return 'uploading';
+}
+
+/** Why a failed row will never upload. */
+function failedReason(receipt: PendingReceipt): string {
+  return receipt.failure === 'quota' ? QUOTA_HINT : 'Couldn’t read this photo';
 }
 
 interface PendingRowProps {
@@ -107,7 +135,7 @@ interface PendingRowProps {
 function PendingRow({ receipt, isConnected, showDivider, onPressFailed }: PendingRowProps) {
   const failed = receipt.status === 'failed';
   const detail = failed
-    ? 'Couldn’t read this photo'
+    ? failedReason(receipt)
     : `${formatQueuedAgo(receipt.capturedAt)} · ${rowState(receipt, isConnected)}`;
 
   return (
@@ -160,6 +188,14 @@ const styles = StyleSheet.create({
   },
   bannerText: { ...type.footnote, flex: 1, color: colors.iosLabel },
   bannerAction: { ...type.caption1, color: colors.orange, fontWeight: '600' },
+  retryButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+    marginVertical: -10,
+    borderRadius: radii.button,
+  },
+  retryPressed: { opacity: 0.5 },
   sectionLabel: {
     ...type.footnote,
     color: colors.iosLabel2,

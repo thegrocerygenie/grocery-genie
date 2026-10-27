@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
+from app.core.retention import days_remaining
 from app.core.security import get_current_user
 from app.models.database import User
 from app.models.schemas import (
@@ -132,7 +133,7 @@ async def recently_deleted(
     for b in budgets:
         if b.deleted_at is None:
             continue
-        days_left = max(0, 30 - (now - b.deleted_at).days)
+        days_left = days_remaining(b.deleted_at, now)
         scope = "Overall" if b.category_id is None else "Category"
         amount = f"${float(b.amount):.0f}"
         out.append(

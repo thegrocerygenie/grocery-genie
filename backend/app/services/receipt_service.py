@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -11,6 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.retention import restore_cutoff
 from app.events.dispatcher import dispatcher
 from app.events.types import ItemCorrected, ReceiptConfirmed
 from app.llm.provider import (
@@ -40,6 +42,13 @@ if TYPE_CHECKING:
     from app.services.analytics_service import AnalyticsService
 
 logger = logging.getLogger(__name__)
+
+
+class ReceiptAlreadyConfirmedError(Exception):
+    """A confirmed receipt cannot move to another status."""
+
+    def __init__(self, receipt_id: uuid.UUID) -> None:
+        super().__init__(f"Receipt {receipt_id} is confirmed and cannot change status")
 
 
 def _format_quantity(quantity: Decimal) -> str:
@@ -277,6 +286,14 @@ class ReceiptService:
     async def confirm_receipt(self, receipt_id: uuid.UUID, user_id: uuid.UUID) -> None:
         """Confirm a receipt, dispatch ReceiptConfirmed, and check budget thresholds."""
         receipt = await self._get_receipt(receipt_id, user_id)
+        await self._confirm(receipt)
+
+    async def _confirm(
+        self, receipt: Receipt, also_changed: Iterable[date] = ()
+    ) -> None:
+        """Confirm ``receipt``. ``also_changed`` holds the dates of other
+        receipts whose spend this request changed; their periods alert too."""
+        user_id = receipt.user_id
         receipt.status = "confirmed"
         await self.db.flush()
 
@@ -292,9 +309,11 @@ class ReceiptService:
                 user_id,
             )
 
-        await self._after_confirm(receipt)
+        await self._after_confirm(receipt, also_changed)
 
-    async def _after_confirm(self, receipt: Receipt) -> None:
+    async def _after_confirm(
+        self, receipt: Receipt, also_changed: Iterable[date] = ()
+    ) -> None:
         """Dispatch ReceiptConfirmed and alert on budget thresholds now crossed.
 
         Every receipt that becomes confirmed runs this: a scan the user confirms
@@ -321,18 +340,21 @@ class ReceiptService:
             )
         )
 
-        await self._alert_on_thresholds(receipt)
+        await self._alert_on_thresholds(receipt.user_id, {receipt.date, *also_changed})
 
-    async def _alert_on_thresholds(self, receipt: Receipt) -> None:
-        """Notify for each budget threshold the receipt's period has now crossed.
+    async def _alert_on_thresholds(self, user_id: uuid.UUID, dates: set[date]) -> None:
+        """Notify for each budget threshold crossed in the periods holding ``dates``.
 
         claim_alert lets each threshold alert once per period, so running this
-        again (after an edit) never repeats an alert.
+        again (after an edit) never repeats an alert. Call it once per request
+        with every changed date: each call locks the user's budget rows, and a
+        second lock pass could deadlock with a concurrent confirm.
         """
-        user_id = receipt.user_id
+        if not dates:
+            return
         budget_service = BudgetService(self.db)
         notification_service = NotificationService(self.db)
-        breaches = await budget_service.check_thresholds(user_id, receipt.date)
+        breaches = await budget_service.check_thresholds(user_id, *sorted(dates))
         for breach in breaches:
             if not await budget_service.claim_alert(breach):
                 continue  # already alerted for this threshold this period
@@ -376,6 +398,13 @@ class ReceiptService:
         """Apply corrections to a receipt."""
         receipt = await self._get_receipt(receipt_id, user_id)
         already_confirmed = receipt.status == "confirmed"
+        if already_confirmed and updates.status not in (None, "confirmed"):
+            # Moving it back and confirming again would dispatch
+            # ReceiptConfirmed a second time.
+            raise ReceiptAlreadyConfirmedError(receipt_id)
+        # Dates of other confirmed receipts whose spend a category correction
+        # moved. Their periods can cross a threshold too.
+        other_changed: set[date] = set()
 
         current_store_name = receipt.store.name if receipt.store else None
         if (
@@ -504,7 +533,7 @@ class ReceiptService:
                     )
 
                     # Retroactive update: apply to all historical instances
-                    await self._retroactive_category_update(
+                    other_changed |= await self._retroactive_category_update(
                         user_id, extracted_name, correction.category_id
                     )
 
@@ -515,15 +544,18 @@ class ReceiptService:
                     receipt.total = Decimal(str(receipt.total)) + price_delta
 
         if updates.status == "confirmed" and not already_confirmed:
-            await self.confirm_receipt(receipt_id, user_id)
-        elif updates.status and updates.status != "confirmed":
-            receipt.status = updates.status
-        elif already_confirmed and (updates.items or updates.date):
-            # An edit to a saved receipt changes spend without confirming
-            # again, so ReceiptConfirmed is not dispatched; thresholds the edit
-            # crosses still alert.
+            await self._confirm(receipt, other_changed)
+        else:
+            if updates.status:
+                receipt.status = updates.status
+            # An edit changes spend without confirming again, so
+            # ReceiptConfirmed is not dispatched; thresholds the edit crosses
+            # still alert. A receipt under review adds no spend of its own.
+            changed = set(other_changed)
+            if already_confirmed and (updates.items or updates.date):
+                changed.add(receipt.date)
             await self.db.flush()
-            await self._alert_on_thresholds(receipt)
+            await self._alert_on_thresholds(user_id, changed)
 
         await self.db.flush()
         return receipt
@@ -668,14 +700,14 @@ class ReceiptService:
         deleted_at = receipt.deleted_at
         if deleted_at.tzinfo is None:
             deleted_at = deleted_at.replace(tzinfo=UTC)
-        if deleted_at < datetime.now(UTC) - timedelta(days=30):
+        if deleted_at < restore_cutoff():
             raise ValueError("Receipt past 30-day restore window")
         receipt.deleted_at = None
         await self.db.flush()
         return receipt
 
     async def list_recently_deleted(self, user_id: uuid.UUID) -> list[Receipt]:
-        cutoff = datetime.now(UTC) - timedelta(days=30)
+        cutoff = restore_cutoff()
         # SQLite-friendly cutoff (naive) for in-memory tests; Postgres ignores TZ.
         cutoff_naive = cutoff.replace(tzinfo=None)
         result = await self.db.execute(
@@ -786,13 +818,17 @@ class ReceiptService:
         user_id: uuid.UUID,
         raw_name: str,
         new_category_id: uuid.UUID,
-    ) -> None:
+    ) -> set[date]:
         """Update category on all historical line items matching
-        raw_name for this user."""
+        raw_name for this user.
+
+        Returns the dates of the confirmed, live receipts it changed: the
+        spend of the periods that hold them moved.
+        """
         pattern = raw_name.strip().lower()
         # Find all matching line items across user's receipts
         result = await self.db.execute(
-            select(LineItem)
+            select(LineItem, Receipt.date, Receipt.status, Receipt.deleted_at)
             .join(Receipt, LineItem.receipt_id == Receipt.id)
             .where(
                 Receipt.user_id == user_id,
@@ -800,11 +836,14 @@ class ReceiptService:
                 LineItem.category_id != new_category_id,
             )
         )
-        items = result.scalars().all()
-        for item in items:
+        changed: set[date] = set()
+        for item, receipt_date, status, deleted_at in result.all():
             item.category_id = new_category_id
             item.category_confidence = 1.0
             item.corrected = True
+            if status == "confirmed" and deleted_at is None:
+                changed.add(receipt_date)
+        return changed
 
     async def _check_duplicate(
         self,

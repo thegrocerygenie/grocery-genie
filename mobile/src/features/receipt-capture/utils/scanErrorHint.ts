@@ -1,5 +1,7 @@
 import { ApiError } from '@/services/api';
 
+import { QUOTA_HINT, isQuotaExceededError } from './scanQuota';
+
 const FALLBACK = 'Couldn’t read that — try again';
 
 /** One wording per photo problem, before capture (frame check) and after (server). */
@@ -23,6 +25,7 @@ const HINTS: [RegExp, string][] = [
 ];
 
 export function scanErrorHint(error: unknown): string {
+  if (isQuotaExceededError(error)) return QUOTA_HINT;
   if (!(error instanceof ApiError) || error.status !== 422) return FALLBACK;
   const detail = (error.data as { detail?: unknown } | null)?.detail;
   if (typeof detail !== 'string') return FALLBACK;

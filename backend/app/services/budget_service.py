@@ -8,6 +8,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.retention import restore_cutoff
 from app.events.types import BudgetThresholdBreached
 from app.models.database import (
     Budget,
@@ -224,7 +225,7 @@ class BudgetService:
         return budget
 
     async def restore_budget(self, budget_id: uuid.UUID, user_id: uuid.UUID) -> Budget:
-        from datetime import UTC, datetime, timedelta
+        from datetime import UTC
 
         result = await self.db.execute(
             select(Budget).where(
@@ -240,7 +241,7 @@ class BudgetService:
         deleted_at = budget.deleted_at
         if deleted_at.tzinfo is None:  # SQLite drops the zone
             deleted_at = deleted_at.replace(tzinfo=UTC)
-        if deleted_at < datetime.now(UTC) - timedelta(days=30):
+        if deleted_at < restore_cutoff():
             raise ValueError("Budget past 30-day restore window")
         if await self._active_budget(user_id, budget.category_id) is not None:
             raise BudgetConflictError("This category already has an active budget")
@@ -249,9 +250,7 @@ class BudgetService:
         return budget
 
     async def list_recently_deleted(self, user_id: uuid.UUID) -> list[Budget]:
-        from datetime import UTC, datetime, timedelta
-
-        cutoff = datetime.now(UTC) - timedelta(days=30)
+        cutoff = restore_cutoff()
         result = await self.db.execute(
             select(Budget)
             .where(
@@ -643,16 +642,25 @@ class BudgetService:
     async def check_thresholds(
         self,
         user_id: uuid.UUID,
-        receipt_date: date,
+        *receipt_dates: date,
     ) -> list[BudgetThresholdBreached]:
-        """Check all budgets for threshold breaches after a receipt confirmation."""
-        # The period that holds the receipt's date. Before the start day, that
-        # is the period that began last month, not this month's.
-        today = date.today()
-        _, period_start, period_end = await self.get_period_containing(
-            user_id, receipt_date
-        )
-        days_left = max(0, (period_end - today).days)
+        """Check all budgets for threshold breaches in the periods that hold
+        ``receipt_dates``: a confirmed receipt's date, or each date an edit
+        moved spend in.
+
+        Pass every date in one call. Each call locks the user's budget rows
+        (below), so a second call in the same transaction could lock a budget
+        created between the calls after a concurrent confirm already holds it,
+        and deadlock with that confirm.
+        """
+        # The period that holds each date. Before the start day, that is the
+        # period that began last month, not this month's.
+        periods: dict[date, date] = {}
+        for receipt_date in receipt_dates:
+            _, period_start, period_end = await self.get_period_containing(
+                user_id, receipt_date
+            )
+            periods[period_start] = period_end
 
         # Lock all of the user's budgets until the request commits, before the
         # spend read below. Two receipts confirmed at once then take turns: the
@@ -678,7 +686,23 @@ class BudgetService:
         if not active_thresholds:
             return []
 
-        # Get spending
+        breaches: list[BudgetThresholdBreached] = []
+        for period_start, period_end in sorted(periods.items()):
+            breaches += await self._period_breaches(
+                user_id, budgets, active_thresholds, period_start, period_end
+            )
+        return breaches
+
+    async def _period_breaches(
+        self,
+        user_id: uuid.UUID,
+        budgets: list[Budget],
+        active_thresholds: list[int],
+        period_start: date,
+        period_end: date,
+    ) -> list[BudgetThresholdBreached]:
+        """Thresholds each budget has reached in one period."""
+        days_left = max(0, (period_end - date.today()).days)
         spending = await self.get_spending_by_category(
             user_id, period_start, period_end
         )
