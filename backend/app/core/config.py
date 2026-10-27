@@ -81,9 +81,6 @@ class Settings(BaseSettings):
     signin_lockout_window_seconds: int = 3600
     signin_lockout_duration_seconds: int = 3600
 
-    # Soft-delete retention
-    soft_delete_retention_days: int = 30
-
     # Email — Resend
     resend_api_key: str = ""
     resend_from: str = "Grocery Genie <noreply@onresend.dev>"

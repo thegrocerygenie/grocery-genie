@@ -10,6 +10,7 @@ celery_app = Celery(
     broker=settings.redis_url,
     # Task modules the worker imports at startup so their tasks register.
     include=[
+        "app.tasks.purge_tasks",
         "app.tasks.push_tasks",
         "app.tasks.receipt_tasks",
         "app.tasks.summary_tasks",
@@ -33,5 +34,10 @@ celery_app.conf.beat_schedule = {
     "deliver-pending-pushes": {
         "task": "app.tasks.push_tasks.deliver_pending_pushes",
         "schedule": 60.0,
+    },
+    # Erase soft-deleted receipts and budgets past the 30-day restore window.
+    "purge-expired-deletions": {
+        "task": "app.tasks.purge_tasks.purge_expired_deletions",
+        "schedule": crontab(hour=3, minute=30),
     },
 }

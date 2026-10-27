@@ -131,6 +131,7 @@ Left out:
 - Expo push receipts (the second-phase delivery report);
 - creating the notification in the same transaction as the alert. The model merges `claim_alert` and `create_notification` into one step, which is sound because nothing sees either write before commit;
 - weekly summaries;
+- the daily purge (`purge_tasks.py`), which erases a budget soft-deleted longer than the restore window, its `budget_alerts_sent` rows (ON DELETE CASCADE), and the `budget_threshold` notifications that name it. `check_thresholds` neither locks nor reads a deleted budget, so a confirm never claims on it. The purge holds the budget row lock and rechecks `deleted_at` in its delete, so a revive in `create_budget` cannot keep the row and lose its ledger. Those notifications are far older than `push_max_age`, so the push beat has already settled them;
 - anything outside these files.
 
 The model's `Select` may take any subset of the right size, while the code takes the oldest rows (`ORDER BY created_at`). That over-approximates the code. When you replay a trace, check that the result does not depend on which rows were picked.
