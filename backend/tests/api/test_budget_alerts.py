@@ -5,10 +5,15 @@ phone, so a repeat alert is a repeat push.
 """
 
 import io
+from datetime import date
 
+import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.llm.provider import MockReceiptExtractor
+from app.models.database import BudgetAlertSent
 
 
 async def _scan_and_confirm(client: AsyncClient, image_bytes: bytes) -> None:
@@ -35,12 +40,14 @@ async def _alert_thresholds(client: AsyncClient) -> list[int]:
     )
 
 
-async def _manual_entry(client: AsyncClient, amount: float) -> None:
+async def _manual_entry(
+    client: AsyncClient, amount: float, on: str = "2026-03-20"
+) -> None:
     resp = await client.post(
         "/api/receipts",
         json={
             "store_name": "Corner Shop",
-            "date": "2026-03-20",
+            "date": on,
             "total": amount,
             "items": [
                 {
@@ -55,10 +62,16 @@ async def _manual_entry(client: AsyncClient, amount: float) -> None:
     assert resp.status_code == 201
 
 
-async def _overall_budget(client: AsyncClient, amount: float) -> None:
+async def _overall_budget(
+    client: AsyncClient, amount: float, period_start: str = "2026-03-01"
+) -> None:
     resp = await client.post(
         "/api/budgets",
-        json={"amount": amount, "period_type": "monthly", "period_start": "2026-03-01"},
+        json={
+            "amount": amount,
+            "period_type": "monthly",
+            "period_start": period_start,
+        },
     )
     assert resp.status_code == 201
 
@@ -205,3 +218,85 @@ async def test_confirming_twice_does_not_confirm_again(
     assert resp.status_code == 200
     assert resp.json()["status"] == "confirmed"
     assert len(dispatched) == 1
+
+
+async def _claimed_period_starts(db_session: AsyncSession) -> list[date]:
+    result = await db_session.execute(select(BudgetAlertSent.period_start))
+    return sorted(set(result.scalars().all()))
+
+
+# A budget period runs from the reset day (the overall budget's period_start
+# day) to the day before it next month. A receipt dated before the reset day
+# belongs to the period that started last month, so its alerts must count
+# that period's spend.
+@pytest.mark.parametrize(
+    ("period_start", "dates", "expected_alerts", "claimed_period"),
+    [
+        pytest.param(
+            "2026-02-15",
+            ["2026-03-10"],
+            [50, 80],
+            date(2026, 2, 15),
+            id="reset-15-receipt-before-reset-day",
+        ),
+        pytest.param(
+            "2026-02-15",
+            ["2026-02-20", "2026-03-10"],
+            [50, 80, 100],
+            date(2026, 2, 15),
+            id="reset-15-receipts-either-side-of-month-end-share-a-period",
+        ),
+        pytest.param(
+            "2026-01-28",
+            ["2026-02-27"],
+            [50, 80],
+            date(2026, 1, 28),
+            id="reset-28-february-27-is-in-january-period",
+        ),
+        pytest.param(
+            "2026-01-31",
+            ["2026-02-28", "2026-03-30"],
+            [50, 80, 100],
+            date(2026, 2, 28),
+            id="reset-31-clamps-to-february-28",
+        ),
+        pytest.param(
+            "2025-12-15",
+            ["2025-12-20", "2026-01-10"],
+            [50, 80, 100],
+            date(2025, 12, 15),
+            id="reset-15-december-period-wraps-into-january",
+        ),
+    ],
+)
+async def test_receipt_alerts_in_the_period_that_holds_its_date(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    period_start: str,
+    dates: list[str],
+    expected_alerts: list[int],
+    claimed_period: date,
+):
+    await _overall_budget(client, 20.0, period_start=period_start)
+    amount = 17.0 if len(dates) == 1 else 10.0  # 85%, or 50% each
+
+    for on in dates:
+        await _manual_entry(client, amount, on=on)
+
+    assert await _alert_thresholds(client) == expected_alerts
+    assert await _claimed_period_starts(db_session) == [claimed_period]
+
+
+async def test_receipts_on_either_side_of_the_reset_day_are_separate_periods(
+    client: AsyncClient, db_session: AsyncSession
+):
+    await _overall_budget(client, 20.0, period_start="2026-02-15")
+
+    await _manual_entry(client, 10.0, on="2026-03-14")  # Feb 15 - Mar 14: 50%
+    await _manual_entry(client, 10.0, on="2026-03-15")  # Mar 15 - Apr 14: 50%
+
+    assert await _alert_thresholds(client) == [50, 50]
+    assert await _claimed_period_starts(db_session) == [
+        date(2026, 2, 15),
+        date(2026, 3, 15),
+    ]
