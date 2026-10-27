@@ -303,7 +303,8 @@ class AppleSignInRequest(BaseModel):
     identity_token: str
     authorization_code: str
     nonce: str | None = None
-    name: str | None = None
+    # No name: the app asks Apple for the email only (data minimization).
+    # Older builds still send one; it is ignored as an unknown field.
 
 
 class GoogleSignInRequest(BaseModel):

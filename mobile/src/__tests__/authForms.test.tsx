@@ -8,9 +8,11 @@ import { fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 import type { ComponentType } from 'react';
 import { StyleSheet } from 'react-native';
 
+import OnboardingPrivacyScreen from '../../app/onboarding/privacy';
 import ResetPasswordScreen from '../../app/onboarding/reset-password';
 import SignInScreen from '../../app/onboarding/sign-in';
 import SignUpScreen from '../../app/onboarding/sign-up';
+import { PRIVACY_POLICY } from '@/features/settings/content/privacy';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 
@@ -158,5 +160,33 @@ describe('reset-password hints', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Show password' }));
 
     expect(screen.getByRole('button', { name: 'Hide password' })).toBeTruthy();
+  });
+});
+
+describe('sign-up privacy policy link', () => {
+  function openSignUp() {
+    return renderRouter(
+      {
+        _layout: () => <Stack />,
+        'onboarding/sign-up': SignUpScreen,
+        'onboarding/privacy': OnboardingPrivacyScreen,
+      },
+      { initialUrl: '/onboarding/sign-up' },
+    );
+  }
+
+  it('opens the in-app policy inside onboarding, so a signed-out user can read it', () => {
+    const router = openSignUp();
+
+    fireEvent.press(screen.getByRole('link', { name: 'Privacy Policy' }));
+
+    expect(router.getPathname()).toBe('/onboarding/privacy');
+    expect(screen.getByText(PRIVACY_POLICY.sections[0].heading)).toBeTruthy();
+  });
+
+  it('does not mention Terms, which do not exist yet', () => {
+    openSignUp();
+
+    expect(screen.queryByText(/Terms/)).toBeNull();
   });
 });
