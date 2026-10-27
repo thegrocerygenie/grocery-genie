@@ -81,11 +81,14 @@ export function cropRect(
   };
 }
 
-/**
- * Light first: a dark or washed-out frame also scores as blurry, and "find
- * more light" is the advice that fixes it.
- */
-export function frameVerdict(crops: GrayCrop[]): FrameVerdict {
+export interface FrameScores {
+  /** Laplacian variance of the sharpest crop. */
+  sharpest: number;
+  /** Mean gray over all crops. */
+  brightness: number;
+}
+
+export function frameScores(crops: GrayCrop[]): FrameScores {
   let total = 0;
   let pixels = 0;
   let sharpest = 0;
@@ -94,7 +97,18 @@ export function frameVerdict(crops: GrayCrop[]): FrameVerdict {
     pixels += gray.length;
     sharpest = Math.max(sharpest, laplacianVariance(gray, width, height));
   }
-  const brightness = pixels > 0 ? total / pixels : 0;
+  return { sharpest, brightness: pixels > 0 ? total / pixels : 0 };
+}
+
+/**
+ * Light first: a dark or washed-out frame also scores as blurry, and "find
+ * more light" is the advice that fixes it.
+ */
+export function frameVerdict(crops: GrayCrop[]): FrameVerdict {
+  return verdictFromScores(frameScores(crops));
+}
+
+export function verdictFromScores({ sharpest, brightness }: FrameScores): FrameVerdict {
   if (brightness < BRIGHTNESS_MIN) return 'dark';
   if (brightness > BRIGHTNESS_MAX) return 'bright';
   if (sharpest < DEVICE_BLUR_THRESHOLD) return 'blurry';

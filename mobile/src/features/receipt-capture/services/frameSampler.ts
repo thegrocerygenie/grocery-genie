@@ -4,8 +4,9 @@ import { decode } from 'jpeg-js';
 import {
   CROP_POINTS,
   cropRect,
-  frameVerdict,
+  frameScores,
   grayFromRgba,
+  verdictFromScores,
   type FrameVerdict,
   type GrayCrop,
 } from '../utils/frameQuality';
@@ -55,7 +56,18 @@ export async function sampleFrame(camera: SamplingCamera): Promise<FrameVerdict 
       });
       crops.push({ gray: grayFromRgba(data, width, height), width, height });
     }
-    return crops.length > 0 ? frameVerdict(crops) : null;
+    if (crops.length === 0) return null;
+    const scores = frameScores(crops);
+    const verdict = verdictFromScores(scores);
+    if (__DEV__) {
+      // Calibrates DEVICE_BLUR_THRESHOLD on a real phone; see
+      // scripts/calibrate-device-blur.py. Scores only, never pixels.
+      // eslint-disable-next-line no-console
+      console.log(
+        `[FrameQuality] blur=${Math.round(scores.sharpest)} brightness=${Math.round(scores.brightness)} verdict=${verdict}`,
+      );
+    }
+    return verdict;
   } finally {
     deleteQuietly(photo.uri);
   }

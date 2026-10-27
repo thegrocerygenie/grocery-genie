@@ -4,6 +4,7 @@ import {
   CROP_SIZE,
   DEVICE_BLUR_THRESHOLD,
   cropRect,
+  frameScores,
   frameVerdict,
   grayFromRgba,
   laplacianVariance,
@@ -108,5 +109,21 @@ describe('frameVerdict', () => {
     // and rejects 723 and below.
     expect(DEVICE_BLUR_THRESHOLD).toBeGreaterThan(723);
     expect(DEVICE_BLUR_THRESHOLD).toBeLessThan(1151);
+  });
+});
+
+describe('frameScores', () => {
+  it('gives the sharpest crop and the mean brightness over all crops', () => {
+    const size = 8;
+    const scores = frameScores([
+      { gray: flat(size, size, 100), width: size, height: size },
+      { gray: checkerboard(size, size, 0, 255), width: size, height: size },
+    ]);
+    expect(scores.sharpest).toBe(1020 * 1020);
+    expect(scores.brightness).toBeCloseTo((100 + 127.5) / 2, 6);
+  });
+
+  it('is zero for no crops', () => {
+    expect(frameScores([])).toEqual({ sharpest: 0, brightness: 0 });
   });
 });
