@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.retention import restore_cutoff
 from app.events.dispatcher import dispatcher
 from app.events.types import ItemCorrected, ReceiptConfirmed
 from app.llm.provider import (
@@ -668,14 +669,14 @@ class ReceiptService:
         deleted_at = receipt.deleted_at
         if deleted_at.tzinfo is None:
             deleted_at = deleted_at.replace(tzinfo=UTC)
-        if deleted_at < datetime.now(UTC) - timedelta(days=30):
+        if deleted_at < restore_cutoff():
             raise ValueError("Receipt past 30-day restore window")
         receipt.deleted_at = None
         await self.db.flush()
         return receipt
 
     async def list_recently_deleted(self, user_id: uuid.UUID) -> list[Receipt]:
-        cutoff = datetime.now(UTC) - timedelta(days=30)
+        cutoff = restore_cutoff()
         # SQLite-friendly cutoff (naive) for in-memory tests; Postgres ignores TZ.
         cutoff_naive = cutoff.replace(tzinfo=None)
         result = await self.db.execute(
