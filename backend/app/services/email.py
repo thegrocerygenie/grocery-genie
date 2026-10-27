@@ -1,7 +1,9 @@
 """Transactional email — Resend with log-only fallback.
 
 Falls back to logging the deep-link URL when `resend_api_key` isn't set so
-local dev doesn't need a real provider.
+local dev doesn't need a real provider. Production refuses to start without
+the key (`Settings.production_safety_errors`), so the fallback runs in debug
+only.
 """
 
 from __future__ import annotations

@@ -303,7 +303,6 @@ class ReceiptService:
                 "receipt_confirmed",
                 {
                     "item_count": len(receipt.line_items),
-                    "total_amount": float(receipt.total) if receipt.total else 0,
                     "correction_count": correction_count,
                 },
                 user_id,
@@ -599,11 +598,10 @@ class ReceiptService:
         if self.analytics:
             self.analytics.emit(
                 "receipt_correction_made",
-                {
-                    "field": field,
-                    "original_value": original_value,
-                    "corrected_value": corrected_value,
-                },
+                # The field name only: the values stay in receipt_corrections,
+                # where account deletion and the purge can reach them. Logs
+                # are kept outside the app.
+                {"field": field},
                 user_id,
             )
 

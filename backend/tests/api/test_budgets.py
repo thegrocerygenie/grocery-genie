@@ -313,3 +313,24 @@ async def test_restore_brings_back_a_deleted_budget(
     assert response.status_code == 200
     listed = (await client.get("/api/budgets")).json()
     assert [(b["id"], b["amount"]) for b in listed] == [(old["id"], 200.0)]
+
+
+@pytest.mark.asyncio
+async def test_budget_created_event_logs_the_type_not_the_amount(
+    client: AsyncClient, seeded_db
+):
+    from tests.api.test_receipts import _install_analytics_spy
+
+    calls = _install_analytics_spy()
+    await client.post(
+        "/api/budgets",
+        json={
+            "category_id": None,
+            "amount": 500.0,
+            "period_type": "monthly",
+            "period_start": "2026-03-01",
+        },
+    )
+
+    created = [p for name, p, _ in calls if name == "budget_created"]
+    assert created == [{"type": "overall"}]

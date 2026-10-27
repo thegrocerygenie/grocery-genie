@@ -1,6 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Well-known insecure default. If this value ever signs tokens in production,
@@ -87,6 +88,10 @@ class Settings(BaseSettings):
     signin_lockout_window_seconds: int = 3600
     signin_lockout_duration_seconds: int = 3600
 
+    # Auth — sign-in activity (auth_events: IP, user agent) older than this
+    # is erased by a daily beat task. The privacy policy states the period.
+    auth_event_retention_days: int = Field(default=365, ge=1)
+
     # Email — Resend
     resend_api_key: str = ""
     resend_from: str = "Grocery Genie <noreply@onresend.dev>"
@@ -139,6 +144,11 @@ class Settings(BaseSettings):
             errors.append(
                 "GG_DATABASE_ECHO must be False in production; it logs raw "
                 "SQL parameters including auth tokens."
+            )
+        if not self.resend_api_key:
+            errors.append(
+                "GG_RESEND_API_KEY must be set in production; without it, "
+                "verification and password-reset emails are never sent."
             )
         return errors
 

@@ -12,14 +12,14 @@ Sources:
 - [ ] **AI consent before the first scan** (Apple 5.1.2(i), review blocker 3). The app asks nobody before it sends receipt photos and item names to Anthropic. Card: "Ask permission before sending receipts to AI". When it ships, add the consent wording to `privacy.ts` (a test currently forbids it).
 - [ ] **Public privacy policy URL** for App Store Connect (5.1.1(i)), for example on the `marketing/` site. It must match the in-app text.
 - [ ] **App Store privacy label** filled in from the table in the privacy review.
-- [ ] **Sign-up "Privacy Policy" and "Terms" links work.** Today they are plain text (`mobile/app/onboarding/sign-up.tsx`), and no Terms document exists. Card: "Privacy minimization and sign-up policy link".
+- [x] **Sign-up "Privacy Policy" link works.** It opens the in-app policy at `onboarding/privacy`. "Terms" was dropped: no Terms document exists.
 - [ ] **Legal sign-off** on `privacy.ts`, then set `reviewed: true` to remove the draft banner. Replace the placeholder company name ("The Grocery Genie Inc.").
 
 ## 2. Claims the privacy text makes that code doesn't enforce yet
 
-- [ ] **Sign-in security records kept up to 12 months:** `auth_events` has no purge. This is in the minimization card.
+- [x] **Sign-in security records kept up to 12 months:** a daily beat task purges `auth_events` older than `GG_AUTH_EVENT_RETENTION_DAYS` (default 365).
 - [ ] **Server logs kept up to 30 days:** set Docker log rotation or the host's retention (`docker/docker-compose.yml` has no `logging:`), or change the text.
-- [ ] **The other minimization fixes** (same card):
+- [x] **The other minimization fixes:**
   - stop requesting the unused Apple full name;
   - drop raw receipt values from the analytics logs;
   - block the email-logging fallback in production.

@@ -199,10 +199,17 @@ export default function SignUpScreen() {
             <Text style={styles.primaryBtnLabel}>Create account</Text>
           </Pressable>
 
-          <Text style={styles.legal}>
-            By continuing you agree to the <Text style={styles.legalLink}>Terms</Text> and{' '}
-            <Text style={styles.legalLink}>Privacy Policy</Text>.
-          </Text>
+          <Pressable
+            onPress={() => router.push('/onboarding/privacy')}
+            hitSlop={{ top: 14, bottom: 14 }}
+            accessibilityRole="link"
+            accessibilityLabel="Privacy Policy"
+            accessibilityHint="Opens the privacy policy"
+          >
+            <Text style={styles.legal}>
+              By continuing you agree to the <Text style={styles.legalLink}>Privacy Policy</Text>.
+            </Text>
+          </Pressable>
 
           <View style={{ flex: 1 }} />
 
