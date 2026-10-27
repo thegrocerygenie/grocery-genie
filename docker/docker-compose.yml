@@ -1,0 +1,62 @@
+# Production stack. Run from the repo root:
+#   docker compose -f docker/docker-compose.yml up -d --build
+# Compose resolves relative paths from this file's directory (docker/).
+
+# Fixes the project name, so volumes are grocery-genie_<name> (the backup path
+# in docs/DEPLOYMENT.md 1.10 relies on it).
+name: grocery-genie
+
+x-app: &app
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+  image: grocery-genie-backend
+  env_file: .env.production
+  depends_on:
+    - redis
+  restart: unless-stopped
+
+services:
+  api:
+    <<: *app
+    # Reached only through Caddy; no port is published on the host.
+    expose:
+      - "8000"
+    volumes:
+      - receipt_images:/app/storage # Receipt image storage, shared with worker
+
+  worker:
+    <<: *app
+    command: celery -A app.tasks worker --loglevel=info --concurrency=2
+    volumes:
+      - receipt_images:/app/storage
+
+  beat:
+    <<: *app
+    # The schedule file goes to /tmp: /app is not writable by the app user.
+    command: celery -A app.tasks beat --loglevel=info --schedule=/tmp/celerybeat-schedule
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  receipt_images:
+  redis_data:
+  caddy_data:
+  caddy_config:
