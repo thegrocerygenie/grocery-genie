@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { deletePendingImage } from '@/features/receipt-capture/services/pendingImageFiles';
+
 import { useOfflineStore } from '../offlineStore';
+
+jest.mock('@/features/receipt-capture/services/pendingImageFiles', () => ({
+  deletePendingImage: jest.fn(),
+}));
 
 // Reset store between tests
 beforeEach(() => {
@@ -13,6 +19,7 @@ describe('offlineStore', () => {
       imageUri: 'file:///photo.jpg',
       mimeType: 'image/jpeg',
       capturedAt: '2026-03-22T10:00:00Z',
+      ownerId: 'user-a',
     });
 
     const { pendingReceipts } = useOfflineStore.getState();
@@ -27,6 +34,7 @@ describe('offlineStore', () => {
       imageUri: 'file:///photo.jpg',
       mimeType: 'image/jpeg',
       capturedAt: '2026-03-22T10:00:00Z',
+      ownerId: 'user-a',
     });
 
     const id = useOfflineStore.getState().pendingReceipts[0].id;
@@ -40,6 +48,7 @@ describe('offlineStore', () => {
       imageUri: 'file:///photo.jpg',
       mimeType: 'image/jpeg',
       capturedAt: '2026-03-22T10:00:00Z',
+      ownerId: 'user-a',
     });
 
     const id = useOfflineStore.getState().pendingReceipts[0].id;
@@ -54,11 +63,13 @@ describe('offlineStore', () => {
       imageUri: 'file:///a.jpg',
       mimeType: 'image/jpeg',
       capturedAt: '2026-03-22T10:00:00Z',
+      ownerId: 'user-a',
     });
     store.addPendingReceipt({
       imageUri: 'file:///b.jpg',
       mimeType: 'image/jpeg',
       capturedAt: '2026-03-22T11:00:00Z',
+      ownerId: 'user-a',
     });
 
     const id = useOfflineStore.getState().pendingReceipts[0].id;
@@ -79,6 +90,7 @@ describe('offlineStore', () => {
               imageUri: 'file:///a.jpg',
               mimeType: 'image/jpeg',
               capturedAt: '2026-03-22T10:00:00Z',
+              ownerId: 'user-a',
               status: 'syncing',
             },
             {
@@ -86,6 +98,7 @@ describe('offlineStore', () => {
               imageUri: 'file:///b.jpg',
               mimeType: 'image/jpeg',
               capturedAt: '2026-03-22T11:00:00Z',
+              ownerId: 'user-a',
               status: 'failed',
             },
           ],
@@ -105,6 +118,7 @@ describe('offlineStore', () => {
       imageUri: 'file:///a.jpg',
       mimeType: 'image/jpeg',
       capturedAt: '2026-03-22T10:00:00Z',
+      ownerId: 'user-a',
     });
     const id = useOfflineStore.getState().pendingReceipts[0].id;
     useOfflineStore.getState().updateStatus(id, 'syncing');
@@ -114,5 +128,45 @@ describe('offlineStore', () => {
     const [receipt] = useOfflineStore.getState().pendingReceipts;
     expect(receipt.status).toBe('pending');
     expect(receipt.lastAttemptFailed).toBe(true);
+  });
+
+  it('drops photos an older build queued with no owner, and deletes their files', async () => {
+    // Builds before per-account queues saved entries without ownerId (version 0).
+    // Nothing may upload or show them, so they would sit on disk forever.
+    await AsyncStorage.setItem(
+      'grocery-genie-offline',
+      JSON.stringify({
+        state: {
+          pendingReceipts: [
+            {
+              id: 'pending-legacy',
+              imageUri: 'file:///doc/pending-receipts/legacy.jpg',
+              mimeType: 'image/jpeg',
+              capturedAt: '2026-03-22T10:00:00Z',
+              status: 'pending',
+            },
+            {
+              id: 'pending-owned',
+              imageUri: 'file:///doc/pending-receipts/owned.jpg',
+              mimeType: 'image/jpeg',
+              capturedAt: '2026-03-22T11:00:00Z',
+              ownerId: 'user-a',
+              status: 'pending',
+            },
+          ],
+        },
+        version: 0,
+      }),
+    );
+
+    await useOfflineStore.persist.rehydrate();
+
+    expect(useOfflineStore.getState().pendingReceipts.map((r) => r.id)).toEqual(['pending-owned']);
+    expect(deletePendingImage).toHaveBeenCalledTimes(1);
+    expect(deletePendingImage).toHaveBeenCalledWith('file:///doc/pending-receipts/legacy.jpg');
+    // Saved as version 1, so the cleanup does not run again on the next launch.
+    const saved = JSON.parse((await AsyncStorage.getItem('grocery-genie-offline')) ?? '{}');
+    expect(saved.version).toBe(1);
+    expect(saved.state.pendingReceipts.map((r: { id: string }) => r.id)).toEqual(['pending-owned']);
   });
 });

@@ -47,7 +47,7 @@ export default function ScanScreen() {
   const receiptImport = useReceiptImport();
   const { setCapturedImageUri, setActiveScanResponse } = useReceiptStore();
   const addPendingReceipt = useOfflineStore((s) => s.addPendingReceipt);
-  const ownerId = tokenSubject(useAuthStore((s) => s.accessToken)) ?? undefined;
+  const ownerId = tokenSubject(useAuthStore((s) => s.accessToken));
   const analytics = useAnalytics();
 
   // Tracks whether a scan was submitted, so leaving the camera without ever
@@ -103,6 +103,11 @@ export default function ScanScreen() {
   };
 
   const queuePhoto = (uri: string) => {
+    // A photo with no owner could never upload under any session; don't keep it.
+    if (!ownerId) {
+      fail();
+      return;
+    }
     try {
       addPendingReceipt({
         imageUri: persistCapturedImage(uri),

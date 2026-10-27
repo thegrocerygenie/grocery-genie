@@ -38,11 +38,15 @@ export function useReceiptImport() {
 
   const queue = useCallback(
     (receipt: PickedReceipt) => {
+      // A file with no owner could never upload under any session. Throwing
+      // makes importReceipt report the failed upload instead.
+      const ownerId = tokenSubject(accessToken);
+      if (!ownerId) throw new Error('No signed-in user to own the queued receipt');
       addPendingReceipt({
         imageUri: persistCapturedImage(receipt.uri),
         mimeType: receipt.mimeType,
         capturedAt: new Date().toISOString(),
-        ownerId: tokenSubject(accessToken) ?? undefined,
+        ownerId,
         source: receipt.source,
       });
     },

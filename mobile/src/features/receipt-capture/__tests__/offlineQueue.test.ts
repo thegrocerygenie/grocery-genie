@@ -1,5 +1,5 @@
 import { ApiError } from '@/services/api';
-import { useOfflineStore } from '@/store/offlineStore';
+import { useOfflineStore, type PendingReceipt } from '@/store/offlineStore';
 
 import {
   formatQueuedAgo,
@@ -198,7 +198,10 @@ describe('syncPendingReceipts only uploads the signed-in user’s photos', () =>
   });
 
   it('never uploads a photo that has no owner', async () => {
-    useOfflineStore.getState().addPendingReceipt(CAPTURE);
+    // Only an older build saved these; the store drops them on upgrade. Seed
+    // one directly so sync stays safe if one ever slips through.
+    const legacy = { ...CAPTURE, id: 'pending-legacy', status: 'pending' } as PendingReceipt;
+    useOfflineStore.setState({ pendingReceipts: [legacy] });
     const scan = jest.fn();
 
     await syncPendingReceipts({

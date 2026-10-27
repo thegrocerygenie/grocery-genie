@@ -9,6 +9,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import ScanScreen from '../../app/(tabs)/scan';
 import { ApiError } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
+import { persistCapturedImage } from '@/features/receipt-capture/services/pendingImageFiles';
 import { useOfflineStore } from '@/store/offlineStore';
 import { fakeAccessToken } from '@/testing/jwt';
 
@@ -41,7 +42,9 @@ jest.mock('@/features/receipt-capture/hooks/useReceiptImport', () => ({
   useReceiptImport: () => ({ importFrom: jest.fn(), progress: null }),
 }));
 jest.mock('@/features/receipt-capture/services/pendingImageFiles', () => ({
-  persistCapturedImage: (uri: string) => uri.replace('/cache/Camera/', '/doc/pending-receipts/'),
+  persistCapturedImage: jest.fn((uri: string) =>
+    uri.replace('/cache/Camera/', '/doc/pending-receipts/'),
+  ),
   deletePendingImage: jest.fn(),
 }));
 
@@ -90,6 +93,21 @@ describe('Scan queues receipts it cannot upload', () => {
     fireEvent.press(screen.getByLabelText('Capture receipt'));
 
     await waitFor(() => expect(useOfflineStore.getState().pendingReceipts).toHaveLength(1));
+  });
+
+  it('does not queue or copy a photo when the session has no user id', async () => {
+    // Without an owner no session could ever upload it, so it would be orphaned.
+    useAuthStore.setState({ accessToken: 'not-a-jwt' });
+    (persistCapturedImage as jest.Mock).mockClear();
+    online(false);
+    render(<ScanScreen />);
+
+    fireEvent.press(screen.getByLabelText('Capture receipt'));
+
+    await waitFor(() => expect(screen.queryByText('Capturing…')).toBeNull());
+    expect(screen.queryByText('Saved · will upload automatically')).toBeNull();
+    expect(useOfflineStore.getState().pendingReceipts).toHaveLength(0);
+    expect(persistCapturedImage).not.toHaveBeenCalled();
   });
 
   it('does not queue a photo the server rejected', async () => {
