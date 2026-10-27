@@ -4,6 +4,7 @@ Settings reads only GG_-prefixed vars, so a doc that says STORAGE_PATH sets
 nothing: the app keeps its default and writes images off the shared volume.
 """
 
+import json
 import re
 from pathlib import Path
 
@@ -77,3 +78,32 @@ def test_production_env_block_loads_into_settings(monkeypatch):
     assert settings.redis_url == "redis://redis:6379/0"
     assert settings.cors_origins == ["https://grocerygenie.app"]
     assert settings.debug is False
+
+
+# Settings whose defaults only suit local development: without them, email is
+# only logged and Apple and Google sign-in fail.
+REQUIRED_IN_PRODUCTION = [
+    "GG_RESEND_API_KEY",
+    "GG_RESEND_FROM",
+    "GG_APPLE_TEAM_ID",
+    "GG_APPLE_KEY_ID",
+    "GG_APPLE_CLIENT_ID",
+    "GG_APPLE_PRIVATE_KEY",
+    "GG_GOOGLE_CLIENT_ID",
+]
+
+
+def test_production_env_block_sets_every_required_setting():
+    assigned = {
+        name
+        for name, _, commented_out in _assignments(_production_env_block())
+        if not commented_out
+    }
+    missing = [name for name in REQUIRED_IN_PRODUCTION if name not in assigned]
+    assert missing == [], "production needs these set"
+
+
+def test_apple_client_id_is_the_ios_bundle_id():
+    values = {name: value for name, value, _ in _assignments(_production_env_block())}
+    app_json = json.loads((REPO_ROOT / "mobile" / "app.json").read_text())
+    assert values["GG_APPLE_CLIENT_ID"] == app_json["expo"]["ios"]["bundleIdentifier"]
