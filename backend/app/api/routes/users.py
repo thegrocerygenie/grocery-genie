@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import contextlib
 from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.dependencies import get_db
-from app.core.security import get_current_user
+from app.core.security import bearer_scheme, get_current_user
+from app.image.storage import LocalFileStorage
 from app.models.database import User
 from app.models.schemas import (
+    DeleteAccountRequest,
     EmailChangeConfirmPayload,
     EmailChangeRequestPayload,
     PushTokenPayload,
@@ -16,6 +21,7 @@ from app.models.schemas import (
     UserPreferencesUpdate,
     UserProfileResponse,
 )
+from app.services import account_service
 from app.services import auth as auth_service
 from app.services.push_token_service import PushTokenService
 
@@ -163,3 +169,33 @@ async def unregister_push_token(
     user: User = Depends(get_current_user),
 ) -> None:
     await PushTokenService(db).unregister(user.id, body.token)
+
+
+@router.delete("/me", status_code=204)
+async def delete_me(
+    body: DeleteAccountRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> None:
+    """Delete the account and everything it owns (App Store 5.1.1(v)).
+
+    A Sign in with Apple account sends a fresh authorization code, and its
+    Apple grant is revoked first; if that fails, nothing is deleted. The
+    account's other sessions fail from here on: their user is gone.
+    """
+    try:
+        await account_service.revoke_sign_in_grants(
+            user,
+            apple_authorization_code=body.apple_authorization_code if body else None,
+        )
+    except account_service.AccountDeletionError as e:
+        raise HTTPException(
+            status_code=e.status, detail={"code": e.code, "message": str(e)}
+        ) from e
+    storage = LocalFileStorage(get_settings().storage_path)
+    await account_service.delete_account(db, user.id, storage=storage)
+    if credentials is not None:
+        # The DEBUG-only legacy api_token is not a JWT; nothing to revoke.
+        with contextlib.suppress(HTTPException):
+            await auth_service.revoke_session(credentials.credentials)

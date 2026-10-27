@@ -155,6 +155,15 @@ export default function SettingsScreen() {
         >
           <Text style={[type.body, { color: colors.red, fontWeight: '500' }]}>Sign out</Text>
         </Pressable>
+
+        <Pressable
+          onPress={() => router.push('/settings/delete-account')}
+          style={({ pressed }) => [styles.signOut, pressed && { backgroundColor: colors.iosFill3 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Delete account"
+        >
+          <Text style={[type.body, { color: colors.red }]}>Delete account</Text>
+        </Pressable>
       </ScrollView>
     </>
   );

@@ -22,7 +22,12 @@ from app.core.jwks_cache import get_apple_jwks_memo
 log = logging.getLogger(__name__)
 
 APPLE_TOKEN_URL = "https://appleid.apple.com/auth/token"
+APPLE_REVOKE_URL = "https://appleid.apple.com/auth/revoke"
 APPLE_ISSUER = "https://appleid.apple.com"
+
+
+class AppleAccountMismatch(ValueError):
+    """The authorization code belongs to a different Apple ID."""
 
 
 @dataclass(frozen=True)
@@ -175,3 +180,43 @@ async def verify_apple_sign_in(
         email=identity_claims.get("email"),
         email_verified=bool(identity_claims.get("email_verified", True)),
     )
+
+
+async def _post_revoke(token: str, token_type_hint: str) -> None:
+    settings = get_settings()
+    payload = {
+        "client_id": settings.apple_client_id,
+        "client_secret": _build_client_secret(),
+        "token": token,
+        "token_type_hint": token_type_hint,
+    }
+    async with httpx.AsyncClient(timeout=8.0) as ac:
+        resp = await ac.post(
+            APPLE_REVOKE_URL,
+            data=payload,
+            headers={"content-type": "application/x-www-form-urlencoded"},
+        )
+    if resp.status_code != 200:
+        raise ValueError(f"apple revoke failed: {resp.status_code}")
+
+
+async def revoke_apple_grant(*, authorization_code: str, expected_sub: str) -> None:
+    """Revoke the app's Sign in with Apple grant for an account being deleted.
+
+    Apple expects this on account deletion (TN3194). The server keeps no Apple
+    token, so the app re-authenticates and sends a fresh authorization code:
+    exchange it, check it is the account's Apple ID, and revoke the tokens it
+    returns. Raises AppleAccountMismatch for another Apple ID, ValueError for
+    any other failure.
+    """
+    try:
+        body = await _exchange_authorization_code(authorization_code)
+        claims = await _decode_apple_jwt(body["id_token"])
+        if claims.get("sub") != expected_sub:
+            raise AppleAccountMismatch("apple sub mismatch")
+        if body.get("refresh_token"):
+            await _post_revoke(body["refresh_token"], "refresh_token")
+        else:
+            await _post_revoke(body["access_token"], "access_token")
+    except httpx.HTTPError as e:
+        raise ValueError(f"apple unreachable: {e}") from e

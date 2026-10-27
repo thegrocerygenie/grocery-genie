@@ -292,6 +292,11 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class DeleteAccountRequest(BaseModel):
+    # Sign in with Apple accounts only: a fresh code to revoke the grant.
+    apple_authorization_code: str | None = None
+
+
 class AppleSignInRequest(BaseModel):
     identity_token: str
     authorization_code: str
