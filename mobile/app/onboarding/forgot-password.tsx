@@ -67,7 +67,7 @@ export default function ForgotPasswordScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
-                placeholderTextColor={colors.iosLabel3 as string}
+                placeholderTextColor={colors.iosLabel3}
                 style={styles.input}
                 accessibilityLabel="Email"
               />
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     ...type.subheadline,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     textAlign: 'center',
     lineHeight: 21,
     maxWidth: 280,
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   },
   input: {
     ...type.subheadline,
-    color: colors.iosLabel as string,
+    color: colors.iosLabel,
     paddingVertical: 13,
     flex: 1,
   },
@@ -157,13 +157,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnLabel: { color: '#fff', ...type.headline },
+  primaryBtnLabel: { ...type.headline, color: colors.onTint },
 
   footerRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  footerText: { ...type.footnote, color: colors.iosLabel2 as string },
+  footerText: { ...type.footnote, color: colors.iosLabel2 },
   footerLink: { ...type.footnote, color: colors.tint, fontWeight: '600' },
 });

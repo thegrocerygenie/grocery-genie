@@ -237,7 +237,7 @@ function PermissionScreen({ denied, onRequest, onChooseFromLibrary }: Permission
         style={[
           type.subheadline,
           {
-            color: colors.iosLabel2 as string,
+            color: colors.iosLabel2,
             textAlign: 'center',
             maxWidth: 260,
             lineHeight: 22,
@@ -471,8 +471,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  cancelLabel: { color: '#fff', ...type.callout },
-  modeLabel: { color: '#fff', ...type.callout, fontWeight: '600' },
+  cancelLabel: { ...type.callout, color: '#fff' },
+  modeLabel: { ...type.callout, color: '#fff', fontWeight: '600' },
 
   shutter: {
     width: 70,
@@ -485,12 +485,12 @@ const styles = StyleSheet.create({
   shutterInner: {
     flex: 1,
     borderRadius: 999,
-    backgroundColor: '#fff',
+    backgroundColor: '#fff', // fixed: the camera UI is white on black in both appearances
   },
 
   permissionRoot: {
     flex: 1,
-    backgroundColor: colors.iosBg as string,
+    backgroundColor: colors.iosBg,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minWidth: 200,
   },
-  primaryBtnLabel: { color: '#fff', ...type.headline },
+  primaryBtnLabel: { ...type.headline, color: colors.onTint },
   secondaryBtn: {
     minHeight: 44,
     paddingHorizontal: spacing.xl,
@@ -523,5 +523,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryBtnPressed: { opacity: 0.5 },
-  secondaryBtnLabel: { color: colors.tint, ...type.headline },
+  secondaryBtnLabel: { ...type.headline, color: colors.tint },
 });

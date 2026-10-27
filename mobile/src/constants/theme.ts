@@ -6,46 +6,78 @@
  * back where SF Symbols / chrome-material blur aren't available.
  */
 
-import { Platform, type TextStyle } from 'react-native';
+import {
+  DynamicColorIOS,
+  Platform,
+  PlatformColor,
+  type ColorValue,
+  type TextStyle,
+} from 'react-native';
 
+/** Brand green per appearance, for the few APIs that take only a string. */
+export const TINT_HEX = { light: '#1F7A4A', dark: '#34D17A' } as const;
+
+/** An iOS semantic color: follows light and dark mode, and accessibility contrast. */
+const system = (name: string): ColorValue => PlatformColor(name);
+/** A color iOS has no semantic name for, given for each appearance. */
+const pair = (light: string, dark: string): ColorValue => DynamicColorIOS({ light, dark });
+
+/**
+ * Every token adapts to dark mode (app.json userInterfaceStyle: automatic).
+ * The light values equal the earlier hex palette; dark values are iOS's own,
+ * or tokens-v2.css [data-theme="dark"] where iOS has no name (brand tint).
+ */
 export const colors = {
-  iosBg: '#F2F2F7',
-  iosBg2: '#FFFFFF',
-  iosBg3: '#F2F2F7',
-  iosFill1: 'rgba(120,120,128,0.20)',
-  iosFill3: 'rgba(120,120,128,0.12)',
-  iosSeparator: 'rgba(60,60,67,0.29)',
-  iosLabel: '#000000',
-  iosLabel2: 'rgba(60,60,67,0.60)',
-  iosLabel3: 'rgba(60,60,67,0.30)',
+  iosBg: system('systemGroupedBackground'),
+  iosBg2: system('secondarySystemGroupedBackground'),
+  iosBg3: system('tertiarySystemGroupedBackground'),
+  iosFill1: system('systemFill'),
+  iosFill3: system('tertiarySystemFill'),
+  iosSeparator: system('separator'),
+  iosLabel: system('label'),
+  iosLabel2: system('secondaryLabel'),
+  iosLabel3: system('tertiaryLabel'),
 
-  tint: '#1F7A4A',
-  tintPressed: '#195F3A',
-  tintBg: 'rgba(31,122,74,0.12)',
+  tint: pair(TINT_HEX.light, TINT_HEX.dark),
+  tintPressed: pair('#195F3A', '#2BB86A'),
+  tintBg: pair('rgba(31,122,74,0.12)', 'rgba(52,209,122,0.18)'),
 
-  red: '#FF3B30',
-  orange: '#FF9500',
-  yellow: '#FFCC00',
-  green: '#34C759',
-  blue: '#007AFF',
-  indigo: '#5856D6',
-  pink: '#FF2D55',
-  teal: '#30B0C7',
-  gray: '#8E8E93',
-  /** systemOrange at 12% — warning banner background. */
-  orangeBg: 'rgba(255,149,0,0.12)',
+  red: system('systemRed'),
+  orange: system('systemOrange'),
+  yellow: system('systemYellow'),
+  green: system('systemGreen'),
+  blue: system('systemBlue'),
+  indigo: system('systemIndigo'),
+  pink: system('systemPink'),
+  teal: system('systemTeal'),
+  gray: system('systemGray'),
+  /** systemOrange at 12% (20% in dark) — warning banner background. */
+  orangeBg: pair('rgba(255,149,0,0.12)', 'rgba(255,159,10,0.20)'),
+  /** systemRed at 12% (20% in dark) — error and over-budget banners. */
+  redBg: pair('rgba(255,59,48,0.12)', 'rgba(255,69,58,0.20)'),
+  /** Text and glyphs on a brand-green fill: white, black on the brighter dark-mode green. */
+  onTint: pair('#FFFFFF', '#000000'),
+  /** systemRed at 40% — the border of a field with an error. */
+  redBorder: pair('rgba(255,59,48,0.40)', 'rgba(255,69,58,0.50)'),
+  /** systemBlue at 8% (16% in dark) — tip cards. */
+  blueBg: pair('rgba(0,122,255,0.08)', 'rgba(10,132,255,0.16)'),
+  /** Action sheet cards: near-opaque white, or the dark elevated gray. */
+  sheetBg: pair('rgba(255,255,255,0.96)', 'rgba(44,44,46,0.96)'),
+  /** Sign in with Apple: black in light mode, white in dark (Apple HIG). */
+  appleButton: pair('#000000', '#FFFFFF'),
+  appleButtonLabel: pair('#FFFFFF', '#000000'),
 
   cat: {
-    groceries: '#34C759',
-    household: '#007AFF',
-    personalCare: '#FF2D55',
-    beverages: '#5856D6',
-    snacks: '#FF9500',
-    babyKids: '#FFCC00',
-    pet: '#30B0C7',
-    other: '#8E8E93',
+    groceries: system('systemGreen'),
+    household: system('systemBlue'),
+    personalCare: system('systemPink'),
+    beverages: system('systemIndigo'),
+    snacks: system('systemOrange'),
+    babyKids: system('systemYellow'),
+    pet: system('systemTeal'),
+    other: system('systemGray'),
   },
-} as const;
+};
 
 export const radii = {
   card: 10,
@@ -64,24 +96,30 @@ export const spacing = {
   xxl: 32,
 } as const;
 
-const money: TextStyle = {
+/**
+ * Each style carries the label color: React Native's Text defaults to black,
+ * which would stay black in dark mode. A screen's own color still overrides it.
+ */
+const text = (style: TextStyle): TextStyle => ({ color: colors.iosLabel, ...style });
+
+const money: TextStyle = text({
   fontFamily: Platform.select({ ios: 'SF Pro Rounded', default: 'System' }),
   fontVariant: ['tabular-nums'],
   fontWeight: '700',
-};
+});
 
 export const type = {
-  largeTitle: { fontSize: 34, fontWeight: '700', letterSpacing: 0.36 } as TextStyle,
-  title1: { fontSize: 28, fontWeight: '700' } as TextStyle,
-  title2: { fontSize: 22, fontWeight: '700' } as TextStyle,
-  title3: { fontSize: 20, fontWeight: '600' } as TextStyle,
-  headline: { fontSize: 17, fontWeight: '600' } as TextStyle,
-  body: { fontSize: 17, fontWeight: '400' } as TextStyle,
-  callout: { fontSize: 16, fontWeight: '400' } as TextStyle,
-  subheadline: { fontSize: 15, fontWeight: '400' } as TextStyle,
-  footnote: { fontSize: 13, fontWeight: '400' } as TextStyle,
-  caption1: { fontSize: 12, fontWeight: '400' } as TextStyle,
-  caption2: { fontSize: 11, fontWeight: '400' } as TextStyle,
+  largeTitle: text({ fontSize: 34, fontWeight: '700', letterSpacing: 0.36 }),
+  title1: text({ fontSize: 28, fontWeight: '700' }),
+  title2: text({ fontSize: 22, fontWeight: '700' }),
+  title3: text({ fontSize: 20, fontWeight: '600' }),
+  headline: text({ fontSize: 17, fontWeight: '600' }),
+  body: text({ fontSize: 17, fontWeight: '400' }),
+  callout: text({ fontSize: 16, fontWeight: '400' }),
+  subheadline: text({ fontSize: 15, fontWeight: '400' }),
+  footnote: text({ fontSize: 13, fontWeight: '400' }),
+  caption1: text({ fontSize: 12, fontWeight: '400' }),
+  caption2: text({ fontSize: 11, fontWeight: '400' }),
   money,
 } as const;
 

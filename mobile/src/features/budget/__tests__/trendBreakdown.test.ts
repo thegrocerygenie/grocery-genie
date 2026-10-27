@@ -1,5 +1,6 @@
 import { buildTrendBreakdown } from '../utils/trendBreakdown';
 import type { DashboardTrendMonth } from '../types';
+import { colors } from '@/constants/theme';
 
 const trend: DashboardTrendMonth[] = [
   { period: '2026-01', spent: 0, budget: null, categories: [] },
@@ -60,7 +61,7 @@ describe('buildTrendBreakdown', () => {
     const { categories, months } = buildTrendBreakdown(trend);
     const groceries = categories.find((c) => c.key === 'g')!;
 
-    expect(groceries.color).toBe('#34C759');
+    expect(groceries.color).toEqual(colors.cat.groceries);
     expect(months[2].segments[0].color).toBe(groceries.color);
   });
 

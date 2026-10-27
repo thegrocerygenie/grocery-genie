@@ -66,13 +66,13 @@ function FloatingTabBar({ state, navigation, descriptors }: BottomTabBarProps) {
               <SymbolView
                 name={tab.symbol as Parameters<typeof SymbolView>[0]['name']}
                 size={16}
-                tintColor={active ? colors.tint : (colors.iosLabel2 as string)}
+                tintColor={active ? colors.tint : colors.iosLabel2}
               />
               <Text
                 style={[
                   type.caption1,
                   {
-                    color: active ? colors.tint : (colors.iosLabel2 as string),
+                    color: active ? colors.tint : colors.iosLabel2,
                     fontWeight: '600',
                   },
                 ]}

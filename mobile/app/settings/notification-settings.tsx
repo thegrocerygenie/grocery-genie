@@ -156,8 +156,8 @@ function NavRow({ label, value, onPress }: NavRowProps) {
     >
       <Text style={type.body}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        <Text style={[type.body, { color: colors.iosLabel2 as string }]}>{value}</Text>
-        <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3 as string} />
+        <Text style={[type.body, { color: colors.iosLabel2 }]}>{value}</Text>
+        <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
       </View>
     </Pressable>
   );
@@ -210,18 +210,18 @@ const sheetStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.iosBg as string },
+  root: { flex: 1, backgroundColor: colors.iosBg },
 
   sectionLabel: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     letterSpacing: 0.5,
     paddingHorizontal: 16,
     paddingBottom: 6,
   },
   sectionFooter: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     paddingHorizontal: 16,
     paddingTop: 6,
   },

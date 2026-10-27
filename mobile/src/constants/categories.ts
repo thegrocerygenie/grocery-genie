@@ -1,10 +1,12 @@
+import type { ColorValue } from 'react-native';
+
 import { colors } from './theme';
 
 export interface CategoryMeta {
   readonly id: string;
   readonly name: string;
   readonly sortOrder: number;
-  readonly color: string;
+  readonly color: ColorValue;
   readonly symbol: string;
 }
 

@@ -45,7 +45,7 @@ export default function OnboardingWelcome() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.iosBg as string },
+  root: { flex: 1, backgroundColor: colors.iosBg },
   heroWrap: {
     flex: 1,
     alignItems: 'center',
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     ...type.callout,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     textAlign: 'center',
     lineHeight: 22,
     maxWidth: 280,
@@ -91,10 +91,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnLabel: { color: '#fff', ...type.headline },
+  primaryBtnLabel: { ...type.headline, color: colors.onTint },
   tertiaryBtn: {
-    color: colors.tint,
     ...type.subheadline,
+    color: colors.tint,
     fontWeight: '500',
     textAlign: 'center',
     paddingVertical: 8,

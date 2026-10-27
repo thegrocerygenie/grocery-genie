@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.96)',
+    backgroundColor: colors.sheetBg,
     borderRadius: 14,
     overflow: 'hidden',
   },
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   cancel: {
     height: 50,
     borderRadius: radii.list,
-    backgroundColor: 'rgba(255,255,255,0.96)',
+    backgroundColor: colors.sheetBg,
     alignItems: 'center',
     justifyContent: 'center',
   },

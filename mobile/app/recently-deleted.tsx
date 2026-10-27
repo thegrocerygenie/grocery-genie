@@ -61,13 +61,13 @@ export default function RecentlyDeletedScreen() {
         ) : all.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
-              <SymbolView name="trash" size={26} tintColor={colors.iosLabel2 as string} />
+              <SymbolView name="trash" size={26} tintColor={colors.iosLabel2} />
             </View>
             <Text style={type.headline}>Nothing recently deleted</Text>
             <Text
               style={[
                 type.footnote,
-                { color: colors.iosLabel2 as string, textAlign: 'center', maxWidth: 240 },
+                { color: colors.iosLabel2, textAlign: 'center', maxWidth: 240 },
               ]}
             >
               Receipts and budgets you delete will appear here for 30 days.
@@ -88,7 +88,7 @@ export default function RecentlyDeletedScreen() {
                   <Text style={type.body} numberOfLines={1}>
                     {item.label}
                   </Text>
-                  <Text style={[type.caption1, { color: colors.iosLabel2 as string }]}>
+                  <Text style={[type.caption1, { color: colors.iosLabel2 }]}>
                     {item.days_remaining}d left to restore
                   </Text>
                 </View>
@@ -114,7 +114,7 @@ export default function RecentlyDeletedScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
   headerBtn: { ...type.body, color: colors.tint, fontWeight: '600' },
-  intro: { ...type.footnote, color: colors.iosLabel2 as string, paddingHorizontal: 4 },
+  intro: { ...type.footnote, color: colors.iosLabel2, paddingHorizontal: 4 },
   center: { paddingTop: 80, alignItems: 'center' },
   empty: { alignItems: 'center', gap: spacing.sm, paddingTop: 80 },
   emptyIcon: {

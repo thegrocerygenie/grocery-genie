@@ -52,9 +52,7 @@ export default function TopItemsScreen() {
         ) : items.length === 0 ? (
           <View style={styles.empty}>
             <Text style={[type.headline, { textAlign: 'center' }]}>No items yet</Text>
-            <Text
-              style={[type.footnote, { color: colors.iosLabel2 as string, textAlign: 'center' }]}
-            >
+            <Text style={[type.footnote, { color: colors.iosLabel2, textAlign: 'center' }]}>
               Scan a receipt to start ranking your most-bought items.
             </Text>
           </View>
@@ -68,9 +66,7 @@ export default function TopItemsScreen() {
                     <Text style={type.headline} numberOfLines={1}>
                       {it.name}
                     </Text>
-                    <Text style={[type.caption1, { color: colors.iosLabel2 as string }]}>
-                      {it.trips}
-                    </Text>
+                    <Text style={[type.caption1, { color: colors.iosLabel2 }]}>{it.trips}</Text>
                   </View>
                   <Text style={[type.money, { fontSize: 15 }]}>${it.amount.toFixed(2)}</Text>
                 </View>
@@ -99,7 +95,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
   intro: {
     ...type.footnote,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     paddingHorizontal: 4,
   },
   listCard: {
@@ -123,7 +119,7 @@ const styles = StyleSheet.create({
   },
   rank: {
     ...type.caption1,
-    color: colors.iosLabel2 as string,
+    color: colors.iosLabel2,
     fontFamily: 'System',
     fontVariant: ['tabular-nums'],
     width: 18,
