@@ -96,6 +96,10 @@ class Settings(BaseSettings):
     resend_api_key: str = ""
     resend_from: str = "Grocery Genie <noreply@onresend.dev>"
     resend_domain: str = ""
+    # "off" sends no email at all, outside debug also logs none: for a
+    # non-debug test run (the verify harness's live-LLM mode). Production
+    # leaves it at "resend", and then startup needs GG_RESEND_API_KEY.
+    email_delivery: Literal["resend", "off"] = "resend"
 
     # Push — Expo push service. The access token is optional; set it when
     # "Enhanced push security" is on for the Expo project.
@@ -145,10 +149,11 @@ class Settings(BaseSettings):
                 "GG_DATABASE_ECHO must be False in production; it logs raw "
                 "SQL parameters including auth tokens."
             )
-        if not self.resend_api_key:
+        if self.email_delivery == "resend" and not self.resend_api_key:
             errors.append(
                 "GG_RESEND_API_KEY must be set in production; without it, "
-                "verification and password-reset emails are never sent."
+                "verification and password-reset emails are never sent. "
+                "(GG_EMAIL_DELIVERY=off turns email off on purpose.)"
             )
         return errors
 

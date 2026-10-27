@@ -104,3 +104,12 @@ async def test_log_only_client_never_logs_the_link_outside_debug(monkeypatch, ca
 
     assert "token=t" not in caplog.text
     assert "not sent" in caplog.text
+
+
+def test_email_delivery_off_uses_the_silent_client_even_with_a_key(monkeypatch):
+    monkeypatch.setattr(
+        email,
+        "get_settings",
+        lambda: Settings(resend_api_key="re_x", email_delivery="off"),
+    )
+    assert isinstance(email.get_email_client(), email.LogOnlyEmailClient)

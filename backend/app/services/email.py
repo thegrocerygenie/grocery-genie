@@ -125,7 +125,7 @@ class ResendEmailClient:
 
 def get_email_client() -> EmailClient:
     settings = get_settings()
-    if settings.resend_api_key:
+    if settings.email_delivery == "resend" and settings.resend_api_key:
         return ResendEmailClient(settings.resend_api_key, settings.resend_from)
     return LogOnlyEmailClient()
 

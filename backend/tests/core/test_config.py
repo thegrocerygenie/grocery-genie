@@ -46,3 +46,12 @@ def test_missing_resend_key_blocks_production_startup():
     # could only go to the log, so production must not start without one.
     errors = _settings(resend_api_key="").production_safety_errors()
     assert any("GG_RESEND_API_KEY" in e for e in errors)
+
+
+def test_email_delivery_off_lets_production_start_without_a_key():
+    # An explicit opt-out (the verify harness's live-LLM mode). With no key,
+    # the non-debug email client neither sends nor logs the body.
+    errors = _settings(
+        resend_api_key="", email_delivery="off"
+    ).production_safety_errors()
+    assert errors == []
