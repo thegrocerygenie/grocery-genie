@@ -121,6 +121,20 @@ describe('Scan queues receipts it cannot upload', () => {
     expect(useOfflineStore.getState().pendingReceipts).toHaveLength(0);
   });
 
+  it('does not queue a photo over the monthly quota, and says the limit is reached', async () => {
+    online(true);
+    mockScanError = new ApiError(429, {
+      detail: 'Monthly receipt quota exceeded (20 receipts/month on Free tier).',
+    });
+    render(<ScanScreen />);
+
+    fireEvent.press(screen.getByLabelText('Capture receipt'));
+
+    await waitFor(() => expect(screen.getByText('Monthly scan limit reached')).toBeTruthy());
+    expect(screen.queryByText('Saved · will upload automatically')).toBeNull();
+    expect(useOfflineStore.getState().pendingReceipts).toHaveLength(0);
+  });
+
   it('opens review when online and the scan succeeds', async () => {
     online(true);
     render(<ScanScreen />);

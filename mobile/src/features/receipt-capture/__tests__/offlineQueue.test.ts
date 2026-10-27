@@ -6,6 +6,7 @@ import {
   isRetryableScanError,
   syncPendingReceipts,
 } from '../services/offlineQueue';
+import { isQuotaExceededError } from '../utils/scanQuota';
 
 const CAPTURE = {
   imageUri: 'file:///doc/pending-receipts/a.jpg',
@@ -14,6 +15,11 @@ const CAPTURE = {
 };
 
 const OWNER = 'user-a';
+
+// The two 429 details the backend sends: app/api/routes/receipts.py (monthly
+// quota) and app/core/rate_limit.py (hourly rate limit).
+const QUOTA_DETAIL = 'Monthly receipt quota exceeded (20 receipts/month on Free tier).';
+const RATE_LIMIT_DETAIL = 'Rate limit exceeded. Try again later.';
 
 function queue(n: number, ownerId: string = OWNER) {
   for (let i = 0; i < n; i++) {
@@ -40,6 +46,29 @@ describe('isRetryableScanError', () => {
 
   it.each([400, 413, 422])('does not retry HTTP %i — the photo itself was rejected', (status) => {
     expect(isRetryableScanError(new ApiError(status, {}))).toBe(false);
+  });
+
+  it('retries the hourly rate limit', () => {
+    expect(isRetryableScanError(new ApiError(429, { detail: RATE_LIMIT_DETAIL }))).toBe(true);
+  });
+
+  it('does not retry the monthly quota: it fails the same way until next month', () => {
+    expect(isRetryableScanError(new ApiError(429, { detail: QUOTA_DETAIL }))).toBe(false);
+  });
+});
+
+describe('isQuotaExceededError', () => {
+  it('spots the monthly quota 429', () => {
+    expect(isQuotaExceededError(new ApiError(429, { detail: QUOTA_DETAIL }))).toBe(true);
+  });
+
+  it.each([
+    ['the rate limit', new ApiError(429, { detail: RATE_LIMIT_DETAIL })],
+    ['a 429 with no detail', new ApiError(429, null)],
+    ['another status', new ApiError(422, { detail: QUOTA_DETAIL })],
+    ['a network failure', new TypeError('Network request failed')],
+  ])('ignores %s', (_label, error) => {
+    expect(isQuotaExceededError(error)).toBe(false);
   });
 });
 
@@ -107,6 +136,23 @@ describe('syncPendingReceipts', () => {
     expect(left).toHaveLength(1);
     expect(left[0].status).toBe('failed');
     expect(deleteImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks a photo over the monthly quota failed for that reason, so it never retries', async () => {
+    queue(1);
+    const scan = jest.fn().mockRejectedValue(new ApiError(429, { detail: QUOTA_DETAIL }));
+
+    const result = await syncPendingReceipts({
+      scan,
+      deleteImage: jest.fn(),
+      ownerId: OWNER,
+      currentOwner: () => OWNER,
+    });
+
+    expect(result).toEqual({ synced: 0, failed: 1 });
+    const [left] = useOfflineStore.getState().pendingReceipts;
+    expect(left.status).toBe('failed');
+    expect(left.failure).toBe('quota');
   });
 
   it('skips photos already marked failed', async () => {

@@ -17,6 +17,7 @@ import SegmentedControl from '@react-native-segmented-control/segmented-control'
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { resolveCategoryMeta } from '@/constants/categories';
 import { CaptureActionSheet } from '@/components/CaptureActionSheet';
+import { LoadErrorState } from '@/components/LoadErrorState';
 import { headerBlurFor } from '@/utils/headerBlur';
 import { ImportProgressOverlay } from '@/features/receipt-capture/components/ImportProgressOverlay';
 import { OfflineQueueSection } from '@/features/receipt-capture/components/OfflineQueueSection';
@@ -26,8 +27,10 @@ import { useReceipts } from '@/features/receipt-capture/hooks/useReceipts';
 import { useCategories } from '@/features/budget/hooks/useCategories';
 import { useDeleteReceipt } from '@/features/lifecycle/hooks/useLifecycle';
 import type { ReceiptResponse } from '@/features/receipt-capture/types';
+import { QUOTA_HINT, QUOTA_MESSAGE } from '@/features/receipt-capture/utils/scanQuota';
 import type { CategoryResponse } from '@/features/budget/types';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { useSyncNow } from '@/hooks/useSyncQueue';
 import { useOfflineStore, type PendingReceipt } from '@/store/offlineStore';
 import { useAuthStore } from '@/store/authStore';
 import { tokenSubject } from '@/features/auth/utils/tokenSubject';
@@ -179,6 +182,7 @@ export default function HistoryScreen() {
   const receiptImport = useReceiptImport();
   const deleteReceipt = useDeleteReceipt();
   const { isConnected } = useNetworkStatus();
+  const syncNow = useSyncNow();
   const ownerId = tokenSubject(useAuthStore((s) => s.accessToken));
   const allPending = useOfflineStore((s) => s.pendingReceipts);
   // The queue is device-wide; show only what this user captured.
@@ -194,21 +198,24 @@ export default function HistoryScreen() {
   };
 
   const onPressFailed = (receipt: PendingReceipt) => {
-    Alert.alert(
-      'Couldn’t read this receipt',
-      'The photo may be blurry or not a receipt. Enter it by hand or discard the photo.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Enter manually',
-          onPress: () => {
-            dropPending(receipt);
-            router.push('/manual-entry');
-          },
+    const [title, message] =
+      receipt.failure === 'quota'
+        ? [QUOTA_HINT, QUOTA_MESSAGE]
+        : [
+            'Couldn’t read this receipt',
+            'The photo may be blurry or not a receipt. Enter it by hand or discard the photo.',
+          ];
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Enter manually',
+        onPress: () => {
+          dropPending(receipt);
+          router.push('/manual-entry');
         },
-        { text: 'Discard', style: 'destructive', onPress: () => dropPending(receipt) },
-      ],
-    );
+      },
+      { text: 'Discard', style: 'destructive', onPress: () => dropPending(receipt) },
+    ]);
   };
 
   const onDelete = (id: string, label: string) => {
@@ -239,7 +246,7 @@ export default function HistoryScreen() {
     [page, search, dateRange],
   );
 
-  const { data, isLoading, isRefetching, refetch } = useReceipts(queryParams);
+  const { data, isLoading, isError, isRefetching, refetch } = useReceipts(queryParams);
   const { data: categories } = useCategories();
   const receipts = data?.items ?? [];
 
@@ -301,6 +308,7 @@ export default function HistoryScreen() {
               pending={pendingReceipts}
               isConnected={isConnected}
               onPressFailed={onPressFailed}
+              onRetry={() => void syncNow()}
             />
             {pendingReceipts.length > 0 && receipts.length > 0 ? (
               <Text style={styles.sectionLabel}>Synced</Text>
@@ -312,6 +320,9 @@ export default function HistoryScreen() {
             <View style={styles.loading}>
               <ActivityIndicator color={colors.tint} />
             </View>
+          ) : isError ? (
+            // A failed load is not an empty history; the list is empty only without data.
+            <LoadErrorState title="Couldn’t load your receipts" onRetry={() => void refetch()} />
           ) : (
             <EmptyState hasQuery={!!search.trim()} />
           )
