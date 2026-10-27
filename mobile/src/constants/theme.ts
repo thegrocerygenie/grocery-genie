@@ -6,6 +6,7 @@
  * back where SF Symbols / chrome-material blur aren't available.
  */
 
+import { DarkTheme, DefaultTheme, type Theme } from '@react-navigation/native';
 import {
   DynamicColorIOS,
   Platform,
@@ -78,6 +79,23 @@ export const colors = {
     other: system('systemGray'),
   },
 };
+
+/**
+ * The React Navigation theme for an appearance. Native stack headers take
+ * their bar, title, and button colors from it; with none they stay light in
+ * dark mode. It takes only strings, so it gives the hex of systemGroupedBackground.
+ */
+export function navigationTheme(scheme: 'light' | 'dark'): Theme {
+  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: TINT_HEX[scheme],
+      background: scheme === 'dark' ? '#000000' : '#F2F2F7',
+    },
+  };
+}
 
 export const radii = {
   card: 10,
