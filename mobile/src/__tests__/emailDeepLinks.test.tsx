@@ -1,8 +1,9 @@
 /**
- * Email deep links. The backend emails `grocerygenie://onboarding/verify-email?token=…`
- * and `grocerygenie://onboarding/reset-password?token=…` (backend/app/core/config.py).
+ * Email deep links. The backend emails `grocerygenie://onboarding/verify-email?token=…`,
+ * `grocerygenie://onboarding/reset-password?token=…` and
+ * `grocerygenie://onboarding/confirm-email-change?token=…` (backend/app/core/config.py).
  * Each must open its screen with the token, signed in or not. After a good
- * verification, the screen must say so and move the user on.
+ * verification or email change, the screen must say so and move the user on.
  */
 import React from 'react';
 import { Alert, Text } from 'react-native';
@@ -11,6 +12,7 @@ import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testi
 
 import RootLayout from '../../app/_layout';
 import OnboardingLayout from '../../app/onboarding/_layout';
+import ConfirmEmailChangeScreen from '../../app/onboarding/confirm-email-change';
 import ResetPasswordScreen from '../../app/onboarding/reset-password';
 import VerifyEmailScreen from '../../app/onboarding/verify-email';
 import type { UserProfile } from '@/features/auth/types';
@@ -46,9 +48,11 @@ function mockProfile(): UserProfile {
 }
 
 const mockVerifyEmail = jest.fn<Promise<{ verified_at: string | null }>, [string]>();
+const mockConfirmEmailChange = jest.fn<Promise<{ email: string }>, [string]>();
 jest.mock('@/features/auth/services/authApi', () => ({
   fetchMe: async () => mockProfile(),
   verifyEmail: (token: string) => mockVerifyEmail(token),
+  confirmEmailChange: (token: string) => mockConfirmEmailChange(token),
 }));
 
 const otherRoutes = Object.fromEntries(
@@ -78,6 +82,7 @@ function openLink(url: string) {
       'onboarding/budget': () => <Text>Set Budget screen</Text>,
       'onboarding/verify-email': VerifyEmailScreen,
       'onboarding/reset-password': ResetPasswordScreen,
+      'onboarding/confirm-email-change': ConfirmEmailChangeScreen,
       ...otherRoutes,
     },
     { initialUrl: url },
@@ -93,6 +98,8 @@ function signIn(accessToken: string | null) {
 beforeEach(() => {
   mockVerifyEmail.mockReset();
   mockVerifyEmail.mockResolvedValue({ verified_at: '2026-10-27T00:00:00Z' });
+  mockConfirmEmailChange.mockReset();
+  mockConfirmEmailChange.mockResolvedValue({ email: 'new@test.com' });
 });
 
 describe('verify-email link', () => {
@@ -150,5 +157,58 @@ describe('reset-password link', () => {
     await screen.findByLabelText('New password');
     expect(router.getPathname()).toBe('/onboarding/reset-password');
     expect(router.getSearchParams()).toEqual({ token: 't0k' });
+  });
+});
+
+describe('email-change link', () => {
+  it('confirms the change with its token and shows the new email', async () => {
+    signIn(null);
+    const router = openLink('/onboarding/confirm-email-change?token=chg1');
+
+    await screen.findByText('Email changed');
+    expect(mockConfirmEmailChange).toHaveBeenCalledWith('chg1');
+    expect(mockConfirmEmailChange).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/new@test\.com/)).toBeTruthy();
+    expect(router.getPathname()).toBe('/onboarding/confirm-email-change');
+  });
+
+  it('moves a signed-out user to sign in', async () => {
+    signIn(null);
+    const router = openLink('/onboarding/confirm-email-change?token=chg1');
+
+    await screen.findByText('Email changed');
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+
+    await screen.findByText('Sign in screen');
+    expect(router.getPathname()).toBe('/onboarding/sign-in');
+  });
+
+  it('moves a signed-in user into the app', async () => {
+    signIn('token');
+    const router = openLink('/onboarding/confirm-email-change?token=chg1');
+
+    await screen.findByText('Email changed');
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+
+    await screen.findByText('Tabs home');
+    expect(router.getPathname()).toBe('/');
+  });
+
+  it('says the link did not work when the token is bad', async () => {
+    mockConfirmEmailChange.mockRejectedValue(new Error('bad token'));
+    signIn(null);
+    openLink('/onboarding/confirm-email-change?token=expired');
+
+    await screen.findByText('Link not valid');
+    expect(screen.queryByText('Email changed')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
+  });
+
+  it('says the link did not work when it has no token', async () => {
+    signIn(null);
+    openLink('/onboarding/confirm-email-change');
+
+    await screen.findByText('Link not valid');
+    expect(mockConfirmEmailChange).not.toHaveBeenCalled();
   });
 });

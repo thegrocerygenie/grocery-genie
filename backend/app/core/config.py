@@ -103,7 +103,7 @@ class Settings(BaseSettings):
     app_scheme: str = "grocerygenie"
     verify_email_path: str = "onboarding/verify-email"
     reset_password_path: str = "onboarding/reset-password"
-    email_change_path: str = "email-change"
+    email_change_path: str = "onboarding/confirm-email-change"
 
     # Apple Sign In
     apple_team_id: str = ""
