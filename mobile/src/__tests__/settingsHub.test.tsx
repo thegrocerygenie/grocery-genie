@@ -3,12 +3,10 @@
  * and every Account row goes somewhere.
  */
 import React from 'react';
-import { Linking } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 
 import SettingsScreen from '../../app/settings/index';
-import { LINKS } from '@/constants/links';
 import type { BudgetResponse } from '@/features/budget/types';
 import type { UserProfile } from '@/features/auth/types';
 
@@ -56,6 +54,8 @@ function renderSettings() {
       index: () => null,
       'settings/index': SettingsScreen,
       'settings/about': () => null,
+      'settings/privacy': () => null,
+      'settings/help': () => null,
     },
     { initialUrl: '/' },
   );
@@ -94,14 +94,13 @@ describe('Settings hub', () => {
   });
 
   it.each([
-    ['Privacy', LINKS.privacyPolicy],
-    ['Help & feedback', LINKS.help],
-  ])('opens %s in the browser', (label, url) => {
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
-    renderSettings();
+    ['Privacy', '/settings/privacy'],
+    ['Help & feedback', '/settings/help'],
+  ])('opens %s in the app', (label, path) => {
+    const routerScreen = renderSettings();
 
     fireEvent.press(screen.getByLabelText(label));
 
-    expect(open).toHaveBeenCalledWith(url);
+    expect(routerScreen.getPathname()).toBe(path);
   });
 });

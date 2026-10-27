@@ -13,6 +13,8 @@ export default function SettingsLayout() {
       <Stack.Screen name="notification-settings" options={{ title: 'Alerts' }} />
       <Stack.Screen name="language-settings" options={{ title: 'Language' }} />
       <Stack.Screen name="about" options={{ title: 'About' }} />
+      <Stack.Screen name="help" options={{ title: 'Help & feedback' }} />
+      <Stack.Screen name="privacy" options={{ title: 'Privacy' }} />
     </Stack>
   );
 }
