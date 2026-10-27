@@ -43,7 +43,8 @@ export default function OnboardingCamera() {
           </View>
           <Text style={[type.title2, { textAlign: 'center' }]}>Allow Camera Access</Text>
           <Text style={styles.tagline}>
-            Grocery Genie uses the camera only to scan receipts. Photos are processed on-device.
+            Grocery Genie uses the camera only to scan receipts. Photos are sent securely to read
+            your receipt, and you can delete them anytime.
           </Text>
         </View>
         <View style={styles.ctaStack}>
