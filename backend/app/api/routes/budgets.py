@@ -38,7 +38,7 @@ async def create_budget(
         budget_type = "overall" if budget.category_id is None else "category"
         analytics.emit(
             "budget_created",
-            {"type": budget_type, "amount": budget.amount},
+            {"type": budget_type},
             user.id,
         )
     else:

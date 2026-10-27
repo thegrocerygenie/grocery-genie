@@ -18,3 +18,13 @@ def test_worker_registers_all_tasks():
     celery_app.loader.import_default_modules()
 
     assert "app.tasks.summary_tasks.generate_weekly_summaries" in celery_app.tasks
+
+
+def test_beat_purges_old_auth_events_daily():
+    from app.tasks.celery_app import celery_app
+
+    celery_app.loader.import_default_modules()
+    tasks = {entry["task"] for entry in celery_app.conf.beat_schedule.values()}
+
+    assert "app.tasks.auth_event_tasks.purge_old_auth_events" in tasks
+    assert "app.tasks.auth_event_tasks.purge_old_auth_events" in celery_app.tasks

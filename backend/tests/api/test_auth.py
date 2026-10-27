@@ -908,3 +908,38 @@ async def test_soft_delete_then_restore(auth_client, db_session):
 
     relisted = await auth_client.get("/api/receipts", headers=headers)
     assert any(r["id"] == receipt_id for r in relisted.json()["items"])
+
+
+@pytest.mark.asyncio
+async def test_apple_signin_ignores_a_name_from_an_older_app(
+    auth_client, stub_apple_verifier, db_session
+):
+    """The app no longer asks Apple for the name; an older build may still
+    send one. Sign-in works and that name is not stored."""
+    from sqlalchemy import select
+
+    from app.models.database import User
+
+    resp = await auth_client.post(
+        "/api/auth/apple",
+        json={
+            "identity_token": "apple_old_build",
+            "authorization_code": "code",
+            "name": "Ada Lovelace",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    user = (
+        await db_session.execute(
+            select(User).where(User.apple_subject == "apple_old_build")
+        )
+    ).scalar_one()
+    # The default for a social account with no name: the email's local part.
+    assert user.name == "apple_old_build"
+
+
+def test_apple_signin_request_has_no_name_field():
+    from app.models.schemas import AppleSignInRequest
+
+    assert "name" not in AppleSignInRequest.model_fields

@@ -13,7 +13,6 @@ interface AppleCredential {
   identity_token: string;
   authorization_code: string;
   nonce?: string;
-  name?: string;
 }
 
 let googleConfigured = false;
@@ -96,20 +95,14 @@ export async function runAppleSignIn(): Promise<AppleCredential | null> {
   try {
     const isAvailable = await AppleAuthentication.isAvailableAsync();
     if (!isAvailable) return null;
+    // Email only: the app never shows or stores an Apple user's name.
     const credential = await AppleAuthentication.signInAsync({
-      requestedScopes: [
-        AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-      ],
+      requestedScopes: [AppleAuthentication.AppleAuthenticationScope.EMAIL],
     });
     if (!credential.identityToken || !credential.authorizationCode) return null;
     return {
       identity_token: credential.identityToken,
       authorization_code: credential.authorizationCode,
-      name:
-        credential.fullName?.givenName && credential.fullName?.familyName
-          ? `${credential.fullName.givenName} ${credential.fullName.familyName}`
-          : undefined,
     };
   } catch (error) {
     if (error instanceof Error && error.message.includes('canceled')) {
