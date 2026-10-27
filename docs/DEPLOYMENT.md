@@ -10,8 +10,8 @@ How to deploy Grocery Genie's backend on Hetzner VPS with Supabase PostgreSQL, a
 │  (App Store)│                │                                  │
 └─────────────┘                │  ┌────────────┐  ┌─────────────┐ │
                                │  │ Caddy      │  │ FastAPI     │ │
-                               │  │ (reverse   │─▸│ (Gunicorn + │ │
-                               │  │  proxy+TLS)│  │  Uvicorn)   │ │
+                               │  │ (reverse   │─▸│ (Uvicorn,   │ │
+                               │  │  proxy+TLS)│  │  4 workers) │ │
                                │  └────────────┘  └──────┬──────┘ │
                                │                         │        │
                                │  ┌─────────────┐  ┌────▼──────┐  │
@@ -33,7 +33,7 @@ How to deploy Grocery Genie's backend on Hetzner VPS with Supabase PostgreSQL, a
 
 **Services on Hetzner VPS (via Docker Compose):**
 - Caddy (reverse proxy, automatic TLS)
-- FastAPI app (Gunicorn + Uvicorn workers)
+- FastAPI app (Uvicorn, 4 workers)
 - Celery Worker (receipt processing, notifications)
 - Celery Beat (weekly summary scheduler)
 - Redis (Celery broker + caching)
@@ -57,129 +57,49 @@ How to deploy Grocery Genie's backend on Hetzner VPS with Supabase PostgreSQL, a
 
 ### 1.1 Project Structure for Deployment
 
-Add these files to the repo root:
+The deploy files are in the repo:
 
 ```
 docker/
-  Dockerfile           # Multi-stage build for FastAPI + Celery
-  docker-compose.yml   # All services
-  Caddyfile            # Reverse proxy config
-  .env.production      # Environment variables (DO NOT commit)
+  Dockerfile                # One image for the api, worker and beat services
+  Dockerfile.dockerignore   # Keeps the build context to backend/ code
+  docker-compose.yml        # All services
+  Caddyfile                 # Reverse proxy and TLS
+  .env.production.example   # Copy to .env.production (gitignored) and fill in
 ```
+
+Run every `docker compose` command from the repo root with
+`-f docker/docker-compose.yml`. Compose resolves the paths in that file from
+`docker/`, and the file sets the project name to `grocery-genie`.
 
 ### 1.2 Dockerfile
 
-```dockerfile
-FROM python:3.12-slim AS base
-
-WORKDIR /app
-
-# System dependencies for OpenCV and psycopg
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    gcc libpq-dev libgl1 libglib2.0-0 && \
-    rm -rf /var/lib/apt/lists/*
-
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY backend/ .
-
-# Default: run FastAPI
-CMD ["gunicorn", "main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
-```
+[`docker/Dockerfile`](../docker/Dockerfile) installs the dependencies listed in
+`backend/pyproject.toml` on `python:3.12-slim` and runs as a non-root user. Its
+default command starts Uvicorn with 4 workers. Uvicorn trusts Caddy's
+`X-Forwarded-For` header, so the per-IP auth rate limit sees the caller's
+address.
 
 ### 1.3 Docker Compose
 
-```yaml
-version: "3.8"
+[`docker/docker-compose.yml`](../docker/docker-compose.yml) runs these services:
 
-services:
-  api:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    env_file: docker/.env.production
-    ports:
-      - "8000:8000"
-    depends_on:
-      - redis
-    restart: unless-stopped
-    volumes:
-      - receipt_images:/app/storage  # Receipt image storage
+- `api`: FastAPI. It publishes no host port, so only Caddy reaches it.
+- `worker`: Celery worker (receipt processing, push delivery).
+- `beat`: Celery beat (weekly summaries, push queue every minute).
+- `redis`: the Celery broker.
+- `caddy`: the only service that publishes ports (80 and 443).
 
-  worker:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    command: celery -A app.tasks worker --loglevel=info --concurrency=2
-    env_file: docker/.env.production
-    depends_on:
-      - redis
-    restart: unless-stopped
-    volumes:
-      - receipt_images:/app/storage
-
-  beat:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    command: celery -A app.tasks beat --loglevel=info
-    env_file: docker/.env.production
-    depends_on:
-      - redis
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    volumes:
-      - redis_data:/data
-
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./docker/Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-
-volumes:
-  receipt_images:
-  redis_data:
-  caddy_data:
-  caddy_config:
-```
+`api` and `worker` both mount the `receipt_images` volume at `/app/storage`.
+`GG_STORAGE_PATH` must be that path (see 1.5).
 
 ### 1.4 Caddyfile
 
-```
-api.grocerygenie.app {
-    reverse_proxy api:8000
-    encode gzip
-
-    header {
-        # Security headers
-        X-Content-Type-Options nosniff
-        X-Frame-Options DENY
-        Referrer-Policy strict-origin-when-cross-origin
-    }
-
-    # Rate limiting (basic — app-level rate limiting is also enforced)
-    rate_limit {
-        zone api {
-            key {remote_host}
-            events 300
-            window 1m
-        }
-    }
-}
-```
-
-Caddy handles automatic HTTPS certificate provisioning via Let's Encrypt. No manual TLS configuration needed.
+[`docker/Caddyfile`](../docker/Caddyfile) proxies `api.grocerygenie.app` to
+`api:8000` and sets security headers. Change the host name if your domain is
+different. Caddy gets and renews the TLS certificate from Let's Encrypt on its
+own. Rate limiting is done in the app: the stock `caddy` image has no
+`rate_limit` directive.
 
 ### 1.5 Environment Variables (.env.production)
 
@@ -242,7 +162,9 @@ GG_GOOGLE_CLIENT_ID=<web client ID>.apps.googleusercontent.com
 # GG_PUSH_MAX_AGE_MINUTES=60
 ```
 
-**Important:** Never commit `.env.production`. Add it to `.gitignore`.
+[`docker/.env.production.example`](../docker/.env.production.example) holds
+this block; a test checks that the two match. `.gitignore` excludes
+`docker/.env.production`: never commit it.
 
 ### 1.6 Supabase PostgreSQL Setup
 
@@ -264,10 +186,7 @@ GG_GOOGLE_CLIENT_ID=<web client ID>.apps.googleusercontent.com
    alembic upgrade head
    ```
 
-5. **Seed default categories:**
-   ```bash
-   python -c "from app.core.seed import seed_categories; import asyncio; asyncio.run(seed_categories())"
-   ```
+The API seeds the default categories when it starts, so there is no seed step.
 
 ### 1.7 Deploy to Hetzner
 
@@ -292,8 +211,6 @@ docker compose -f docker/docker-compose.yml logs api --tail=50
 
 # Run migrations (first deploy only — or after model changes)
 docker compose -f docker/docker-compose.yml exec api alembic upgrade head
-docker compose -f docker/docker-compose.yml exec api python -c \
-  "from app.core.seed import seed_categories; import asyncio; asyncio.run(seed_categories())"
 
 # Verify API is responding
 curl https://api.grocerygenie.app/health
