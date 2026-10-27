@@ -1,10 +1,9 @@
 import React from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Constants from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
-import { LINKS } from '@/constants/links';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useMe, useSignOut } from '@/features/auth/hooks/useAuth';
 import { useBudgets } from '@/features/budget/hooks/useBudget';
@@ -139,8 +138,8 @@ export default function SettingsScreen() {
             onPress={() => router.push('/recently-deleted')}
           />
           <SettingsLinkRow title="Change email" onPress={() => router.push('/email-change')} />
-          <SettingsLinkRow title="Privacy" onPress={() => Linking.openURL(LINKS.privacyPolicy)} />
-          <SettingsLinkRow title="Help & feedback" onPress={() => Linking.openURL(LINKS.help)} />
+          <SettingsLinkRow title="Privacy" onPress={() => router.push('/settings/privacy')} />
+          <SettingsLinkRow title="Help & feedback" onPress={() => router.push('/settings/help')} />
           <SettingsLinkRow
             title="About"
             detail={version ? `v${version}` : undefined}
