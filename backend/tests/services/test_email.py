@@ -53,6 +53,16 @@ async def test_reset_password_link_opens_the_reset_password_screen(captured):
     )
 
 
+async def test_email_change_link_opens_the_confirm_screen(captured):
+    # Not app/email-change.tsx: that screen requests a change, it can't confirm one.
+    await email.send_email_change_email(to="a@b.co", new_email="c@d.co", token="tok123")
+
+    assert (
+        _link(captured.html)
+        == "grocerygenie://onboarding/confirm-email-change?token=tok123"
+    )
+
+
 @pytest.mark.parametrize(
     "field", ["verify_email_path", "reset_password_path", "email_change_path"]
 )
@@ -64,7 +74,9 @@ def test_every_deep_link_path_has_an_app_route(field):
     assert (MOBILE_APP_DIR / f"{path}.tsx").is_file(), f"no route for {path!r}"
 
 
-@pytest.mark.parametrize("field", ["verify_email_path", "reset_password_path"])
+@pytest.mark.parametrize(
+    "field", ["verify_email_path", "reset_password_path", "email_change_path"]
+)
 def test_signed_out_links_stay_inside_onboarding(field):
     # The root layout redirects a signed-out user away from any other screen.
     assert getattr(Settings(), field).startswith("onboarding/")
