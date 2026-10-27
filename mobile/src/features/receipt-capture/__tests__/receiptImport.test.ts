@@ -14,6 +14,7 @@ import {
   type PickedReceipt,
 } from '../services/receiptImport';
 import type { ReceiptScanResponse } from '../types';
+import { QUOTA_MESSAGE } from '../utils/scanQuota';
 
 jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: jest.fn(),
@@ -259,6 +260,21 @@ describe('importReceipt', () => {
     });
     expect(queue).not.toHaveBeenCalled();
     expect(result).toEqual({ status: 'error', message: 'Image quality insufficient' });
+  });
+
+  it('does not queue a file over the monthly quota, and says why', async () => {
+    const queue = jest.fn();
+    const result = await importReceipt({
+      pick: async () => ({ status: 'picked', receipt: picked }),
+      upload: async () => {
+        throw new ApiError(429, {
+          detail: 'Monthly receipt quota exceeded (20 receipts/month on Free tier).',
+        });
+      },
+      queue,
+    });
+    expect(queue).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: 'error', message: QUOTA_MESSAGE });
   });
 
   it('reports the error when saving to the queue fails', async () => {

@@ -2,15 +2,19 @@ import type { ScanSource } from '@/constants/analyticsEvents';
 import { ApiError } from '@/services/api';
 import { useOfflineStore } from '@/store/offlineStore';
 
+import { isQuotaExceededError } from '../utils/scanQuota';
+
 /** HTTP statuses where the same photo can succeed later (auth refresh, rate limit, outage). */
 const RETRYABLE_STATUSES = new Set([401, 408, 429]);
 
 /**
  * True when a scan failed for a reason outside the photo itself: no network
  * (fetch throws a TypeError), an expired session, rate limiting or a server
- * error. A 4xx such as 422 (blurry, not a receipt) fails the same way every time.
+ * error. A 4xx such as 422 (blurry, not a receipt) fails the same way every
+ * time, and so does the monthly quota until the month ends.
  */
 export function isRetryableScanError(error: unknown): boolean {
+  if (isQuotaExceededError(error)) return false;
   if (error instanceof ApiError) {
     return RETRYABLE_STATUSES.has(error.status) || error.status >= 500;
   }
@@ -63,7 +67,8 @@ async function runSync({
   ownerId,
   currentOwner,
 }: SyncDeps): Promise<SyncResult> {
-  const { updateStatus, markAttemptFailed, removePendingReceipt } = useOfflineStore.getState();
+  const { updateStatus, markAttemptFailed, markFailed, removePendingReceipt } =
+    useOfflineStore.getState();
   // Another account's photo (or one with no owner) waits for its owner: uploading
   // it here would file it under the wrong account, or let that account's server
   // mark it failed.
@@ -83,7 +88,7 @@ async function runSync({
         markAttemptFailed(receipt.id);
         return result;
       }
-      updateStatus(receipt.id, 'failed');
+      markFailed(receipt.id, isQuotaExceededError(error) ? 'quota' : 'unreadable');
       result.failed += 1;
       continue;
     }

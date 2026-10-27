@@ -5,6 +5,7 @@ import type { ScanSource } from '@/constants/analyticsEvents';
 import { ApiError } from '@/services/api';
 
 import type { ReceiptScanResponse } from '../types';
+import { QUOTA_MESSAGE, isQuotaExceededError } from '../utils/scanQuota';
 import { isRetryableScanError } from './offlineQueue';
 
 /** Mirrors the backend's limits so a bad file fails before it is uploaded. */
@@ -112,6 +113,7 @@ export async function pickFromFiles(): Promise<PickOutcome> {
 }
 
 export function scanErrorMessage(error: unknown): string {
+  if (isQuotaExceededError(error)) return QUOTA_MESSAGE;
   if (error instanceof ApiError) {
     const detail = (error.data as { detail?: unknown } | null)?.detail;
     if (typeof detail === 'string' && detail) return detail;

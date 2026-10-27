@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useOfflineStore } from '@/store/offlineStore';
 import { fakeAccessToken } from '@/testing/jwt';
 
-import { useSyncQueue } from '../useSyncQueue';
+import { SYNC_RETRY_DELAYS_MS, useSyncNow, useSyncQueue } from '../useSyncQueue';
 
 let mockConnected = true;
 jest.mock('../useNetworkStatus', () => ({
@@ -131,5 +131,126 @@ describe('useSyncQueue', () => {
     await act(async () => onChange('active'));
 
     expect(mockSync).toHaveBeenCalledTimes(2);
+  });
+
+  describe('while the app stays in the foreground and online', () => {
+    // Each run leaves the photo waiting to retry, as a server outage would.
+    function failEachRun() {
+      mockSync.mockImplementation(async () => {
+        const [r] = useOfflineStore.getState().pendingReceipts;
+        useOfflineStore.getState().markAttemptFailed(r.id);
+        return { synced: 0, failed: 0 };
+      });
+    }
+
+    // A plain property in the jest-expo mock, so set it rather than spy on it.
+    const initialState = AppState.currentState;
+    function setAppState(state: AppStateStatus) {
+      (AppState as { currentState: AppStateStatus }).currentState = state;
+    }
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      setAppState('active');
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+      setAppState(initialState);
+    });
+
+    async function advance(ms: number) {
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(ms);
+      });
+    }
+
+    it('retries after a failed attempt, backing off each time', async () => {
+      failEachRun();
+      queue();
+      renderSync();
+      await advance(0);
+      expect(mockSync).toHaveBeenCalledTimes(1);
+
+      await advance(SYNC_RETRY_DELAYS_MS[0] - 1);
+      expect(mockSync).toHaveBeenCalledTimes(1);
+      await advance(1);
+      expect(mockSync).toHaveBeenCalledTimes(2);
+
+      await advance(SYNC_RETRY_DELAYS_MS[1]);
+      expect(mockSync).toHaveBeenCalledTimes(3);
+    });
+
+    it('never waits longer than the last delay', async () => {
+      failEachRun();
+      queue();
+      renderSync();
+      const total = SYNC_RETRY_DELAYS_MS.reduce((a, b) => a + b, 0);
+      await advance(total);
+      const calls = mockSync.mock.calls.length;
+
+      await advance(SYNC_RETRY_DELAYS_MS.at(-1)!);
+      expect(mockSync).toHaveBeenCalledTimes(calls + 1);
+    });
+
+    it('does not schedule a retry when nothing failed', async () => {
+      queue();
+      renderSync();
+      await advance(SYNC_RETRY_DELAYS_MS.at(-1)! * 2);
+
+      expect(mockSync).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips a timed retry while the app is in the background', async () => {
+      failEachRun();
+      queue();
+      renderSync();
+      await advance(0);
+      setAppState('background');
+
+      await advance(SYNC_RETRY_DELAYS_MS[0]);
+      expect(mockSync).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops retrying once unmounted (signed out)', async () => {
+      failEachRun();
+      queue();
+      const { unmount } = renderSync();
+      await advance(0);
+      unmount();
+
+      await advance(SYNC_RETRY_DELAYS_MS[0] * 2);
+      expect(mockSync).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe('useSyncNow', () => {
+  function renderSyncNow() {
+    const client = new QueryClient();
+    const invalidate = jest.spyOn(client, 'invalidateQueries');
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    return { ...renderHook(() => useSyncNow(), { wrapper }), invalidate };
+  }
+
+  it('uploads the signed-in user’s photos on demand and refreshes after an upload', async () => {
+    mockSync.mockResolvedValue({ synced: 1, failed: 0 });
+    const { result, invalidate } = renderSyncNow();
+
+    await act(async () => result.current());
+
+    expect(mockSync).toHaveBeenCalledTimes(1);
+    expect(mockSync.mock.calls[0][0].ownerId).toBe('user-a');
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['receipts'] });
+  });
+
+  it('does nothing while signed out', async () => {
+    useAuthStore.setState({ accessToken: null });
+    const { result } = renderSyncNow();
+
+    await act(async () => result.current());
+
+    expect(mockSync).not.toHaveBeenCalled();
   });
 });

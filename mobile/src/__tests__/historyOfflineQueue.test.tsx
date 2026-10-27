@@ -12,6 +12,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useOfflineStore } from '@/store/offlineStore';
 import { fakeAccessToken } from '@/testing/jwt';
 import type { ReceiptResponse } from '@/features/receipt-capture/types';
+import { QUOTA_MESSAGE } from '@/features/receipt-capture/utils/scanQuota';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('@react-native-segmented-control/segmented-control', () => () => null);
@@ -26,6 +27,11 @@ jest.mock('@/features/receipt-capture/hooks/useReceiptImport', () => ({
 }));
 jest.mock('@/features/receipt-capture/services/pendingImageFiles', () => ({
   deletePendingImage: jest.fn(),
+}));
+
+const mockSyncNow = jest.fn();
+jest.mock('@/hooks/useSyncQueue', () => ({
+  useSyncNow: () => mockSyncNow,
 }));
 
 let mockConnected = false;
@@ -89,6 +95,7 @@ function renderHistory() {
 }
 
 beforeEach(() => {
+  mockSyncNow.mockClear();
   mockConnected = false;
   useOfflineStore.setState({ pendingReceipts: [] });
   useAuthStore.setState({ accessToken: fakeAccessToken('user-a') });
@@ -129,9 +136,27 @@ describe('History offline queue', () => {
     renderHistory();
 
     expect(screen.getByText('1 receipt waiting to upload')).toBeTruthy();
-    expect(screen.getByText('Will retry')).toBeTruthy();
     expect(screen.getByText('Captured 2h ago · will retry')).toBeTruthy();
     expect(screen.queryByText(/^Uploading/)).toBeNull();
+  });
+
+  it('lets the user retry the upload now from the banner', () => {
+    mockConnected = true;
+    queue();
+    const id = useOfflineStore.getState().pendingReceipts[0].id;
+    useOfflineStore.getState().markAttemptFailed(id);
+    renderHistory();
+
+    fireEvent.press(screen.getByLabelText('Retry upload now'));
+
+    expect(mockSyncNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers no retry while offline: there is nothing to reach', () => {
+    queue();
+    renderHistory();
+
+    expect(screen.queryByLabelText('Retry upload now')).toBeNull();
   });
 
   it('says uploading again once the retry starts', () => {
@@ -174,6 +199,19 @@ describe('History offline queue', () => {
     act(() => buttons.find((b) => b.text === 'Discard')!.onPress!());
 
     expect(useOfflineStore.getState().pendingReceipts).toHaveLength(0);
+  });
+
+  it('says a photo over the monthly quota hit the limit, not that it was unreadable', () => {
+    queue();
+    const id = useOfflineStore.getState().pendingReceipts[0].id;
+    useOfflineStore.getState().markFailed(id, 'quota');
+    const alert = jest.spyOn(Alert, 'alert');
+    renderHistory();
+
+    expect(screen.queryByText('Couldn’t read this photo')).toBeNull();
+    fireEvent.press(screen.getByText('Monthly scan limit reached'));
+    expect(alert.mock.calls[0][0]).toBe('Monthly scan limit reached');
+    expect(alert.mock.calls[0][1]).toBe(QUOTA_MESSAGE);
   });
 
   it('lets the user enter a failed photo by hand', () => {
