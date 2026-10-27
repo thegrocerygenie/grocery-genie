@@ -10,6 +10,7 @@ import HistoryScreen from '../../app/(tabs)/history/index';
 import type { ReceiptResponse } from '@/features/receipt-capture/types';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+jest.mock('@/hooks/useSyncQueue', () => ({ useSyncNow: () => jest.fn() }));
 jest.mock('@react-native-segmented-control/segmented-control', () => () => null);
 jest.mock('@/features/budget/hooks/useCategories', () => ({
   useCategories: () => ({ data: [] }),

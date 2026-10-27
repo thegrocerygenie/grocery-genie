@@ -19,6 +19,7 @@ import { headerBlurFor } from '@/utils/headerBlur';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { getCategoryMetaByName } from '@/constants/categories';
 import { capBreachMessage } from '@/features/budget/utils/capBreach';
+import { LoadErrorState } from '@/components/LoadErrorState';
 import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
 import { useBudgetStore } from '@/store/budgetStore';
 import type { DashboardData as ApiDashboardData } from '@/features/budget/types';
@@ -124,7 +125,7 @@ function adaptDashboard(api: ApiDashboardData | undefined, period: string): Dash
 export default function DashboardScreen() {
   const router = useRouter();
   const { selectedPeriod } = useBudgetStore();
-  const { data, isLoading, refetch, isRefetching } = useDashboardSpending(selectedPeriod);
+  const { data, isLoading, isError, refetch, isRefetching } = useDashboardSpending(selectedPeriod);
 
   const view = useMemo(() => adaptDashboard(data, selectedPeriod), [data, selectedPeriod]);
 
@@ -185,7 +186,10 @@ export default function DashboardScreen() {
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.tint} />
         }
       >
-        {view.state === 'empty' ? (
+        {isError && !data ? (
+          // A failed load is not an empty account: say so, and keep cached data otherwise.
+          <LoadErrorState title="Couldn’t load your budget" onRetry={() => void refetch()} />
+        ) : view.state === 'empty' ? (
           <EmptyState onScan={onScan} onSetBudget={onSetBudget} />
         ) : (
           <FilledState
