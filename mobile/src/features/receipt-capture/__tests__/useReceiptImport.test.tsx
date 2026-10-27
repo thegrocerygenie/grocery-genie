@@ -23,6 +23,9 @@ jest.mock('expo-image-picker', () => ({
 }));
 jest.mock('expo-document-picker', () => ({ getDocumentAsync: jest.fn() }));
 jest.mock('../services/receiptApi', () => ({ scanReceipt: jest.fn() }));
+jest.mock('../services/pendingImageFiles', () => ({
+  persistCapturedImage: (uri: string) => uri.replace('file:///', 'file:///doc/pending-receipts/'),
+}));
 
 const launchLibrary = ImagePicker.launchImageLibraryAsync as jest.Mock;
 const getDocument = DocumentPicker.getDocumentAsync as jest.Mock;
@@ -121,4 +124,44 @@ it('reports a picker that fails to open', async () => {
     'Couldn’t import receipt',
     'The picker couldn’t open. Try again.',
   );
+});
+
+describe('an import that cannot upload now', () => {
+  beforeEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { useOfflineStore } = require('@/store/offlineStore');
+    useOfflineStore.setState({ pendingReceipts: [] });
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { useAuthStore } = require('@/store/authStore');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { fakeAccessToken } = require('@/testing/jwt');
+    useAuthStore.setState({ accessToken: fakeAccessToken('user-a') });
+  });
+
+  it('queues a library photo when the network fails, and says so', async () => {
+    launchLibrary.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///photo.jpg', width: 1200, height: 1600, mimeType: 'image/jpeg' }],
+    });
+    scan.mockRejectedValue(new TypeError('Network request failed'));
+    const { result } = renderImportHook();
+
+    await act(() => result.current.importFrom('library'));
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { useOfflineStore } = require('@/store/offlineStore');
+    const [queued] = useOfflineStore.getState().pendingReceipts;
+    expect(queued).toMatchObject({
+      imageUri: 'file:///doc/pending-receipts/photo.jpg',
+      mimeType: 'image/jpeg',
+      source: 'library',
+      ownerId: 'user-a',
+      status: 'pending',
+    });
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Saved to upload later',
+      expect.stringContaining('Pending in History'),
+    );
+    expect(mockPush).not.toHaveBeenCalled();
+  });
 });

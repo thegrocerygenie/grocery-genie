@@ -5,6 +5,7 @@ import type { ScanSource } from '@/constants/analyticsEvents';
 import { ApiError } from '@/services/api';
 
 import type { ReceiptScanResponse } from '../types';
+import { isRetryableScanError } from './offlineQueue';
 
 /** Mirrors the backend's limits so a bad file fails before it is uploaded. */
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -51,6 +52,7 @@ export type PickOutcome =
 
 export type ImportResult =
   | { status: 'canceled' }
+  | { status: 'queued' }
   | { status: 'error'; message: string }
   | { status: 'ready'; response: ReceiptScanResponse; previewUri: string };
 
@@ -120,10 +122,12 @@ export function scanErrorMessage(error: unknown): string {
 interface ImportDeps {
   pick: () => Promise<PickOutcome>;
   upload: (receipt: PickedReceipt) => Promise<ReceiptScanResponse>;
+  /** Save a file that could not upload now (network or server down) for later. */
+  queue?: (receipt: PickedReceipt) => void;
 }
 
 /** Pick a file, check it, and upload it into the same review flow as a camera scan. */
-export async function importReceipt({ pick, upload }: ImportDeps): Promise<ImportResult> {
+export async function importReceipt({ pick, upload, queue }: ImportDeps): Promise<ImportResult> {
   const outcome = await pick();
   if (outcome.status === 'canceled') return outcome;
   if (outcome.status === 'rejected') return { status: 'error', message: outcome.message };
@@ -137,6 +141,16 @@ export async function importReceipt({ pick, upload }: ImportDeps): Promise<Impor
       previewUri: outcome.receipt.previewUri ?? `/api/receipts/${response.receipt_id}/image`,
     };
   } catch (error) {
+    // NFR reliability 3, as for camera scans: keep a file that failed for a
+    // reason outside the file itself; a rejected file (422) is an error.
+    if (queue && isRetryableScanError(error)) {
+      try {
+        queue(outcome.receipt);
+        return { status: 'queued' };
+      } catch {
+        // Fall through: the user still learns the upload failed.
+      }
+    }
     return { status: 'error', message: scanErrorMessage(error) };
   }
 }

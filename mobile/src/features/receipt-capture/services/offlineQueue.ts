@@ -1,3 +1,4 @@
+import type { ScanSource } from '@/constants/analyticsEvents';
 import { ApiError } from '@/services/api';
 import { useOfflineStore } from '@/store/offlineStore';
 
@@ -17,7 +18,7 @@ export function isRetryableScanError(error: unknown): boolean {
 }
 
 export interface SyncDeps {
-  scan: (imageUri: string, mimeType: string) => Promise<unknown>;
+  scan: (imageUri: string, mimeType: string, source: ScanSource) => Promise<unknown>;
   deleteImage: (imageUri: string) => void;
   /** The signed-in user; only photos they captured are uploaded. */
   ownerId: string;
@@ -58,7 +59,7 @@ async function runSync({ scan, deleteImage, ownerId }: SyncDeps): Promise<SyncRe
   for (const receipt of queued) {
     updateStatus(receipt.id, 'syncing');
     try {
-      await scan(receipt.imageUri, receipt.mimeType);
+      await scan(receipt.imageUri, receipt.mimeType, receipt.source ?? 'camera');
     } catch (error) {
       if (isRetryableScanError(error)) {
         markAttemptFailed(receipt.id);
