@@ -113,3 +113,29 @@ def test_email_delivery_off_uses_the_silent_client_even_with_a_key(monkeypatch):
         lambda: Settings(resend_api_key="re_x", email_delivery="off"),
     )
     assert isinstance(email.get_email_client(), email.LogOnlyEmailClient)
+
+
+@pytest.mark.parametrize(
+    "send",
+    [
+        lambda: email.send_verify_email(to="ada@example.com", token="t"),
+        lambda: email.send_reset_password_email(to="ada@example.com", token="t"),
+        lambda: email.send_email_change_email(
+            to="ada@example.com", new_email="ada@example.com", token="t"
+        ),
+    ],
+    ids=["verify", "reset", "email-change"],
+)
+async def test_queued_email_log_has_no_recipient_address(monkeypatch, caplog, send):
+    # Production logs keep the event, not the address.
+    class _Silent:
+        async def send(self, *, to: str, subject: str, html: str) -> None:
+            pass
+
+    monkeypatch.setattr(email, "get_email_client", lambda: _Silent())
+    caplog.set_level(logging.DEBUG, logger="app.services.email")
+
+    await send()
+
+    assert "queued" in caplog.text
+    assert "ada@example.com" not in caplog.text

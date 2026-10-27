@@ -144,7 +144,7 @@ async def send_verify_email(*, to: str, token: str) -> None:
     # surfaces the link locally; production uses Resend.
     settings = get_settings()
     link = _deep_link(settings.verify_email_path, token)
-    log.info("[email] verification email queued for %s", to)
+    log.info("[email] verification email queued")
     html = VERIFY_EMAIL_TEMPLATE.render(email=to, link=link)
     await get_email_client().send(
         to=to, subject="Verify your Grocery Genie email", html=html
@@ -154,7 +154,7 @@ async def send_verify_email(*, to: str, token: str) -> None:
 async def send_reset_password_email(*, to: str, token: str) -> None:
     settings = get_settings()
     link = _deep_link(settings.reset_password_path, token)
-    log.info("[email] password-reset email queued for %s", to)
+    log.info("[email] password-reset email queued")
     html = RESET_PASSWORD_TEMPLATE.render(email=to, link=link)
     await get_email_client().send(
         to=to, subject="Reset your Grocery Genie password", html=html
@@ -164,7 +164,7 @@ async def send_reset_password_email(*, to: str, token: str) -> None:
 async def send_email_change_email(*, to: str, new_email: str, token: str) -> None:
     settings = get_settings()
     link = _deep_link(settings.email_change_path, token)
-    log.info("[email] email-change email queued for %s", to)
+    log.info("[email] email-change email queued")
     html = EMAIL_CHANGE_TEMPLATE.render(new_email=new_email, link=link)
     await get_email_client().send(
         to=to, subject="Confirm your Grocery Genie email change", html=html
