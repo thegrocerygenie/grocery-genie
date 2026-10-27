@@ -12,6 +12,9 @@ import { useOfflineStore } from '@/store/offlineStore';
 import { fakeAccessToken } from '@/testing/jwt';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+jest.mock('@/features/ai-consent/hooks/useAiConsent', () =>
+  jest.requireActual('@/testing/aiConsentHooksMock'),
+);
 jest.mock('@/hooks/useSyncQueue', () => ({ useSyncNow: () => jest.fn() }));
 jest.mock('@react-native-segmented-control/segmented-control', () => () => null);
 jest.mock('@/features/budget/hooks/useCategories', () => ({

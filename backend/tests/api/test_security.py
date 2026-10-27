@@ -7,7 +7,13 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.models.database import Budget, Category, Receipt, User
-from tests.conftest import DEV_USER_ID, DEV_USER_TOKEN, USER_B_ID, USER_B_TOKEN
+from tests.conftest import (
+    DEV_USER_ID,
+    DEV_USER_TOKEN,
+    USER_B_ID,
+    USER_B_TOKEN,
+    consented,
+)
 
 
 @pytest.fixture
@@ -18,12 +24,14 @@ async def seeded_users(db_session):
         email="usera@test.com",
         name="User A",
         api_token=DEV_USER_TOKEN,
+        **consented(),
     )
     user_b = User(
         id=USER_B_ID,
         email="userb@test.com",
         name="User B",
         api_token=USER_B_TOKEN,
+        **consented(),
     )
     db_session.add_all([user_a, user_b])
     await db_session.flush()

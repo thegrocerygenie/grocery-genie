@@ -23,6 +23,7 @@ from app.models.schemas import (
     UserProfileResponse,
     VerifyEmailRequest,
 )
+from app.services import ai_consent
 from app.services import auth as auth_service
 from app.services.apple_auth import verify_apple_sign_in
 from app.services.google_auth import verify_google_id_token
@@ -63,6 +64,7 @@ def _user_to_profile(
             ocr_languages=prefs.get("ocr_languages", []),
         ),
         needs_onboarding=needs_onboarding,
+        ai_consent=ai_consent.public(user),
     )
 
 

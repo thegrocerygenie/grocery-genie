@@ -35,6 +35,11 @@ Submit receipt image for processing. Returns job ID for async polling or sync re
 ```
 
 - `store_name_confidence`, `date_confidence`, and `total_confidence` are 0.0–1.0, or `null` when the model gave no score. The review screen flags each one below 0.7. A future or unreadable date gives a `date_confidence` of 0.5 or less.
+- **AI consent** (App Store 5.1.2(i)): the scan sends the image, and the item names on it, to Anthropic's Claude. Without the user's consent to the current policy version (see `PUT /api/users/me/ai-consent`), the scan returns `403` before it reads the file. Nothing is stored or sent:
+  ```json
+  { "detail": { "code": "ai_consent_required", "message": "...", "policy_version": "2026-10-27" } }
+  ```
+  Manual receipts (`POST /api/receipts`) never call the AI and need no consent.
 
 ### GET /api/receipts/{id} [MVP]
 Full receipt data including extraction, corrections, and original image URL. It also returns the stored `store_name_confidence`, `date_confidence`, and `total_confidence`, so a scan reopened from History is flagged the same way. The list endpoint returns them too.
@@ -129,6 +134,28 @@ Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-mont
 Ends onboarding, with or without a budget (Skip on Set Budget). Idempotent: a repeat call keeps the first completion time. Returns the user profile with `needs_onboarding: false`.
 
 `needs_onboarding` (on `/api/auth/me`, `/api/users/me`, and the sign-up and sign-in token pairs) is true only while the user has not completed onboarding and has no active monthly budget. After completion, deleting the budget does not restart onboarding.
+
+## AI Consent
+
+### PUT /api/users/me/ai-consent [MVP]
+Records that the user allows receipts to go to third-party AI (App Store 5.1.2(i)). The app sends the policy version of the text it showed. Returns the user profile.
+
+**Request:**
+```json
+{ "policy_version": "2026-10-27" }
+```
+
+- `409 ai_consent_version_mismatch` (with `current_policy_version`) when the version is not the current one: the app shows the new text first.
+- Idempotent: a repeat call keeps the first `granted_at`.
+
+### DELETE /api/users/me/ai-consent [MVP]
+Withdraws consent; scans return `403 ai_consent_required` until the user allows them again. Idempotent. Returns the user profile.
+
+The profile (`/api/auth/me`, `/api/users/me`) carries the consent:
+```json
+"ai_consent": { "granted": true, "granted_at": "2026-10-27T10:00:00Z", "policy_version": "2026-10-27", "current_policy_version": "2026-10-27" }
+```
+`granted` is true only for consent to the current version. A new version (`AI_CONSENT_POLICY_VERSION` in `backend/app/services/ai_consent.py`) asks every user again.
 
 ## Account
 

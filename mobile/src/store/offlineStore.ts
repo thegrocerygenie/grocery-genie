@@ -22,6 +22,8 @@ export interface PendingReceipt {
   lastAttemptFailed?: boolean;
   /** Why a `failed` photo will never upload; absent on entries saved before it existed. */
   failure?: 'unreadable' | 'quota';
+  /** The server refused it until the user allows AI reading; it waits on the device. */
+  needsConsent?: boolean;
 }
 
 interface OfflineState {
@@ -30,6 +32,8 @@ interface OfflineState {
   updateStatus: (id: string, status: PendingReceipt['status']) => void;
   /** Put a receipt back in the queue after an upload attempt failed and should be retried. */
   markAttemptFailed: (id: string) => void;
+  /** Keep a receipt queued until the user allows AI reading (not a failed attempt). */
+  holdForConsent: (id: string) => void;
   /** Stop uploading a receipt: the server will reject it the same way every time. */
   markFailed: (id: string, failure: NonNullable<PendingReceipt['failure']>) => void;
   removePendingReceipt: (id: string) => void;
@@ -61,6 +65,13 @@ export const useOfflineStore = create<OfflineState>()(
         set((state) => ({
           pendingReceipts: state.pendingReceipts.map((r) =>
             r.id === id ? { ...r, status: 'pending' as const, lastAttemptFailed: true } : r,
+          ),
+        })),
+
+      holdForConsent: (id) =>
+        set((state) => ({
+          pendingReceipts: state.pendingReceipts.map((r) =>
+            r.id === id ? { ...r, status: 'pending' as const, needsConsent: true } : r,
           ),
         })),
 

@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 
+import { useAiConsentGate } from '@/features/ai-consent/hooks/useAiConsent';
 import { tokenSubject } from '@/features/auth/utils/tokenSubject';
 import { useAuthStore } from '@/store/authStore';
 import { useOfflineStore } from '@/store/offlineStore';
@@ -35,6 +36,7 @@ export function useReceiptImport() {
   const busy = useRef(false);
   const addPendingReceipt = useOfflineStore((s) => s.addPendingReceipt);
   const accessToken = useAuthStore((s) => s.accessToken);
+  const { ensureConsent, askForConsent, markRequired } = useAiConsentGate();
 
   const queue = useCallback(
     (receipt: PickedReceipt) => {
@@ -58,6 +60,8 @@ export function useReceiptImport() {
       if (busy.current) return;
       busy.current = true;
       try {
+        // 5.1.2(i): the file goes to Anthropic, so ask before the picker opens.
+        if (!(await ensureConsent())) return;
         const result = await importReceipt({
           pick: kind === 'library' ? pickFromLibrary : pickFromFiles,
           upload: (receipt) => {
@@ -81,6 +85,12 @@ export function useReceiptImport() {
             'Saved to upload later',
             'This receipt will upload automatically when the connection is back. You can see it under Pending in History.',
           );
+        } else if (result.status === 'consent-required') {
+          // Consent was withdrawn elsewhere or the policy changed: ask again.
+          // After Allow the user picks the file again.
+          markRequired();
+          busy.current = false;
+          await askForConsent();
         } else if (result.status === 'error') {
           Alert.alert('Couldn’t import receipt', result.message);
         }
@@ -91,7 +101,16 @@ export function useReceiptImport() {
         busy.current = false;
       }
     },
-    [router, scanMutation, setActiveScanResponse, setCapturedImageUri, queue],
+    [
+      router,
+      scanMutation,
+      setActiveScanResponse,
+      setCapturedImageUri,
+      queue,
+      ensureConsent,
+      askForConsent,
+      markRequired,
+    ],
   );
 
   return { importFrom, progress };

@@ -2,6 +2,8 @@ import type { ScanSource } from '@/constants/analyticsEvents';
 import { ApiError } from '@/services/api';
 import { useOfflineStore } from '@/store/offlineStore';
 
+import { isAiConsentRequiredError } from '@/features/ai-consent/utils/aiConsent';
+
 import { isQuotaExceededError } from '../utils/scanQuota';
 
 /** HTTP statuses where the same photo can succeed later (auth refresh, rate limit, outage). */
@@ -31,6 +33,8 @@ export interface SyncDeps {
    * starts, so the run stops once this is no longer `ownerId`.
    */
   currentOwner: () => string | null;
+  /** The server refused for AI consent: the queue waits until the user allows it. */
+  onConsentRequired?: () => void;
 }
 
 export interface SyncResult {
@@ -66,8 +70,9 @@ async function runSync({
   deleteImage,
   ownerId,
   currentOwner,
+  onConsentRequired,
 }: SyncDeps): Promise<SyncResult> {
-  const { updateStatus, markAttemptFailed, markFailed, removePendingReceipt } =
+  const { updateStatus, markAttemptFailed, markFailed, holdForConsent, removePendingReceipt } =
     useOfflineStore.getState();
   // Another account's photo (or one with no owner) waits for its owner: uploading
   // it here would file it under the wrong account, or let that account's server
@@ -84,6 +89,13 @@ async function runSync({
     try {
       await scan(receipt.imageUri, receipt.mimeType, receipt.source ?? 'camera');
     } catch (error) {
+      // 5.1.2(i): no photo leaves the phone until the user allows AI reading.
+      // The rest would be refused the same way.
+      if (isAiConsentRequiredError(error)) {
+        holdForConsent(receipt.id);
+        onConsentRequired?.();
+        return result;
+      }
       if (isRetryableScanError(error)) {
         markAttemptFailed(receipt.id);
         return result;

@@ -2,6 +2,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
 import { AppState } from 'react-native';
 
+import {
+  useAiConsentStatus,
+  useMarkAiConsentRequired,
+} from '@/features/ai-consent/hooks/useAiConsent';
 import { scanReceipt } from '@/features/receipt-capture/services/receiptApi';
 import { syncPendingReceipts } from '@/features/receipt-capture/services/offlineQueue';
 import { deletePendingImage } from '@/features/receipt-capture/services/pendingImageFiles';
@@ -34,20 +38,24 @@ function waitingToRetry(ownerId: string): boolean {
 export function useSyncNow(): () => Promise<void> {
   const queryClient = useQueryClient();
   const ownerId = tokenSubject(useAuthStore((s) => s.accessToken));
+  const consent = useAiConsentStatus();
+  const markRequired = useMarkAiConsentRequired();
 
   return useCallback(async () => {
-    if (!ownerId) return;
+    // Without AI consent the photos wait on the device (App Store 5.1.2(i)).
+    if (!ownerId || consent === false) return;
     const { synced } = await syncPendingReceipts({
       scan: (uri, mimeType, source) => scanReceipt(uri, mimeType, source),
       deleteImage: deletePendingImage,
       ownerId,
       currentOwner: () => tokenSubject(useAuthStore.getState().accessToken),
+      onConsentRequired: markRequired,
     });
     if (synced > 0) {
       await queryClient.invalidateQueries({ queryKey: ['receipts'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     }
-  }, [ownerId, queryClient]);
+  }, [ownerId, consent, markRequired, queryClient]);
 }
 
 /**
@@ -60,6 +68,7 @@ export function useSyncQueue() {
   const { isConnected } = useNetworkStatus();
   const syncNow = useSyncNow();
   const ownerId = tokenSubject(useAuthStore((s) => s.accessToken));
+  const consent = useAiConsentStatus();
   // Only the signed-in user's photos count. Failed photos never upload again,
   // so they must not trigger a sync. A pending → syncing → pending bounce keeps
   // the count, so a failing server does not restart this effect in a loop; the
@@ -69,7 +78,7 @@ export function useSyncQueue() {
   );
 
   useEffect(() => {
-    if (!isConnected || !ownerId || queuedCount === 0) return;
+    if (!isConnected || !ownerId || queuedCount === 0 || consent === false) return;
 
     let stopped = false;
     let retries = 0;
@@ -102,5 +111,5 @@ export function useSyncQueue() {
       if (timer) clearTimeout(timer);
       subscription.remove();
     };
-  }, [isConnected, ownerId, queuedCount, syncNow]);
+  }, [isConnected, ownerId, queuedCount, consent, syncNow]);
 }

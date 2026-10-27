@@ -15,6 +15,9 @@ import LanguageSettingsScreen from '../../app/settings/language-settings';
 import AboutScreen from '../../app/settings/about';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+jest.mock('@/features/ai-consent/hooks/useAiConsent', () =>
+  jest.requireActual('@/testing/aiConsentHooksMock'),
+);
 jest.mock('expo-constants', () => ({ expoConfig: { version: '0.1.0' } }));
 jest.mock('@/features/auth/hooks/useAuth', () => ({
   useMe: () => ({ data: undefined }),

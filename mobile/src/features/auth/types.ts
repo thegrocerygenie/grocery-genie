@@ -18,6 +18,15 @@ export interface UserPreferences {
   ocr_languages: string[];
 }
 
+/** Consent to send receipts to third-party AI (backend app/services/ai_consent.py). */
+export interface AiConsent {
+  /** True only for consent to the current policy version. */
+  granted: boolean;
+  granted_at: string | null;
+  policy_version: string | null;
+  current_policy_version: string;
+}
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -27,4 +36,5 @@ export interface UserProfile {
   email_verified_at: string | null;
   preferences: UserPreferences;
   needs_onboarding?: boolean;
+  ai_consent?: AiConsent;
 }

@@ -2,6 +2,7 @@ import io
 import os
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -15,6 +16,7 @@ from sqlalchemy.ext.asyncio import (
 from app.core.config import get_settings
 from app.llm.provider import MockReceiptExtractor
 from app.models.database import Base
+from app.services.ai_consent import AI_CONSENT_POLICY_VERSION
 
 # Count rate limits in memory: the suite has no Redis. Clear the cache in case
 # an import above already read the settings.
@@ -29,6 +31,14 @@ DEV_USER_TOKEN = "test-token-user-a-00000000"
 
 USER_B_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
 USER_B_TOKEN = "test-token-user-b-00000000"
+
+
+def consented() -> dict:
+    """User fields for a user who allowed receipts to go to the AI."""
+    return {
+        "ai_consent_at": datetime.now(UTC),
+        "ai_consent_version": AI_CONSENT_POLICY_VERSION,
+    }
 
 
 @pytest.fixture
@@ -109,6 +119,7 @@ async def client(mock_extractor, db_session) -> AsyncGenerator[AsyncClient, None
         email="test@test.com",
         name="Test User",
         api_token=DEV_USER_TOKEN,
+        **consented(),
     )
 
     _create_test_client(app, db_session, mock_extractor, test_user)
@@ -135,6 +146,7 @@ async def client_user_b(
         email="userb@test.com",
         name="User B",
         api_token=USER_B_TOKEN,
+        **consented(),
     )
 
     _create_test_client(app, db_session, mock_extractor, user_b)

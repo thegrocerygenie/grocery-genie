@@ -38,6 +38,7 @@ from app.models.database import (
     UserItemMapping,
 )
 from app.services import account_service
+from app.services.ai_consent import AI_CONSENT_POLICY_VERSION
 
 # Redis and email stubbed, as in test_auth.py.
 from tests.api.test_auth import (  # noqa: F401
@@ -87,6 +88,12 @@ async def _give_user_everything(
 
     Returns the scanned receipt's id.
     """
+    consent = await client.put(
+        "/api/users/me/ai-consent",
+        headers=headers,
+        json={"policy_version": AI_CONSENT_POLICY_VERSION},
+    )
+    assert consent.status_code == 200, consent.text
     scan = await client.post(
         "/api/receipts/scan",
         headers=headers,

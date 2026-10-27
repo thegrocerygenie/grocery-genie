@@ -38,6 +38,7 @@ from app.models.schemas import (
     ReceiptScanResponse,
     ReceiptUpdateRequest,
 )
+from app.services.ai_consent import require_ai_consent
 from app.services.analytics_service import AnalyticsService, get_analytics_service
 from app.services.receipt_service import ReceiptAlreadyConfirmedError, ReceiptService
 
@@ -97,7 +98,8 @@ async def scan_receipt(
     file: UploadFile,
     source: str = Form("camera"),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    # 5.1.2(i): the photo and item names go to Anthropic, so consent comes first.
+    user: User = Depends(require_ai_consent),
     extractor: ReceiptExtractor = Depends(get_receipt_extractor),
     category_assigner: CategoryAssigner = Depends(get_category_assigner),
     analytics: AnalyticsService = Depends(get_analytics_service),

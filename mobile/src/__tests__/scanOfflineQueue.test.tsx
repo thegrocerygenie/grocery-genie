@@ -14,6 +14,9 @@ import { useOfflineStore } from '@/store/offlineStore';
 import { fakeAccessToken } from '@/testing/jwt';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+jest.mock('@/features/ai-consent/hooks/useAiConsent', () =>
+  jest.requireActual('@/testing/aiConsentHooksMock'),
+);
 jest.mock('expo-haptics', () => ({
   notificationAsync: jest.fn(),
   NotificationFeedbackType: { Success: 'success' },

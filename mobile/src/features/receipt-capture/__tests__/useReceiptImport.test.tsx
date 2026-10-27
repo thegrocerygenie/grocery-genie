@@ -1,10 +1,13 @@
 import React from 'react';
 import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, renderHook } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
+import { answerAiConsent } from '@/features/ai-consent/services/consentPrompt';
+import { ME_QUERY_KEY } from '@/features/auth/hooks/useAuth';
+import type { UserProfile } from '@/features/auth/types';
 import { ApiError } from '@/services/api';
 import { useReceiptStore } from '@/store/receiptStore';
 
@@ -14,6 +17,9 @@ import { scanReceipt } from '../services/receiptApi';
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+jest.mock('expo-secure-store', () => ({
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
+}));
 jest.mock('expo-haptics', () => ({
   notificationAsync: jest.fn(),
   NotificationFeedbackType: { Success: 'success' },
@@ -36,16 +42,30 @@ const scan = scanReceipt as jest.Mock;
 
 const response = { receipt_id: 'r-9', status: 'pending_review', extraction: { items: [] } };
 
-function renderImportHook() {
+function renderImportHook(consent?: boolean) {
   // gcTime Infinity: a finished mutation otherwise schedules a 5-minute cache
   // timer that keeps Jest from exiting.
   const client = new QueryClient({
-    defaultOptions: { mutations: { retry: false, gcTime: Infinity } },
+    defaultOptions: {
+      queries: { gcTime: Infinity },
+      mutations: { retry: false, gcTime: Infinity },
+    },
   });
+  if (consent !== undefined) {
+    client.setQueryData(ME_QUERY_KEY, {
+      id: 'u-1',
+      ai_consent: {
+        granted: consent,
+        granted_at: null,
+        policy_version: null,
+        current_policy_version: '2026-10-27',
+      },
+    } as unknown as UserProfile);
+  }
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
-  return renderHook(() => useReceiptImport(), { wrapper });
+  return { client, ...renderHook(() => useReceiptImport(), { wrapper }) };
 }
 
 beforeEach(() => {
@@ -187,5 +207,63 @@ describe('an import that cannot upload now', () => {
     expect(useOfflineStore.getState().pendingReceipts).toHaveLength(0);
     expect(persistCapturedImage).not.toHaveBeenCalled();
     expect(Alert.alert).toHaveBeenCalledWith('Couldn’t import receipt', expect.any(String));
+  });
+});
+
+describe('AI consent (App Store 5.1.2(i))', () => {
+  const photo = {
+    canceled: false,
+    assets: [{ uri: 'file:///photo.jpg', width: 1200, height: 1600, mimeType: 'image/jpeg' }],
+  };
+
+  it('asks for consent before picking, and stops on manual entry', async () => {
+    launchLibrary.mockResolvedValue(photo);
+    const { result } = renderImportHook(false);
+
+    let done: Promise<void> | undefined;
+    act(() => {
+      done = result.current.importFrom('library');
+    });
+    expect(mockPush).toHaveBeenCalledWith('/ai-consent');
+    expect(launchLibrary).not.toHaveBeenCalled();
+
+    answerAiConsent(false);
+    await act(() => done!);
+    expect(launchLibrary).not.toHaveBeenCalled();
+    expect(scan).not.toHaveBeenCalled();
+  });
+
+  it('imports after the user allows it', async () => {
+    launchLibrary.mockResolvedValue(photo);
+    scan.mockResolvedValue(response);
+    const { result } = renderImportHook(false);
+
+    let done: Promise<void> | undefined;
+    act(() => {
+      done = result.current.importFrom('library');
+    });
+    answerAiConsent(true);
+    await act(() => done!);
+
+    expect(scan).toHaveBeenCalledWith('file:///photo.jpg', 'image/jpeg', 'library');
+    expect(mockPush).toHaveBeenLastCalledWith('/review');
+  });
+
+  it('opens the consent sheet when the server refuses for consent', async () => {
+    launchLibrary.mockResolvedValue(photo);
+    scan.mockRejectedValue(
+      new ApiError(403, { detail: { code: 'ai_consent_required', message: 'Allow first.' } }),
+    );
+    const { client, result } = renderImportHook(true);
+
+    let done: Promise<void> | undefined;
+    act(() => {
+      done = result.current.importFrom('library');
+    });
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/ai-consent'));
+    expect(client.getQueryData<UserProfile>(ME_QUERY_KEY)?.ai_consent?.granted).toBe(false);
+    expect(Alert.alert).not.toHaveBeenCalled();
+    answerAiConsent(false);
+    await act(() => done!);
   });
 });

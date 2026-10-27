@@ -339,6 +339,20 @@ class UserPreferencesPublic(BaseModel):
     ocr_languages: list[str] = Field(default_factory=list)
 
 
+class AiConsentPublic(BaseModel):
+    """Consent to send receipts to third-party AI (app/services/ai_consent.py)."""
+
+    granted: bool
+    granted_at: datetime | None
+    policy_version: str | None
+    current_policy_version: str
+
+
+class AiConsentGrantRequest(BaseModel):
+    # The policy version of the text the app showed the user.
+    policy_version: str = Field(min_length=1, max_length=32)
+
+
 class UserProfileResponse(BaseModel):
     id: uuid.UUID
     email: str
@@ -348,6 +362,7 @@ class UserProfileResponse(BaseModel):
     email_verified_at: datetime | None
     preferences: UserPreferencesPublic
     needs_onboarding: bool = False
+    ai_consent: AiConsentPublic
 
 
 class UserPreferencesUpdate(BaseModel):

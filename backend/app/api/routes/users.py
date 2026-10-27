@@ -13,6 +13,7 @@ from app.core.security import bearer_scheme, get_current_user
 from app.image.storage import LocalFileStorage
 from app.models.database import User
 from app.models.schemas import (
+    AiConsentGrantRequest,
     DeleteAccountRequest,
     EmailChangeConfirmPayload,
     EmailChangeRequestPayload,
@@ -21,7 +22,7 @@ from app.models.schemas import (
     UserPreferencesUpdate,
     UserProfileResponse,
 )
-from app.services import account_service
+from app.services import account_service, ai_consent
 from app.services import auth as auth_service
 from app.services.push_token_service import PushTokenService
 
@@ -64,6 +65,7 @@ def _to_profile(user: User, *, needs_onboarding: bool = False) -> UserProfileRes
             ocr_languages=prefs.get("ocr_languages", []),
         ),
         needs_onboarding=needs_onboarding,
+        ai_consent=ai_consent.public(user),
     )
 
 
@@ -118,6 +120,41 @@ async def complete_onboarding(
     db: AsyncSession = Depends(get_db),
 ) -> UserProfileResponse:
     await auth_service.complete_onboarding(db, user)
+    needs = await auth_service.user_needs_onboarding(db, user.id)
+    return _to_profile(user, needs_onboarding=needs)
+
+
+@router.put("/me/ai-consent", response_model=UserProfileResponse)
+async def grant_ai_consent(
+    body: AiConsentGrantRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserProfileResponse:
+    """Allow receipts to go to third-party AI for the policy version shown."""
+    try:
+        ai_consent.grant(user, body.policy_version)
+    except ai_consent.ConsentVersionMismatchError:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "ai_consent_version_mismatch",
+                "message": "The consent text changed. Review it again.",
+                "current_policy_version": ai_consent.AI_CONSENT_POLICY_VERSION,
+            },
+        ) from None
+    await db.flush()
+    needs = await auth_service.user_needs_onboarding(db, user.id)
+    return _to_profile(user, needs_onboarding=needs)
+
+
+@router.delete("/me/ai-consent", response_model=UserProfileResponse)
+async def withdraw_ai_consent(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserProfileResponse:
+    """Withdraw consent: scans are refused until the user allows them again."""
+    ai_consent.withdraw(user)
+    await db.flush()
     needs = await auth_service.user_needs_onboarding(db, user.id)
     return _to_profile(user, needs_onboarding=needs)
 
