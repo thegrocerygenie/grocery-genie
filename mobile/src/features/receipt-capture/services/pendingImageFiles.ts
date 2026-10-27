@@ -16,12 +16,17 @@ export function persistCapturedImage(uri: string): string {
   return target.uri;
 }
 
-/** Remove a queued photo once it has uploaded or been discarded. Missing files are fine. */
-export function deletePendingImage(uri: string): void {
+/** Delete a file if it exists. Never throws: a leftover file only costs disk space. */
+export function deleteQuietly(uri: string): void {
   try {
     const file = new File(uri);
     if (file.exists) file.delete();
   } catch {
-    // A leftover file only costs disk space; never fail the sync over it.
+    // Nothing to do.
   }
+}
+
+/** Remove a queued photo once it has uploaded or been discarded. Missing files are fine. */
+export function deletePendingImage(uri: string): void {
+  deleteQuietly(uri);
 }

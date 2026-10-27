@@ -31,6 +31,10 @@ jest.mock('expo-camera', () => {
     }),
   };
 });
+let mockFrame: string | null = null;
+jest.mock('@/features/receipt-capture/services/frameSampler', () => ({
+  sampleFrame: async () => mockFrame,
+}));
 jest.mock('@/hooks/useAnalytics', () => ({
   useAnalytics: () => ({ emit: jest.fn() }),
 }));
@@ -53,6 +57,7 @@ jest.mock('@/features/receipt-capture/hooks/useReceiptScan', () => ({
 
 beforeEach(() => {
   mockHandlers = null;
+  mockFrame = null;
   (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
 });
 
@@ -94,5 +99,24 @@ describe('Scan states', () => {
     act(() => mockHandlers!.onError(new ApiError(422, { detail: 'Empty file uploaded.' })));
 
     expect(screen.getByText('Couldn’t read that — try again')).toBeTruthy();
+  });
+
+  it.each([
+    ['blurry', 'Image looks blurry — hold steady'],
+    ['dark', 'Too dark — find more light'],
+    ['bright', 'Too much glare — tilt the receipt'],
+  ])('warns before capture when the view is %s (RC-01 AC 2)', async (verdict, hint) => {
+    mockFrame = verdict;
+    render(<ScanScreen />);
+
+    expect(await screen.findByText(hint)).toBeTruthy();
+    expect(screen.queryByText('Receipt detected')).toBeNull();
+  });
+
+  it('shows "Receipt detected" when the view is fine', async () => {
+    mockFrame = 'ok';
+    render(<ScanScreen />);
+
+    expect(await screen.findByText('Receipt detected')).toBeTruthy();
   });
 });
