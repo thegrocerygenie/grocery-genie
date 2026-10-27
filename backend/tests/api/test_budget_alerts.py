@@ -12,6 +12,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.seed import seed_default_categories
 from app.llm.provider import MockReceiptExtractor
 from app.models.database import BudgetAlertSent
 
@@ -300,3 +301,158 @@ async def test_receipts_on_either_side_of_the_reset_day_are_separate_periods(
         date(2026, 2, 15),
         date(2026, 3, 15),
     ]
+
+
+@pytest.fixture
+async def seeded_categories(db_session: AsyncSession) -> None:
+    await seed_default_categories(db_session)
+
+
+async def _category_id(client: AsyncClient, name: str) -> str:
+    resp = await client.get("/api/categories")
+    assert resp.status_code == 200
+    return next(c["id"] for c in resp.json() if c["name"] == name)
+
+
+# A category correction recategorizes every line item with the same name, in
+# all of the user's receipts. Spend then moves in each period that holds one
+# of those receipts, so each such period must alert, not only the period of
+# the receipt that was edited.
+@pytest.mark.parametrize(
+    "edited",
+    [
+        pytest.param("confirmed", id="edit-a-saved-receipt"),
+        pytest.param("under-review", id="edit-a-scan-under-review"),
+        pytest.param("confirm-with-edit", id="confirm-a-scan-with-the-edit"),
+    ],
+)
+async def test_category_correction_alerts_in_every_period_it_moves_spend(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    test_image_bytes: bytes,
+    seeded_categories,
+    monkeypatch,
+    edited: str,
+):
+    # check_thresholds locks the user's budget rows. A second lock pass in one
+    # request could deadlock with a concurrent confirm, so the edit must check
+    # every changed period in one call.
+    from app.services.budget_service import BudgetService
+
+    calls: list[tuple] = []
+    original = BudgetService.check_thresholds
+
+    async def spy(self, user_id, *dates):
+        calls.append(dates)
+        return await original(self, user_id, *dates)
+
+    monkeypatch.setattr(BudgetService, "check_thresholds", spy)
+    snacks = await _category_id(client, "Snacks & Treats")
+    other = await _category_id(client, "Other")
+    resp = await client.post(
+        "/api/budgets",
+        json={
+            "category_id": snacks,
+            "amount": 20.0,
+            "period_type": "monthly",
+            "period_start": "2026-02-01",
+        },
+    )
+    assert resp.status_code == 201
+
+    # February: $17 of "Organic Bananas", filed under Other. Snacks is at 0%.
+    resp = await client.post(
+        "/api/receipts",
+        json={
+            "store_name": "Corner Shop",
+            "date": "2026-02-20",
+            "total": 17.0,
+            "items": [
+                {
+                    "name": "Organic Bananas",
+                    "quantity": 1,
+                    "unit_price": 17.0,
+                    "total_price": 17.0,
+                    "category_id": other,
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 201
+
+    # March (2026-03-15): the mock scan has $1.29 of "Organic Bananas".
+    scan = await client.post(
+        "/api/receipts/scan",
+        files={"file": ("receipt.jpg", io.BytesIO(test_image_bytes), "image/jpeg")},
+    )
+    receipt_url = f"/api/receipts/{scan.json()['receipt_id']}"
+    if edited == "confirmed":
+        resp = await client.patch(receipt_url, json={"status": "confirmed"})
+        assert resp.status_code == 200
+    items = (await client.get(receipt_url)).json()["items"]
+    bananas = next(i["id"] for i in items if i["raw_name"] == "Organic Bananas")
+    assert await _alert_thresholds(client) == []
+
+    body: dict = {"items": [{"id": bananas, "category_id": snacks}]}
+    if edited == "confirm-with-edit":
+        body["status"] = "confirmed"
+    calls.clear()
+    resp = await client.patch(receipt_url, json=body)
+    assert resp.status_code == 200
+    assert len(calls) == 1
+
+    # February Snacks is now $17 of $20 (85%). March Snacks is under 50%.
+    assert await _alert_thresholds(client) == [50, 80]
+    assert await _claimed_period_starts(db_session) == [date(2026, 2, 1)]
+
+
+@pytest.mark.parametrize("status", ["pending_review", "pending", "archived"])
+async def test_a_confirmed_receipt_cannot_leave_confirmed(
+    client: AsyncClient, test_image_bytes: bytes, monkeypatch, status: str
+):
+    # Moving a confirmed receipt out of confirmed and back would confirm it
+    # again, and dispatch ReceiptConfirmed a second time.
+    from app.events import dispatcher as dispatcher_module
+    from app.events.types import ReceiptConfirmed
+
+    dispatched: list[ReceiptConfirmed] = []
+    original = dispatcher_module.dispatcher.dispatch
+
+    def spy(event):
+        if isinstance(event, ReceiptConfirmed):
+            dispatched.append(event)
+        return original(event)
+
+    monkeypatch.setattr(dispatcher_module.dispatcher, "dispatch", spy)
+    scan = await client.post(
+        "/api/receipts/scan",
+        files={"file": ("receipt.jpg", io.BytesIO(test_image_bytes), "image/jpeg")},
+    )
+    receipt_url = f"/api/receipts/{scan.json()['receipt_id']}"
+    resp = await client.patch(receipt_url, json={"status": "confirmed"})
+    assert resp.status_code == 200
+
+    resp = await client.patch(receipt_url, json={"status": status})
+    assert resp.status_code == 422
+    assert (await client.get(receipt_url)).json()["status"] == "confirmed"
+
+    resp = await client.patch(receipt_url, json={"status": "confirmed"})
+    assert resp.status_code == 200
+    assert len(dispatched) == 1
+
+
+async def test_status_accepts_only_known_values(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    scan = await client.post(
+        "/api/receipts/scan",
+        files={"file": ("receipt.jpg", io.BytesIO(test_image_bytes), "image/jpeg")},
+    )
+    receipt_url = f"/api/receipts/{scan.json()['receipt_id']}"
+
+    resp = await client.patch(receipt_url, json={"status": "archived"})
+    assert resp.status_code == 422
+
+    resp = await client.patch(receipt_url, json={"status": "pending_review"})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "pending_review"

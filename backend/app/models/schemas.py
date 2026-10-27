@@ -1,6 +1,7 @@
 import datetime as dt
 import uuid
 from datetime import date, datetime, timedelta
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -98,7 +99,8 @@ class ReceiptUpdateRequest(BaseModel):
     # dt.date: a bare `date` here would resolve to this field, not the type.
     date: dt.date | None = None
     items: list[LineItemCorrection] | None = None
-    status: str | None = None
+    # A confirmed receipt stays confirmed: update_receipt refuses to move it.
+    status: Literal["pending_review", "confirmed"] | None = None
 
     @field_validator("date")
     @classmethod
