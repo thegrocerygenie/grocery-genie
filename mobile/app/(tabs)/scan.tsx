@@ -5,8 +5,17 @@ import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import NetInfo from '@react-native-community/netinfo';
 import { Stack, Tabs, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ANALYTICS_EVENTS } from '@/constants/analyticsEvents';
+import { AiConsentContent } from '@/features/ai-consent/components/AiConsentContent';
+import { AI_CONSENT_COPY } from '@/features/ai-consent/constants';
+import {
+  useAiConsentStatus,
+  useGrantAiConsent,
+  useMarkAiConsentRequired,
+} from '@/features/ai-consent/hooks/useAiConsent';
+import { isAiConsentRequiredError } from '@/features/ai-consent/utils/aiConsent';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { ImportProgressOverlay } from '@/features/receipt-capture/components/ImportProgressOverlay';
 import { useReceiptImport } from '@/features/receipt-capture/hooks/useReceiptImport';
@@ -49,6 +58,13 @@ export default function ScanScreen() {
   const addPendingReceipt = useOfflineStore((s) => s.addPendingReceipt);
   const ownerId = tokenSubject(useAuthStore((s) => s.accessToken));
   const analytics = useAnalytics();
+  // App Store 5.1.2(i): the photo goes to Anthropic, so the tab asks first.
+  const aiConsent = useAiConsentStatus();
+  const grantConsent = useGrantAiConsent();
+  const markConsentRequired = useMarkAiConsentRequired();
+  // The consent screen is not the camera: leaving it is not a capture abandonment.
+  const askingConsent = useRef(false);
+  askingConsent.current = aiConsent === false;
 
   // Tracks whether a scan was submitted, so leaving the camera without ever
   // capturing is recorded as a capture-stage abandonment.
@@ -62,11 +78,28 @@ export default function ScanScreen() {
 
   useEffect(() => {
     return () => {
-      if (!scanSubmitted.current) {
+      if (!scanSubmitted.current && !askingConsent.current) {
         analytics.emit(ANALYTICS_EVENTS.RECEIPT_ABANDONED, { stage: 'capture' });
       }
     };
   }, [analytics]);
+
+  if (aiConsent === false) {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <Tabs.Screen options={{ tabBarStyle: undefined }} />
+        <SafeAreaView style={styles.consentRoot} edges={['top']}>
+          <AiConsentContent
+            onAllow={() => grantConsent.mutate()}
+            onManual={() => router.push('/manual-entry')}
+            saving={grantConsent.isPending}
+            error={grantConsent.isError ? AI_CONSENT_COPY.saveFailed : null}
+          />
+        </SafeAreaView>
+      </>
+    );
+  }
 
   if (!permission) {
     return (
@@ -162,7 +195,12 @@ export default function ScanScreen() {
             router.push('/review');
           },
           onError: (error) => {
-            if (isRetryableScanError(error)) {
+            if (isAiConsentRequiredError(error)) {
+              // Withdrawn on another device, or the policy changed: show the
+              // consent screen in place of the camera.
+              setFlowState('detected');
+              markConsentRequired();
+            } else if (isRetryableScanError(error)) {
               queuePhoto(photo.uri);
             } else {
               fail(error);
@@ -416,6 +454,8 @@ function HintPill({ state, errorHint, frame }: HintPillProps) {
 }
 
 const styles = StyleSheet.create({
+  // Clears the floating tab bar, which stays as the way out.
+  consentRoot: { flex: 1, backgroundColor: colors.iosBg, paddingBottom: 72 },
   root: { flex: 1, backgroundColor: '#000' },
 
   topHintRow: {

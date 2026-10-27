@@ -5,6 +5,7 @@ import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
+import { AiConsentSettingsSection } from '@/features/ai-consent/components/AiConsentSettingsSection';
 import { useMe, useSignOut } from '@/features/auth/hooks/useAuth';
 import { useBudgets } from '@/features/budget/hooks/useBudget';
 import { alertsSummary, budgetsSummary } from '@/features/settings/utils/settingsSummary';
@@ -131,6 +132,8 @@ export default function SettingsScreen() {
             />
           ))}
         </Section>
+
+        <AiConsentSettingsSection />
 
         <Section header="ACCOUNT">
           <SettingsLinkRow

@@ -90,6 +90,10 @@ export default function RootLayout() {
               name="manual-entry"
               options={{ title: 'Manual Entry', presentation: 'modal' }}
             />
+            <Stack.Screen
+              name="ai-consent"
+              options={{ presentation: 'modal', headerShown: false }}
+            />
             <Stack.Screen name="top-items" options={{ title: 'Top Items' }} />
             <Stack.Screen name="trend" options={{ title: 'Trend' }} />
             <Stack.Screen

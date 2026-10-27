@@ -7,6 +7,9 @@ import React from 'react';
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+jest.mock('@/features/ai-consent/hooks/useAiConsent', () =>
+  jest.requireActual('@/testing/aiConsentHooksMock'),
+);
 jest.mock('@/hooks/useSyncQueue', () => ({ useSyncNow: () => jest.fn() }));
 jest.mock('expo-haptics', () => ({
   selectionAsync: jest.fn(),

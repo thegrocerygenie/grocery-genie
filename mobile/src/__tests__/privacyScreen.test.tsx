@@ -58,8 +58,12 @@ describe('Privacy policy', () => {
     expect(text()).not.toMatch(/not yet erased/i);
   });
 
-  it('does not claim AI consent the app does not ask for yet', () => {
-    expect(text()).not.toMatch(/after you allow|with your permission/i);
+  // App Store 5.1.2(i): the app asks before a receipt goes to Anthropic
+  // (app/ai-consent.tsx), and Settings turns it off.
+  it('says receipts go to Anthropic only after the user allows it, and how to stop', () => {
+    expect(text()).toMatch(/only after you allow it/i);
+    expect(text()).toMatch(/Settings → Read receipts with AI/);
+    expect(text()).toMatch(/enter receipts manually/i);
   });
 
   it('covers retention, rights, children, security and changes', () => {

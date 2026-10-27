@@ -12,6 +12,9 @@ import type { BudgetResponse } from '@/features/budget/types';
 import type { UserProfile } from '@/features/auth/types';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+jest.mock('@/features/ai-consent/hooks/useAiConsent', () =>
+  jest.requireActual('@/testing/aiConsentHooksMock'),
+);
 jest.mock('expo-constants', () => ({ expoConfig: { version: '0.1.0' } }));
 
 const profile: UserProfile = {
@@ -83,6 +86,11 @@ describe('Settings hub', () => {
 
     expect(screen.getByText('$400/mo · 4 caps')).toBeTruthy();
     expect(screen.getByText('80% · 100% · weekly')).toBeTruthy();
+  });
+
+  it('has a switch to withdraw AI receipt reading (App Store 5.1.2(i))', () => {
+    renderSettings();
+    expect(screen.getByRole('switch', { name: 'Read receipts with AI' }).props.value).toBe(true);
   });
 
   it('shows the real app version on About and opens the About screen', () => {

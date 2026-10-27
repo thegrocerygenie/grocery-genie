@@ -51,7 +51,7 @@ export const PRIVACY_POLICY: {
       paragraphs: [
         'These companies process data for us, only to provide the service, under terms that require them to protect it at least as well as this policy does:',
         'Hetzner runs our servers, and Supabase hosts our database.',
-        'Anthropic (Claude) reads receipt photos and item names to extract the details and suggest categories. Under its commercial terms, Anthropic does not use this data to train its models.',
+        'Anthropic (Claude) reads receipt photos and item names to extract the details and suggest categories. We send them only after you allow it: the app asks before your first scan or import. You can turn this off at any time in Settings → Read receipts with AI; scans and imports then stop, and you can still enter receipts manually. Under its commercial terms, Anthropic does not use this data to train its models.',
         'Expo and Apple deliver push notifications: your device’s notification token and the alert text, which can include spending amounts.',
         'Resend sends account emails, such as verification, password reset and email change.',
         'Apple and Google confirm your identity when you sign in with them.',

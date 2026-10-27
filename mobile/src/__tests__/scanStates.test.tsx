@@ -8,16 +8,21 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 
 import ScanScreen from '../../app/(tabs)/scan';
 import { ApiError } from '@/services/api';
+import { aiConsentMock } from '@/testing/aiConsentHooksMock';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+jest.mock('@/features/ai-consent/hooks/useAiConsent', () =>
+  jest.requireActual('@/testing/aiConsentHooksMock'),
+);
 jest.mock('expo-haptics', () => ({
   notificationAsync: jest.fn(),
   NotificationFeedbackType: { Success: 'success' },
 }));
+const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
   Tabs: { Screen: () => null },
-  useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: mockPush, back: jest.fn() }),
 }));
 jest.mock('expo-camera', () => {
   const { forwardRef, useImperativeHandle } = jest.requireActual('react');
@@ -56,6 +61,8 @@ jest.mock('@/features/receipt-capture/hooks/useReceiptScan', () => ({
 }));
 
 beforeEach(() => {
+  jest.clearAllMocks();
+  aiConsentMock.granted = true;
   mockHandlers = null;
   mockFrame = null;
   (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
@@ -118,5 +125,53 @@ describe('Scan states', () => {
     render(<ScanScreen />);
 
     expect(await screen.findByText('Receipt detected')).toBeTruthy();
+  });
+});
+
+// App Store 5.1.2(i): the photo goes to Anthropic, so the tab asks first.
+describe('Scan without AI consent', () => {
+  it('shows the consent screen instead of the camera', () => {
+    aiConsentMock.granted = false;
+    render(<ScanScreen />);
+
+    expect(screen.getByText('Read receipts with AI')).toBeTruthy();
+    expect(screen.getAllByText(/Anthropic/).length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText('Capture receipt')).toBeNull();
+  });
+
+  it('Allow records consent', () => {
+    aiConsentMock.granted = false;
+    render(<ScanScreen />);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Allow' }));
+    expect(aiConsentMock.grant).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers manual entry instead', () => {
+    aiConsentMock.granted = false;
+    render(<ScanScreen />);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Enter receipts manually' }));
+    expect(mockPush).toHaveBeenCalledWith('/manual-entry');
+    expect(aiConsentMock.grant).not.toHaveBeenCalled();
+  });
+
+  it('shows the camera while consent is unknown: the server decides', () => {
+    aiConsentMock.granted = undefined;
+    render(<ScanScreen />);
+
+    expect(screen.getByLabelText('Capture receipt')).toBeTruthy();
+  });
+
+  it('records the server refusal, which brings the consent screen back', async () => {
+    await capture();
+    act(() =>
+      mockHandlers!.onError(
+        new ApiError(403, { detail: { code: 'ai_consent_required', message: 'Allow first.' } }),
+      ),
+    );
+
+    expect(aiConsentMock.markRequired).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Reading receipt…')).toBeNull();
   });
 });

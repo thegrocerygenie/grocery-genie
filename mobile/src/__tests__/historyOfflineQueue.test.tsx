@@ -15,6 +15,9 @@ import type { ReceiptResponse } from '@/features/receipt-capture/types';
 import { QUOTA_MESSAGE } from '@/features/receipt-capture/utils/scanQuota';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+jest.mock('@/features/ai-consent/hooks/useAiConsent', () =>
+  jest.requireActual('@/testing/aiConsentHooksMock'),
+);
 jest.mock('@react-native-segmented-control/segmented-control', () => () => null);
 jest.mock('@/features/budget/hooks/useCategories', () => ({
   useCategories: () => ({ data: [] }),

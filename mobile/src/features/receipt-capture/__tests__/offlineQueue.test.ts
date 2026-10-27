@@ -35,6 +35,42 @@ beforeEach(() => {
   useOfflineStore.setState({ pendingReceipts: [] });
 });
 
+// app/services/ai_consent.py: the server refuses a scan until the user allows AI reading.
+const CONSENT_REQUIRED = new ApiError(403, {
+  detail: { code: 'ai_consent_required', message: 'Allow this in the app first.' },
+});
+
+describe('a queue held for AI consent', () => {
+  it('keeps the photo queued, stops the run and reports it, without failing anything', async () => {
+    queue(2);
+    const scan = jest.fn().mockRejectedValue(CONSENT_REQUIRED);
+    const deleteImage = jest.fn();
+    const onConsentRequired = jest.fn();
+
+    const result = await syncPendingReceipts({
+      scan,
+      deleteImage,
+      ownerId: OWNER,
+      currentOwner: () => OWNER,
+      onConsentRequired,
+    });
+
+    expect(result).toEqual({ synced: 0, failed: 0 });
+    expect(scan).toHaveBeenCalledTimes(1);
+    expect(deleteImage).not.toHaveBeenCalled();
+    expect(onConsentRequired).toHaveBeenCalledTimes(1);
+    const [first, second] = useOfflineStore.getState().pendingReceipts;
+    expect(first).toMatchObject({ status: 'pending', needsConsent: true });
+    // Not a failed attempt: no retry timer runs until the user allows it.
+    expect(first.lastAttemptFailed).toBeFalsy();
+    expect(second.status).toBe('pending');
+  });
+
+  it('is not a retryable error', () => {
+    expect(isRetryableScanError(CONSENT_REQUIRED)).toBe(false);
+  });
+});
+
 describe('isRetryableScanError', () => {
   it('retries a network failure (fetch throws a TypeError)', () => {
     expect(isRetryableScanError(new TypeError('Network request failed'))).toBe(true);
