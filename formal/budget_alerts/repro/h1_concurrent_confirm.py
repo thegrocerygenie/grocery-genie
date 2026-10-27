@@ -50,6 +50,14 @@ async def trial(n: int, photo: bytes, serial: bool) -> bool:
         )
         r.raise_for_status()
         auth = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        # Scans need AI consent, as the app's consent sheet grants it.
+        me = await setup.get("/api/users/me", headers=auth)
+        me.raise_for_status()
+        version = me.json()["ai_consent"]["current_policy_version"]
+        r = await setup.put(
+            "/api/users/me/ai-consent", headers=auth, json={"policy_version": version}
+        )
+        r.raise_for_status()
         r = await setup.post(
             "/api/budgets",
             headers=auth,

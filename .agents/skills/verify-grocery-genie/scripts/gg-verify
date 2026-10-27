@@ -3,7 +3,9 @@
 #
 #   gg-verify launch [--live-llm]   start an isolated instance and wait until usable
 #   gg-verify doctor                read-only: is this instance worth driving?
-#   gg-verify signup [label]        create a user; later api calls use its token
+#   gg-verify signup [label] [--no-consent]  create a user; later api calls use its token.
+#                                   It allows AI receipt reading, as the app's consent sheet
+#                                   does; --no-consent leaves it off, so scans get 403.
 #   gg-verify api METHOD PATH [JSON]  call the API as that user (body on stdout)
 #   gg-verify scan [PHOTO]          upload a receipt photo (default: a generated one) to /api/receipts/scan
 #   gg-verify sql "SELECT ..."      read the instance's database
@@ -130,7 +132,14 @@ cmd_doctor() {
 }
 
 cmd_signup() {
-  local label="${1:-user}" run; run="$(run_dir)"
+  local label="user" consent=1 arg
+  for arg in "$@"; do
+    case "$arg" in
+      --no-consent) consent=0 ;;
+      *) label="$arg" ;;
+    esac
+  done
+  local run; run="$(run_dir)"
   local email; email="$label-$(cat "$STATE/run_id")-$RANDOM@example.com"
   local password; password="$(openssl rand -hex 16)"
   local seq; seq="$(next_seq)"
@@ -143,6 +152,19 @@ cmd_signup() {
   [ "$code" = "201" ] || die "sign-up returned $code: $(echo "$body" | sed '$d')"
   echo "$body" | sed '$d' | jq -r .access_token > "$STATE/token"
   echo "$email" > "$STATE/email"
+  if [ "$consent" = 1 ]; then
+    # The consent sheet's Allow (app/ai-consent.tsx): scans are refused without it.
+    # Retried because get_db commits the sign-up after the response is sent, so
+    # the first call can still get 401 "user not found" (seen 1 in 30).
+    local version="" try
+    for try in 1 2 3 4 5; do
+      version="$(cmd_api GET /api/users/me 2>/dev/null | jq -r .ai_consent.current_policy_version)" && break
+      sleep 0.3
+    done
+    [ -n "$version" ] && [ "$version" != null ] || die "could not read the consent policy version; see $run"
+    cmd_api PUT /api/users/me/ai-consent "$(jq -nc --arg v "$version" '{policy_version:$v}')" > /dev/null 2>&1 \
+      || die "allowing AI receipt reading failed; see $run"
+  fi
   echo "$email"
 }
 
