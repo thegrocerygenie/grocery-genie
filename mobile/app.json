@@ -41,8 +41,26 @@
       ],
       "expo-camera",
       "expo-image-picker",
-      "expo-build-properties",
-      "expo-notifications"
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "extraPods": [
+              {
+                "name": "GoogleUtilities",
+                "modular_headers": true
+              },
+              {
+                "name": "RecaptchaInterop",
+                "modular_headers": true
+              }
+            ]
+          }
+        }
+      ],
+      "expo-notifications",
+      "./plugins/withPodsMinDeploymentTarget",
+      "./plugins/ios-scene-lifecycle"
     ]
   }
 }
