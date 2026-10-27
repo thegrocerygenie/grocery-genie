@@ -73,7 +73,9 @@ cmd_launch() {
   export GG_DEBUG; GG_DEBUG="$([ "$mode" = "debug" ] && echo true || echo false)"
   export GG_JWT_SECRET; GG_JWT_SECRET="$(openssl rand -hex 32)"
   export GG_STORAGE_PATH="$STATE/uploads"
-  export GG_RESEND_API_KEY="" GG_EXPO_PUSH_ACCESS_TOKEN=""
+  # No email: --live-llm runs with GG_DEBUG=false, where startup needs a
+  # Resend key unless email is turned off on purpose.
+  export GG_RESEND_API_KEY="" GG_EMAIL_DELIVERY=off GG_EXPO_PUSH_ACCESS_TOKEN=""
 
   echo "== migrating $DB to head" >&2
   (cd "$BACKEND" && "$VENV/alembic" upgrade head) > "$run/migrate.log" 2>&1 || { cat "$run/migrate.log" >&2; die "migration failed"; }

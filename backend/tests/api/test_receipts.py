@@ -688,11 +688,9 @@ async def test_date_correction_is_recorded_as_a_correction(
     )
 
     corrections = [p for name, p, _ in calls if name == "receipt_correction_made"]
-    assert {
-        "field": "date",
-        "original_value": "2026-03-15",
-        "corrected_value": "2026-03-20",
-    } in corrections
+    # The event names the field only; the values stay in receipt_corrections,
+    # out of the logs.
+    assert corrections == [{"field": "date"}]
 
 
 async def test_update_receipt_rejects_a_future_date(
@@ -885,11 +883,7 @@ async def test_quantity_correction_is_recorded_as_a_correction(
     )
 
     corrections = [p for name, p, _ in calls if name == "receipt_correction_made"]
-    assert {
-        "field": "quantity",
-        "original_value": "1",
-        "corrected_value": "1.105",
-    } in corrections
+    assert corrections == [{"field": "quantity"}]
 
 
 async def test_unchanged_quantity_is_not_a_correction(
@@ -1099,3 +1093,17 @@ async def test_a_repeated_price_correction_moves_the_totals_once(
     resp = await client.patch(f"/api/receipts/{scan['receipt_id']}", json=body)
     assert resp.json()["subtotal"] == 15.98
     assert resp.json()["total"] == 17.16
+
+
+async def test_confirmed_event_logs_counts_not_the_receipt_total(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    calls = _install_analytics_spy()
+    scan = await _create_receipt(client, test_image_bytes)
+
+    await client.patch(
+        f"/api/receipts/{scan['receipt_id']}", json={"status": "confirmed"}
+    )
+
+    confirmed = [p for name, p, _ in calls if name == "receipt_confirmed"]
+    assert confirmed == [{"item_count": 3, "correction_count": 0}]
