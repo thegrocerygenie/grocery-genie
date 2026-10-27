@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 async def list_notifications(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> NotificationListResponse:
     service = NotificationService(db)
@@ -39,7 +39,7 @@ async def mark_notification_read(
     notification_id: str,
     # "push" when the user opened the alert by tapping a push notification.
     source: Literal["push", "in_app"] = Query("in_app"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> NotificationResponse:

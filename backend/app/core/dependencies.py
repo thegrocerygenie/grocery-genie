@@ -38,6 +38,16 @@ async_session_factory = async_sessionmaker(
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """One transaction per request. Always use Depends(get_db, scope="function").
+
+    With the default "request" scope, FastAPI runs the code after `yield` once
+    the response is sent, so a client could act on a 201 before the commit
+    (sign-up, then GET /api/users/me -> 401 "user not found"). The "function"
+    scope commits before the response starts, and a failed commit becomes a
+    500 instead of a success the database never saw. Every use must share the
+    same scope: FastAPI caches the session per scope, so mixing them would
+    open two sessions in one request.
+    """
     async with async_session_factory() as session:
         try:
             yield session
