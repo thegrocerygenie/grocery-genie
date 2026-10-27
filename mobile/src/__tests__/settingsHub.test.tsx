@@ -3,6 +3,7 @@
  * and every Account row goes somewhere.
  */
 import React from 'react';
+import { StyleSheet, type ViewStyle } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 
@@ -105,4 +106,15 @@ describe('Settings hub', () => {
 
     expect(routerScreen.getPathname()).toBe(path);
   });
+
+  it.each(['Sign out', 'Delete account'])(
+    'lets %s grow with large text instead of clipping its label',
+    (label) => {
+      renderSettings();
+
+      const style = StyleSheet.flatten(screen.getByLabelText(label).props.style) as ViewStyle;
+      expect(style.height).toBeUndefined();
+      expect(style.minHeight).toBeGreaterThanOrEqual(44);
+    },
+  );
 });

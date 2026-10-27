@@ -284,6 +284,30 @@ To stop the server, stop the backend process the phone points at (`EXPO_PUBLIC_A
 
 Simulator run on 2026-10-27 (PR #21) passed the server-down, automatic-retry, and import-quota items. Not yet run anywhere: the Retry Now tap, the camera quota message, the airplane-mode reconnect, and the queued receipt that hits the quota.
 
+**Account Deletion (App Store 5.1.1(v)):**
+
+Settings → Delete account. The API contract is in `08-api-contracts.md` (`DELETE /api/users/me`). To check the server side, query each user-owned table for the user's id. `verify-grocery-genie` has the queries.
+
+Simulator or device:
+- [x] The Delete account row sits below Sign out. The screen lists what is erased and says it can't be undone.
+- [x] Delete, then Cancel in the alert: no request reaches the server, and the account stays.
+- [x] Server down, Delete, then confirm: "Your account was not deleted. Check your connection and try again." The user stays signed in, and a later Delete succeeds.
+- [x] Delete, then confirm, as an email account: the app opens Welcome. The server has no rows for the user and no receipt image files. The account's email and password get 401.
+- [x] After the delete, relaunch the app: it stays on Welcome (the Keychain session is gone).
+- [x] Apple-linked account, Delete, then close the Apple sheet: "Your account was not deleted. Confirm with Apple to delete your account." The server got one DELETE (409) and the account stays.
+- [x] Dark mode, and the largest accessibility text size: the text stays readable, and the Delete account button grows instead of clipping its label.
+- [ ] A receipt still in Pending for this account when it is deleted: the receipt and its photo leave the queue. Another account's Pending receipt on the same device stays.
+
+Physical device only:
+- [ ] **Sign in with Apple, full path.** This needs a device signed in to an Apple Account, and a backend with real Apple keys (`GG_APPLE_TEAM_ID`, `GG_APPLE_KEY_ID`, `GG_APPLE_CLIENT_ID`, `GG_APPLE_PRIVATE_KEY`). Sign up with Apple, then Delete and confirm. The Apple sheet asks for Face ID, and the account is deleted. Then iOS Settings → [your name] → Sign in with Apple no longer lists Grocery Genie. A server log line `apple revoke failed` means the revoke did not happen.
+- [ ] **Sign in with Apple, other Apple ID.** On a device with two Apple Accounts: at the Apple sheet, choose the account that is not linked. Expected: "That's a different Apple ID from the one this account uses." The account stays.
+- [ ] **Apple unreachable.** With Network Link Conditioner set to 100% loss, or a backend that cannot reach appleid.apple.com: confirm with Apple. Expected: "We couldn't reach Apple. Try again in a moment." The account stays.
+- [ ] **Push after deletion.** Turn on alerts, then delete the account. No later push reaches the device for it. Then sign up again on the same device, and a budget alert arrives for the new account. Expo Go in the Simulator has no remote push.
+- [ ] **Connection lost during the delete.** Turn on airplane mode right after tapping Delete account in the alert. If the server finished the delete, the next app launch returns to Welcome (every call gets 401). If it did not, the account still works.
+- [ ] **VoiceOver.** It reads the erased list in order and announces "Delete account, button". It reads the alert's two choices, and announces the "not deleted" error when it appears. The Simulator has no VoiceOver; Accessibility Inspector does not count.
+
+Simulator run on 2026-10-27: iPhone 17e, iOS 27, Expo Go, backend on Postgres. Every item marked [x] passed. The run found that the Delete account and Sign out buttons clipped their labels at the largest accessibility text size; they now grow with the text. For the Apple cancel item, the test account was marked as Apple-linked directly in the scratch database, because the local backend has no Apple keys. The Simulator had no Apple Account, so iOS showed "Sign in to your Apple Account", which the app handled as a cancel. Not run: the Pending-receipt item. Its logic is covered by `clearLocalAccountData.test.ts`.
+
 **Accessibility:**
 - [ ] VoiceOver reads all screen elements in logical order.
 - [ ] Receipt review screen: each field announced with label and value.
