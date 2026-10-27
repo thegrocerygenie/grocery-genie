@@ -123,7 +123,7 @@ Verified, within the bounds in each config:
 
 Left out:
 - category budgets (same steps, another budget row);
-- an edit that lowers a confirmed receipt's spend, or moves its date to another month: spend in the model only grows. Neither can break a property: the old month reaches fewer thresholds, and an edit to a confirmed receipt runs the alert check for its new date (`update_receipt` → `_alert_on_thresholds`);
+- an edit that lowers a confirmed receipt's spend, or moves its date to another period: spend in the model only grows. Neither can break a property: the old period reaches fewer thresholds, and an edit to a confirmed receipt runs the alert check for its new date (`update_receipt` → `_alert_on_thresholds`);
 - editing a budget during a period (`save_budget` updates the active budget in place, `update_budget` can move `period_start`). The model holds one budget at a fixed amount. An in-place save waits on the confirm's budget row lock (`check_thresholds` locks the user's active budgets), so it cannot interleave with `Read` and `Claim`. Creating or reviving a budget takes no such wait, and a confirm already in flight checks only the budgets it locked. Thresholds already in `budget_alerts_sent` for the period stay claimed after a raise, so they do not alert again at the new amount;
 - two requests confirming the same receipt;
 - the `no_device` path and `DeviceNotRegistered` token deletion;
@@ -139,7 +139,7 @@ A pass covers the model within its bounds, not the whole system.
 
 ## Coverage record
 
-Sync commit: `8268f9a`
+Sync commit: `b30e6b6`
 
 The verification was last confirmed to describe these files and functions at the sync commit. `run.sh` reads this table and the sync commit.
 
@@ -147,7 +147,7 @@ The verification was last confirmed to describe these files and functions at the
 | --- | --- | --- |
 | `backend/app/core/dependencies.py` | `get_db`, `engine` (no isolation level) | `ConfirmAlerts`: `Commit`, `Abort` |
 | `backend/app/services/receipt_service.py` | `confirm_receipt`, `update_receipt` (date and status branches: the date is set before the status branch, in the same transaction; an already confirmed receipt is not confirmed again, and an edit to one flushes, then runs `_alert_on_thresholds`), `create_manual_receipt`, `_after_confirm` and `_alert_on_thresholds` (every alert path shares them) | `ConfirmAlerts`: `Flush` |
-| `backend/app/services/budget_service.py` | `check_thresholds` (budget row lock), `get_spending_by_category`, `_active_thresholds`, `claim_alert`; watched, not modeled: `save_budget`, `update_budget`, `restore_budget` (they write budget rows the `Read` step locks) | `ConfirmAlerts`: `Read`, `Claim` |
+| `backend/app/services/budget_service.py` | `check_thresholds` (budget row lock), `get_spending_by_category`, `_active_thresholds`, `claim_alert`; watched, not modeled: `get_period_containing` (picks the period whose spend `Read` sums; the model holds one period), `save_budget`, `update_budget`, `restore_budget` (they write budget rows the `Read` step locks) | `ConfirmAlerts`: `Read`, `Claim` |
 | `backend/app/services/notification_service.py` | `create_notification` | `ConfirmAlerts`: `Claim` |
 | `backend/app/models/database.py` | `BudgetAlertSent` unique key, `Notification.push_status`, `ix_notifications_push_pending`, `ix_notifications_push_sending` | `UniqueLedger`, `PushDelivery` statuses |
 | `backend/app/tasks/push_tasks.py` | `deliver_pending_pushes`, `BATCH_SIZE` | `PushDelivery`: `Expire`, `Select`, `Claim`, `Record`, `Finish`, `Crash` |
