@@ -22,7 +22,23 @@
       }
     },
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "redirects": [
+            {
+              "source": "/notification-settings",
+              "destination": "/settings/notification-settings",
+              "permanent": true
+            },
+            {
+              "source": "/language-settings",
+              "destination": "/settings/language-settings",
+              "permanent": true
+            }
+          ]
+        }
+      ],
       "expo-camera",
       "expo-image-picker",
       "expo-build-properties",
