@@ -35,6 +35,7 @@ export function useSyncQueue() {
         scan: (uri, mimeType, source) => scanReceipt(uri, mimeType, source),
         deleteImage: deletePendingImage,
         ownerId,
+        currentOwner: () => tokenSubject(useAuthStore.getState().accessToken),
       });
       if (synced > 0) {
         await queryClient.invalidateQueries({ queryKey: ['receipts'] });
