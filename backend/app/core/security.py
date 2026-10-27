@@ -189,7 +189,7 @@ def decode_token(token: str, expected_typ: TokenType | None = None) -> TokenPayl
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> User:
     """Resolve the current user from a Bearer token.
 

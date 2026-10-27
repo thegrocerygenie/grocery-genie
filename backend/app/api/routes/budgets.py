@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/budgets", tags=["budgets"])
 async def create_budget(
     budget: BudgetCreateRequest,
     response: Response,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> BudgetResponse:
@@ -48,7 +48,7 @@ async def create_budget(
 
 @router.get("", response_model=list[BudgetResponse])
 async def list_budgets(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> list[BudgetResponse]:
     service = BudgetService(db)
@@ -60,7 +60,7 @@ async def list_budgets(
 @router.get("/summary", response_model=BudgetSummaryResponse)
 async def budget_summary(
     period: str = Query(..., description="Budget period, e.g. 2026-03"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> BudgetSummaryResponse:
     service = BudgetService(db)
@@ -71,7 +71,7 @@ async def budget_summary(
 async def update_budget(
     budget_id: str,
     updates: BudgetUpdateRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> BudgetResponse:
     service = BudgetService(db)
@@ -91,7 +91,7 @@ async def update_budget(
 @router.delete("/{budget_id}", status_code=204)
 async def delete_budget(
     budget_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> None:
     service = BudgetService(db)
@@ -104,7 +104,7 @@ async def delete_budget(
 @router.post("/{budget_id}/restore", response_model=BudgetResponse)
 async def restore_budget(
     budget_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> BudgetResponse:
     service = BudgetService(db)
@@ -121,7 +121,7 @@ async def restore_budget(
 
 @router.get("/recently-deleted", response_model=list[DeletedItemResponse])
 async def recently_deleted(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> list[DeletedItemResponse]:
     from datetime import UTC, datetime
