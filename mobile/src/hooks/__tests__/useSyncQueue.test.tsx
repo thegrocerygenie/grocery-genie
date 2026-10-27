@@ -69,6 +69,17 @@ describe('useSyncQueue', () => {
     expect(mockSync.mock.calls[0][0].ownerId).toBe('user-a');
   });
 
+  it('lets the sync see who is signed in now, so it stops after an account switch', async () => {
+    queue();
+    renderSync();
+
+    await waitFor(() => expect(mockSync).toHaveBeenCalled());
+    const { currentOwner } = mockSync.mock.calls[0][0] as { currentOwner: () => string | null };
+    expect(currentOwner()).toBe('user-a');
+    act(() => useAuthStore.setState({ accessToken: fakeAccessToken('user-b') }));
+    expect(currentOwner()).toBe('user-b');
+  });
+
   it('does not sync another user’s photos', () => {
     queue('pending', 'user-b');
     renderSync();
