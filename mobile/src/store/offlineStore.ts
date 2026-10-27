@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
+
+import type { ScanSource } from '@/constants/analyticsEvents';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 export interface PendingReceipt {
@@ -12,6 +14,8 @@ export interface PendingReceipt {
    * every session on the device, so only this user's session may upload it.
    */
   ownerId?: string;
+  /** Where the photo came from, for the upload's analytics; camera when absent. */
+  source?: ScanSource;
   status: 'pending' | 'syncing' | 'failed';
   /** An upload was tried and failed for a reason worth retrying (network, server). */
   lastAttemptFailed?: boolean;

@@ -3,9 +3,18 @@ import { Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 
+import { tokenSubject } from '@/features/auth/utils/tokenSubject';
+import { useAuthStore } from '@/store/authStore';
+import { useOfflineStore } from '@/store/offlineStore';
 import { useReceiptStore } from '@/store/receiptStore';
 
-import { importReceipt, pickFromFiles, pickFromLibrary } from '../services/receiptImport';
+import { persistCapturedImage } from '../services/pendingImageFiles';
+import {
+  importReceipt,
+  pickFromFiles,
+  pickFromLibrary,
+  type PickedReceipt,
+} from '../services/receiptImport';
 import { useReceiptScan } from './useReceiptScan';
 
 export type ImportKind = 'library' | 'files';
@@ -24,6 +33,21 @@ export function useReceiptImport() {
   const scanMutation = useReceiptScan();
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const busy = useRef(false);
+  const addPendingReceipt = useOfflineStore((s) => s.addPendingReceipt);
+  const accessToken = useAuthStore((s) => s.accessToken);
+
+  const queue = useCallback(
+    (receipt: PickedReceipt) => {
+      addPendingReceipt({
+        imageUri: persistCapturedImage(receipt.uri),
+        mimeType: receipt.mimeType,
+        capturedAt: new Date().toISOString(),
+        ownerId: tokenSubject(accessToken) ?? undefined,
+        source: receipt.source,
+      });
+    },
+    [addPendingReceipt, accessToken],
+  );
 
   const importFrom = useCallback(
     async (kind: ImportKind) => {
@@ -40,6 +64,7 @@ export function useReceiptImport() {
               source: receipt.source,
             });
           },
+          queue,
         });
         setProgress(null);
         if (result.status === 'ready') {
@@ -47,6 +72,11 @@ export function useReceiptImport() {
           setCapturedImageUri(result.previewUri);
           setActiveScanResponse(result.response);
           router.push('/review');
+        } else if (result.status === 'queued') {
+          Alert.alert(
+            'Saved to upload later',
+            'This receipt will upload automatically when the connection is back. You can see it under Pending in History.',
+          );
         } else if (result.status === 'error') {
           Alert.alert('Couldn’t import receipt', result.message);
         }
@@ -57,7 +87,7 @@ export function useReceiptImport() {
         busy.current = false;
       }
     },
-    [router, scanMutation, setActiveScanResponse, setCapturedImageUri],
+    [router, scanMutation, setActiveScanResponse, setCapturedImageUri, queue],
   );
 
   return { importFrom, progress };

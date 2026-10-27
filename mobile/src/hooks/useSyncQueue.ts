@@ -32,7 +32,7 @@ export function useSyncQueue() {
 
     const sync = async () => {
       const { synced } = await syncPendingReceipts({
-        scan: (uri, mimeType) => scanReceipt(uri, mimeType, 'camera'),
+        scan: (uri, mimeType, source) => scanReceipt(uri, mimeType, source),
         deleteImage: deletePendingImage,
         ownerId,
       });

@@ -53,7 +53,7 @@ describe('syncPendingReceipts', () => {
 
     expect(result).toEqual({ synced: 2, failed: 0 });
     expect(scan).toHaveBeenCalledTimes(2);
-    expect(scan).toHaveBeenCalledWith('file:///doc/pending-receipts/0.jpg', 'image/jpeg');
+    expect(scan).toHaveBeenCalledWith('file:///doc/pending-receipts/0.jpg', 'image/jpeg', 'camera');
     expect(deleteImage).toHaveBeenCalledWith('file:///doc/pending-receipts/1.jpg');
     expect(useOfflineStore.getState().pendingReceipts).toHaveLength(0);
   });
@@ -122,6 +122,18 @@ describe('syncPendingReceipts', () => {
     await Promise.all([first, second]);
 
     expect(scan).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('syncPendingReceipts keeps where the photo came from', () => {
+  it('uploads a queued library photo as a library scan', async () => {
+    useOfflineStore.getState().addPendingReceipt({ ...CAPTURE, ownerId: OWNER, source: 'library' });
+    useOfflineStore.getState().addPendingReceipt({ ...CAPTURE, ownerId: OWNER });
+    const scan = jest.fn().mockResolvedValue({});
+
+    await syncPendingReceipts({ scan, deleteImage: jest.fn(), ownerId: OWNER });
+
+    expect(scan.mock.calls.map((c) => c[2])).toEqual(['library', 'camera']);
   });
 });
 
