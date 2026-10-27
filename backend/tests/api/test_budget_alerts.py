@@ -114,3 +114,94 @@ async def test_next_period_alerts_again(
     await _scan_and_confirm(client, test_image_bytes)  # April: 87%
 
     assert await _alert_thresholds(client) == [50, 50, 80, 80]
+
+
+async def test_editing_a_saved_receipt_alerts_on_newly_crossed_thresholds(
+    client: AsyncClient,
+):
+    # Editing a confirmed receipt sends only corrections (no status), so it
+    # does not confirm again. It must still alert when the edit crosses a
+    # threshold, and never twice for the same one.
+    await _overall_budget(client, 20.0)
+    resp = await client.post(
+        "/api/receipts",
+        json={
+            "store_name": "Corner Shop",
+            "date": "2026-03-20",
+            "total": 9.0,
+            "items": [
+                {
+                    "name": "Groceries",
+                    "quantity": 1,
+                    "unit_price": 9.0,
+                    "total_price": 9.0,
+                }
+            ],
+        },
+    )
+    receipt_id = resp.json()["id"]
+    item_id = resp.json()["items"][0]["id"]
+    assert await _alert_thresholds(client) == []  # 45%
+
+    async def edit_price(amount: float) -> None:
+        resp = await client.patch(
+            f"/api/receipts/{receipt_id}",
+            json={"items": [{"id": item_id, "total_price": amount}]},
+        )
+        assert resp.status_code == 200
+
+    await edit_price(17.0)  # 85%
+    assert await _alert_thresholds(client) == [50, 80]
+
+    await edit_price(18.0)  # 90%
+    assert await _alert_thresholds(client) == [50, 80]
+
+    await edit_price(25.0)  # 125%
+    assert await _alert_thresholds(client) == [50, 80, 100]
+
+
+async def test_editing_an_unconfirmed_scan_does_not_alert(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    # Spend counts confirmed receipts only, and a scan under review is not one.
+    await _overall_budget(client, 10.0)
+    scan = await client.post(
+        "/api/receipts/scan",
+        files={"file": ("receipt.jpg", io.BytesIO(test_image_bytes), "image/jpeg")},
+    )
+    resp = await client.patch(
+        f"/api/receipts/{scan.json()['receipt_id']}", json={"store_name": "Renamed"}
+    )
+    assert resp.status_code == 200
+    assert await _alert_thresholds(client) == []
+
+
+async def test_confirming_twice_does_not_confirm_again(
+    client: AsyncClient, test_image_bytes: bytes, monkeypatch
+):
+    # A second "confirmed" would dispatch ReceiptConfirmed again, and every
+    # handler of it (budget, mappings, pantry) would run twice.
+    from app.events import dispatcher as dispatcher_module
+    from app.events.types import ReceiptConfirmed
+
+    dispatched: list[ReceiptConfirmed] = []
+    original = dispatcher_module.dispatcher.dispatch
+
+    def spy(event):
+        if isinstance(event, ReceiptConfirmed):
+            dispatched.append(event)
+        return original(event)
+
+    monkeypatch.setattr(dispatcher_module.dispatcher, "dispatch", spy)
+    scan = await client.post(
+        "/api/receipts/scan",
+        files={"file": ("receipt.jpg", io.BytesIO(test_image_bytes), "image/jpeg")},
+    )
+    receipt_url = f"/api/receipts/{scan.json()['receipt_id']}"
+
+    await client.patch(receipt_url, json={"status": "confirmed"})
+    resp = await client.patch(receipt_url, json={"status": "confirmed"})
+
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "confirmed"
+    assert len(dispatched) == 1
