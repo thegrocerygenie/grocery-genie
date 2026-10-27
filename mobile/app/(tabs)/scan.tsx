@@ -15,7 +15,10 @@ import { isRetryableScanError } from '@/features/receipt-capture/services/offlin
 import { persistCapturedImage } from '@/features/receipt-capture/services/pendingImageFiles';
 import { tokenSubject } from '@/features/auth/utils/tokenSubject';
 import { useAuthStore } from '@/store/authStore';
-import { scanErrorHint } from '@/features/receipt-capture/utils/scanErrorHint';
+import { QUALITY_HINTS, scanErrorHint } from '@/features/receipt-capture/utils/scanErrorHint';
+import { useFrameQuality } from '@/features/receipt-capture/hooks/useFrameQuality';
+import { sampleFrame } from '@/features/receipt-capture/services/frameSampler';
+import type { FrameVerdict } from '@/features/receipt-capture/utils/frameQuality';
 import { useOfflineStore } from '@/store/offlineStore';
 import { useReceiptStore } from '@/store/receiptStore';
 import { useAnalytics } from '@/hooks/useAnalytics';
@@ -31,6 +34,13 @@ export default function ScanScreen() {
   const [flowState, setFlowState] = useState<ScanFlowState>('detected');
   const [processingUri, setProcessingUri] = useState<string | null>(null);
   const [errorHint, setErrorHint] = useState(() => scanErrorHint(undefined));
+  // RC-01 AC 2: check blur and light before capture, only while waiting for one.
+  // Not gated on onCameraReady (the simulator never sends it): a sample taken
+  // before the camera is ready fails, and the next one retries.
+  const frameQuality = useFrameQuality(
+    () => (cameraRef.current ? sampleFrame(cameraRef.current) : Promise.resolve(null)),
+    flowState === 'detected',
+  );
   const cameraRef = useRef<CameraView>(null);
 
   const scanMutation = useReceiptScan();
@@ -114,6 +124,8 @@ export default function ScanScreen() {
 
     setFlowState('capturing');
     try {
+      // A frame sample may hold the camera; take the real photo after it.
+      await frameQuality.settle();
       const photo = await cameraRef.current?.takePictureAsync({
         quality: 0.8,
         skipProcessing: false,
@@ -176,7 +188,7 @@ export default function ScanScreen() {
             <Brackets />
 
             <View style={styles.topHintRow}>
-              <HintPill state={flowState} errorHint={errorHint} />
+              <HintPill state={flowState} errorHint={errorHint} frame={frameQuality.verdict} />
             </View>
 
             <View style={styles.bottomBar}>
@@ -348,9 +360,25 @@ function ProcessingOverlay({ uri }: { uri: string }) {
 interface HintPillProps {
   state: ScanFlowState;
   errorHint: string;
+  /** The latest pre-capture check of the view; null before the first. */
+  frame: FrameVerdict | null;
 }
 
-function HintPill({ state, errorHint }: HintPillProps) {
+function HintPill({ state, errorHint, frame }: HintPillProps) {
+  if (state === 'detected' && frame && frame !== 'ok') {
+    return (
+      <View
+        style={[styles.pill, { backgroundColor: colors.orange }]}
+        accessibilityLiveRegion="polite"
+        accessibilityRole="alert"
+      >
+        <SymbolView name="exclamationmark.triangle.fill" size={14} tintColor="#fff" />
+        <Text style={[type.footnote, { color: '#fff', fontWeight: '600' }]}>
+          {QUALITY_HINTS[frame]}
+        </Text>
+      </View>
+    );
+  }
   if (state === 'low-quality') {
     return (
       <View style={[styles.pill, { backgroundColor: colors.orange }]}>
