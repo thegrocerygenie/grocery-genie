@@ -1,9 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import * as authApi from '@/features/auth/services/authApi';
+import { clearLocalAccountData } from '@/features/auth/services/clearLocalAccountData';
+import { runAppleReauth } from '@/features/auth/services/socialSignIn';
 import type { TokenPair, UserProfile } from '@/features/auth/types';
+import { tokenSubject } from '@/features/auth/utils/tokenSubject';
 import { releasePushToken } from '@/features/notifications/releasePushToken';
 import { unregisterPushToken } from '@/features/notifications/services/pushApi';
+import { apiErrorCode } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { usePushStore } from '@/store/pushStore';
 
@@ -64,6 +68,33 @@ export function useSignOut() {
         // Ignore network failures during sign-out — we still clear locally.
       }
       await useAuthStore.getState().clear();
+      qc.clear();
+    },
+  });
+}
+
+/** The user closed the Sign in with Apple sheet, so nothing was deleted. */
+export class AppleReauthCancelledError extends Error {}
+
+/**
+ * Delete the account on the server, then everything the device kept for it.
+ * A Sign in with Apple account first confirms with Apple, so the server can
+ * revoke the app's grant. A failed call leaves the device as it was.
+ */
+export function useDeleteAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const ownerId = tokenSubject(useAuthStore.getState().accessToken);
+      try {
+        await authApi.deleteAccount();
+      } catch (error) {
+        if (apiErrorCode(error) !== 'apple_reauth_required') throw error;
+        const code = await runAppleReauth();
+        if (!code) throw new AppleReauthCancelledError('Apple sign-in cancelled');
+        await authApi.deleteAccount(code);
+      }
+      await clearLocalAccountData(ownerId);
       qc.clear();
     },
   });
