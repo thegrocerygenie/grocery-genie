@@ -11,6 +11,7 @@ Sources:
 
 - [ ] **AI consent before the first scan** (Apple 5.1.2(i), review blocker 3). The app asks nobody before it sends receipt photos and item names to Anthropic. Card: "Ask permission before sending receipts to AI". When it ships, add the consent wording to `privacy.ts` (a test currently forbids it).
 - [ ] **Public privacy policy URL** for App Store Connect (5.1.1(i)), for example on the `marketing/` site. It must match the in-app text.
+- [ ] **Marketing FAQ makes a false privacy claim.** `marketing/index.html` (the "Will my receipts be private?" answer) says receipts are "processed on-device for OCR" and that "we never sell or share your data". Receipts are uploaded to our servers, and Anthropic reads them. The same answer promises an opt-in community-pricing feature, which is a later-phase feature. Rewrite it to match `privacy.ts` before the site goes public.
 - [ ] **App Store privacy label** filled in from the table in the privacy review.
 - [ ] **Sign-up "Privacy Policy" and "Terms" links work.** Today they are plain text (`mobile/app/onboarding/sign-up.tsx`), and no Terms document exists. Card: "Privacy minimization and sign-up policy link".
 - [ ] **Legal sign-off** on `privacy.ts`, then set `reviewed: true` to remove the draft banner. Replace the placeholder company name ("The Grocery Genie Inc.").
@@ -64,7 +65,7 @@ Fixed already: H1 and H2 (#20), H4 and M8 (#22, #29), H5, M1 and M2 (#21), and t
 - [ ] **M4:** `receipt_abandoned {stage: capture}` fires on every Scan screen re-render, which inflates analytics.
 - [ ] **M5:** budget alerts fire for past periods, including months before the budget existed. Check this against PR 11 and PR 16 first; they may have changed it.
 - [ ] **M6:** the Language setting does nothing, and its default looks wrong.
-- [ ] **M7:** the onboarding camera screen says "Photos are processed on-device". That's false, since photos go to the server and Anthropic, and it contradicts the privacy policy. Fix this with the AI-consent work.
+- [x] **M7:** the onboarding camera screen and the Scan permission prompt said "Photos are processed on-device". Fixed in PR 31; a guard test now fails on any on-device claim in the app.
 - [ ] **M9:** the Budget dashboard's pull-to-refresh spinner sticks after a background refetch.
 
 **Low**
