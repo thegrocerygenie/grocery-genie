@@ -215,6 +215,25 @@ GG_CORS_ORIGINS=["https://grocerygenie.app"]
 # there is no public base URL to set.
 GG_STORAGE_PATH=/app/storage
 
+# Email — Resend. Without the key, verify and reset emails are only logged.
+# The sender must be on a domain verified in Resend.
+GG_RESEND_API_KEY=re_...
+GG_RESEND_FROM=Grocery Genie <noreply@grocerygenie.app>
+
+# Sign in with Apple — from Apple Developer → Certificates, IDs & Profiles → Keys
+# (a key with Sign in with Apple enabled). The client ID is the iOS bundle ID.
+GG_APPLE_TEAM_ID=<10-character Team ID>
+GG_APPLE_KEY_ID=<10-character Key ID>
+GG_APPLE_CLIENT_ID=com.grocerygenie.app
+# The .p8 file contents on one line, in double quotes: join its lines with
+# the two characters \n. Compose turns each \n back into a newline.
+GG_APPLE_PRIVATE_KEY="<.p8 file lines joined with \n>"
+
+# Sign in with Google — the app passes webClientId, so Google's ID tokens carry
+# the web client ID as audience. Use the same value as the mobile build's
+# EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.
+GG_GOOGLE_CLIENT_ID=<web client ID>.apps.googleusercontent.com
+
 # Push notifications — sent through Expo's push service, which forwards to
 # APNs. The APNs key is uploaded to EAS (see 2.2), not configured here.
 # Set only if "Enhanced push security" is on for the Expo project:
