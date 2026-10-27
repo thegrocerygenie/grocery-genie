@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -56,6 +57,11 @@ class Settings(BaseSettings):
     # forgot/reset password, verify, refresh). 30/min/IP is generous enough for
     # legitimate retries and tight enough to deter brute-force/JWKS-fetch abuse.
     auth_ip_rate_limit_per_minute: int = 30
+
+    # Where the rate limit counts live. "redis" (at redis_url) shares them
+    # across API workers; "memory" keeps them per process, so each worker
+    # allows the full limit. Tests use "memory".
+    rate_limit_storage: Literal["redis", "memory"] = "redis"
 
     # Free-tier quota (overview: 20 receipts/month). Set to 0 to disable.
     free_tier_receipts_per_month: int = 20

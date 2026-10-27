@@ -1,4 +1,5 @@
 import io
+import os
 import uuid
 from collections.abc import AsyncGenerator
 
@@ -11,8 +12,14 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.core.config import get_settings
 from app.llm.provider import MockReceiptExtractor
 from app.models.database import Base
+
+# Count rate limits in memory: the suite has no Redis. Clear the cache in case
+# an import above already read the settings.
+os.environ.setdefault("GG_RATE_LIMIT_STORAGE", "memory")
+get_settings.cache_clear()
 
 # Use SQLite for tests (async via aiosqlite)
 TEST_DATABASE_URL = "sqlite+aiosqlite://"
