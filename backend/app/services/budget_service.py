@@ -8,6 +8,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.retention import restore_cutoff
 from app.events.types import BudgetThresholdBreached
 from app.models.database import (
     Budget,
@@ -224,7 +225,7 @@ class BudgetService:
         return budget
 
     async def restore_budget(self, budget_id: uuid.UUID, user_id: uuid.UUID) -> Budget:
-        from datetime import UTC, datetime, timedelta
+        from datetime import UTC
 
         result = await self.db.execute(
             select(Budget).where(
@@ -240,7 +241,7 @@ class BudgetService:
         deleted_at = budget.deleted_at
         if deleted_at.tzinfo is None:  # SQLite drops the zone
             deleted_at = deleted_at.replace(tzinfo=UTC)
-        if deleted_at < datetime.now(UTC) - timedelta(days=30):
+        if deleted_at < restore_cutoff():
             raise ValueError("Budget past 30-day restore window")
         if await self._active_budget(user_id, budget.category_id) is not None:
             raise BudgetConflictError("This category already has an active budget")
@@ -249,9 +250,7 @@ class BudgetService:
         return budget
 
     async def list_recently_deleted(self, user_id: uuid.UUID) -> list[Budget]:
-        from datetime import UTC, datetime, timedelta
-
-        cutoff = datetime.now(UTC) - timedelta(days=30)
+        cutoff = restore_cutoff()
         result = await self.db.execute(
             select(Budget)
             .where(
