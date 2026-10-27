@@ -86,7 +86,7 @@ def _raise_auth(e: auth_service.AuthError) -> NoReturn:
 async def sign_up(
     body: SignUpRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> TokenPairResponse:
     try:
         user, pair = await auth_service.sign_up(
@@ -107,7 +107,7 @@ async def sign_up(
 async def sign_in(
     body: SignInRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> TokenPairResponse:
     try:
         user, pair = await auth_service.sign_in(
@@ -128,7 +128,7 @@ async def sign_out(
     request: Request,
     user: User = Depends(get_current_user),
     credentials: HTTPAuthorizationCredentials = Depends(bearer),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> None:
     if credentials is None:
         raise HTTPException(status_code=401, detail="missing credentials")
@@ -145,7 +145,7 @@ async def sign_out(
 async def refresh(
     body: RefreshRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> TokenPairResponse:
     try:
         pair = await auth_service.refresh(
@@ -162,7 +162,7 @@ async def refresh(
 @router.post("/verify-email", status_code=200)
 async def verify_email(
     body: VerifyEmailRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict:
     try:
         user = await auth_service.verify_email(db, token=body.token)
@@ -174,7 +174,7 @@ async def verify_email(
 @router.post("/resend-verification", status_code=202)
 async def resend_verification(
     body: ResendVerificationRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict:
     await auth_service.resend_verification(db, email=body.email)
     return {"status": "sent"}
@@ -183,7 +183,7 @@ async def resend_verification(
 @router.post("/forgot-password", status_code=202)
 async def forgot_password(
     body: ForgotPasswordRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict:
     await auth_service.forgot_password(db, email=body.email)
     return {"status": "sent"}
@@ -192,7 +192,7 @@ async def forgot_password(
 @router.post("/reset-password", status_code=200)
 async def reset_password(
     body: ResetPasswordRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict:
     try:
         await auth_service.reset_password(
@@ -206,7 +206,7 @@ async def reset_password(
 @router.post("/apple", response_model=TokenPairResponse)
 async def apple_sign_in(
     body: AppleSignInRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> TokenPairResponse:
     try:
         identity = await verify_apple_sign_in(
@@ -231,7 +231,7 @@ async def apple_sign_in(
 @router.post("/google", response_model=TokenPairResponse)
 async def google_sign_in(
     body: GoogleSignInRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> TokenPairResponse:
     try:
         identity = await verify_google_id_token(body.id_token)
@@ -253,7 +253,7 @@ async def google_sign_in(
 @router.get("/me", response_model=UserProfileResponse)
 async def me(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> UserProfileResponse:
     needs = await auth_service.user_needs_onboarding(db, user.id)
     return _user_to_profile(user, needs_onboarding=needs)
