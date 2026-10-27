@@ -251,7 +251,7 @@ function PermissionScreen({ denied, onRequest, onChooseFromLibrary }: Permission
       >
         {denied
           ? 'To scan receipts, enable Camera in Settings → Grocery Genie.'
-          : 'Grocery Genie uses the camera only to scan receipts. Photos are processed on-device.'}
+          : 'Grocery Genie uses the camera only to scan receipts. Photos are sent securely to read your receipt, and you can delete them anytime.'}
       </Text>
       <Pressable
         style={styles.primaryBtn}
