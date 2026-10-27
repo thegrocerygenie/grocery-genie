@@ -20,7 +20,9 @@ export default function PrivacyScreen() {
             <Text style={styles.draftText}>Draft · pending legal review</Text>
           </View>
         )}
-        <Text style={styles.updated}>Last updated {PRIVACY_POLICY.updated}</Text>
+        <Text style={styles.updated}>
+          Effective {PRIVACY_POLICY.effective} · Last updated {PRIVACY_POLICY.updated}
+        </Text>
         {PRIVACY_POLICY.sections.map((section) => (
           <View key={section.heading} style={styles.section}>
             <Text style={styles.heading} accessibilityRole="header">
