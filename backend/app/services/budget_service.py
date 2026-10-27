@@ -46,6 +46,23 @@ def previous_period(period: str) -> str:
     return f"{year:04d}-{month - 1:02d}"
 
 
+def _period_bounds(year: int, month: int, start_day: int) -> tuple[date, date]:
+    """Start and end dates of the period that starts in ``year``-``month``."""
+    # Clamp to valid day for this month
+    max_day = calendar.monthrange(year, month)[1]
+    period_start = date(year, month, min(start_day, max_day))
+
+    # End date is the day before the start of next period
+    if month == 12:
+        next_year, next_month = year + 1, 1
+    else:
+        next_year, next_month = year, month + 1
+    next_max_day = calendar.monthrange(next_year, next_month)[1]
+    next_clamped_day = min(start_day, next_max_day)
+    period_end = date(next_year, next_month, next_clamped_day) - timedelta(days=1)
+    return period_start, period_end
+
+
 def _same_category(category_id: uuid.UUID | None):
     """Match a category, treating None as the overall budget (SQL NULL)."""
     if category_id is None:
@@ -255,7 +272,27 @@ class BudgetService:
         Otherwise default to 1st of month.
         """
         year, month = int(period[:4]), int(period[5:7])
+        return _period_bounds(year, month, await self._start_day(user_id))
 
+    async def get_period_containing(
+        self, user_id: uuid.UUID, day: date
+    ) -> tuple[str, date, date]:
+        """The 'YYYY-MM' period that holds ``day``, with its start and end dates.
+
+        A period is named for the month it starts in. With a start day of 15,
+        March 10 falls in the period that began February 15, so it is
+        '2026-02', not '2026-03'.
+        """
+        start_day = await self._start_day(user_id)
+        year, month = day.year, day.month
+        period_start, period_end = _period_bounds(year, month, start_day)
+        if day < period_start:
+            year, month = (year - 1, 12) if month == 1 else (year, month - 1)
+            period_start, period_end = _period_bounds(year, month, start_day)
+        return f"{year:04d}-{month:02d}", period_start, period_end
+
+    async def _start_day(self, user_id: uuid.UUID) -> int:
+        """Day of the month the user's budget periods start on."""
         # Find user's overall budget to get their preferred start day
         result = await self.db.execute(
             select(Budget)
@@ -267,24 +304,7 @@ class BudgetService:
             .limit(1)
         )
         overall_budget = result.scalar_one_or_none()
-
-        start_day = overall_budget.period_start.day if overall_budget else 1
-
-        # Clamp to valid day for this month
-        max_day = calendar.monthrange(year, month)[1]
-        clamped_day = min(start_day, max_day)
-        period_start = date(year, month, clamped_day)
-
-        # End date is the day before the start of next period
-        if month == 12:
-            next_year, next_month = year + 1, 1
-        else:
-            next_year, next_month = year, month + 1
-        next_max_day = calendar.monthrange(next_year, next_month)[1]
-        next_clamped_day = min(start_day, next_max_day)
-        period_end = date(next_year, next_month, next_clamped_day) - timedelta(days=1)
-
-        return period_start, period_end
+        return overall_budget.period_start.day if overall_budget else 1
 
     async def get_spending_by_category(
         self, user_id: uuid.UUID, start: date, end: date
@@ -626,10 +646,12 @@ class BudgetService:
         receipt_date: date,
     ) -> list[BudgetThresholdBreached]:
         """Check all budgets for threshold breaches after a receipt confirmation."""
-        # Determine the period for this receipt
+        # The period that holds the receipt's date. Before the start day, that
+        # is the period that began last month, not this month's.
         today = date.today()
-        period = f"{receipt_date.year:04d}-{receipt_date.month:02d}"
-        period_start, period_end = await self.get_period_dates(user_id, period)
+        _, period_start, period_end = await self.get_period_containing(
+            user_id, receipt_date
+        )
         days_left = max(0, (period_end - today).days)
 
         # Lock all of the user's budgets until the request commits, before the
