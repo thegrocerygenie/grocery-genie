@@ -300,7 +300,6 @@ class ReceiptService:
         Every receipt that becomes confirmed runs this: a scan the user confirms
         and a manual entry, which is saved as confirmed.
         """
-        user_id = receipt.user_id
         dispatcher.dispatch(
             ReceiptConfirmed(
                 receipt_id=receipt.id,
@@ -322,7 +321,15 @@ class ReceiptService:
             )
         )
 
-        # Check budget thresholds and create notifications
+        await self._alert_on_thresholds(receipt)
+
+    async def _alert_on_thresholds(self, receipt: Receipt) -> None:
+        """Notify for each budget threshold the receipt's period has now crossed.
+
+        claim_alert lets each threshold alert once per period, so running this
+        again (after an edit) never repeats an alert.
+        """
+        user_id = receipt.user_id
         budget_service = BudgetService(self.db)
         notification_service = NotificationService(self.db)
         breaches = await budget_service.check_thresholds(user_id, receipt.date)
@@ -368,6 +375,7 @@ class ReceiptService:
     ) -> Receipt:
         """Apply corrections to a receipt."""
         receipt = await self._get_receipt(receipt_id, user_id)
+        already_confirmed = receipt.status == "confirmed"
 
         current_store_name = receipt.store.name if receipt.store else None
         if (
@@ -506,10 +514,16 @@ class ReceiptService:
                 if receipt.total is not None:
                     receipt.total = Decimal(str(receipt.total)) + price_delta
 
-        if updates.status == "confirmed":
+        if updates.status == "confirmed" and not already_confirmed:
             await self.confirm_receipt(receipt_id, user_id)
-        elif updates.status:
+        elif updates.status and updates.status != "confirmed":
             receipt.status = updates.status
+        elif already_confirmed and (updates.items or updates.date):
+            # An edit to a saved receipt changes spend without confirming
+            # again, so ReceiptConfirmed is not dispatched; thresholds the edit
+            # crosses still alert.
+            await self.db.flush()
+            await self._alert_on_thresholds(receipt)
 
         await self.db.flush()
         return receipt
