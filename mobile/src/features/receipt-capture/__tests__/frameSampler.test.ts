@@ -95,6 +95,37 @@ describe('sampleFrame', () => {
     );
   });
 
+  describe('dev score log, for calibrating DEVICE_BLUR_THRESHOLD on a phone', () => {
+    const dev = __DEV__;
+    const setDev = (on: boolean) => {
+      (globalThis as unknown as { __DEV__: boolean }).__DEV__ = on;
+    };
+    let log: jest.SpyInstance;
+    beforeEach(() => {
+      log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      log.mockRestore();
+      setDev(dev);
+    });
+
+    it('logs the blur score, brightness, and verdict of each sample in dev', async () => {
+      setDev(true);
+      mockCropB64 = FLAT;
+      await sampleFrame(camera);
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(log.mock.calls[0][0]).toMatch(
+        /^\[FrameQuality\] blur=\d+ brightness=\d+ verdict=blurry$/,
+      );
+    });
+
+    it('logs nothing in a release build', async () => {
+      setDev(false);
+      await sampleFrame(camera);
+      expect(log).not.toHaveBeenCalled();
+    });
+  });
+
   it('returns null when the camera gives no photo', async () => {
     takePictureAsync.mockResolvedValue(undefined);
     expect(await sampleFrame(camera)).toBeNull();
