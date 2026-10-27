@@ -5,6 +5,7 @@ import { SymbolView } from 'expo-symbols';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useResendVerification, useVerifyEmail } from '@/features/auth/hooks/useAuth';
+import { useAuthStore } from '@/store/authStore';
 
 const RESEND_COOLDOWN_SECONDS = 42;
 
@@ -15,15 +16,15 @@ export default function VerifyEmailScreen() {
   const resend = useResendVerification();
   const verify = useVerifyEmail();
   const verifiedOnce = useRef(false);
+  const [verified, setVerified] = useState(false);
+  const signedIn = useAuthStore((s) => !!s.accessToken);
 
   useEffect(() => {
     if (token && !verifiedOnce.current) {
       verifiedOnce.current = true;
       verify
         .mutateAsync(token)
-        .then(() => {
-          // Confirm visually then advance.
-        })
+        .then(() => setVerified(true))
         .catch(() => {
           Alert.alert('Verification failed', 'The link may be invalid or expired.');
         });
@@ -42,6 +43,46 @@ export default function VerifyEmailScreen() {
   const onContinue = () => {
     router.push('/onboarding/budget');
   };
+
+  // A link opened while signed out needs a sign-in; otherwise the root gate
+  // sends the user to Set Budget or the tabs.
+  const onVerifiedContinue = () => {
+    router.replace(signedIn ? '/' : '/onboarding/sign-in');
+  };
+
+  if (verified) {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.root}>
+          <View style={styles.heroWrap}>
+            <View style={styles.envelope}>
+              <SymbolView name="checkmark" size={34} tintColor={colors.onTint} />
+            </View>
+            <Text style={[type.title2, { textAlign: 'center' }]}>Email verified</Text>
+            <Text style={styles.tagline}>
+              {signedIn
+                ? 'Your email is confirmed. You are all set.'
+                : 'Your email is confirmed. Sign in to continue.'}
+            </Text>
+          </View>
+          <View style={styles.ctaStack}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.primaryBtn,
+                pressed && { backgroundColor: colors.tintPressed },
+              ]}
+              onPress={onVerifiedContinue}
+              accessibilityRole="button"
+              accessibilityLabel="Continue"
+            >
+              <Text style={styles.primaryBtnLabel}>Continue</Text>
+            </Pressable>
+          </View>
+        </View>
+      </>
+    );
+  }
 
   const onResend = async () => {
     if (!email || resend.isPending) return;
