@@ -130,6 +130,25 @@ Ends onboarding, with or without a budget (Skip on Set Budget). Idempotent: a re
 
 `needs_onboarding` (on `/api/auth/me`, `/api/users/me`, and the sign-up and sign-in token pairs) is true only while the user has not completed onboarding and has no active monthly budget. After completion, deleting the budget does not restart onboarding.
 
+## Account
+
+### DELETE /api/users/me [MVP]
+Deletes the signed-in account and everything it owns, at once and for good (App Store Review Guideline 5.1.1(v)). Returns 204.
+
+**Request** (optional; a Sign in with Apple account must send it):
+```json
+{ "apple_authorization_code": "fresh code from Sign in with Apple" }
+```
+
+- **Deleted:** the user row (profile, preferences, password hash, Apple and Google subject IDs), all receipts (soft-deleted ones too), their line items and corrections, budgets and the alerts sent for them, notifications, push tokens, item mappings, the user's own categories, sign-in activity (`auth_events`, including failed sign-ins logged under the account's email), and each receipt's image, converted JPEG, and thumbnail files.
+- **Kept:** stores (shared by all users, with no user link) and the default categories.
+- **Sessions:** the calling token's family is revoked. Every other token of the account fails too, because its user no longer exists (`/me` returns 401, `/api/auth/refresh` returns 400 `invalid_token`).
+- **Idempotent:** image files go first (a missing file is fine), then all rows in one transaction. A run cut off before the commit leaves the account in place, so the user can call again. A second call after success returns 401: its token no longer resolves to a user.
+- **Sign in with Apple** (TN3194): the server keeps no Apple token, so an account with an Apple ID signs in with Apple again, and the app sends the new authorization code. The server exchanges the code, checks that it is the account's Apple ID, and calls `https://appleid.apple.com/auth/revoke` with the refresh token (or the access token when Apple returns none). Only then does it delete. Each failure stops the deletion, and nothing is deleted:
+  - `409 apple_reauth_required`: an Apple account sent no code. The app shows the Apple sheet and retries.
+  - `403 apple_account_mismatch`: the code is for a different Apple ID.
+  - `502 apple_revoke_failed`: the exchange or the revoke call failed, or Apple could not be reached.
+
 ## Price Intelligence [V1.1]
 
 ### GET /api/items/{canonical_id}/prices?store=...&from=...&to=...
