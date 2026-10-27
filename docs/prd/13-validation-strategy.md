@@ -268,6 +268,21 @@ Some validations cannot be fully automated. These require manual execution on a 
 - [ ] Receipt syncs automatically when network restored.
 - [ ] Budget updates after sync completes.
 - [ ] Multiple offline receipts sync in order.
+- [ ] Airplane mode off → queued receipt uploads without reopening the app (reconnect path; the Simulator cannot toggle it).
+- [ ] Server down while online: the queued receipt shows "waiting to upload" with **Retry Now**. Start the server and leave the app open: it uploads within about 30 seconds, with no tap.
+- [ ] With the server back, tapping **Retry Now** uploads at once.
+
+**Server Errors and Quota:**
+
+To stop the server, stop the backend process the phone points at (`EXPO_PUBLIC_API_URL`). To reach the quota, the account needs `free_tier_receipts_per_month` receipts (default 20) created this calendar month. Manual entries count.
+
+- [ ] Server down, relaunch as a user with receipts: Budget shows "Couldn't load your budget" and History shows "Couldn't load your receipts", each with **Try Again**. Neither shows "Scan your first receipt" or "No receipts yet".
+- [ ] **Try Again** with the server back loads the data.
+- [ ] At the quota, a camera scan shows "Monthly scan limit reached". The photo is not queued: nothing appears under Pending.
+- [ ] At the quota, an import from Photos or Files shows the monthly-limit alert, not "Saved to upload later". Nothing appears under Pending.
+- [ ] A receipt queued offline that hits the quota when it syncs: its Pending row says "Monthly scan limit reached", and tapping it offers Enter manually or Discard. It does not retry.
+
+Simulator run on 2026-10-27 (PR #21) passed the server-down, automatic-retry, and import-quota items. Not yet run anywhere: the Retry Now tap, the camera quota message, the airplane-mode reconnect, and the queued receipt that hits the quota.
 
 **Accessibility:**
 - [ ] VoiceOver reads all screen elements in logical order.
