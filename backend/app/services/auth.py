@@ -309,6 +309,17 @@ async def refresh(
 # ── Sign out ──────────────────────────────────────────────────────
 
 
+async def revoke_session(access_token: str) -> None:
+    """Revoke an access token and its whole family, so the paired refresh dies too."""
+    payload = decode_token(access_token, expected_typ="access")
+    remaining = max(0, payload.exp - int(datetime.now(tz=UTC).timestamp()))
+    settings = get_settings()
+    await add_jti_async(payload.jti, remaining)
+    await invalidate_family_async(
+        payload.fam, ttl_seconds=settings.jwt_refresh_ttl_seconds
+    )
+
+
 async def sign_out(
     db: AsyncSession,
     *,
@@ -317,14 +328,7 @@ async def sign_out(
     ip: str | None = None,
     user_agent: str | None = None,
 ) -> None:
-    payload = decode_token(access_token, expected_typ="access")
-    remaining = max(0, payload.exp - int(datetime.now(tz=UTC).timestamp()))
-    settings = get_settings()
-    await add_jti_async(payload.jti, remaining)
-    # Wipe the whole family so the paired refresh dies too.
-    await invalidate_family_async(
-        payload.fam, ttl_seconds=settings.jwt_refresh_ttl_seconds
-    )
+    await revoke_session(access_token)
     await auth_audit.record(
         db,
         event_type=auth_audit.EVENT_SIGNOUT,

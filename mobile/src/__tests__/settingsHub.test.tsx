@@ -56,6 +56,7 @@ function renderSettings() {
       'settings/about': () => null,
       'settings/privacy': () => null,
       'settings/help': () => null,
+      'settings/delete-account': () => null,
     },
     { initialUrl: '/' },
   );
@@ -96,6 +97,7 @@ describe('Settings hub', () => {
   it.each([
     ['Privacy', '/settings/privacy'],
     ['Help & feedback', '/settings/help'],
+    ['Delete account', '/settings/delete-account'],
   ])('opens %s in the app', (label, path) => {
     const routerScreen = renderSettings();
 
