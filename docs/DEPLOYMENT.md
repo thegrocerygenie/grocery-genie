@@ -135,7 +135,8 @@ GG_CORS_ORIGINS=["https://grocerygenie.app"]
 # there is no public base URL to set.
 GG_STORAGE_PATH=/app/storage
 
-# Email — Resend. Without the key, verify and reset emails are only logged.
+# Email — Resend. Startup fails without the key: the app sends verify and
+# reset links only by email.
 # The sender must be on a domain verified in Resend.
 GG_RESEND_API_KEY=re_...
 GG_RESEND_FROM=Grocery Genie <noreply@grocerygenie.app>

@@ -16,7 +16,7 @@ async def dashboard_spending(
         default=None,
         description="Budget period, e.g. 2026-03. Defaults to current month.",
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> DashboardSpendingResponse:
     service = BudgetService(db)

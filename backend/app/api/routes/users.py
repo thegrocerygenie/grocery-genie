@@ -72,7 +72,7 @@ def _to_profile(user: User, *, needs_onboarding: bool = False) -> UserProfileRes
 @router.get("/me", response_model=UserProfileResponse)
 async def get_me(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> UserProfileResponse:
     needs = await auth_service.user_needs_onboarding(db, user.id)
     return _to_profile(user, needs_onboarding=needs)
@@ -82,7 +82,7 @@ async def get_me(
 async def update_me(
     body: UserPreferencesUpdate,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> UserProfileResponse:
     if body.locale is not None:
         user.locale = body.locale
@@ -117,7 +117,7 @@ async def update_me(
 @router.post("/me/onboarding-complete", response_model=UserProfileResponse)
 async def complete_onboarding(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> UserProfileResponse:
     await auth_service.complete_onboarding(db, user)
     needs = await auth_service.user_needs_onboarding(db, user.id)
@@ -128,7 +128,7 @@ async def complete_onboarding(
 async def grant_ai_consent(
     body: AiConsentGrantRequest,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> UserProfileResponse:
     """Allow receipts to go to third-party AI for the policy version shown."""
     try:
@@ -150,7 +150,7 @@ async def grant_ai_consent(
 @router.delete("/me/ai-consent", response_model=UserProfileResponse)
 async def withdraw_ai_consent(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> UserProfileResponse:
     """Withdraw consent: scans are refused until the user allows them again."""
     ai_consent.withdraw(user)
@@ -164,7 +164,7 @@ async def request_email_change(
     body: EmailChangeRequestPayload,
     request: Request,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict:
     try:
         await auth_service.request_email_change(
@@ -181,7 +181,7 @@ async def request_email_change(
 @router.post("/me/email-change/confirm", status_code=200)
 async def confirm_email_change(
     body: EmailChangeConfirmPayload,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict:
     try:
         user = await auth_service.confirm_email_change(db, token=body.token)
@@ -193,7 +193,7 @@ async def confirm_email_change(
 @router.post("/me/push-tokens", status_code=204)
 async def register_push_token(
     body: PushTokenPayload,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> None:
     await PushTokenService(db).register(user.id, body.token)
@@ -202,7 +202,7 @@ async def register_push_token(
 @router.delete("/me/push-tokens", status_code=204)
 async def unregister_push_token(
     body: PushTokenPayload,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> None:
     await PushTokenService(db).unregister(user.id, body.token)
@@ -211,7 +211,7 @@ async def unregister_push_token(
 @router.delete("/me", status_code=204)
 async def delete_me(
     body: DeleteAccountRequest | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> None:

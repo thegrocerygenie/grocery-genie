@@ -97,7 +97,7 @@ def _receipt_to_response(receipt) -> ReceiptResponse:
 async def scan_receipt(
     file: UploadFile,
     source: str = Form("camera"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     # 5.1.2(i): the photo and item names go to Anthropic, so consent comes first.
     user: User = Depends(require_ai_consent),
     extractor: ReceiptExtractor = Depends(get_receipt_extractor),
@@ -246,7 +246,7 @@ async def _serve_stored_file(candidate_paths: list[str]) -> Response:
 @router.get("/{receipt_id}/image")
 async def get_receipt_image(
     receipt_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> Response:
     """Stream a receipt's original image — only to its owner."""
@@ -258,7 +258,7 @@ async def get_receipt_image(
 @router.get("/{receipt_id}/thumbnail")
 async def get_receipt_thumbnail(
     receipt_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> Response:
     """Stream a receipt's thumbnail — only to its owner.
@@ -274,7 +274,7 @@ async def get_receipt_thumbnail(
 
 @router.get("/recently-deleted", response_model=list[DeletedItemResponse])
 async def recently_deleted(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> list[DeletedItemResponse]:
     from datetime import UTC, datetime
@@ -307,7 +307,7 @@ async def recently_deleted(
 @router.get("/{receipt_id}", response_model=ReceiptResponse)
 async def get_receipt(
     receipt_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> ReceiptResponse:
     service = ReceiptService(db=db)
@@ -324,7 +324,7 @@ async def get_receipt(
 async def update_receipt(
     receipt_id: str,
     updates: ReceiptUpdateRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> ReceiptResponse:
@@ -343,7 +343,7 @@ async def update_receipt(
 @router.post("", response_model=ReceiptResponse, status_code=201)
 async def create_manual_receipt(
     body: ManualReceiptCreateRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> ReceiptResponse:
@@ -366,7 +366,7 @@ async def create_manual_receipt(
 @router.delete("/{receipt_id}", status_code=204)
 async def delete_receipt(
     receipt_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> None:
     service = ReceiptService(db=db)
@@ -379,7 +379,7 @@ async def delete_receipt(
 @router.post("/{receipt_id}/restore", response_model=ReceiptResponse)
 async def restore_receipt(
     receipt_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> ReceiptResponse:
     service = ReceiptService(db=db)
@@ -399,7 +399,7 @@ async def list_receipts(
     store: str | None = None,
     from_date: str | None = None,
     to_date: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> ReceiptListResponse:
     service = ReceiptService(db=db)

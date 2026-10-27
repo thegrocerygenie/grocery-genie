@@ -8,10 +8,10 @@ All events include: user_id, timestamp, device type, app version.
 |-------|-----------|---------|
 | `receipt_scan_started` | source (camera/library/pdf) | Scan initiation rate and source mix |
 | `receipt_extraction_completed` | duration_ms, item_count, confidence_avg, language_detected | Extraction performance and accuracy |
-| `receipt_correction_made` | field (name/qty/price/category), original_value, corrected_value | Identify systematic failures for prompt improvement |
-| `receipt_confirmed` | item_count, total_amount, correction_count | Scan-to-confirmed conversion rate |
+| `receipt_correction_made` | field (name/qty/price/category) | Identify systematic failures for prompt improvement. The original and corrected values are in `receipt_corrections`, not in the event. |
+| `receipt_confirmed` | item_count, correction_count | Scan-to-confirmed conversion rate |
 | `receipt_abandoned` | stage (capture/review/confirmation), reason (optional) | Drop-off point identification |
-| `budget_created` | type (overall/category), amount | Budget feature adoption |
+| `budget_created` | type (overall/category) | Budget feature adoption |
 | `budget_alert_triggered` | threshold_percent, category | Alert frequency |
 | `budget_alert_opened` | threshold_percent, notification_source (push/in_app) | Alert engagement rate |
 | `price_history_viewed` | canonical_item_id, store_count | Price intelligence engagement |
