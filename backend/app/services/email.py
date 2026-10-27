@@ -78,9 +78,18 @@ class EmailClient(Protocol):
 
 
 class LogOnlyEmailClient:
-    """Default for dev/test — writes the URL + subject to the log."""
+    """Default for dev/test — writes the URL + subject to the log.
+
+    The body holds a live token link, so it is logged in debug mode only.
+    """
 
     async def send(self, *, to: str, subject: str, html: str) -> None:
+        if not get_settings().debug:
+            log.warning(
+                "[email] no email provider is set (GG_RESEND_API_KEY); %r was not sent",
+                subject,
+            )
+            return
         log.info("[email:dev] to=%s subject=%s", to, subject)
         log.info("[email:dev:body] %s", html.replace("\n", " "))
 

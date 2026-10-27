@@ -95,10 +95,11 @@ class Settings(BaseSettings):
     # Pending pushes older than this are marked expired instead of sent late.
     push_max_age_minutes: int = 60
 
-    # Deep links
+    # Deep links — each path is an Expo Router route (mobile/app/<path>.tsx).
+    # Signed-out users can open only onboarding/* routes.
     app_scheme: str = "grocerygenie"
-    verify_email_path: str = "verify"
-    reset_password_path: str = "reset"
+    verify_email_path: str = "onboarding/verify-email"
+    reset_password_path: str = "onboarding/reset-password"
     email_change_path: str = "email-change"
 
     # Apple Sign In

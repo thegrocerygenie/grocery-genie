@@ -22,10 +22,12 @@ from app.api.routes import (
 )
 from app.core.config import get_settings
 from app.core.dependencies import async_session_factory, engine
+from app.core.logging_config import configure_logging
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.seed import seed_default_categories
 from app.events.wiring import register_handlers
 
+configure_logging()
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
