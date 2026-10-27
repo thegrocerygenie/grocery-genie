@@ -11,9 +11,13 @@ import { QUOTA_HINT } from '../utils/scanQuota';
 interface OfflineQueueSectionProps {
   pending: PendingReceipt[];
   isConnected: boolean;
+  /** The user has not allowed AI reading, so the queue waits on the device. */
+  consentNeeded?: boolean;
   onPressFailed: (receipt: PendingReceipt) => void;
   /** Upload the queue now; offered after a failed attempt while online. */
   onRetry: () => void;
+  /** Open the consent sheet. */
+  onReviewConsent?: () => void;
 }
 
 function plural(n: number): string {
@@ -27,15 +31,19 @@ function plural(n: number): string {
 export function OfflineQueueSection({
   pending,
   isConnected,
+  consentNeeded = false,
   onPressFailed,
   onRetry,
+  onReviewConsent,
 }: OfflineQueueSectionProps) {
   if (pending.length === 0) return null;
 
   const banner = bannerState(
     pending.filter((r) => r.status !== 'failed'),
     isConnected,
+    consentNeeded,
   );
+  const onBannerAction = banner?.consent ? onReviewConsent : onRetry;
 
   return (
     <View style={styles.root}>
@@ -48,11 +56,13 @@ export function OfflineQueueSection({
           <Text style={styles.bannerText}>{banner.text}</Text>
           {banner.retry ? (
             <Pressable
-              onPress={onRetry}
+              onPress={onBannerAction}
               hitSlop={12}
               style={({ pressed }) => [styles.retryButton, pressed && styles.retryPressed]}
               accessibilityRole="button"
-              accessibilityLabel="Retry upload now"
+              accessibilityLabel={
+                banner.consent ? 'Review AI reading permission' : 'Retry upload now'
+              }
             >
               <Text style={styles.bannerAction}>{banner.action}</Text>
             </Pressable>
@@ -71,6 +81,7 @@ export function OfflineQueueSection({
             key={receipt.id}
             receipt={receipt}
             isConnected={isConnected}
+            consentNeeded={consentNeeded}
             showDivider={i > 0}
             onPressFailed={onPressFailed}
           />
@@ -81,12 +92,14 @@ export function OfflineQueueSection({
 }
 
 interface BannerState {
-  symbol: 'wifi.slash' | 'arrow.up' | 'arrow.clockwise';
+  symbol: 'wifi.slash' | 'arrow.up' | 'arrow.clockwise' | 'sparkles';
   text: string;
   /** Right-hand label; null while an upload runs, so a spinner shows instead. */
   action: string | null;
-  /** The label is a button that uploads now. */
+  /** The label is a button that uploads now (or, with `consent`, opens the consent sheet). */
   retry?: boolean;
+  /** The queue waits for the user to allow AI reading. */
+  consent?: boolean;
 }
 
 /**
@@ -95,9 +108,22 @@ interface BannerState {
  * retries on a timer) with a button to retry now, so the banner never claims an
  * upload is running while the server is down.
  */
-function bannerState(queued: PendingReceipt[], isConnected: boolean): BannerState | null {
+function bannerState(
+  queued: PendingReceipt[],
+  isConnected: boolean,
+  consentNeeded: boolean,
+): BannerState | null {
   if (queued.length === 0) return null;
   const count = plural(queued.length);
+  if (consentNeeded) {
+    return {
+      symbol: 'sparkles',
+      text: `${count} wait until you allow AI reading`,
+      action: 'Review',
+      retry: true,
+      consent: true,
+    };
+  }
   if (!isConnected) {
     return { symbol: 'wifi.slash', text: `Offline · ${count} queued`, action: 'Will sync' };
   }
@@ -114,7 +140,8 @@ function bannerState(queued: PendingReceipt[], isConnected: boolean): BannerStat
 }
 
 /** What a queued row is doing, shown after its capture time. */
-function rowState(receipt: PendingReceipt, isConnected: boolean): string {
+function rowState(receipt: PendingReceipt, isConnected: boolean, consentNeeded: boolean): string {
+  if (consentNeeded) return 'needs your OK to read with AI';
   if (!isConnected) return 'waiting for connection';
   if (receipt.status !== 'syncing' && receipt.lastAttemptFailed) return 'will retry';
   return 'uploading';
@@ -128,15 +155,22 @@ function failedReason(receipt: PendingReceipt): string {
 interface PendingRowProps {
   receipt: PendingReceipt;
   isConnected: boolean;
+  consentNeeded: boolean;
   showDivider: boolean;
   onPressFailed: (receipt: PendingReceipt) => void;
 }
 
-function PendingRow({ receipt, isConnected, showDivider, onPressFailed }: PendingRowProps) {
+function PendingRow({
+  receipt,
+  isConnected,
+  consentNeeded,
+  showDivider,
+  onPressFailed,
+}: PendingRowProps) {
   const failed = receipt.status === 'failed';
   const detail = failed
     ? failedReason(receipt)
-    : `${formatQueuedAgo(receipt.capturedAt)} · ${rowState(receipt, isConnected)}`;
+    : `${formatQueuedAgo(receipt.capturedAt)} · ${rowState(receipt, isConnected, consentNeeded)}`;
 
   return (
     <Pressable

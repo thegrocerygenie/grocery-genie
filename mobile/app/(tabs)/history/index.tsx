@@ -31,6 +31,7 @@ import { QUOTA_HINT, QUOTA_MESSAGE } from '@/features/receipt-capture/utils/scan
 import type { CategoryResponse } from '@/features/budget/types';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useSyncNow } from '@/hooks/useSyncQueue';
+import { useAiConsentGate, useAiConsentStatus } from '@/features/ai-consent/hooks/useAiConsent';
 import { useOfflineStore, type PendingReceipt } from '@/store/offlineStore';
 import { useAuthStore } from '@/store/authStore';
 import { tokenSubject } from '@/features/auth/utils/tokenSubject';
@@ -183,6 +184,8 @@ export default function HistoryScreen() {
   const deleteReceipt = useDeleteReceipt();
   const { isConnected } = useNetworkStatus();
   const syncNow = useSyncNow();
+  const aiConsent = useAiConsentStatus();
+  const { askForConsent } = useAiConsentGate();
   const ownerId = tokenSubject(useAuthStore((s) => s.accessToken));
   const allPending = useOfflineStore((s) => s.pendingReceipts);
   // The queue is device-wide; show only what this user captured.
@@ -307,8 +310,13 @@ export default function HistoryScreen() {
             <OfflineQueueSection
               pending={pendingReceipts}
               isConnected={isConnected}
+              consentNeeded={
+                aiConsent === false ||
+                (aiConsent === undefined && pendingReceipts.some((r) => r.needsConsent))
+              }
               onPressFailed={onPressFailed}
               onRetry={() => void syncNow()}
+              onReviewConsent={() => void askForConsent()}
             />
             {pendingReceipts.length > 0 && receipts.length > 0 ? (
               <Text style={styles.sectionLabel}>Synced</Text>

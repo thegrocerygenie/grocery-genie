@@ -41,7 +41,9 @@ This is read-only. It checks that the process is alive, owns its port, answers `
 ## Drive
 
 ```bash
-$G signup [label]                 # new user (example.com); later calls use its token
+$G signup [label] [--no-consent]  # new user (example.com); later calls use its token. It allows AI
+                                  # receipt reading as the app's consent sheet does; --no-consent leaves
+                                  # it off, so a scan gets 403 ai_consent_required
 $G api METHOD PATH [JSON]         # body on stdout, "METHOD PATH -> status" on stderr; exits non-zero on >= 400
 $G scan [PHOTO]                   # POST /api/receipts/scan (default: a generated photo); prints the scan response
 $G sql "SELECT ..."               # read gg_verify (observe only; never write through it)

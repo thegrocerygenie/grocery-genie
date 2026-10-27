@@ -87,6 +87,10 @@ class User(Base):
     onboarding_completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+    # Consent to send receipts to third-party AI (app/services/ai_consent.py).
+    # Both null when the user has not allowed it or has withdrawn it.
+    ai_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ai_consent_version: Mapped[str | None] = mapped_column(String(32))
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

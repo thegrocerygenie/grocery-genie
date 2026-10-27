@@ -2,6 +2,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
 import type { ScanSource } from '@/constants/analyticsEvents';
+import { isAiConsentRequiredError } from '@/features/ai-consent/utils/aiConsent';
 import { ApiError } from '@/services/api';
 
 import type { ReceiptScanResponse } from '../types';
@@ -54,6 +55,8 @@ export type PickOutcome =
 export type ImportResult =
   | { status: 'canceled' }
   | { status: 'queued' }
+  /** The server refused: the user has not allowed AI reading. */
+  | { status: 'consent-required' }
   | { status: 'error'; message: string }
   | { status: 'ready'; response: ReceiptScanResponse; previewUri: string };
 
@@ -143,6 +146,7 @@ export async function importReceipt({ pick, upload, queue }: ImportDeps): Promis
       previewUri: outcome.receipt.previewUri ?? `/api/receipts/${response.receipt_id}/image`,
     };
   } catch (error) {
+    if (isAiConsentRequiredError(error)) return { status: 'consent-required' };
     // NFR reliability 3, as for camera scans: keep a file that failed for a
     // reason outside the file itself; a rejected file (422) is an error.
     if (queue && isRetryableScanError(error)) {

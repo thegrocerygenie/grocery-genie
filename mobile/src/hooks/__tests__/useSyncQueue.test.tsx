@@ -3,6 +3,8 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 
+import { ME_QUERY_KEY } from '@/features/auth/hooks/useAuth';
+import type { UserProfile } from '@/features/auth/types';
 import { useAuthStore } from '@/store/authStore';
 import { useOfflineStore } from '@/store/offlineStore';
 import { fakeAccessToken } from '@/testing/jwt';
@@ -32,8 +34,7 @@ function queue(status: 'pending' | 'failed' = 'pending', ownerId = 'user-a') {
   useOfflineStore.getState().updateStatus(id, status);
 }
 
-function renderSync() {
-  const client = new QueryClient();
+function renderSync(client = new QueryClient()) {
   const invalidate = jest.spyOn(client, 'invalidateQueries');
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -50,7 +51,54 @@ beforeEach(() => {
 
 afterEach(() => jest.restoreAllMocks());
 
+function withConsentCache(granted: boolean) {
+  const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } });
+  client.setQueryData(ME_QUERY_KEY, {
+    id: 'user-a',
+    ai_consent: {
+      granted,
+      granted_at: null,
+      policy_version: null,
+      current_policy_version: '2026-10-27',
+    },
+  } as unknown as UserProfile);
+  return client;
+}
+
 describe('useSyncQueue', () => {
+  it('holds the queue while the account has not allowed AI reading', () => {
+    queue();
+    renderSync(withConsentCache(false));
+
+    expect(mockSync).not.toHaveBeenCalled();
+  });
+
+  it('uploads the held queue once the user allows AI reading', async () => {
+    queue();
+    const client = withConsentCache(false);
+    renderSync(client);
+    expect(mockSync).not.toHaveBeenCalled();
+
+    act(() => {
+      client.setQueryData<UserProfile>(ME_QUERY_KEY, (old) =>
+        old ? { ...old, ai_consent: { ...old.ai_consent!, granted: true } } : old,
+      );
+    });
+
+    await waitFor(() => expect(mockSync).toHaveBeenCalledTimes(1));
+  });
+
+  it('marks consent missing when the server refuses an upload for it', async () => {
+    queue();
+    const client = withConsentCache(true);
+    renderSync(client);
+
+    await waitFor(() => expect(mockSync).toHaveBeenCalled());
+    const { onConsentRequired } = mockSync.mock.calls[0][0] as { onConsentRequired: () => void };
+    act(() => onConsentRequired());
+    expect(client.getQueryData<UserProfile>(ME_QUERY_KEY)?.ai_consent?.granted).toBe(false);
+  });
+
   it('syncs when online with photos queued, and refreshes receipts after an upload', async () => {
     mockSync.mockResolvedValue({ synced: 1, failed: 0 });
     queue();
