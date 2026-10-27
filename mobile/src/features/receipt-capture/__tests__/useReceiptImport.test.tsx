@@ -9,6 +9,7 @@ import { ApiError } from '@/services/api';
 import { useReceiptStore } from '@/store/receiptStore';
 
 import { useReceiptImport } from '../hooks/useReceiptImport';
+import { persistCapturedImage } from '../services/pendingImageFiles';
 import { scanReceipt } from '../services/receiptApi';
 
 const mockPush = jest.fn();
@@ -24,7 +25,9 @@ jest.mock('expo-image-picker', () => ({
 jest.mock('expo-document-picker', () => ({ getDocumentAsync: jest.fn() }));
 jest.mock('../services/receiptApi', () => ({ scanReceipt: jest.fn() }));
 jest.mock('../services/pendingImageFiles', () => ({
-  persistCapturedImage: (uri: string) => uri.replace('file:///', 'file:///doc/pending-receipts/'),
+  persistCapturedImage: jest.fn((uri: string) =>
+    uri.replace('file:///', 'file:///doc/pending-receipts/'),
+  ),
 }));
 
 const launchLibrary = ImagePicker.launchImageLibraryAsync as jest.Mock;
@@ -163,5 +166,26 @@ describe('an import that cannot upload now', () => {
       expect.stringContaining('Pending in History'),
     );
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('does not queue or copy a photo when the session has no user id, and says it failed', async () => {
+    // Without an owner no session could ever upload it, so it would be orphaned.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { useAuthStore } = require('@/store/authStore');
+    useAuthStore.setState({ accessToken: 'not-a-jwt' });
+    launchLibrary.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///photo.jpg', width: 1200, height: 1600, mimeType: 'image/jpeg' }],
+    });
+    scan.mockRejectedValue(new TypeError('Network request failed'));
+    const { result } = renderImportHook();
+
+    await act(() => result.current.importFrom('library'));
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { useOfflineStore } = require('@/store/offlineStore');
+    expect(useOfflineStore.getState().pendingReceipts).toHaveLength(0);
+    expect(persistCapturedImage).not.toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalledWith('Couldn’t import receipt', expect.any(String));
   });
 });

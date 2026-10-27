@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
 import type { ScanSource } from '@/constants/analyticsEvents';
+import { deletePendingImage } from '@/features/receipt-capture/services/pendingImageFiles';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 export interface PendingReceipt {
@@ -13,7 +14,7 @@ export interface PendingReceipt {
    * The user who captured it (the access token's `sub`). The queue is shared by
    * every session on the device, so only this user's session may upload it.
    */
-  ownerId?: string;
+  ownerId: string;
   /** Where the photo came from, for the upload's analytics; camera when absent. */
   source?: ScanSource;
   status: 'pending' | 'syncing' | 'failed';
@@ -67,6 +68,21 @@ export const useOfflineStore = create<OfflineState>()(
     {
       name: 'grocery-genie-offline',
       storage: createJSONStorage(() => AsyncStorage),
+      // Version 0 (before per-account queues) saved entries with no ownerId. No
+      // session may upload or show them, so drop them and their photos. Safe to
+      // rerun after a crash: a missing file is fine.
+      version: 1,
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<OfflineState> | undefined;
+        if (version >= 1 || !state?.pendingReceipts) return state as OfflineState;
+        for (const r of state.pendingReceipts as Partial<PendingReceipt>[]) {
+          if (!r.ownerId && r.imageUri) deletePendingImage(r.imageUri);
+        }
+        return {
+          ...state,
+          pendingReceipts: state.pendingReceipts.filter((r) => r.ownerId),
+        } as OfflineState;
+      },
       // An upload cut off by a crash or force-quit stays 'syncing' on disk and
       // would never be retried. On launch nothing is uploading yet, so put it back.
       merge: (persisted, current) => {
