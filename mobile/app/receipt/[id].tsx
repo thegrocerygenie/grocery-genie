@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
   center: { alignItems: 'center', justifyContent: 'center' },
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 80 },
-  headerBtn: { ...type.body, color: colors.tint },
+  headerBtn: { ...type.body, color: colors.tint, paddingHorizontal: spacing.xs },
   muted: { ...type.footnote, color: colors.iosLabel2 },
   photoCard: {
     alignSelf: 'center',

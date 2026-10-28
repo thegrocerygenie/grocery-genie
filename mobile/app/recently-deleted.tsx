@@ -113,7 +113,7 @@ export default function RecentlyDeletedScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
-  headerBtn: { ...type.body, color: colors.tint, fontWeight: '600' },
+  headerBtn: { ...type.body, color: colors.tint, fontWeight: '600', paddingHorizontal: spacing.xs },
   intro: { ...type.footnote, color: colors.iosLabel2, paddingHorizontal: 4 },
   center: { paddingTop: 80, alignItems: 'center' },
   empty: { alignItems: 'center', gap: spacing.sm, paddingTop: 80 },
