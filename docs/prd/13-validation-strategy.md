@@ -247,6 +247,8 @@ pytest tests/llm_validation/test_prompt_regression.py --prompt-version=v2 --base
 
 Some validations cannot be fully automated. These require manual execution on a physical iOS device.
 
+The open items below, plus device checks from launch work, are collected in [device-checklist.md](../device-checklist.md) with the setup a device session needs. Run device sessions from that list and record results there.
+
 **Camera & Capture:**
 - [ ] Camera opens with edge detection overlay visible on receipt.
 - [ ] Blur warning appears when receipt is out of focus.
@@ -353,6 +355,6 @@ Also, `expo run:ios` treats an Xcode 27 Simulator as a physical device, so the b
 
 1. Every row in the acceptance criteria traceability matrix has a passing test.
 2. LLM validation harness passes all thresholds.
-3. Manual test checklist completed on a physical device.
+3. Manual test checklist completed on a physical device ([device-checklist.md](../device-checklist.md)).
 4. Non-functional benchmarks measured and within targets.
 5. Phase Definition of Done checklist 100% complete.
