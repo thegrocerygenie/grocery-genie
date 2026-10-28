@@ -33,6 +33,7 @@ The phone:
 - [ ] **Continue with Google works.** `app.json` has no Google Sign-In config plugin, so the Info.plist has no reversed-client-ID URL scheme, and the native button may fail. Expo Go hid the button. (launch-open-items §1)
 - [ ] **Sign up with Apple** on a fresh install, then sign out and sign in with Apple again. (launch-open-items §3)
 - [ ] **Onboarding: Set budget → Continue** reaches the camera step and saves the budget. (launch-open-items §3)
+- [ ] **Onboarding's Skip button** is a capsule with room around the text, not a cramped circle. The Simulator never reached this screen after the fix. (L8, PR 42)
 - [ ] **The first-run camera permission prompt** appears once, with the app's usage text. Allow it and the camera opens. On another fresh install, deny it: the Scan screen explains why it needs the camera and offers Choose from Library. (launch-open-items §3; NFR 10 compatibility 4)
 
 ## 2. Camera and capture
@@ -92,6 +93,7 @@ To reach the quota, the account needs `free_tier_receipts_per_month` receipts (d
 ## 6. Navigation and refresh
 
 - [ ] **Back button after a push over the tabs (H3).** Budget → See 3-month trend → Back → See 3-month trend → Back: both return to Budget. Repeat with Top items, and with History → a receipt. Edge-swipe back, and release an edge swipe halfway, then tap Back. Afterwards the tab bar and the History rows still respond. These passed on a Simulator debug build; the phone is the proof launch-open-items asks for. (H3, 13 Native Back button)
+- [ ] **Swipe to delete (L6).** On a native build, swipe a History row left: Delete shows and the row slides back when released early. Tap Delete, confirm, and the receipt moves to Recently Deleted. This is the first native build with `react-native-gesture-handler`; the Simulator check ran in Expo Go. (L6, PR 42)
 - [ ] **Pull-to-refresh (M9).** Confirm a receipt, then go back to Budget: no spinner sticks. Pull down on Budget, and on History: the spinner shows, then stops. Pull with the server down: the spinner stops, and the screen keeps the data it had. (M9, PR 40; the stuck spinner was never reproduced, so this is the only proof)
 
 ## 7. Accessibility

@@ -1,6 +1,6 @@
 # Launch open items
 
-Curated on 2026-10-27, after PRs 9–29 merged (main at `1f0b3e4`). Updated the same day after PRs 30–37 merged (main at `699b739`). Every session that worked on these is archived, so this file is the list to work from. Tick an item off here when it lands.
+Curated on 2026-10-27, after PRs 9–29 merged (main at `1f0b3e4`). Updated the same day after PRs 30–37 merged (main at `699b739`), and on 2026-10-28 after PRs 38–47 merged (main at `4509fff`). Every session that worked on these is archived, so this file is the list to work from. Tick an item off here when it lands.
 
 Sources:
 - [privacy review](legal/privacy-review-2026-10-27.md)
@@ -22,10 +22,12 @@ Sources:
 - [ ] **Native build setup still to do:**
   - There is no `eas.json` yet, so no store build profile.
   - `npx expo run:ios` treats Xcode 27 Simulators as physical devices ("No code signing certificates"). For now, build with `xcodebuild -sdk iphonesimulator`, then use `xcrun simctl install`.
+  - Metro warns that five packages don't match Expo SDK 54's pinned versions: `expo` 54.0.34 (wants ~54.0.37), `expo-font`, `expo-router`, `jest-expo`, and `expo-secure-store` 55.0.13, a whole major version off from ~15.0.8. Align them with `npx expo install --fix` before a store build, and recheck sign-in, since `expo-secure-store` holds the session.
   - Google Sign-In has no config plugin in `app.json`, so the Info.plist has no reversed-client-ID URL scheme. Expo Go hides the button, but a native build shows it. Check that "Continue with Google" works on a native build before launch.
 
 ## 1b. Before the next deploy
 
+- [ ] **Run the database migration `20261028_0010`** (`make backend-migrate`). PR 42 (L2) adds `line_items.position`, and the API orders receipt items by it, so the API fails against a database without the column. The migration fills existing rows from their current order.
 - [ ] **Set `GG_RESEND_API_KEY` in production.** Since PR 32, the API refuses to start without it, so nothing can log email bodies. Only local dev opts out, with `GG_EMAIL_DELIVERY=off`.
 - [x] **Run `npm install` in `mobile/` after pulling.** PR 35's H3 fix is a `patch-package` patch to react-native-screens 4.16. Without the install, `nativeBackButtonPatch.test.ts` fails (seen on 2026-10-27 in a stale checkout), and a native build ships without the fix. Done: mobile `make` targets now install when dependencies change. Direct `npx` or `npm` use still needs `npm install` by hand.
 
@@ -77,4 +79,6 @@ Fixed already: H1 and H2 (#20), H4 and M8 (#22, #29), H5, M1 and M2 (#21), and t
 
 - **Rate limits count per token, not per user** (noted in PR 24), so signing in again resets the count.
 - **Dev loop:** `LogOnlyEmailClient` logs at INFO, but the backend sets no logging config, so verify and reset links never appear locally.
+- **Backend dependencies aren't locked.** `backend/pyproject.toml` has version ranges and there's no `uv.lock`, so two machines can install different versions. `uv lock` plus `uv sync` would pin them and let `uv` check freshness (raised in the PR 43 review).
+- **`make hooks` says "Git hooks on" on every run in Claude worktrees** (PR 47). Their git config holds the hooks path as a full path, so the check never matches `.githooks`. It does no harm.
 - **Your shell:** a stale `GITHUB_TOKEN` in your profile breaks `gh` until it's removed. `.claude/launch.json` is untracked.
