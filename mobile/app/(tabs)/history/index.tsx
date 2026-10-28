@@ -101,7 +101,7 @@ function ReceiptRow({ receipt, showDivider, categories, onPress, onDelete }: Rec
   const total = receipt.total ?? 0;
   const sub = needsReview
     ? 'Needs review'
-    : `${formatShortDate(receipt.date)} · ${itemCount} items`;
+    : `${formatShortDate(receipt.date)} · ${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
   const label = receipt.store_name ?? 'Receipt';
 
   // L6: swipe left for Delete, as in Mail. Long-press still works, and

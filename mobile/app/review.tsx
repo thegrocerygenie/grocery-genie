@@ -244,7 +244,8 @@ export default function ReviewScreen() {
       <Stack.Screen
         options={{
           presentation: 'modal',
-          title: 'Review',
+          // L4: editing a saved receipt says so; a scan being checked is a Review.
+          title: edit === '1' ? 'Edit Receipt' : 'Review',
           headerLeft: () => (
             <Pressable onPress={() => router.back()} hitSlop={12}>
               <Text style={styles.headerBtn}>{isReadOnly ? 'Done' : 'Cancel'}</Text>
