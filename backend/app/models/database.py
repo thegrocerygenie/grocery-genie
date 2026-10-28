@@ -183,8 +183,12 @@ class Receipt(Base):
 
     user: Mapped["User"] = relationship(back_populates="receipts")
     store: Mapped["Store | None"] = relationship(back_populates="receipts")
+    # In the order the receipt lists them (L2). Without an ORDER BY, Postgres
+    # returns rows in storage order, and an edited row moved to the end.
     line_items: Mapped[list["LineItem"]] = relationship(
-        back_populates="receipt", cascade="all, delete-orphan"
+        back_populates="receipt",
+        cascade="all, delete-orphan",
+        order_by="LineItem.position",
     )
 
 
@@ -196,6 +200,8 @@ class LineItem(Base):
         ForeignKey("receipts.id"), nullable=False
     )
     raw_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    # 0-based place on the receipt; Receipt.line_items orders by it.
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     canonical_item_id: Mapped[uuid.UUID | None] = mapped_column()
     quantity: Mapped[float] = mapped_column(Numeric(10, 3), default=1)
     unit_price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
