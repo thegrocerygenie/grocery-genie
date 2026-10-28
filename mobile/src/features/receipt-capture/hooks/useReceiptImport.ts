@@ -33,7 +33,12 @@ export function useReceiptImport() {
   const { setCapturedImageUri, setActiveScanResponse } = useReceiptStore();
   const scanMutation = useReceiptScan();
   const [progress, setProgress] = useState<ImportProgress | null>(null);
-  const busy = useRef(false);
+  // 'busy' covers the consent sheet and the upload; a second tap then does
+  // nothing. While 'picking', a new tap replaces the pick: iOS drops a picker
+  // presented while another sheet is closing, its promise never settles, and
+  // the screen takes taps only when no picker is up.
+  const phase = useRef<'idle' | 'busy' | 'picking'>('idle');
+  const attempt = useRef(0);
   const addPendingReceipt = useOfflineStore((s) => s.addPendingReceipt);
   const accessToken = useAuthStore((s) => s.accessToken);
   const { ensureConsent, askForConsent, markRequired } = useAiConsentGate();
@@ -57,13 +62,22 @@ export function useReceiptImport() {
 
   const importFrom = useCallback(
     async (kind: ImportKind) => {
-      if (busy.current) return;
-      busy.current = true;
+      if (phase.current === 'busy') return;
+      const id = ++attempt.current;
+      const current = () => id === attempt.current;
+      phase.current = 'busy';
       try {
         // 5.1.2(i): the file goes to Anthropic, so ask before the picker opens.
         if (!(await ensureConsent())) return;
         const result = await importReceipt({
-          pick: kind === 'library' ? pickFromLibrary : pickFromFiles,
+          pick: async () => {
+            phase.current = 'picking';
+            const outcome = await (kind === 'library' ? pickFromLibrary : pickFromFiles)();
+            // A newer tap replaced this pick; drop what it returns.
+            if (!current()) return { status: 'canceled' };
+            phase.current = 'busy';
+            return outcome;
+          },
           upload: (receipt) => {
             setProgress({ previewUri: receipt.previewUri });
             return scanMutation.mutateAsync({
@@ -89,16 +103,17 @@ export function useReceiptImport() {
           // Consent was withdrawn elsewhere or the policy changed: ask again.
           // After Allow the user picks the file again.
           markRequired();
-          busy.current = false;
+          phase.current = 'idle';
           await askForConsent();
         } else if (result.status === 'error') {
           Alert.alert('Couldn’t import receipt', result.message);
         }
       } catch {
+        if (!current()) return;
         setProgress(null);
         Alert.alert('Couldn’t import receipt', 'The picker couldn’t open. Try again.');
       } finally {
-        busy.current = false;
+        if (current()) phase.current = 'idle';
       }
     },
     [

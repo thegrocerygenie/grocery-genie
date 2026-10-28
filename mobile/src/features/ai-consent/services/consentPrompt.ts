@@ -13,9 +13,15 @@ export function requestAiConsent(open: () => void): Promise<boolean> {
   });
 }
 
-/** Called by the sheet: Allow saved, manual entry, or the sheet was dismissed. */
-export function answerAiConsent(allowed: boolean): void {
+/**
+ * Called by the sheet: Allow saved, manual entry, or the sheet was dismissed.
+ * With `delayMs`, the waiting request is taken now and answered later, so a
+ * new request in between is not answered by mistake.
+ */
+export function answerAiConsent(allowed: boolean, delayMs = 0): void {
   const resolve = pending;
   pending = null;
-  resolve?.(allowed);
+  if (!resolve) return;
+  if (delayMs > 0) setTimeout(() => resolve(allowed), delayMs);
+  else resolve(allowed);
 }

@@ -5,7 +5,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import AiConsentSheet from '../../app/ai-consent';
+import AiConsentSheet, { SHEET_DISMISS_MS } from '../../app/ai-consent';
 import { requestAiConsent } from '@/features/ai-consent/services/consentPrompt';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
@@ -42,9 +42,20 @@ it('closes once the server saved consent, and answers yes after the sheet is gon
   await Promise.resolve();
   expect(answered).toBeUndefined();
 
-  unmount();
-  await answer;
-  expect(answered).toBe(true);
+  // The route unmounts as soon as the sheet starts closing; a picker presented
+  // then lands on the closing sheet, and iOS drops it with no error.
+  jest.useFakeTimers();
+  try {
+    unmount();
+    await Promise.resolve();
+    expect(answered).toBeUndefined();
+
+    jest.advanceTimersByTime(SHEET_DISMISS_MS);
+    await answer;
+    expect(answered).toBe(true);
+  } finally {
+    jest.useRealTimers();
+  }
 });
 
 it('stays open with the reason when saving fails', () => {
@@ -73,4 +84,24 @@ it('answers no when swiped down', async () => {
   unmount();
 
   await expect(answer).resolves.toBe(false);
+});
+
+it('does not answer a newer request with the delayed yes', async () => {
+  mockGrant.mockImplementation((_v: unknown, opts: { onSuccess: () => void }) => opts.onSuccess());
+  const first = requestAiConsent(jest.fn());
+  const { unmount } = render(<AiConsentSheet />);
+  fireEvent.press(screen.getByRole('button', { name: 'Allow' }));
+
+  jest.useFakeTimers();
+  try {
+    unmount();
+    let second: boolean | undefined;
+    void requestAiConsent(jest.fn()).then((a) => (second = a));
+    jest.advanceTimersByTime(SHEET_DISMISS_MS);
+
+    await expect(first).resolves.toBe(true);
+    expect(second).toBeUndefined();
+  } finally {
+    jest.useRealTimers();
+  }
 });
