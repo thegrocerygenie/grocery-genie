@@ -107,7 +107,11 @@ describe('Scan queues receipts it cannot upload', () => {
 
     fireEvent.press(screen.getByLabelText('Capture receipt'));
 
-    await waitFor(() => expect(screen.queryByText('Capturing…')).toBeNull());
+    // Wait on getByText, not queryByText(...).toBeNull(): a failing toBeNull
+    // pretty-prints the whole element tree, which under a loaded full run can
+    // take longer than waitFor's 1 s budget by itself.
+    await waitFor(() => expect(screen.getByText('Couldn’t read that — try again')).toBeTruthy());
+    expect(screen.queryByText('Capturing…')).toBeNull();
     expect(screen.queryByText('Saved · will upload automatically')).toBeNull();
     expect(useOfflineStore.getState().pendingReceipts).toHaveLength(0);
     expect(persistCapturedImage).not.toHaveBeenCalled();
@@ -120,7 +124,8 @@ describe('Scan queues receipts it cannot upload', () => {
 
     fireEvent.press(screen.getByLabelText('Capture receipt'));
 
-    await waitFor(() => expect(screen.queryByText('Capturing…')).toBeNull());
+    await waitFor(() => expect(screen.getByText('That doesn’t look like a receipt')).toBeTruthy());
+    expect(screen.queryByText('Capturing…')).toBeNull();
     expect(useOfflineStore.getState().pendingReceipts).toHaveLength(0);
   });
 
