@@ -74,12 +74,12 @@ Fixed already: H1 and H2 (#20), H4 and M8 (#22, #29), H5, M1 and M2 (#21), and t
 - [ ] **H3:** the app stops responding to touches after an edge-swipe back. Fixed in code by PR 35: a patch for react-native-screens 4.16's back-button bug (upstream #3294), plus a guard test. Expo Go can't load native patches, so it is still unproven at runtime. Prove it on a native build with the device checklist in `13-validation-strategy.md`, then tick this.
 
 **Medium**
-- [ ] **M3:** the duplicate-receipt warning never appears.
-- [ ] **M4:** `receipt_abandoned {stage: capture}` fires on every Scan screen re-render, which inflates analytics.
-- [ ] **M5:** budget alerts fire for past periods, including months before the budget existed. Check this against PR 11 and PR 16 first; they may have changed it.
-- [ ] **M6:** the Language setting does nothing, and its default looks wrong.
+- [x] **M3:** the duplicate-receipt warning never appears. Fixed: Review shows a "Possible duplicate" banner from the scan's `duplicate_warning`, and a receipt in Recently Deleted no longer counts as a duplicate. A receipt queued offline and opened from History shows no warning, because the warning comes only with the scan response.
+- [x] **M4:** `receipt_abandoned {stage: capture}` fires on every Scan screen re-render, which inflates analytics. Fixed: `useAnalytics` now returns a stable object. This also fixed the same over-count for `{stage: review}`.
+- [x] **M5:** budget alerts fire for past periods, including months before the budget existed. Fixed: only the current period alerts (the periods that hold yesterday, today, and tomorrow in UTC, so a user's local date still counts). A receipt dated in a later period does not alert when that period begins.
+- [x] **M6:** the Language setting does nothing, and its default looks wrong. Fixed: the extractor always reads all six RC-05 languages, so "Receipt Languages" is now a read-only list with no switches.
 - [x] **M7:** the onboarding camera screen and the Scan permission prompt said "Photos are processed on-device". Fixed in PR 31; a guard test now fails on any on-device claim in the app.
-- [ ] **M9:** the Budget dashboard's pull-to-refresh spinner sticks after a background refetch.
+- [x] **M9:** the Budget dashboard's pull-to-refresh spinner sticks after a background refetch. Fixed: the spinner shows only for a refresh that the user pulled, on Budget and History (`useUserRefresh`). Not yet checked on a device.
 
 **Low**
 - [ ] **L1:** the Scan pill always says "Receipt detected", even while idle.
