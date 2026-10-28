@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
@@ -23,6 +24,7 @@ import { ImportProgressOverlay } from '@/features/receipt-capture/components/Imp
 import { OfflineQueueSection } from '@/features/receipt-capture/components/OfflineQueueSection';
 import { deletePendingImage } from '@/features/receipt-capture/services/pendingImageFiles';
 import { useUserRefresh } from '@/hooks/useUserRefresh';
+import { confirmDeleteReceipt } from '@/features/lifecycle/utils/confirmDeleteReceipt';
 import { useReceiptImport } from '@/features/receipt-capture/hooks/useReceiptImport';
 import { useReceipts } from '@/features/receipt-capture/hooks/useReceipts';
 import { useCategories } from '@/features/budget/hooks/useCategories';
@@ -100,46 +102,73 @@ function ReceiptRow({ receipt, showDivider, categories, onPress, onDelete }: Rec
   const sub = needsReview
     ? 'Needs review'
     : `${formatShortDate(receipt.date)} · ${itemCount} items`;
+  const label = receipt.store_name ?? 'Receipt';
+
+  // L6: swipe left for Delete, as in Mail. Long-press still works, and
+  // VoiceOver offers Delete as a row action.
+  const renderDeleteAction = () => (
+    <Pressable
+      onPress={onDelete}
+      style={({ pressed }) => [styles.swipeDelete, pressed && { opacity: 0.8 }]}
+      accessibilityRole="button"
+      accessibilityLabel={`Delete ${label}`}
+    >
+      <SymbolView name="trash.fill" size={18} tintColor="#fff" />
+      <Text style={styles.swipeDeleteLabel}>Delete</Text>
+    </Pressable>
+  );
 
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onDelete}
-      delayLongPress={400}
-      style={({ pressed }) => [
-        styles.row,
-        showDivider && styles.rowDivider,
-        pressed && { backgroundColor: colors.iosFill3 },
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={`${receipt.store_name ?? 'Receipt'}, ${sub}, $${total.toFixed(2)}. Long press to delete.`}
+    <ReanimatedSwipeable
+      renderRightActions={renderDeleteAction}
+      rightThreshold={40}
+      overshootRight={false}
     >
-      <View style={[styles.catCircle, { backgroundColor: meta.color }]}>
-        <SymbolView
-          name={meta.symbol as Parameters<typeof SymbolView>[0]['name']}
-          size={14}
-          tintColor="#fff"
-        />
-      </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={type.headline} numberOfLines={1}>
-          {receipt.store_name ?? 'Unknown store'}
-        </Text>
-        <Text
-          style={[
-            type.caption1,
-            {
-              color: needsReview ? colors.orange : colors.iosLabel2,
-              marginTop: 1,
-            },
-          ]}
-        >
-          {sub}
-        </Text>
-      </View>
-      <Text style={[type.money, { fontSize: 15 }]}>${total.toFixed(2)}</Text>
-      <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
-    </Pressable>
+      <Pressable
+        onPress={onPress}
+        onLongPress={onDelete}
+        delayLongPress={400}
+        // The divider stays on this plain view: the swipeable's container is
+        // animated, and Reanimated can't take the adaptive separator color.
+        style={({ pressed }) => [
+          styles.row,
+          showDivider && styles.rowDivider,
+          pressed && { backgroundColor: colors.iosFill3 },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={`${label}, ${sub}, $${total.toFixed(2)}`}
+        accessibilityActions={[{ name: 'delete', label: 'Delete' }]}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === 'delete') onDelete();
+        }}
+      >
+        <View style={[styles.catCircle, { backgroundColor: meta.color }]}>
+          <SymbolView
+            name={meta.symbol as Parameters<typeof SymbolView>[0]['name']}
+            size={14}
+            tintColor="#fff"
+          />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={type.headline} numberOfLines={1}>
+            {receipt.store_name ?? 'Unknown store'}
+          </Text>
+          <Text
+            style={[
+              type.caption1,
+              {
+                color: needsReview ? colors.orange : colors.iosLabel2,
+                marginTop: 1,
+              },
+            ]}
+          >
+            {sub}
+          </Text>
+        </View>
+        <Text style={[type.money, { fontSize: 15 }]}>${total.toFixed(2)}</Text>
+        <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
+      </Pressable>
+    </ReanimatedSwipeable>
   );
 }
 
@@ -222,22 +251,10 @@ export default function HistoryScreen() {
     ]);
   };
 
-  const onDelete = (id: string, label: string) => {
-    Alert.alert(
-      'Delete receipt?',
-      `${label} will be moved to Recently Deleted (30 days to restore).`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            void deleteReceipt.mutateAsync(id);
-          },
-        },
-      ],
-    );
-  };
+  const onDelete = (id: string, label: string) =>
+    confirmDeleteReceipt(label, () => {
+      void deleteReceipt.mutateAsync(id);
+    });
 
   const dateRange = useMemo(() => getDateRange(filter), [filter]);
   const queryParams = useMemo(
@@ -411,7 +428,17 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 14,
     paddingVertical: 11,
+    // Opaque, so the swipe's Delete stays hidden until the row slides.
+    backgroundColor: colors.iosBg2,
   },
+  swipeDelete: {
+    width: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    backgroundColor: colors.red,
+  },
+  swipeDeleteLabel: { ...type.caption1, color: '#fff', fontWeight: '600' },
   rowDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.iosSeparator,
