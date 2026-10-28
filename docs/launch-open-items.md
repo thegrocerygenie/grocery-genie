@@ -1,6 +1,6 @@
 # Launch open items
 
-Curated on 2026-10-27, after PRs 9–29 merged (main at `1f0b3e4`). Every session that worked on these is archived, so this file is the list to work from. Tick an item off here when it lands.
+Curated on 2026-10-27, after PRs 9–29 merged (main at `1f0b3e4`). Updated the same day after PRs 30–37 merged (main at `699b739`). Every session that worked on these is archived, so this file is the list to work from. Tick an item off here when it lands.
 
 Sources:
 - [privacy review](legal/privacy-review-2026-10-27.md)
@@ -9,7 +9,7 @@ Sources:
 
 ## 1. App Store blockers
 
-- [ ] **AI consent before the first scan** (Apple 5.1.2(i), review blocker 3). The app asks nobody before it sends receipt photos and item names to Anthropic. Card: "Ask permission before sending receipts to AI". When it ships, add the consent wording to `privacy.ts` (a test currently forbids it).
+- [x] **AI consent before the first scan** (Apple 5.1.2(i), review blocker 3). Shipped in PR 34: a one-time consent sheet, a Settings switch to withdraw it, server-side consent (a 403 without it), and the consent wording in `privacy.ts`.
 - [ ] **Public privacy policy URL** for App Store Connect (5.1.1(i)), for example on the `marketing/` site. It must match the in-app text.
 - [ ] **Marketing FAQ makes a false privacy claim.** `marketing/index.html` (the "Will my receipts be private?" answer) says receipts are "processed on-device for OCR" and that "we never sell or share your data". Receipts are uploaded to our servers, and Anthropic reads them. The same answer promises an opt-in community-pricing feature, which is a later-phase feature. Rewrite it to match `privacy.ts` before the site goes public.
 - [ ] **App Store privacy label** filled in from the table in the privacy review.
@@ -23,6 +23,11 @@ Sources:
   - There is no `eas.json` yet, so no store build profile.
   - `npx expo run:ios` treats Xcode 27 Simulators as physical devices ("No code signing certificates"). For now, build with `xcodebuild -sdk iphonesimulator`, then use `xcrun simctl install`.
   - Google Sign-In has no config plugin in `app.json`, so the Info.plist has no reversed-client-ID URL scheme. Expo Go hides the button, but a native build shows it. Check that "Continue with Google" works on a native build before launch.
+
+## 1b. Before the next deploy
+
+- [ ] **Set `GG_RESEND_API_KEY` in production.** Since PR 32, the API refuses to start without it, so nothing can log email bodies. Only local dev opts out, with `GG_EMAIL_DELIVERY=off`.
+- [ ] **Run `npm install` in `mobile/` after pulling.** PR 35's H3 fix is a `patch-package` patch to react-native-screens 4.16. Without the install, `nativeBackButtonPatch.test.ts` fails (seen on 2026-10-27 in a stale checkout), and a native build ships without the fix.
 
 ## 2. Claims the privacy text makes that code doesn't enforce yet
 
@@ -66,7 +71,7 @@ From `docs/prd/13-validation-strategy.md`. Run them on a development build from 
 Fixed already: H1 and H2 (#20), H4 and M8 (#22, #29), H5, M1 and M2 (#21), and the L4 privacy-copy mismatch (#27).
 
 **High**
-- [ ] **H3:** the app stops responding to touches after an edge-swipe back.
+- [ ] **H3:** the app stops responding to touches after an edge-swipe back. Fixed in code by PR 35: a patch for react-native-screens 4.16's back-button bug (upstream #3294), plus a guard test. Expo Go can't load native patches, so it is still unproven at runtime. Prove it on a native build with the device checklist in `13-validation-strategy.md`, then tick this.
 
 **Medium**
 - [ ] **M3:** the duplicate-receipt warning never appears.
