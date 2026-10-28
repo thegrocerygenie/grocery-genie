@@ -581,6 +581,12 @@ function ItemRow({
   const [text, setText] = useState('');
   const [editingQuantity, setEditingQuantity] = useState(false);
   const [quantityText, setQuantityText] = useState('');
+  // L9: a quantity edit keeps the line total (what was paid), so show the
+  // unit price it implies instead of changing it out of sight.
+  const quantityLabel =
+    item.quantity === 1
+      ? 'Qty 1'
+      : `Qty ${formatQuantity(item.quantity)} · $${(item.totalPrice / item.quantity).toFixed(2)} each`;
   const meta = resolveCategoryMeta(item.categoryId, categories);
 
   return (
@@ -657,10 +663,10 @@ function ItemRow({
             hitSlop={{ top: 8, bottom: 8, right: 24 }}
             accessibilityRole="button"
             accessibilityLabel={`Quantity of ${item.name}`}
-            accessibilityValue={{ text: formatQuantity(item.quantity) }}
+            accessibilityValue={{ text: quantityLabel }}
             accessibilityHint={readOnly ? undefined : 'Double-tap to change'}
           >
-            <Text style={styles.quantityText}>{`Qty ${formatQuantity(item.quantity)}`}</Text>
+            <Text style={styles.quantityText}>{quantityLabel}</Text>
           </Pressable>
         )}
       </View>
