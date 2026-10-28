@@ -104,7 +104,7 @@ export default function OnboardingBudget() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
-  headerBtn: { ...type.body, color: colors.tint },
+  headerBtn: { ...type.body, color: colors.tint, paddingHorizontal: spacing.xs },
 
   sectionLabel: {
     ...type.footnote,

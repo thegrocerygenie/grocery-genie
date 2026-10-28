@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
   center: { alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
 
-  headerBtn: { ...type.body, color: colors.tint },
+  headerBtn: { ...type.body, color: colors.tint, paddingHorizontal: spacing.xs },
 
   image: {
     height: 200,
