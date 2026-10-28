@@ -1,70 +1,40 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
-import { useMe, useUpdatePreferences } from '@/features/auth/hooks/useAuth';
+import { RECEIPT_LANGUAGES } from '@/constants/receiptLanguages';
 
-interface Lang {
-  id: string;
-  english: string;
-  native: string;
-}
-
-const LANGUAGES: readonly Lang[] = [
-  { id: 'en', english: 'English', native: 'auto' },
-  { id: 'fr', english: 'French', native: 'Français' },
-  { id: 'es', english: 'Spanish', native: 'Español' },
-  { id: 'de', english: 'German', native: 'Deutsch' },
-  { id: 'sr', english: 'Serbian', native: 'Српски' },
-  { id: 'zh', english: 'Mandarin', native: '中文' },
-];
-
+// RC-05: extraction reads every language below on every receipt, so there is
+// nothing to choose. The screen says what is supported (M6).
 export default function LanguageSettingsScreen() {
-  const { data: profile } = useMe();
-  const update = useUpdatePreferences();
-  const enabledList = profile?.preferences.ocr_languages ?? ['en'];
-  const enabled: Record<string, boolean> = LANGUAGES.reduce(
-    (acc, l) => ({ ...acc, [l.id]: enabledList.includes(l.id) }),
-    { en: true } as Record<string, boolean>,
-  );
-
-  const toggle = (id: string) => {
-    const next = enabled[id]
-      ? enabledList.filter((x) => x !== id)
-      : [...new Set([...enabledList, id])];
-    update.mutate({ ocr_languages: next });
-  };
-
   return (
     <>
-      <Stack.Screen options={{ title: 'Language', headerBackTitle: 'Settings' }} />
+      <Stack.Screen options={{ title: 'Receipt Languages', headerBackTitle: 'Settings' }} />
       <ScrollView
         style={styles.root}
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: 60 }}
       >
         <Text style={styles.intro}>
-          Receipts in any selected language are processed automatically.
+          Receipts in any of these languages are read automatically. There is nothing to set up.
         </Text>
 
         <View style={styles.listCard}>
-          {LANGUAGES.map((l, i) => (
+          {RECEIPT_LANGUAGES.map((l, i) => (
             <View
               key={l.id}
               style={[styles.row, i > 0 && styles.rowDivider]}
-              accessibilityLabel={`${l.english} ${enabled[l.id] ? 'enabled' : 'disabled'}`}
+              accessible
+              accessibilityLabel={`${l.english}, supported`}
             >
               <View style={{ flex: 1 }}>
                 <Text style={[type.subheadline, { fontWeight: '500' }]}>{l.english}</Text>
-                <Text style={[type.caption1, { color: colors.iosLabel2 }]}>{l.native}</Text>
+                {l.native !== l.english ? (
+                  <Text style={[type.caption1, { color: colors.iosLabel2 }]}>{l.native}</Text>
+                ) : null}
               </View>
-              <Switch
-                value={!!enabled[l.id]}
-                onValueChange={() => toggle(l.id)}
-                trackColor={{ false: colors.iosFill1, true: colors.tint }}
-                ios_backgroundColor={colors.iosFill1}
-                accessibilityLabel={l.english}
-              />
+              <SymbolView name="checkmark" size={16} tintColor={colors.tint} />
             </View>
           ))}
         </View>

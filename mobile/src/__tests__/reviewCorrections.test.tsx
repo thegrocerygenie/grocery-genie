@@ -543,3 +543,19 @@ describe('Review opened from History', () => {
     ).toMatchObject({ disabled: true });
   });
 });
+
+// Edge case 4 (11-edge-cases.md): a likely duplicate is flagged before saving.
+describe('Review screen duplicate warning', () => {
+  it('warns when the scan matches a receipt saved in the last 24 hours', () => {
+    useReceiptStore.getState().setActiveScanResponse({ ...scan, duplicate_warning: true });
+    renderReview();
+
+    expect(screen.getByText('Possible duplicate')).toBeTruthy();
+  });
+
+  it('shows no warning for a new receipt', () => {
+    renderReview();
+
+    expect(screen.queryByText('Possible duplicate')).toBeNull();
+  });
+});

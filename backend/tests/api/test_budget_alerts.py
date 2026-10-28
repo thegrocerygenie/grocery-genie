@@ -41,6 +41,12 @@ async def _alert_thresholds(client: AsyncClient) -> list[int]:
     )
 
 
+def _pin_today(monkeypatch, day: str) -> None:
+    from app.core import clock
+
+    monkeypatch.setattr(clock, "today", lambda: date.fromisoformat(day))
+
+
 async def _manual_entry(
     client: AsyncClient, amount: float, on: str = "2026-03-20"
 ) -> None:
@@ -119,12 +125,14 @@ async def test_next_period_alerts_again(
     client: AsyncClient,
     test_image_bytes: bytes,
     mock_extractor: MockReceiptExtractor,
+    monkeypatch,
 ):
     await _overall_budget(client, 17.0)
     await _scan_and_confirm(client, test_image_bytes)  # March: 87%
 
     april = await mock_extractor.extract(b"", "image/jpeg")
     mock_extractor._result = april.model_copy(update={"date": "2026-04-10"})
+    _pin_today(monkeypatch, "2026-04-12")
     await _scan_and_confirm(client, test_image_bytes)  # April: 87%
 
     assert await _alert_thresholds(client) == [50, 50, 80, 80]
@@ -277,7 +285,9 @@ async def test_receipt_alerts_in_the_period_that_holds_its_date(
     dates: list[str],
     expected_alerts: list[int],
     claimed_period: date,
+    monkeypatch,
 ):
+    _pin_today(monkeypatch, claimed_period.isoformat())
     await _overall_budget(client, 20.0, period_start=period_start)
     amount = 17.0 if len(dates) == 1 else 10.0  # 85%, or 50% each
 
@@ -289,18 +299,17 @@ async def test_receipt_alerts_in_the_period_that_holds_its_date(
 
 
 async def test_receipts_on_either_side_of_the_reset_day_are_separate_periods(
-    client: AsyncClient, db_session: AsyncSession
+    client: AsyncClient, db_session: AsyncSession, monkeypatch
 ):
+    _pin_today(monkeypatch, "2026-03-20")
     await _overall_budget(client, 20.0, period_start="2026-02-15")
 
     await _manual_entry(client, 10.0, on="2026-03-14")  # Feb 15 - Mar 14: 50%
     await _manual_entry(client, 10.0, on="2026-03-15")  # Mar 15 - Apr 14: 50%
 
-    assert await _alert_thresholds(client) == [50, 50]
-    assert await _claimed_period_starts(db_session) == [
-        date(2026, 2, 15),
-        date(2026, 3, 15),
-    ]
+    # One period would hold $20 (100%). The current period holds only $10.
+    assert await _alert_thresholds(client) == [50]
+    assert await _claimed_period_starts(db_session) == [date(2026, 3, 15)]
 
 
 @pytest.fixture
@@ -347,6 +356,7 @@ async def test_category_correction_alerts_in_every_period_it_moves_spend(
         return await original(self, user_id, *dates)
 
     monkeypatch.setattr(BudgetService, "check_thresholds", spy)
+    _pin_today(monkeypatch, "2026-02-25")  # February is the period that alerts
     snacks = await _category_id(client, "Snacks & Treats")
     other = await _category_id(client, "Other")
     resp = await client.post(
@@ -456,3 +466,43 @@ async def test_status_accepts_only_known_values(
     resp = await client.patch(receipt_url, json={"status": "pending_review"})
     assert resp.status_code == 200
     assert resp.json()["status"] == "pending_review"
+
+
+# M5: an alert is something the user can act on, so only the period that
+# holds today alerts. A receipt dated in an earlier period still counts toward
+# that period's spend, but sends no push, including for periods before the
+# budget existed.
+@pytest.mark.parametrize(
+    ("period_start", "today", "receipt_date", "expected_alerts"),
+    [
+        pytest.param("2026-03-01", "2026-03-20", "2026-03-10", [50, 80], id="current"),
+        pytest.param("2026-03-01", "2026-04-02", "2026-03-10", [], id="last-month"),
+        pytest.param("2026-03-01", "2026-03-20", "2025-11-10", [], id="pre-budget"),
+        pytest.param("2026-03-15", "2026-04-10", "2026-03-20", [50, 80], id="reset-15"),
+        pytest.param("2026-03-15", "2026-04-10", "2026-04-20", [], id="reset-15-next"),
+        # The server's today is UTC, and the user's local date can be a day
+        # either side of it. A receipt dated that day must still alert.
+        pytest.param(
+            "2026-03-01", "2026-04-01", "2026-03-31", [50, 80], id="utc-ahead"
+        ),
+        pytest.param(
+            "2026-03-01", "2026-03-31", "2026-04-01", [50, 80], id="utc-behind"
+        ),
+        pytest.param("2026-03-01", "2026-04-02", "2026-03-31", [], id="two-days-late"),
+    ],
+)
+async def test_only_the_current_period_alerts(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch,
+    period_start: str,
+    today: str,
+    receipt_date: str,
+    expected_alerts: list[int],
+):
+    _pin_today(monkeypatch, today)
+    await _overall_budget(client, 20.0, period_start=period_start)
+
+    await _manual_entry(client, 17.0, on=receipt_date)  # 85%
+
+    assert await _alert_thresholds(client) == expected_alerts

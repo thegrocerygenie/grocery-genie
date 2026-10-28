@@ -21,6 +21,7 @@ import { getCategoryMetaByName } from '@/constants/categories';
 import { capBreachMessage } from '@/features/budget/utils/capBreach';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
+import { useUserRefresh } from '@/hooks/useUserRefresh';
 import { useBudgetStore } from '@/store/budgetStore';
 import type { DashboardData as ApiDashboardData } from '@/features/budget/types';
 
@@ -125,7 +126,8 @@ function adaptDashboard(api: ApiDashboardData | undefined, period: string): Dash
 export default function DashboardScreen() {
   const router = useRouter();
   const { selectedPeriod } = useBudgetStore();
-  const { data, isLoading, isError, refetch, isRefetching } = useDashboardSpending(selectedPeriod);
+  const { data, isLoading, isError, refetch } = useDashboardSpending(selectedPeriod);
+  const pull = useUserRefresh(refetch);
 
   const view = useMemo(() => adaptDashboard(data, selectedPeriod), [data, selectedPeriod]);
 
@@ -183,7 +185,11 @@ export default function DashboardScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ paddingBottom: 120 }}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.tint} />
+          <RefreshControl
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
+            tintColor={colors.tint}
+          />
         }
       >
         {isError && !data ? (

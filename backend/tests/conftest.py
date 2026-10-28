@@ -2,7 +2,7 @@ import io
 import os
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.core import clock
 from app.core.config import get_settings
 from app.llm.provider import MockReceiptExtractor
 from app.models.database import Base
@@ -39,6 +40,18 @@ def consented() -> dict:
         "ai_consent_at": datetime.now(UTC),
         "ai_consent_version": AI_CONSENT_POLICY_VERSION,
     }
+
+
+# The mock receipt and most fixtures are dated March 2026. Only the budget
+# period that holds today alerts (M5), so pin today inside that period. A test
+# that crosses periods sets ``clock.today`` itself.
+TEST_TODAY = date(2026, 3, 20)
+
+
+@pytest.fixture(autouse=True)
+def pinned_today(monkeypatch) -> date:
+    monkeypatch.setattr(clock, "today", lambda: TEST_TODAY)
+    return TEST_TODAY
 
 
 @pytest.fixture

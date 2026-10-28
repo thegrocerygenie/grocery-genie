@@ -35,7 +35,7 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     question: 'Which languages can receipts be in?',
     answer:
-      'English, French, Spanish, German, Serbian and Mandarin. Choose yours in Settings → Language.',
+      'English, French, Spanish, German, Serbian and Mandarin. Receipts in any of them are read automatically.',
   },
   {
     question: 'I deleted a receipt by mistake.',
