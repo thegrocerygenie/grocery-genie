@@ -90,8 +90,8 @@ const legacyLinks = [
   {
     from: '/language-settings',
     to: '/settings/language-settings',
-    title: 'Language',
-    content: /processed automatically/,
+    title: 'Receipt Languages',
+    content: /read automatically/,
   },
 ];
 
