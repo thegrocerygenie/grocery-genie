@@ -401,3 +401,42 @@ async def test_dashboard_prior_average_is_zero_without_earlier_spending(
     response = await client.get("/api/dashboard/spending?period=2026-03")
 
     assert response.json()["prior_average"] == 0.0
+
+
+# L7: the Budget tab said "Scan your first receipt" to a user whose receipts
+# are all in other months. has_receipts tells the app the account isn't new.
+@pytest.mark.asyncio
+async def test_dashboard_has_no_receipts_for_a_new_account(
+    client: AsyncClient, seeded_db, db_session
+):
+    # Another user's receipt, and a receipt in Recently Deleted, don't count.
+    await _add_receipt(db_session, date(2026, 3, 10), [(None, 5.0)], user_id=USER_B_ID)
+    await _add_receipt(db_session, date(2026, 3, 10), [(None, 5.0)])
+    receipt = (
+        await db_session.execute(
+            Receipt.__table__.select().where(Receipt.user_id == DEV_USER_ID)
+        )
+    ).first()
+    await db_session.execute(
+        Receipt.__table__.update()
+        .where(Receipt.id == receipt.id)
+        .values(deleted_at=date(2026, 3, 11))
+    )
+    await db_session.commit()
+
+    response = await client.get("/api/dashboard/spending?period=2026-03")
+
+    assert response.json()["has_receipts"] is False
+
+
+@pytest.mark.asyncio
+async def test_dashboard_has_receipts_from_another_month(
+    client: AsyncClient, seeded_db, db_session
+):
+    await _add_receipt(db_session, date(2026, 1, 10), [(None, 5.0)])
+
+    response = await client.get("/api/dashboard/spending?period=2026-03")
+
+    data = response.json()
+    assert data["overall"]["spent"] == 0
+    assert data["has_receipts"] is True

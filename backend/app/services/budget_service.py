@@ -628,6 +628,7 @@ class BudgetService:
         trend = await self.get_spending_trend(user_id, period)
         prior_average = await self.get_prior_average(user_id, period)
         category_changes = await self.get_category_changes(user_id, period)
+        has_receipts = await self._has_receipts(user_id)
 
         return DashboardSpendingResponse(
             period=period,
@@ -638,7 +639,17 @@ class BudgetService:
             prior_average=prior_average,
             previous_period=previous_period(period),
             category_changes=category_changes,
+            has_receipts=has_receipts,
         )
+
+    async def _has_receipts(self, user_id: uuid.UUID) -> bool:
+        """Whether the user has any receipt outside Recently Deleted."""
+        result = await self.db.execute(
+            select(Receipt.id)
+            .where(Receipt.user_id == user_id, Receipt.deleted_at.is_(None))
+            .limit(1)
+        )
+        return result.first() is not None
 
     async def check_thresholds(
         self,
