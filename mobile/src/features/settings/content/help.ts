@@ -21,7 +21,7 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     question: 'How do budget alerts work?',
     answer:
-      'You can get an alert at 50%, 80% and 100% of your monthly budget. Each one is sent at most once a month. Turn them on or off in Settings → Notifications.',
+      'You can get an alert at 50%, 80% and 100% of your monthly budget. Each one is sent at most once a month. Turn them on or off in Settings → Alerts.',
   },
   {
     question: 'Can I fix a wrong category?',

@@ -531,6 +531,25 @@ describe('Review opened from History', () => {
     );
   });
 
+  // L4: the sheet that edits a saved receipt says so; a new scan says Review.
+  it('titles the sheet "Edit Receipt" when it edits a saved receipt', async () => {
+    mockGetReceipt.mockResolvedValue(stored('confirmed'));
+    useReceiptStore.getState().clearScanSession();
+    renderReview();
+    act(() => router.back());
+    act(() => router.push({ pathname: '/review', params: { receiptId: 'r-2', edit: '1' } }));
+
+    await screen.findByLabelText('Store');
+    expect(headerTitles()).toContain('Edit Receipt');
+    expect(headerTitles()).not.toContain('Review');
+  });
+
+  it('titles a new scan "Review"', () => {
+    renderReview();
+
+    expect(headerTitles()).toContain('Review');
+  });
+
   it('shows a confirmed receipt read-only', async () => {
     mockGetReceipt.mockResolvedValue(stored('confirmed'));
     openFromHistory();
@@ -559,3 +578,21 @@ describe('Review screen duplicate warning', () => {
     expect(screen.queryByText('Possible duplicate')).toBeNull();
   });
 });
+
+interface HostNode {
+  type: string;
+  props: Record<string, unknown>;
+  children: (HostNode | string)[] | null;
+}
+
+function headerTitles(): string[] {
+  const titles: string[] = [];
+  const walk = (node: HostNode | string): void => {
+    if (typeof node === 'string') return;
+    if (node.type === 'RNSScreenStackHeaderConfig') titles.push(String(node.props.title));
+    node.children?.forEach(walk);
+  };
+  const root = screen.toJSON() as HostNode | HostNode[] | null;
+  (Array.isArray(root) ? root : root ? [root] : []).forEach(walk);
+  return titles;
+}

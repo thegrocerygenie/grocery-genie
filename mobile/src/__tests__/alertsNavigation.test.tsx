@@ -95,7 +95,8 @@ describe('Alerts navigation', () => {
   it('pushes Alerts onto the Settings stack, with a Back button to Settings', async () => {
     openSettings();
 
-    fireEvent.press(await screen.findByLabelText('Notifications'));
+    // L4: the row and the screen it opens share one name.
+    fireEvent.press(await screen.findByLabelText('Alerts'));
 
     expect(await screen.findByText('50% of budget')).toBeTruthy();
     expect(stacks().some((t) => t.includes('Settings') && t.includes('Alerts'))).toBe(true);

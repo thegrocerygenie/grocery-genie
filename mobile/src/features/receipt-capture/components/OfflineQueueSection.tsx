@@ -160,6 +160,18 @@ interface PendingRowProps {
   onPressFailed: (receipt: PendingReceipt) => void;
 }
 
+/** L4: name the row for where the photo came from, not always "Scanned". */
+function pendingTitle(receipt: PendingReceipt): string {
+  switch (receipt.source) {
+    case 'library':
+      return 'Imported photo';
+    case 'pdf':
+      return 'Imported PDF';
+    default:
+      return 'Scanned receipt';
+  }
+}
+
 function PendingRow({
   receipt,
   isConnected,
@@ -168,6 +180,7 @@ function PendingRow({
   onPressFailed,
 }: PendingRowProps) {
   const failed = receipt.status === 'failed';
+  const title = pendingTitle(receipt);
   const detail = failed
     ? failedReason(receipt)
     : `${formatQueuedAgo(receipt.capturedAt)} · ${rowState(receipt, isConnected, consentNeeded)}`;
@@ -182,7 +195,7 @@ function PendingRow({
         pressed && styles.rowPressed,
       ]}
       accessibilityRole={failed ? 'button' : undefined}
-      accessibilityLabel={`Scanned receipt, ${detail}`}
+      accessibilityLabel={`${title}, ${detail}`}
       accessibilityHint={failed ? 'Enter it manually or discard the photo' : undefined}
     >
       <View style={[styles.iconSquare, failed ? styles.iconFailed : styles.iconQueued]}>
@@ -193,7 +206,7 @@ function PendingRow({
         />
       </View>
       <View style={styles.rowText}>
-        <Text style={type.body}>Scanned receipt</Text>
+        <Text style={type.body}>{title}</Text>
         <Text style={[styles.detail, failed && styles.detailFailed]}>{detail}</Text>
       </View>
       {failed ? <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} /> : null}
