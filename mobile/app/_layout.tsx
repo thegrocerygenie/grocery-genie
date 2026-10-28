@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
-import { useColorScheme, View } from 'react-native';
+import { StyleSheet, useColorScheme, View } from 'react-native';
 import { ThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Redirect, Stack, useSegments } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { APP_FONTS } from '@/constants/fonts';
@@ -64,49 +65,59 @@ export default function RootLayout() {
     return <View style={{ flex: 1, backgroundColor: colors.iosBg }} />;
   }
 
+  // Gesture handler needs one root view, for the History row swipe (L6).
   return (
-    <ThemeProvider value={navigationTheme(scheme)}>
-      <QueryClientProvider client={queryClient}>
-        <SyncQueueProvider />
-        <PushNotificationsProvider />
-        <OnboardingGate>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="review"
-              options={{ title: 'Review Receipt', presentation: 'modal' }}
-            />
-            <Stack.Screen
-              name="budget-settings"
-              options={{ title: 'Budget Settings', presentation: 'modal' }}
-            />
-            <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: false }} />
-            <Stack.Screen
-              name="receipt/[id]"
-              options={{ title: 'Receipt', headerBackTitle: 'History' }}
-            />
-            <Stack.Screen
-              name="manual-entry"
-              options={{ title: 'Manual Entry', presentation: 'modal' }}
-            />
-            <Stack.Screen
-              name="ai-consent"
-              options={{ presentation: 'modal', headerShown: false }}
-            />
-            <Stack.Screen name="top-items" options={{ title: 'Top Items' }} />
-            <Stack.Screen name="trend" options={{ title: 'Trend' }} />
-            <Stack.Screen
-              name="email-change"
-              options={{ title: 'Change Email', presentation: 'modal' }}
-            />
-            <Stack.Screen
-              name="recently-deleted"
-              options={{ title: 'Recently Deleted', presentation: 'modal' }}
-            />
-          </Stack>
-        </OnboardingGate>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <ThemeProvider value={navigationTheme(scheme)}>
+        <QueryClientProvider client={queryClient}>
+          <SyncQueueProvider />
+          <PushNotificationsProvider />
+          <OnboardingGate>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="review"
+                options={{ title: 'Review Receipt', presentation: 'modal' }}
+              />
+              <Stack.Screen
+                name="budget-settings"
+                options={{ title: 'Budget Settings', presentation: 'modal' }}
+              />
+              <Stack.Screen
+                name="settings"
+                options={{ presentation: 'modal', headerShown: false }}
+              />
+              <Stack.Screen
+                name="receipt/[id]"
+                options={{ title: 'Receipt', headerBackTitle: 'History' }}
+              />
+              <Stack.Screen
+                name="manual-entry"
+                options={{ title: 'Manual Entry', presentation: 'modal' }}
+              />
+              <Stack.Screen
+                name="ai-consent"
+                options={{ presentation: 'modal', headerShown: false }}
+              />
+              <Stack.Screen name="top-items" options={{ title: 'Top Items' }} />
+              <Stack.Screen name="trend" options={{ title: 'Trend' }} />
+              <Stack.Screen
+                name="email-change"
+                options={{ title: 'Change Email', presentation: 'modal' }}
+              />
+              <Stack.Screen
+                name="recently-deleted"
+                options={{ title: 'Recently Deleted', presentation: 'modal' }}
+              />
+            </Stack>
+          </OnboardingGate>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+});

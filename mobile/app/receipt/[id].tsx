@@ -14,6 +14,8 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { resolveCategoryMeta } from '@/constants/categories';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useCategories } from '@/features/budget/hooks/useCategories';
+import { useDeleteReceipt } from '@/features/lifecycle/hooks/useLifecycle';
+import { confirmDeleteReceipt } from '@/features/lifecycle/utils/confirmDeleteReceipt';
 import { getReceipt } from '@/features/receipt-capture/services/receiptApi';
 import { formatLongDate } from '@/features/receipt-capture/utils/receiptDate';
 import { receiptImageSource } from '@/features/receipt-capture/utils/receiptImageSource';
@@ -37,7 +39,14 @@ export default function ReceiptDetailScreen() {
     enabled: !!id,
   });
 
+  const deleteReceipt = useDeleteReceipt();
+
   const onEdit = () => router.push({ pathname: '/review', params: { receiptId: id, edit: '1' } });
+  // L6: delete from here too. The receipt moves to Recently Deleted.
+  const onDelete = () =>
+    confirmDeleteReceipt(receipt?.store_name ?? 'Receipt', () =>
+      deleteReceipt.mutate(id, { onSuccess: () => router.back() }),
+    );
 
   const header = (
     <Stack.Screen
@@ -128,6 +137,17 @@ export default function ReceiptDetailScreen() {
             </View>
           ))}
         </View>
+
+        <Pressable
+          onPress={onDelete}
+          disabled={deleteReceipt.isPending}
+          style={({ pressed }) => [styles.listCard, styles.deleteRow, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Delete receipt"
+          accessibilityHint="Moves it to Recently Deleted for 30 days"
+        >
+          <Text style={styles.deleteLabel}>Delete Receipt</Text>
+        </Pressable>
       </ScrollView>
     </>
   );
@@ -178,4 +198,13 @@ const styles = StyleSheet.create({
   },
   itemName: { flex: 1 },
   itemPrice: { ...type.money, fontSize: 15 },
+  deleteRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingVertical: 11,
+    marginTop: spacing.md,
+  },
+  deleteLabel: { ...type.body, color: colors.red },
+  pressed: { opacity: 0.6 },
 });
