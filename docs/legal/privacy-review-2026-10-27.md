@@ -1,10 +1,10 @@
 # Privacy policy review: in-app text, 2026-10-27
 
-Reviewed: `mobile/src/features/settings/content/privacy.ts` (drafted 2026-10-26), against the code on `main` at `39b9cf8`, Apple's App Review Guidelines (fetched 2026-10-27), GDPR / UK GDPR Article 13, CCPA/CPRA, and COPPA. Claude did a full claim-by-claim pass. Codex did a second, independent read-only pass. Each finding below was checked against the code.
+Reviewed: `mobile/src/features/settings/content/privacy.ts` (drafted 2026-10-26), against the code on `main` at `105631b`, Apple's App Review Guidelines (fetched 2026-10-27), GDPR / UK GDPR Article 13, CCPA/CPRA, and COPPA. Claude did a full claim-by-claim pass. Codex did a second, independent read-only pass. Each finding below was checked against the code.
 
 **This is not legal advice.** It is an engineering review of what the code does against what the text says, plus a checklist of what regulators and Apple ask for. A lawyer should review the final text, especially the controller identity, lawful bases, and the CCPA applicability call.
 
-## Status after the revision (2026-10-27, main at `6fb946e`)
+## Status after the revision (2026-10-27, main at `8dbe4f8`)
 
 `privacy.ts` now holds the revised text. It uses the facts supplied on 2026-10-27:
 - The controller is "The Grocery Genie Inc." (a placeholder in one constant, `COMPANY`).

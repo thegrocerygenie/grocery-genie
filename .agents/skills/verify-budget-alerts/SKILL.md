@@ -113,7 +113,7 @@ A worker that dies, or a `db.commit()` that fails, after step 2 gives the same r
 
 The cost: an alert whose outcome is unknown is never retried, so the user may miss it.
 
-Before the fix, `repro/h2_push_resend.py` pushed messages twice in every scenario: lost response 2 of 2, chunks 100 of 120, failed commit 2 of 2. After the fix, it pushes none twice: lost ends `failed`, chunks ends all `sent`, and crash leaves `sending` until the expire step. The same script still finds 3 of 3 on the old code (`a7a60f8`). Run it as `backend/.venv/bin/python formal/budget_alerts/repro/h2_push_resend.py`, against Postgres, with Expo stubbed by `httpx.MockTransport`. The unit tests in `backend/tests/tasks/test_push_tasks.py` cover the same faults on SQLite.
+Before the fix, `repro/h2_push_resend.py` pushed messages twice in every scenario: lost response 2 of 2, chunks 100 of 120, failed commit 2 of 2. After the fix, it pushes none twice: lost ends `failed`, chunks ends all `sent`, and crash leaves `sending` until the expire step. The same script still finds 3 of 3 on the old code (`7cfad8c`). Run it as `backend/.venv/bin/python formal/budget_alerts/repro/h2_push_resend.py`, against Postgres, with Expo stubbed by `httpx.MockTransport`. The unit tests in `backend/tests/tasks/test_push_tasks.py` cover the same faults on SQLite.
 
 ## Scope and assumptions
 
@@ -141,7 +141,7 @@ A pass covers the model within its bounds, not the whole system.
 
 ## Coverage record
 
-Sync commit: `7f67c0f`
+Sync commit: `fe018b7`
 
 The verification was last confirmed to describe these files and functions at the sync commit. `run.sh` reads this table and the sync commit.
 
@@ -156,6 +156,6 @@ The verification was last confirmed to describe these files and functions at the
 | `backend/app/services/push_service.py` | `ExpoPushClient.send`, `expo_rejected`, `EXPO_MAX_BATCH` | `PushDelivery`: `SendChunk` |
 | `backend/app/tasks/celery_app.py` | `deliver-pending-pushes` beat schedule | `PushDelivery`: workers and fairness |
 
-`create_manual_receipt` inserts the receipt as `confirmed`, flushes, then runs `_after_confirm`, the same lock, read, and claim steps as `confirm_receipt`, in the same transaction (fix `4d81efa`). In the model it is one more `Flush` request, so a manual entry needs no model change.
+`create_manual_receipt` inserts the receipt as `confirmed`, flushes, then runs `_after_confirm`, the same lock, read, and claim steps as `confirm_receipt`, in the same transaction (fix `c22be8f`). In the model it is one more `Flush` request, so a manual entry needs no model change.
 
 To bring the verification back in line after changes that skipped this skill, use `gg-maintain-formal-verification-skill`.
