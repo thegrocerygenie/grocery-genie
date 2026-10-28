@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import type { AnalyticsEventName } from '@/constants/analyticsEvents';
 import { apiClient } from '@/services/api';
@@ -30,5 +30,7 @@ export function useAnalytics() {
     [],
   );
 
-  return { emit };
+  // Stable across renders: Scan and Review emit receipt_abandoned from an
+  // effect cleanup that depends on this object (M4).
+  return useMemo(() => ({ emit }), [emit]);
 }
