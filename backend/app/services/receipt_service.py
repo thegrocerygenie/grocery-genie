@@ -858,6 +858,8 @@ class ReceiptService:
             Receipt.user_id == user_id,
             Receipt.date == receipt_date,
             Receipt.created_at >= cutoff,
+            # A receipt in Recently Deleted is not one the user still has.
+            Receipt.deleted_at.is_(None),
         )
         if store_id:
             query = query.where(Receipt.store_id == store_id)

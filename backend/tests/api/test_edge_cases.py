@@ -46,6 +46,27 @@ async def test_duplicate_receipt_warns(
     assert data2["duplicate_warning"] is True
 
 
+@pytest.mark.asyncio
+async def test_deleted_receipt_is_not_a_duplicate(
+    client: AsyncClient, test_image_bytes: bytes, db_session: AsyncSession, category
+):
+    """A receipt in Recently Deleted does not make a rescan a duplicate."""
+    resp1 = await client.post(
+        "/api/receipts/scan",
+        files={"file": ("receipt.jpg", test_image_bytes, "image/jpeg")},
+    )
+    assert resp1.status_code == 200
+    deleted = await client.delete(f"/api/receipts/{resp1.json()['receipt_id']}")
+    assert deleted.status_code == 204
+
+    resp2 = await client.post(
+        "/api/receipts/scan",
+        files={"file": ("receipt.jpg", test_image_bytes, "image/jpeg")},
+    )
+    assert resp2.status_code == 200
+    assert resp2.json()["duplicate_warning"] is False
+
+
 # --- Receipts Spanning Budget Periods ---
 
 
