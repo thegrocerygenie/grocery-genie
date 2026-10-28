@@ -14,7 +14,7 @@ Items the Simulator already passed are not repeated here. The Simulator notes in
 The build:
 - [ ] Run `make install-mobile`. It applies the patches (react-native-screens for H3, `@expo/cli` for Xcode 27). Without it, a native build ships without the H3 fix.
 - [ ] Make a development build, not Expo Go. Expo Go can't load the react-native-screens patch, has no remote push, and hides the Google Sign-In button. Run `npx expo prebuild --clean`, then build with Xcode and code signing for the phone. There is no `eas.json` yet, so EAS can't make the build.
-- [ ] If PR 39 isn't merged yet, build from a branch that has it, or skip the picker-after-consent item.
+- [ ] Build from `2b506b3` or later, so the build has PR 39 (the picker after AI consent).
 
 The backend the phone talks to:
 - [ ] Set `EXPO_PUBLIC_API_URL` to an address the phone can reach: the Mac's LAN IP with `--host 0.0.0.0`, or a deployed staging API.
@@ -42,7 +42,12 @@ The phone:
 - [ ] A low-light warning appears in a dim room. (13 Camera, RC-01)
 - [ ] Retake works before you submit. (13 Camera)
 - [ ] The "uploading" banner shows while a scan uploads. (launch-open-items §3)
-- [ ] **Import after AI consent.** On a new account, choose + → Choose from Library. Tap Allow on the consent sheet. The photo picker opens, and the import reaches Review. Then a second import from the library opens the picker too. (PR 39)
+- [ ] **Import after AI consent.** Before PR 39, the picker opened while the consent sheet was still closing. iOS dropped it, and every later import did nothing until a relaunch. The fix waits 650 ms (`SHEET_DISMISS_MS` in `mobile/app/ai-consent.tsx`) before the picker opens. Only a phone shows whether that is long enough. (PR 39)
+  - [ ] **Library.** Turn off Settings → Read receipts with AI, or use a new account. In History, tap + → Choose from Library → Allow. The photo picker opens on the first try, and the import reaches Review.
+  - [ ] **Files.** Turn the setting off again. In History, tap + → Choose Files → Allow. The Files picker opens on the first try.
+  - [ ] **Next import.** After either check, start another import. The picker opens again.
+  - [ ] **Reduce Motion.** Turn on Settings → Accessibility → Motion → Reduce Motion, then repeat the Library check. The sheet closes differently there.
+  - If the picker opens only on the second tap, 650 ms is too short for this phone. Write down the device and iOS version, and raise `SHEET_DISMISS_MS`.
 - [ ] The photo library picker accepts JPEG, PNG and HEIC. (13 Camera, RC-03)
 - [ ] A PDF from the Files app is accepted. (13 Camera, RC-03)
 - [ ] **Duplicate warning.** Scan the same receipt twice within 24 hours. The second Review shows "Possible duplicate". Delete both, then scan again: no banner. A receipt queued offline and opened from History shows no banner; that's known. (M3, PR 40)
