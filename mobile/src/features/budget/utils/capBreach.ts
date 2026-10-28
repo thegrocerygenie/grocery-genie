@@ -5,7 +5,8 @@ interface CapSpend {
   cap: number;
 }
 
-const ACTION = 'Adjust limits or pause alerts.';
+// The banner opens Budgets (L5); pausing alerts lives in Settings → Alerts.
+const ACTION = 'Adjust limits.';
 
 /** "A", "A and B", "A, B and C". Category names may hold "&", so lists use "and". */
 function joinNames(names: string[]): string {

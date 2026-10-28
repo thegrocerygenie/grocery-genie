@@ -2,7 +2,7 @@
  * Design "Dashboard · over budget": the banner appears once any cap is
  * breached and names the categories that crossed.
  */
-import { renderRouter, screen } from 'expo-router/testing-library';
+import { fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 
 import DashboardScreen from '../../app/(tabs)/(budget)/index';
 import type { BudgetCategorySummary, DashboardData } from '@/features/budget/types';
@@ -44,7 +44,10 @@ function dashboard(spent: number, categories: BudgetCategorySummary[]): Dashboar
 }
 
 function renderDashboard() {
-  renderRouter({ index: DashboardScreen }, { initialUrl: '/' });
+  return renderRouter(
+    { index: DashboardScreen, 'budget-settings': () => null },
+    { initialUrl: '/' },
+  );
 }
 
 describe('Dashboard over-budget banner', () => {
@@ -57,9 +60,7 @@ describe('Dashboard over-budget banner', () => {
     renderDashboard();
 
     expect(
-      screen.getByText(
-        'Snacks & Treats and Beverages crossed their caps. Adjust limits or pause alerts.',
-      ),
+      screen.getByText('Snacks & Treats and Beverages crossed their caps. Adjust limits.'),
     ).toBeTruthy();
   });
 
@@ -70,18 +71,14 @@ describe('Dashboard over-budget banner', () => {
     ]);
     renderDashboard();
 
-    expect(
-      screen.getByText('Beverages crossed its cap. Adjust limits or pause alerts.'),
-    ).toBeTruthy();
+    expect(screen.getByText('Beverages crossed its cap. Adjust limits.')).toBeTruthy();
   });
 
   it('speaks to the monthly budget when no category cap is crossed', () => {
     mockDashboard.data = dashboard(432, [category('Groceries', 432, 0)]);
     renderDashboard();
 
-    expect(
-      screen.getByText('You’re over your monthly budget. Adjust limits or pause alerts.'),
-    ).toBeTruthy();
+    expect(screen.getByText('You’re over your monthly budget. Adjust limits.')).toBeTruthy();
     expect(screen.queryByText(/Some categories/)).toBeNull();
   });
 
@@ -89,6 +86,19 @@ describe('Dashboard over-budget banner', () => {
     mockDashboard.data = dashboard(242, [category('Groceries', 142, 175)]);
     renderDashboard();
 
-    expect(screen.queryByText(/Adjust limits or pause alerts/)).toBeNull();
+    expect(screen.queryByText(/Adjust limits/)).toBeNull();
   });
+});
+
+// L5: the banner says "Adjust limits", so a tap opens Budgets.
+it('opens Budgets when the over-budget banner is tapped', () => {
+  mockDashboard.data = dashboard(242, [
+    category('Groceries', 142, 175),
+    category('Beverages', 58, 40),
+  ]);
+  const routerScreen = renderDashboard();
+
+  fireEvent.press(screen.getByRole('button', { name: /Beverages crossed its cap/ }));
+
+  expect(routerScreen.getPathname()).toBe('/budget-settings');
 });

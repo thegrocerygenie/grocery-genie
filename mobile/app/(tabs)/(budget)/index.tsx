@@ -318,10 +318,23 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
       </View>
 
       {breachMessage && (
-        <View style={styles.alertBanner}>
+        // L5: it says "Adjust limits", so a tap opens Budgets.
+        <Pressable
+          onPress={onSetBudget}
+          style={({ pressed }) => [styles.alertBanner, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+          accessibilityLabel={breachMessage}
+          accessibilityHint="Opens Budgets"
+        >
           <SymbolView name="bell.fill" size={16} tintColor={colors.red} />
           <Text style={[type.footnote, { color: colors.red, flex: 1 }]}>{breachMessage}</Text>
-        </View>
+          <SymbolView
+            name="chevron.right"
+            size={12}
+            tintColor={colors.red}
+            style={styles.bannerChevron}
+          />
+        </Pressable>
       )}
 
       {data.categories.length > 0 && (
@@ -465,6 +478,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     alignItems: 'flex-start',
   },
+  bannerChevron: { alignSelf: 'center' },
 
   sectionLabel: {
     ...type.footnote,
