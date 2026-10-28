@@ -63,6 +63,8 @@ grocery-genie/
 - Redis (for Celery task queue)
 - iOS Simulator (Xcode) or physical iOS device
 
+With `make`, you can skip the install steps below: each target installs dependencies first when they changed, and backend targets use `backend/.venv`. `make reinstall-backend` or `make reinstall-mobile` forces an install.
+
 ### Backend
 
 ```bash
