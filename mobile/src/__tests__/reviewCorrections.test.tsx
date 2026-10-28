@@ -164,7 +164,9 @@ describe('Review screen quantity edit', () => {
     editQuantity('2');
     save();
 
-    expect(screen.getByText('Qty 2')).toBeTruthy();
+    // L9: the line total stays what was paid, and the new unit price shows.
+    expect(screen.getByText('Qty 2 · $0.65 each')).toBeTruthy();
+    expect(screen.getByLabelText('Total, $1.29')).toBeTruthy();
     expect(mockMutate).toHaveBeenCalledWith(
       {
         receiptId: 'r-1',
