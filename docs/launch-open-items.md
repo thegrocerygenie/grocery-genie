@@ -1,10 +1,10 @@
 # Launch open items
 
-Curated on 2026-10-27, after PRs 9–29 merged (main at `1f0b3e4`). Updated the same day after PRs 30–37 merged (main at `699b739`), and on 2026-10-28 after PRs 38–47 merged (main at `4509fff`). Every session that worked on these is archived, so this file is the list to work from. Tick an item off here when it lands.
+Curated on 2026-10-27, after PRs 9–29 merged (main at `59d8c7e`). Updated the same day after PRs 30–37 merged (main at `8af1942`), and on 2026-10-28 after PRs 38–47 merged (main at `a05a460`). Every session that worked on these is archived, so this file is the list to work from. Tick an item off here when it lands.
 
 Sources:
 - [privacy review](legal/privacy-review-2026-10-27.md)
-- the Simulator pass report (on origin/main `39b9cf8`; H = high, M = medium, L = low). It lives in the app's side-session notes and isn't in the repo. Each finding below carries enough detail to act on without it.
+- the Simulator pass report (on origin/main `105631b`; H = high, M = medium, L = low). It lives in the app's side-session notes and isn't in the repo. Each finding below carries enough detail to act on without it.
 - the device checklists in [13-validation-strategy.md](prd/13-validation-strategy.md)
 
 ## 1. App Store blockers
@@ -74,6 +74,17 @@ Fixed already: H1 and H2 (#20), H4 and M8 (#22, #29), H5, M1 and M2 (#21), and t
 - [x] **L7:** after you confirm a receipt dated in an earlier month, Budget still says "Scan your first receipt". Fixed: the dashboard returns `has_receipts`, and the first-scan state shows only without any receipt.
 - [x] **L8:** "Skip" and "Done" look cramped in the round header buttons. Fixed: every text header button has side padding, so iOS draws a capsule. Checked on Settings' Done; onboarding's Skip wasn't reached on the Simulator.
 - [x] **L9:** changing an item's quantity keeps the line total and silently changes the unit price. Fixed: the total stays what was paid, and the row shows the unit price ("Qty 2 · $0.65 each").
+
+## 4b. MVP design alignment, round 2
+
+A comparison of the design (removed in `041f38f`, still in git) with `main` on 2026-10-28. It found:
+- 11 accessibility gaps (VoiceOver values, Reduce Motion, Increase Contrast, Reduce Transparency, Dynamic Type);
+- 4 behavior and copy gaps;
+- 8 visual details.
+
+[.planning/HANDOFF-2026-10-28-design-alignment.md](../.planning/HANDOFF-2026-10-28-design-alignment.md) has every item, with file and line, size and order. Its two decisions were made on 2026-10-28:
+- [x] **Review's Category row** has a chevron but does nothing. Decided: it opens `CategoryPickerSheet` and sets the category on every item (PR 2 of the handoff).
+- [ ] **Edge detection on the camera (RC-01 AC 1, MVP).** Nothing provides it. Decided: Apple's document scanner (`VNDocumentCameraViewController`), through a community Expo module, in a native build. It replaces the custom capture screen, so it is its own piece of work and needs a plan first.
 
 ## 5. Known gaps, accepted for now
 
