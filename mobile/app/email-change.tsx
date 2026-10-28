@@ -147,7 +147,7 @@ export default function EmailChangeScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerBtn: { ...type.body, color: colors.tint },
+  headerBtn: { ...type.body, color: colors.tint, paddingHorizontal: spacing.xs },
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
