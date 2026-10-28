@@ -41,37 +41,14 @@ Sources:
 
 ## 3. Checks that need a real phone
 
-From `docs/prd/13-validation-strategy.md`. Run them on a development build from main.
-
-- [ ] **Account deletion:**
-  - full Sign in with Apple deletion with the production Apple keys, then confirm Grocery Genie is gone from iOS Settings → Apple ID → Sign-In with Apple;
-  - choosing a different Apple ID at the sheet;
-  - Apple unreachable;
-  - push after deletion;
-  - connection lost mid-delete;
-  - VoiceOver.
-- [ ] **Scan errors and the queue:**
-  - the Retry Now tap;
-  - the quota message on the camera screen;
-  - airplane mode off with a receipt waiting;
-  - an offline receipt that hits the quota on upload.
-- [ ] **Blur calibration:** scan 20–30 receipts in Expo Go (half sharp, half blurry, in mixed light), and paste the labeled `[FrameQuality]` lines from the Metro log. Then set `DEVICE_BLUR_THRESHOLD` (still 900, unchecked) and update its test. The scripts are on main (PR 26).
-- [ ] **Not covered by the Simulator:**
-  - blur hints with a real camera;
-  - real airplane mode;
-  - push delivery (Expo Go has no remote push);
-  - onboarding "Set budget → Continue";
-  - Apple sign-in;
-  - the first-run camera permission prompt;
-  - the "uploading" banner;
-  - VoiceOver across the app.
+All of them are in [device-checklist.md](device-checklist.md), with the setup a device session needs. Tick them there. Its groups: build and sign-in, camera and capture (with blur calibration), push, offline and quota, account deletion, navigation and refresh (H3, M9), and VoiceOver.
 
 ## 4. Simulator-pass findings still open
 
 Fixed already: H1 and H2 (#20), H4 and M8 (#22, #29), H5, M1 and M2 (#21), and the L4 privacy-copy mismatch (#27).
 
 **High**
-- [ ] **H3:** the app stops responding to touches after an edge-swipe back. Fixed in code by PR 35: a patch for react-native-screens 4.16's back-button bug (upstream #3294), plus a guard test. Expo Go can't load native patches, so it is still unproven at runtime. Prove it on a native build with the device checklist in `13-validation-strategy.md`, then tick this.
+- [ ] **H3:** the app stops responding to touches after an edge-swipe back. Fixed in code by PR 35: a patch for react-native-screens 4.16's back-button bug (upstream #3294), plus a guard test. Expo Go can't load native patches, so it is still unproven at runtime. Prove it on a native build with section 6 of [device-checklist.md](device-checklist.md), then tick this.
 
 **Medium**
 - [x] **M3:** the duplicate-receipt warning never appears. Fixed: Review shows a "Possible duplicate" banner from the scan's `duplicate_warning`, and a receipt in Recently Deleted no longer counts as a duplicate. A receipt queued offline and opened from History shows no warning, because the warning comes only with the scan response.
