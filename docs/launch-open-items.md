@@ -59,19 +59,19 @@ Fixed already: H1 and H2 (#20), H4 and M8 (#22, #29), H5, M1 and M2 (#21), and t
 - [x] **M9:** the Budget dashboard's pull-to-refresh spinner sticks after a background refetch. Fixed: the spinner shows only for a refresh that the user pulled, on Budget and History (`useUserRefresh`). Not yet checked on a device.
 
 **Low**
-- [ ] **L1:** the Scan pill always says "Receipt detected", even while idle.
-- [ ] **L2:** an edited item moves to the bottom (`Receipt.line_items` has no `order_by`).
-- [ ] **L3:** the dashboard doesn't sort categories, but Trend does.
-- [ ] **L4:** copy issues:
-  - "1 items";
-  - the Edit sheet is titled "Review";
-  - the Settings row says "Notifications", but its screen says "Alerts";
-  - a file import is labeled "Scanned receipt".
-- [ ] **L5:** the over-cap banner says "Adjust limits or pause alerts", but can't be tapped.
-- [ ] **L6:** delete works only by long-pressing a History row; there's no swipe and no Delete on the receipt detail screen.
-- [ ] **L7:** after you confirm a receipt dated in an earlier month, Budget still says "Scan your first receipt".
-- [ ] **L8:** "Skip" and "Done" look cramped in the round header buttons.
-- [ ] **L9:** changing an item's quantity keeps the line total and silently changes the unit price.
+- [x] **L1:** the Scan pill always says "Receipt detected", even while idle. Fixed: nothing detects a receipt, so it says "Fit the receipt in the frame" until the first frame check, then "Looks clear — tap to capture".
+- [x] **L2:** an edited item moves to the bottom (`Receipt.line_items` has no `order_by`). Fixed: `line_items.position` (migration `20261028_0010`), and reads order by it. Existing rows keep the order the app already showed; an item that had moved before this fix stays where it is.
+- [x] **L3:** the dashboard doesn't sort categories, but Trend does. Fixed: largest spend first, as on Trend.
+- [x] **L4:** copy issues. Fixed:
+  - "1 item" / "3 items";
+  - the sheet that edits a saved receipt is titled "Edit Receipt"; a new scan stays "Review";
+  - the Settings row is "Alerts", like its screen and the privacy text, and Help says Settings → Alerts;
+  - a queued import says "Imported photo" or "Imported PDF".
+- [x] **L5:** the over-cap banner says "Adjust limits or pause alerts", but can't be tapped. Fixed: it says "Adjust limits." and opens Budgets.
+- [x] **L6:** delete works only by long-pressing a History row; there's no swipe and no Delete on the receipt detail screen. Fixed: swipe left on a row (adds `react-native-gesture-handler`), a VoiceOver Delete action, and Delete Receipt on the detail screen. Long-press stays.
+- [x] **L7:** after you confirm a receipt dated in an earlier month, Budget still says "Scan your first receipt". Fixed: the dashboard returns `has_receipts`, and the first-scan state shows only without any receipt.
+- [x] **L8:** "Skip" and "Done" look cramped in the round header buttons. Fixed: every text header button has side padding, so iOS draws a capsule. Checked on Settings' Done; onboarding's Skip wasn't reached on the Simulator.
+- [x] **L9:** changing an item's quantity keeps the line total and silently changes the unit price. Fixed: the total stays what was paid, and the row shows the unit price ("Qty 2 · $0.65 each").
 
 ## 5. Known gaps, accepted for now
 
