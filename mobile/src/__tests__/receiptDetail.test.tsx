@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Alert, type AlertButton } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 
@@ -13,6 +14,10 @@ import type { ReceiptResponse } from '@/features/receipt-capture/types';
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('@/features/budget/hooks/useCategories', () => ({
   useCategories: () => ({ data: [{ id: 'c-g', name: 'Groceries', icon: null, color: null }] }),
+}));
+const mockDelete = jest.fn();
+jest.mock('@/features/lifecycle/hooks/useLifecycle', () => ({
+  useDeleteReceipt: () => ({ mutate: mockDelete, isPending: false }),
 }));
 const mockGetReceipt = jest.fn();
 jest.mock('@/features/receipt-capture/services/receiptApi', () => ({
@@ -91,6 +96,7 @@ function openDetail() {
 
 beforeEach(() => {
   mockGetReceipt.mockReset().mockResolvedValue(receipt);
+  mockDelete.mockReset();
 });
 
 describe('Receipt detail', () => {
@@ -118,5 +124,44 @@ describe('Receipt detail', () => {
 
     expect(routerScreen.getPathname()).toBe('/review');
     expect(routerScreen.getSearchParams()).toEqual({ receiptId: 'r-1', edit: '1' });
+  });
+});
+
+// L6: delete from the detail screen, not only by long-pressing a History row.
+describe('Receipt detail delete', () => {
+  function pressDeleteAndConfirm(choice: 'Cancel' | 'Delete') {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    fireEvent.press(screen.getByLabelText('Delete receipt'));
+    expect(alert).toHaveBeenCalledWith(
+      'Delete receipt?',
+      "Trader Joe's will be moved to Recently Deleted (30 days to restore).",
+      expect.any(Array),
+    );
+    const buttons = alert.mock.calls[0][2] as AlertButton[];
+    act(() => buttons.find((b) => b.text === choice)?.onPress?.());
+    alert.mockRestore();
+  }
+
+  it('moves the receipt to Recently Deleted after confirming, and goes back', async () => {
+    mockDelete.mockImplementation((_id: string, opts?: { onSuccess?: () => void }) =>
+      opts?.onSuccess?.(),
+    );
+    const routerScreen = openDetail();
+    await screen.findByText('Apr 19, 2026');
+
+    pressDeleteAndConfirm('Delete');
+
+    expect(mockDelete).toHaveBeenCalledWith('r-1', expect.anything());
+    expect(routerScreen.getPathname()).toBe('/');
+  });
+
+  it('keeps the receipt when the user cancels', async () => {
+    const routerScreen = openDetail();
+    await screen.findByText('Apr 19, 2026');
+
+    pressDeleteAndConfirm('Cancel');
+
+    expect(mockDelete).not.toHaveBeenCalled();
+    expect(routerScreen.getPathname()).toBe('/receipt/r-1');
   });
 });
