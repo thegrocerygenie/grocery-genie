@@ -162,7 +162,7 @@ class ReceiptService:
 
         # Create line items
         item_responses: list[LineItemExtraction] = []
-        for extracted_item in extraction.items:
+        for position, extracted_item in enumerate(extraction.items):
             # Check user mappings for category override
             category_id = None
             category_confidence = None
@@ -178,6 +178,7 @@ class ReceiptService:
             line_item = LineItem(
                 receipt_id=receipt.id,
                 raw_name=extracted_item.name,
+                position=position,
                 quantity=extracted_item.quantity,
                 unit_price=extracted_item.unit_price,
                 total_price=extracted_item.total_price,
@@ -750,10 +751,11 @@ class ReceiptService:
         self.db.add(receipt)
         await self.db.flush()
 
-        for item_data in items:
+        for position, item_data in enumerate(items):
             line = LineItem(
                 receipt_id=receipt.id,
                 raw_name=item_data["name"],
+                position=position,
                 quantity=item_data.get("quantity", 1.0),
                 unit_price=item_data["unit_price"],
                 total_price=item_data["total_price"],
