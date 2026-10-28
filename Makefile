@@ -81,8 +81,26 @@ reinstall-mobile:
 
 # backend/.venv is the backend environment (README, launch.json, the verify
 # skills). uv makes venvs without pip, so install with uv when it is there.
+# pyproject.toml needs Python 3.12+, and macOS python3 is 3.9, so a venv on
+# an older Python is removed and made again: with uv (which downloads 3.12
+# when needed), else with the first python3.1x found that is 3.12 or newer.
+PY_OK := -c 'import sys; sys.exit(sys.version_info < (3, 12))'
 $(BACKEND_DEPS): backend/pyproject.toml
-	test -x $(VENV)/bin/python || python3 -m venv $(VENV)
+	@if ! $(VENV)/bin/python $(PY_OK) 2>/dev/null; then \
+		rm -rf $(VENV); \
+		if command -v uv >/dev/null 2>&1; then \
+			echo "uv venv --python 3.12 $(VENV)"; uv venv --python 3.12 $(VENV); \
+		else \
+			for py in python3.14 python3.13 python3.12 python3; do \
+				if command -v $$py >/dev/null 2>&1 && $$py $(PY_OK); then \
+					echo "$$py -m venv $(VENV)"; $$py -m venv $(VENV); break; \
+				fi; \
+			done; \
+		fi; \
+		$(VENV)/bin/python $(PY_OK) 2>/dev/null || { \
+			echo "backend needs Python 3.12 or newer: install uv (https://docs.astral.sh/uv/) or python3.12, then run make install-backend" >&2; \
+			rm -rf $(VENV); exit 1; }; \
+	fi
 	cd backend && if command -v uv >/dev/null 2>&1; \
 		then uv pip install --python $(BIN)/python -e ".[dev]"; \
 		else $(BIN)/python -m pip install -e ".[dev]"; fi
