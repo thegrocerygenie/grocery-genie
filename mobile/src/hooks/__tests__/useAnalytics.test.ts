@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { renderHook, act } from '@testing-library/react-native';
 
 import { apiClient } from '@/services/api';
@@ -76,5 +77,34 @@ describe('useAnalytics', () => {
     });
 
     warnSpy.mockRestore();
+  });
+});
+
+// M4: Scan and Review emit receipt_abandoned from an effect cleanup that
+// depends on the hook's result. A new result each render re-ran the cleanup,
+// so every re-render sent an abandonment.
+describe('useAnalytics identity', () => {
+  it('fires an unmount-only cleanup once, not on each re-render', () => {
+    mockApiClient.mockClear();
+    jest.spyOn(console, 'log').mockImplementation();
+
+    const { rerender, unmount } = renderHook(
+      ({ tick }: { tick: number }) => {
+        const analytics = useAnalytics();
+        useEffect(
+          () => () => analytics.emit('receipt_abandoned', { stage: 'capture' }),
+          [analytics],
+        );
+        return tick;
+      },
+      { initialProps: { tick: 0 } },
+    );
+
+    rerender({ tick: 1 });
+    rerender({ tick: 2 });
+    expect(mockApiClient).not.toHaveBeenCalled();
+
+    unmount();
+    expect(mockApiClient).toHaveBeenCalledTimes(1);
   });
 });

@@ -30,6 +30,8 @@ export interface ReceiptScanResponse {
   receipt_id: string;
   status: string;
   extraction: ReceiptExtraction;
+  /** Same store, date, total and item count as a receipt scanned in the last 24 hours. */
+  duplicate_warning?: boolean;
 }
 
 // --- Full receipt types (from GET/PATCH response) ---

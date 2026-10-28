@@ -26,8 +26,8 @@ const RECEIPT_ROWS: RowDef[] = [
     key: 'language',
     symbol: 'character.book.closed.fill',
     iconBg: colors.indigo,
-    title: 'Language',
-    value: 'English',
+    title: 'Receipt Languages',
+    value: 'Automatic',
     href: '/settings/language-settings',
   },
 ];

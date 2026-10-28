@@ -234,6 +234,9 @@ export default function ReviewScreen() {
     ((displayTotal ?? 0) >= HIGH_VALUE_TOTAL ||
       items.some((it) => it.totalPrice >= HIGH_VALUE_ITEM));
 
+  // Edge case 4: warn before saving a receipt that looks already scanned.
+  const isLikelyDuplicate = !isReadOnly && !!activeScanResponse?.duplicate_warning;
+
   const pickerItem = items.find((i) => i.id === categoryPickerItemId) ?? null;
 
   return (
@@ -277,6 +280,23 @@ export default function ReviewScreen() {
         style={styles.root}
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg, paddingBottom: 60 }}
       >
+        {isLikelyDuplicate ? (
+          <View style={styles.highValueBanner}>
+            <View style={styles.highValueIcon}>
+              <SymbolView name="doc.on.doc.fill" size={14} tintColor="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[type.footnote, { fontWeight: '600' }]}>Possible duplicate</Text>
+              <Text
+                style={[type.caption1, { color: colors.iosLabel2, marginTop: 2, lineHeight: 16 }]}
+              >
+                You scanned a receipt from this store with the same date and total in the last 24
+                hours. Save only if this is a different purchase.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         {isHighValueReceipt ? (
           <View style={styles.highValueBanner}>
             <View style={styles.highValueIcon}>
