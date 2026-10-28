@@ -1,0 +1,3 @@
+#!/bin/sh
+# Runs after a merge, including `git pull`. ORIG_HEAD is the pre-merge HEAD.
+exec "$(dirname "$0")/install-if-deps-changed" ORIG_HEAD HEAD

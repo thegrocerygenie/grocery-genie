@@ -1,5 +1,5 @@
 .PHONY: help \
-	install install-backend install-mobile reinstall-backend reinstall-mobile \
+	install install-backend install-mobile reinstall-backend reinstall-mobile hooks \
 	backend-dev backend-test backend-lint backend-format backend-typecheck \
 	backend-migrate backend-migration backend-worker kill-port \
 	db-up db-down db-reset llm-up llm-down \
@@ -28,6 +28,7 @@ help:
 	@echo "  make install-backend      Install backend deps into backend/.venv (editable + dev extras)"
 	@echo "  make install-mobile       Install mobile npm deps"
 	@echo "  make reinstall-backend    Force a backend install (likewise reinstall-mobile)"
+	@echo "  make hooks                Turn on .githooks: install after a pull or branch switch (make install runs it)"
 	@echo ""
 	@echo "Backend (FastAPI):"
 	@echo "  make backend-dev          Run uvicorn dev server with reload (frees PORT first; override: PORT=, HOST=)"
@@ -58,7 +59,15 @@ help:
 
 # ---------- Setup ----------
 
-install: install-backend install-mobile
+install: hooks install-backend install-mobile
+
+# .githooks run `make install` after a pull or branch switch that changes a
+# dependency file, so a native build never starts from a stale node_modules.
+hooks:
+	@git rev-parse --git-dir >/dev/null 2>&1 || exit 0; \
+	if [ "$$(git config --get core.hooksPath)" != .githooks ]; then \
+		git config core.hooksPath .githooks && echo "Git hooks on: core.hooksPath=.githooks"; \
+	fi
 
 install-backend: $(BACKEND_DEPS)
 
