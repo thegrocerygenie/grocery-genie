@@ -56,7 +56,7 @@ export default function SettingsScreen() {
       key: 'notifications',
       symbol: 'bell.fill',
       iconBg: colors.orange,
-      title: 'Notifications',
+      title: 'Alerts',
       detail: alertsSummary({
         fifty: prefs?.notification_thresholds.fifty ?? localAlerts.fiftyPercent,
         eighty: prefs?.notification_thresholds.eighty ?? localAlerts.eightyPercent,

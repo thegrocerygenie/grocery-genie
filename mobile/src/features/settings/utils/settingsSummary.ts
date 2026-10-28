@@ -25,7 +25,7 @@ export interface AlertsState {
   weekly: boolean;
 }
 
-/** Settings → Notifications detail line (design: "80% · 100% · weekly"). */
+/** Settings → Alerts detail line (design: "80% · 100% · weekly"). */
 export function alertsSummary({ fifty, eighty, hundred, weekly }: AlertsState): string {
   const parts = [
     fifty ? '50%' : null,

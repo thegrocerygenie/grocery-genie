@@ -50,3 +50,24 @@ it('shows the usual upload banner with consent', () => {
   expect(screen.getByText('Uploading 2 receipts…')).toBeTruthy();
   expect(screen.queryByText(/needs your OK/)).toBeNull();
 });
+
+// L4: a queued import isn't labeled "Scanned receipt".
+it.each([
+  [undefined, 'Scanned receipt'],
+  ['camera', 'Scanned receipt'],
+  ['library', 'Imported photo'],
+  ['pdf', 'Imported PDF'],
+] as const)('labels a queued %s receipt "%s"', (source, label) => {
+  render(
+    <OfflineQueueSection
+      pending={[{ ...queued, source }]}
+      isConnected
+      consentNeeded={false}
+      onPressFailed={jest.fn()}
+      onRetry={jest.fn()}
+      onReviewConsent={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByText(label)).toBeTruthy();
+});

@@ -1,6 +1,6 @@
 /**
  * L6: a History row deletes by swipe (and VoiceOver's Delete action), not
- * only by long-press.
+ * only by long-press. L4: the row says "1 item", not "1 items".
  */
 import React from 'react';
 import { Alert, StyleSheet, type AlertButton } from 'react-native';
@@ -102,6 +102,13 @@ function confirmDelete(alert: jest.SpyInstance) {
 }
 
 beforeEach(() => mockDelete.mockReset().mockResolvedValue(undefined));
+
+it('counts items in the singular and plural (L4)', () => {
+  renderHistory();
+
+  expect(screen.getByText('Mar 12 · 1 item')).toBeTruthy();
+  expect(screen.getByText('Mar 12 · 3 items')).toBeTruthy();
+});
 
 it('deletes from the swipe action after confirming (L6)', () => {
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
