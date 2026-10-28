@@ -1,0 +1,25 @@
+#!/bin/sh
+# Shared by post-merge and post-checkout: run `make install` when a
+# dependency file differs between two commits. A native build (expo prebuild
+# plus Xcode) never runs make, so a stale node_modules would ship without its
+# patches; this installs at the moment node_modules goes stale.
+old=$1
+new=$2
+
+# A null old ref means a new clone or worktree: nothing is installed to go
+# stale, and a full install there would be slow and unasked for.
+case $old in
+  *[!0]*) ;;
+  *) exit 0 ;;
+esac
+
+if git diff --quiet "$old" "$new" -- \
+  mobile/package.json mobile/package-lock.json mobile/patches backend/pyproject.toml
+then
+  exit 0
+fi
+
+echo "githooks: dependency files changed; running make install"
+make install || echo "githooks: make install failed; run it by hand" >&2
+# A failed install must not look like a failed checkout or merge.
+exit 0

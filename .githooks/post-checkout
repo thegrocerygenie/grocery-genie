@@ -1,0 +1,5 @@
+#!/bin/sh
+# Args: old HEAD, new HEAD, and 1 for a branch checkout or 0 for a file
+# checkout (`git checkout -- file`), which never changes the installed deps.
+[ "$3" = 1 ] || exit 0
+exec "$(dirname "$0")/install-if-deps-changed" "$1" "$2"
