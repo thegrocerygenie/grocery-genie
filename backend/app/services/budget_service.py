@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import clock
 from app.core.config import get_settings
 from app.core.retention import restore_cutoff
 from app.events.types import BudgetThresholdBreached
@@ -654,13 +655,27 @@ class BudgetService:
         and deadlock with that confirm.
         """
         # The period that holds each date. Before the start day, that is the
-        # period that began last month, not this month's.
+        # period that began last month, not this month's. Only the period that
+        # holds today alerts (M5): a past period can no longer be acted on, and
+        # may predate the budget. Its spend still shows on the dashboard.
+        # Today is the server's (UTC), and the user's local date can be a day
+        # either side of it, so the periods holding those days count too.
+        today = clock.today()
+        current_starts = set()
+        for offset in (-1, 0, 1):
+            _, start, _ = await self.get_period_containing(
+                user_id, today + timedelta(days=offset)
+            )
+            current_starts.add(start)
         periods: dict[date, date] = {}
         for receipt_date in receipt_dates:
             _, period_start, period_end = await self.get_period_containing(
                 user_id, receipt_date
             )
-            periods[period_start] = period_end
+            if period_start in current_starts:
+                periods[period_start] = period_end
+        if not periods:
+            return []
 
         # Lock all of the user's budgets until the request commits, before the
         # spend read below. Two receipts confirmed at once then take turns: the
@@ -702,7 +717,7 @@ class BudgetService:
         period_end: date,
     ) -> list[BudgetThresholdBreached]:
         """Thresholds each budget has reached in one period."""
-        days_left = max(0, (period_end - date.today()).days)
+        days_left = max(0, (period_end - clock.today()).days)
         spending = await self.get_spending_by_category(
             user_id, period_start, period_end
         )
