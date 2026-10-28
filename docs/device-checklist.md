@@ -12,7 +12,7 @@ Items the Simulator already passed are not repeated here. The Simulator notes in
 ## Before the session
 
 The build:
-- [ ] Run `npm install` in `mobile/`. It applies the patches (react-native-screens for H3, `@expo/cli` for Xcode 27). Without it, a native build ships without the H3 fix.
+- [ ] Run `make install-mobile`. It applies the patches (react-native-screens for H3, `@expo/cli` for Xcode 27). Without it, a native build ships without the H3 fix.
 - [ ] Make a development build, not Expo Go. Expo Go can't load the react-native-screens patch, has no remote push, and hides the Google Sign-In button. Run `npx expo prebuild --clean`, then build with Xcode and code signing for the phone. There is no `eas.json` yet, so EAS can't make the build.
 - [ ] If PR 39 isn't merged yet, build from a branch that has it, or skip the picker-after-consent item.
 
