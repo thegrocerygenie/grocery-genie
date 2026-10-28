@@ -1,5 +1,5 @@
 .PHONY: help \
-	install install-backend install-mobile \
+	install install-backend install-mobile reinstall-backend reinstall-mobile \
 	backend-dev backend-test backend-lint backend-format backend-typecheck \
 	backend-migrate backend-migration backend-worker kill-port \
 	db-up db-down db-reset llm-up llm-down \
@@ -12,14 +12,22 @@
 PORT ?= 8001
 HOST ?= 0.0.0.0
 
+# Dependency stamps: targets below install first only when a dependency file
+# is newer than the stamp.
+VENV := backend/.venv
+BIN := .venv/bin
+BACKEND_DEPS := $(VENV)/.deps-stamp
+MOBILE_DEPS := mobile/node_modules/.package-lock.json
+
 # Default target
 help:
 	@echo "Grocery Genie — repo-level commands"
 	@echo ""
 	@echo "Setup:"
 	@echo "  make install              Install backend + mobile dependencies"
-	@echo "  make install-backend      Install backend Python deps (editable + dev extras)"
+	@echo "  make install-backend      Install backend deps into backend/.venv (editable + dev extras)"
 	@echo "  make install-mobile       Install mobile npm deps"
+	@echo "  make reinstall-backend    Force a backend install (likewise reinstall-mobile)"
 	@echo ""
 	@echo "Backend (FastAPI):"
 	@echo "  make backend-dev          Run uvicorn dev server with reload (frees PORT first; override: PORT=, HOST=)"
@@ -52,11 +60,34 @@ help:
 
 install: install-backend install-mobile
 
-install-backend:
-	cd backend && pip install -e ".[dev]"
+install-backend: $(BACKEND_DEPS)
 
-install-mobile:
+install-mobile: $(MOBILE_DEPS)
+
+reinstall-backend:
+	$(MAKE) -B install-backend
+
+reinstall-mobile:
+	$(MAKE) -B install-mobile
+
+# backend/.venv is the backend environment (README, launch.json, the verify
+# skills). uv makes venvs without pip, so install with uv when it is there.
+$(BACKEND_DEPS): backend/pyproject.toml
+	test -x $(VENV)/bin/python || python3 -m venv $(VENV)
+	cd backend && if command -v uv >/dev/null 2>&1; \
+		then uv pip install --python $(BIN)/python -e ".[dev]"; \
+		else $(BIN)/python -m pip install -e ".[dev]"; fi
+	touch $@
+
+# npm leaves its own stamp alone on a no-op install, hence the touch.
+$(MOBILE_DEPS): mobile/package.json mobile/package-lock.json $(wildcard mobile/patches/*.patch)
 	cd mobile && npm install
+	touch $@
+
+backend-dev backend-test backend-lint backend-format backend-migrate backend-migration \
+backend-worker backend-beat: $(BACKEND_DEPS)
+
+mobile-start mobile-ios mobile-test mobile-lint mobile-format mobile-typecheck: $(MOBILE_DEPS)
 
 # ---------- Backend ----------
 
@@ -73,31 +104,31 @@ kill-port:
 	fi
 
 backend-dev: kill-port
-	cd backend && uvicorn main:app --reload --host $(HOST) --port $(PORT)
+	cd backend && $(BIN)/uvicorn main:app --reload --host $(HOST) --port $(PORT)
 
 backend-test:
-	cd backend && pytest
+	cd backend && $(BIN)/pytest
 
 backend-lint:
-	cd backend && ruff check . && ruff format --check .
+	cd backend && $(BIN)/ruff check . && $(BIN)/ruff format --check .
 
 backend-format:
-	cd backend && ruff format . && ruff check --fix .
+	cd backend && $(BIN)/ruff format . && $(BIN)/ruff check --fix .
 
 backend-migrate:
-	cd backend && alembic upgrade head
+	cd backend && $(BIN)/alembic upgrade head
 
 # Usage: make backend-migration M="add receipts table"
 backend-migration:
 	@if [ -z "$(M)" ]; then echo "Usage: make backend-migration M=\"message\""; exit 1; fi
-	cd backend && alembic revision --autogenerate -m "$(M)"
+	cd backend && $(BIN)/alembic revision --autogenerate -m "$(M)"
 
 backend-worker:
-	cd backend && celery -A app.tasks worker --loglevel=info
+	cd backend && $(BIN)/celery -A app.tasks worker --loglevel=info
 
 # Scheduler for weekly summaries and push delivery; run alongside the worker.
 backend-beat:
-	cd backend && celery -A app.tasks beat --loglevel=info
+	cd backend && $(BIN)/celery -A app.tasks beat --loglevel=info
 
 # ---------- Data tier (Postgres + Redis via docker compose) ----------
 
