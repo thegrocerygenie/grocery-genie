@@ -22,6 +22,7 @@ import { headerBlurFor } from '@/utils/headerBlur';
 import { ImportProgressOverlay } from '@/features/receipt-capture/components/ImportProgressOverlay';
 import { OfflineQueueSection } from '@/features/receipt-capture/components/OfflineQueueSection';
 import { deletePendingImage } from '@/features/receipt-capture/services/pendingImageFiles';
+import { useUserRefresh } from '@/hooks/useUserRefresh';
 import { useReceiptImport } from '@/features/receipt-capture/hooks/useReceiptImport';
 import { useReceipts } from '@/features/receipt-capture/hooks/useReceipts';
 import { useCategories } from '@/features/budget/hooks/useCategories';
@@ -249,7 +250,8 @@ export default function HistoryScreen() {
     [page, search, dateRange],
   );
 
-  const { data, isLoading, isError, isRefetching, refetch } = useReceipts(queryParams);
+  const { data, isLoading, isError, refetch } = useReceipts(queryParams);
+  const pull = useUserRefresh(refetch);
   const { data: categories } = useCategories();
   const receipts = data?.items ?? [];
 
@@ -359,7 +361,11 @@ export default function HistoryScreen() {
           </View>
         )}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.tint} />
+          <RefreshControl
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
+            tintColor={colors.tint}
+          />
         }
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.3}
