@@ -149,6 +149,73 @@ it('reports a picker that fails to open', async () => {
   );
 });
 
+it('lets the user pick again when the picker never appeared', async () => {
+  // iOS drops a picker presented while another sheet is still closing, and
+  // the picker promise then never settles. The screen takes taps again only
+  // when no picker is up, so a new pick replaces the lost one.
+  launchLibrary.mockReturnValueOnce(new Promise(() => undefined));
+  launchLibrary.mockResolvedValueOnce({
+    canceled: false,
+    assets: [{ uri: 'file:///photo.jpg', width: 1200, height: 1600, mimeType: 'image/jpeg' }],
+  });
+  scan.mockResolvedValue(response);
+  const { result } = renderImportHook();
+
+  act(() => {
+    void result.current.importFrom('library');
+  });
+  await waitFor(() => expect(launchLibrary).toHaveBeenCalledTimes(1));
+  await act(() => result.current.importFrom('library'));
+
+  expect(launchLibrary).toHaveBeenCalledTimes(2);
+  expect(scan).toHaveBeenCalledWith('file:///photo.jpg', 'image/jpeg', 'library');
+  expect(mockPush).toHaveBeenCalledWith('/review');
+});
+
+it('ignores a replaced pick that settles late', async () => {
+  let settleFirst: (value: unknown) => void = () => undefined;
+  launchLibrary.mockReturnValueOnce(new Promise((resolve) => (settleFirst = resolve)));
+  launchLibrary.mockResolvedValueOnce({ canceled: true, assets: null });
+  const { result } = renderImportHook();
+
+  let first: Promise<void> | undefined;
+  act(() => {
+    first = result.current.importFrom('library');
+  });
+  await waitFor(() => expect(launchLibrary).toHaveBeenCalledTimes(1));
+  await act(() => result.current.importFrom('library'));
+  settleFirst({
+    canceled: false,
+    assets: [{ uri: 'file:///late.jpg', width: 1200, height: 1600, mimeType: 'image/jpeg' }],
+  });
+  await act(() => first!);
+
+  expect(scan).not.toHaveBeenCalled();
+  expect(mockPush).not.toHaveBeenCalled();
+});
+
+it('ignores a second tap while an upload is running', async () => {
+  launchLibrary.mockResolvedValue({
+    canceled: false,
+    assets: [{ uri: 'file:///photo.jpg', width: 1200, height: 1600, mimeType: 'image/jpeg' }],
+  });
+  let finishUpload: (value: unknown) => void = () => undefined;
+  scan.mockReturnValue(new Promise((resolve) => (finishUpload = resolve)));
+  const { result } = renderImportHook();
+
+  let first: Promise<void> | undefined;
+  act(() => {
+    first = result.current.importFrom('library');
+  });
+  await waitFor(() => expect(scan).toHaveBeenCalledTimes(1));
+  await act(() => result.current.importFrom('library'));
+  expect(launchLibrary).toHaveBeenCalledTimes(1);
+
+  finishUpload(response);
+  await act(() => first!);
+  expect(mockPush).toHaveBeenCalledWith('/review');
+});
+
 describe('an import that cannot upload now', () => {
   beforeEach(() => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
