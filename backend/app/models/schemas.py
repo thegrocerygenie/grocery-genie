@@ -208,6 +208,9 @@ class DashboardSpendingResponse(BaseModel):
     prior_average: float = 0.0
     previous_period: str
     category_changes: list[DashboardCategoryChange]
+    # Whether the user has any receipt (not in Recently Deleted), in any
+    # period. The app's "Scan your first receipt" state is for new accounts.
+    has_receipts: bool = False
 
 
 # --- Notification ---
