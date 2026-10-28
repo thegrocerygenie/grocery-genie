@@ -32,7 +32,7 @@ import { useOfflineStore } from '@/store/offlineStore';
 import { useReceiptStore } from '@/store/receiptStore';
 import { useAnalytics } from '@/hooks/useAnalytics';
 
-type ScanFlowState = 'detected' | 'capturing' | 'processing' | 'low-quality' | 'queued';
+type ScanFlowState = 'ready' | 'capturing' | 'processing' | 'low-quality' | 'queued';
 
 /** How long the "Saved" pill stays before the camera is ready again. */
 const QUEUED_PILL_MS = 2500;
@@ -40,7 +40,7 @@ const QUEUED_PILL_MS = 2500;
 export default function ScanScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
-  const [flowState, setFlowState] = useState<ScanFlowState>('detected');
+  const [flowState, setFlowState] = useState<ScanFlowState>('ready');
   const [processingUri, setProcessingUri] = useState<string | null>(null);
   const [errorHint, setErrorHint] = useState(() => scanErrorHint(undefined));
   // RC-01 AC 2: check blur and light before capture, only while waiting for one.
@@ -48,7 +48,7 @@ export default function ScanScreen() {
   // before the camera is ready fails, and the next one retries.
   const frameQuality = useFrameQuality(
     () => (cameraRef.current ? sampleFrame(cameraRef.current) : Promise.resolve(null)),
-    flowState === 'detected',
+    flowState === 'ready',
   );
   const cameraRef = useRef<CameraView>(null);
 
@@ -72,7 +72,7 @@ export default function ScanScreen() {
 
   useEffect(() => {
     if (flowState !== 'queued') return;
-    const timer = setTimeout(() => setFlowState('detected'), QUEUED_PILL_MS);
+    const timer = setTimeout(() => setFlowState('ready'), QUEUED_PILL_MS);
     return () => clearTimeout(timer);
   }, [flowState]);
 
@@ -191,14 +191,14 @@ export default function ScanScreen() {
           onSuccess: (response) => {
             setCapturedImageUri(photo.uri);
             setActiveScanResponse(response);
-            setFlowState('detected');
+            setFlowState('ready');
             router.push('/review');
           },
           onError: (error) => {
             if (isAiConsentRequiredError(error)) {
               // Withdrawn on another device, or the policy changed: show the
               // consent screen in place of the camera.
-              setFlowState('detected');
+              setFlowState('ready');
               markConsentRequired();
             } else if (isRetryableScanError(error)) {
               queuePhoto(photo.uri);
@@ -408,7 +408,7 @@ interface HintPillProps {
 }
 
 function HintPill({ state, errorHint, frame }: HintPillProps) {
-  if (state === 'detected' && frame && frame !== 'ok') {
+  if (state === 'ready' && frame && frame !== 'ok') {
     return (
       <View
         style={[styles.pill, { backgroundColor: colors.orange }]}
@@ -446,9 +446,13 @@ function HintPill({ state, errorHint, frame }: HintPillProps) {
       </View>
     );
   }
+  // Nothing detects the receipt itself (L1): before the first frame check,
+  // ask to frame it; after a clear check, say so.
   return (
     <View style={[styles.pill, styles.pillGlass]}>
-      <Text style={[type.footnote, { color: '#fff' }]}>Receipt detected</Text>
+      <Text style={[type.footnote, { color: '#fff' }]}>
+        {frame === 'ok' ? 'Looks clear — tap to capture' : 'Fit the receipt in the frame'}
+      </Text>
     </View>
   );
 }

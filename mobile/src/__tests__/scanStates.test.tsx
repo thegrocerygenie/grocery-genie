@@ -117,14 +117,24 @@ describe('Scan states', () => {
     render(<ScanScreen />);
 
     expect(await screen.findByText(hint)).toBeTruthy();
-    expect(screen.queryByText('Receipt detected')).toBeNull();
+    expect(screen.queryByText('Looks clear — tap to capture')).toBeNull();
   });
 
-  it('shows "Receipt detected" when the view is fine', async () => {
+  // L1: nothing detects a receipt, so the pill never claims one.
+  it('says the view is clear when it is fine', async () => {
     mockFrame = 'ok';
     render(<ScanScreen />);
 
-    expect(await screen.findByText('Receipt detected')).toBeTruthy();
+    expect(await screen.findByText('Looks clear — tap to capture')).toBeTruthy();
+    expect(screen.queryByText('Receipt detected')).toBeNull();
+  });
+
+  it('asks to frame the receipt before the first check', async () => {
+    mockFrame = null;
+    render(<ScanScreen />);
+
+    expect(await screen.findByText('Fit the receipt in the frame')).toBeTruthy();
+    expect(screen.queryByText('Receipt detected')).toBeNull();
   });
 });
 
