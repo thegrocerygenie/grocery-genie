@@ -7,6 +7,12 @@ import { useGrantAiConsent } from '@/features/ai-consent/hooks/useAiConsent';
 import { answerAiConsent } from '@/features/ai-consent/services/consentPrompt';
 
 /**
+ * How long iOS takes to slide a modal sheet away, with a margin. The route
+ * unmounts as soon as the sheet starts to close, and no event marks the end.
+ */
+export const SHEET_DISMISS_MS = 650;
+
+/**
  * App Store 5.1.2(i): the one-time consent sheet before the first import, and
  * from Settings. useAiConsentGate opens it and waits for the answer.
  */
@@ -14,10 +20,13 @@ export default function AiConsentSheet() {
   const router = useRouter();
   const grant = useGrantAiConsent();
   // Allow is answered once the sheet is gone: the import waiting on it opens
-  // the photo picker, which iOS refuses while the sheet is still closing.
-  // A swipe down is a "no".
+  // the photo picker, and iOS drops a picker presented on a closing sheet with
+  // no error. A swipe down is a "no".
   const allowed = useRef(false);
-  useEffect(() => () => answerAiConsent(allowed.current), []);
+  useEffect(
+    () => () => answerAiConsent(allowed.current, allowed.current ? SHEET_DISMISS_MS : 0),
+    [],
+  );
 
   const onAllow = () => {
     grant.mutate(undefined, {
