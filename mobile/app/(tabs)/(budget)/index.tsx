@@ -83,10 +83,13 @@ function adaptDashboard(api: ApiDashboardData | undefined, period: string): Dash
   const hasBudget = api.overall.budget > 0;
   const hasSpending = api.overall.spent > 0 || api.categories.length > 0;
 
-  if (!hasBudget && !hasSpending) return { state: 'empty' };
+  // "Scan your first receipt" is for a new account, not a quiet month (L7).
+  if (!hasBudget && !hasSpending && !api.has_receipts) return { state: 'empty' };
 
-  const categories: CategorySpend[] = api.categories
+  // Ranked by spend, as Trend ranks them (L3).
+  const categories: CategorySpend[] = [...api.categories]
     .filter((c) => c.spent > 0 || c.budget > 0)
+    .sort((a, b) => b.spent - a.spent || a.name.localeCompare(b.name))
     .map((c) => {
       // category_id is a backend UUID; resolve display meta by the category
       // name that the API returns alongside it (matches DEFAULT_CATEGORIES).

@@ -103,7 +103,7 @@ Budget vs. actual for specified period.
 ```
 
 ### GET /api/dashboard/spending?period=2026-03 [MVP]
-Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-month trend (oldest first, ending at `period`), and a month-over-month comparison per category. `category_changes` lists every category with spend in `period` or `previous_period`, largest current spend first; uncategorized spend is left out. `prior_average` is the mean monthly spend over the 3 months before the trend window (0.0 when there was none), for comparing with the trend's own average. Each top item carries the category that holds most of its spend (`category_id` and `category_name` are null when uncategorized). Each trend month splits its `spent` into `categories`, largest first; uncategorized spend is kept there (`category_id` null, name "Uncategorized") so the parts add up to `spent`.
+Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-month trend (oldest first, ending at `period`), and a month-over-month comparison per category. `category_changes` lists every category with spend in `period` or `previous_period`, largest current spend first; uncategorized spend is left out. `prior_average` is the mean monthly spend over the 3 months before the trend window (0.0 when there was none), for comparing with the trend's own average. `has_receipts` is true when the user has any receipt outside Recently Deleted, in any period; the app shows its first-scan state only when it is false. Each top item carries the category that holds most of its spend (`category_id` and `category_name` are null when uncategorized). Each trend month splits its `spent` into `categories`, largest first; uncategorized spend is kept there (`category_id` null, name "Uncategorized") so the parts add up to `spent`.
 
 **Response:**
 ```json
@@ -124,7 +124,8 @@ Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-mont
   "previous_period": "2026-02",
   "category_changes": [
     { "category_id": "uuid", "name": "Groceries", "spent": 30.0, "previous_spent": 20.0 }
-  ]
+  ],
+  "has_receipts": true
 }
 ```
 

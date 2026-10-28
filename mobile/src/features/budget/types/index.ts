@@ -68,6 +68,8 @@ export interface DashboardData {
   prior_average?: number;
   previous_period: string;
   category_changes: DashboardCategoryChange[];
+  /** Any receipt outside Recently Deleted, in any period (L7). */
+  has_receipts?: boolean;
 }
 
 export interface BudgetCreateRequest {
