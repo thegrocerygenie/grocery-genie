@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useConfirmEmailChange } from '@/features/auth/hooks/useAuth';
@@ -16,6 +17,10 @@ export default function ConfirmEmailChangeScreen() {
   const router = useRouter();
   const { token } = useLocalSearchParams<{ token?: string }>();
   const signedIn = useAuthStore((s) => !!s.accessToken);
+  // Padding the hero by the top inset on both sides keeps it centred at the
+  // default text size and keeps the title clear of the status bar when large
+  // text makes the screen scroll.
+  const heroPad = { paddingVertical: useSafeAreaInsets().top };
   const confirm = useConfirmEmailChange();
   const [status, setStatus] = useState<Status>(token ? { kind: 'confirming' } : { kind: 'failed' });
   const confirmedOnce = useRef(false);
@@ -37,10 +42,16 @@ export default function ConfirmEmailChangeScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={[styles.root, styles.heroWrap]}>
-          <ActivityIndicator accessibilityLabel="Confirming email change" />
-          <Text style={styles.tagline}>Confirming your new email…</Text>
-        </View>
+        <ScrollView
+          style={styles.root}
+          contentContainerStyle={styles.scrollContent}
+          alwaysBounceVertical={false}
+        >
+          <View style={[styles.heroWrap, heroPad]}>
+            <ActivityIndicator accessibilityLabel="Confirming email change" />
+            <Text style={styles.tagline}>Confirming your new email…</Text>
+          </View>
+        </ScrollView>
       </>
     );
   }
@@ -51,8 +62,12 @@ export default function ConfirmEmailChangeScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.root}>
-        <View style={styles.heroWrap}>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={styles.scrollContent}
+        alwaysBounceVertical={false}
+      >
+        <View style={[styles.heroWrap, heroPad]}>
           <View style={[styles.badge, !changed && styles.badgeFailed]}>
             <SymbolView
               name={changed ? 'checkmark' : 'exclamationmark'}
@@ -86,13 +101,14 @@ export default function ConfirmEmailChangeScreen() {
             <Text style={styles.primaryBtnLabel}>Continue</Text>
           </Pressable>
         </View>
-      </View>
+      </ScrollView>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
+  scrollContent: { flexGrow: 1 },
   heroWrap: {
     flex: 1,
     alignItems: 'center',
@@ -124,7 +140,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   primaryBtn: {
-    height: 50,
+    minHeight: 50,
+    paddingVertical: spacing.sm,
     borderRadius: radii.button,
     backgroundColor: colors.tint,
     alignItems: 'center',

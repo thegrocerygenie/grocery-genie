@@ -66,7 +66,7 @@ describe('Scan tab bar', () => {
     renderRouter(TABS_DIR, { initialUrl: '/scan' });
 
     expect(await screen.findByLabelText('Capture receipt')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'History' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'History' })).toBeNull();
   });
 
   it('keeps the tab bar on the camera-permission screen', async () => {
@@ -74,18 +74,18 @@ describe('Scan tab bar', () => {
     renderRouter(TABS_DIR, { initialUrl: '/scan' });
 
     expect(await screen.findByText('Allow Camera Access')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'History' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'History' })).toBeTruthy();
   });
 
   it('brings the tab bar back after leaving Scan', async () => {
     const router = renderRouter(TABS_DIR, { initialUrl: '/history' });
-    fireEvent.press(await screen.findByRole('button', { name: 'Scan' }));
+    fireEvent.press(await screen.findByRole('tab', { name: 'Scan' }));
     expect(await screen.findByLabelText('Capture receipt')).toBeTruthy();
 
     fireEvent.press(screen.getByText('Cancel'));
 
     expect(router.getPathname()).toBe('/history');
-    expect(await screen.findByRole('button', { name: 'Budget' })).toBeTruthy();
+    expect(await screen.findByRole('tab', { name: 'Budget' })).toBeTruthy();
     await act(async () => undefined);
   });
 });

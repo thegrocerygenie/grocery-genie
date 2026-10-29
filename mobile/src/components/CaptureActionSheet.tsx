@@ -136,7 +136,8 @@ const styles = StyleSheet.create({
   },
   label: { ...type.body, color: colors.tint },
   cancel: {
-    height: 50,
+    minHeight: 50,
+    paddingVertical: spacing.sm,
     borderRadius: radii.list,
     backgroundColor: colors.sheetBg,
     alignItems: 'center',

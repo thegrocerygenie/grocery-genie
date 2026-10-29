@@ -1,5 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  Image,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -408,6 +417,11 @@ interface HintPillProps {
 }
 
 function HintPill({ state, errorHint, frame }: HintPillProps) {
+  // iOS ignores accessibilityLiveRegion, so VoiceOver is told a capture failed outright.
+  useEffect(() => {
+    if (state === 'low-quality') AccessibilityInfo.announceForAccessibility(errorHint);
+  }, [state, errorHint]);
+
   if (state === 'ready' && frame && frame !== 'ok') {
     return (
       <View
@@ -424,7 +438,12 @@ function HintPill({ state, errorHint, frame }: HintPillProps) {
   }
   if (state === 'low-quality') {
     return (
-      <View style={[styles.pill, { backgroundColor: colors.orange }]}>
+      <View
+        style={[styles.pill, { backgroundColor: colors.orange }]}
+        testID="scan-error-pill"
+        accessibilityLiveRegion="polite"
+        accessibilityRole="alert"
+      >
         <SymbolView name="exclamationmark.triangle.fill" size={14} tintColor="#fff" />
         <Text style={[type.footnote, { color: '#fff', fontWeight: '600' }]}>{errorHint}</Text>
       </View>
@@ -556,7 +575,8 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     marginTop: spacing.md,
-    height: 50,
+    minHeight: 50,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.xl,
     backgroundColor: colors.tint,
     borderRadius: radii.button,

@@ -5,6 +5,7 @@ import { BlurView } from 'expo-blur';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { colors, type } from '@/constants/theme';
+import { useReduceTransparency } from '@/hooks/useAccessibilitySetting';
 import type { BottomTabBarProps, BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 
 interface TabDef {
@@ -18,6 +19,10 @@ const TABS: TabDef[] = [
   { name: 'scan', label: 'Scan', symbol: 'camera.viewfinder' },
   { name: 'history', label: 'History', symbol: 'clock.fill' },
 ];
+
+// The pill bar floats over content, so its labels grow only so far with
+// Dynamic Type; VoiceOver and the Large Content Viewer still read them in full.
+const TAB_LABEL_MAX_FONT_SCALE = 1.3;
 
 export default function TabsLayout() {
   return (
@@ -35,6 +40,7 @@ export default function TabsLayout() {
 }
 
 function FloatingTabBar({ state, navigation, descriptors }: BottomTabBarProps) {
+  const reduceTransparency = useReduceTransparency();
   // A screen hides the bar with `tabBarStyle: { display: 'none' }` (Scan's camera).
   const focused = descriptors[state.routes[state.index].key];
   const barStyle = StyleSheet.flatten(focused?.options.tabBarStyle as StyleProp<ViewStyle>);
@@ -42,7 +48,7 @@ function FloatingTabBar({ state, navigation, descriptors }: BottomTabBarProps) {
 
   return (
     <View style={styles.wrap} pointerEvents="box-none">
-      <BlurView intensity={80} tint="systemChromeMaterial" style={styles.bar}>
+      <TabBarSurface opaque={reduceTransparency}>
         {state.routes.map((route, idx) => {
           const active = state.index === idx;
           const tab = TABS.find((t) => t.name === route.name);
@@ -59,7 +65,7 @@ function FloatingTabBar({ state, navigation, descriptors }: BottomTabBarProps) {
               onPress={onPress}
               style={[styles.tab, active && styles.tabActive]}
               hitSlop={8}
-              accessibilityRole="button"
+              accessibilityRole="tab"
               accessibilityLabel={tab.label}
               accessibilityState={{ selected: active }}
             >
@@ -69,6 +75,7 @@ function FloatingTabBar({ state, navigation, descriptors }: BottomTabBarProps) {
                 tintColor={active ? colors.tint : colors.iosLabel2}
               />
               <Text
+                maxFontSizeMultiplier={TAB_LABEL_MAX_FONT_SCALE}
                 style={[
                   type.caption1,
                   {
@@ -82,8 +89,30 @@ function FloatingTabBar({ state, navigation, descriptors }: BottomTabBarProps) {
             </Pressable>
           );
         })}
-      </BlurView>
+      </TabBarSurface>
     </View>
+  );
+}
+
+// Reduce Transparency: an opaque bar, not a material (design motion.jsx).
+function TabBarSurface({ opaque, children }: { opaque: boolean; children: React.ReactNode }) {
+  if (opaque) {
+    return (
+      <View style={[styles.bar, styles.barOpaque]} testID="tab-bar" accessibilityRole="tablist">
+        {children}
+      </View>
+    );
+  }
+  return (
+    <BlurView
+      intensity={80}
+      tint="systemChromeMaterial"
+      style={styles.bar}
+      testID="tab-bar"
+      accessibilityRole="tablist"
+    >
+      {children}
+    </BlurView>
   );
 }
 
@@ -114,5 +143,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 999,
   },
+  barOpaque: { backgroundColor: colors.iosBg2 },
   tabActive: { backgroundColor: colors.tintBg },
 });

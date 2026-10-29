@@ -206,11 +206,12 @@ const styles = StyleSheet.create({
   },
 
   primaryBtn: {
-    height: 50,
+    minHeight: 50,
+    paddingVertical: spacing.sm,
     borderRadius: radii.button,
     backgroundColor: colors.tint,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnLabel: { ...type.headline, color: colors.onTint },
+  primaryBtnLabel: { ...type.headline, color: colors.onTint, textAlign: 'center' },
 });

@@ -91,7 +91,12 @@ export default function ForgotPasswordScreen() {
 
           <View style={styles.footerRow}>
             <Text style={styles.footerText}>Remembered it? </Text>
-            <Pressable onPress={() => router.back()} hitSlop={6} accessibilityRole="button">
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={6}
+              style={styles.footerLinkBtn}
+              accessibilityRole="button"
+            >
               <Text style={styles.footerLink}>Back to sign in</Text>
             </Pressable>
           </View>
@@ -151,19 +156,22 @@ const styles = StyleSheet.create({
   },
 
   primaryBtn: {
-    height: 50,
+    minHeight: 50,
+    paddingVertical: spacing.sm,
     borderRadius: radii.button,
     backgroundColor: colors.tint,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnLabel: { ...type.headline, color: colors.onTint },
+  primaryBtnLabel: { ...type.headline, color: colors.onTint, textAlign: 'center' },
 
   footerRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  footerText: { ...type.footnote, color: colors.iosLabel2 },
+  footerText: { ...type.footnote, color: colors.iosLabel2, flexShrink: 1 },
+  footerLinkBtn: { flexShrink: 1 },
   footerLink: { ...type.footnote, color: colors.tint, fontWeight: '600' },
 });
