@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,6 +14,11 @@ import { Stack, useRouter } from 'expo-router';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useBudgetCreate } from '@/features/budget/hooks/useBudget';
+
+// The amount is one line in a fixed-width card, and Skip sits in the
+// fixed-height nav bar. Neither can wrap, so both stop growing here.
+const AMOUNT_MAX_FONT_SCALE = 1.3;
+const HEADER_BUTTON_MAX_FONT_SCALE = 1.3;
 
 export default function OnboardingBudget() {
   const router = useRouter();
@@ -52,7 +58,9 @@ export default function OnboardingBudget() {
           headerBackTitle: 'Back',
           headerRight: () => (
             <Pressable onPress={() => onContinue(true)} hitSlop={12} disabled={saving}>
-              <Text style={styles.headerBtn}>Skip</Text>
+              <Text style={styles.headerBtn} maxFontSizeMultiplier={HEADER_BUTTON_MAX_FONT_SCALE}>
+                Skip
+              </Text>
             </Pressable>
           ),
         }}
@@ -61,7 +69,12 @@ export default function OnboardingBudget() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <View style={[styles.root, { padding: spacing.lg }]}>
+        <ScrollView
+          style={styles.root}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          alwaysBounceVertical={false}
+        >
           <Text style={styles.sectionLabel}>MONTHLY BUDGET</Text>
           <View style={styles.amountCard}>
             <View
@@ -71,13 +84,16 @@ export default function OnboardingBudget() {
                 justifyContent: 'center',
               }}
             >
-              <Text style={styles.amountCurrency}>$</Text>
+              <Text style={styles.amountCurrency} maxFontSizeMultiplier={AMOUNT_MAX_FONT_SCALE}>
+                $
+              </Text>
               <TextInput
                 keyboardType="decimal-pad"
                 value={amount}
                 onChangeText={setAmount}
                 style={styles.amountInput}
                 maxLength={6}
+                maxFontSizeMultiplier={AMOUNT_MAX_FONT_SCALE}
                 accessibilityLabel="Monthly budget amount"
               />
             </View>
@@ -96,7 +112,7 @@ export default function OnboardingBudget() {
           >
             <Text style={styles.primaryBtnLabel}>Continue</Text>
           </Pressable>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </>
   );
@@ -104,6 +120,7 @@ export default function OnboardingBudget() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
+  scrollContent: { flexGrow: 1, padding: spacing.lg },
   headerBtn: { ...type.body, color: colors.tint, paddingHorizontal: spacing.xs },
 
   sectionLabel: {

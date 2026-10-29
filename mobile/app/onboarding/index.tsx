@@ -1,22 +1,36 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { WORDMARK_FONT } from '@/constants/fonts';
 import { colors, radii, spacing, type } from '@/constants/theme';
 
+// "Grocery" is one word, so past twice its size the wordmark breaks mid-word.
+const WORDMARK_MAX_FONT_SCALE = 2;
+
 export default function OnboardingWelcome() {
+  // Padding the hero by the top inset on both sides keeps it centred at the
+  // default text size and keeps the title clear of the status bar when large
+  // text makes the screen scroll.
+  const heroPad = { paddingVertical: useSafeAreaInsets().top };
   const router = useRouter();
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.root}>
-        <View style={styles.heroWrap}>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={styles.scrollContent}
+        alwaysBounceVertical={false}
+      >
+        <View style={[styles.heroWrap, heroPad]}>
           <View style={styles.appIcon}>
             <SymbolView name="cart.fill" size={44} tintColor="#fff" />
           </View>
-          <Text style={styles.wordmark}>Grocery Genie</Text>
+          <Text style={styles.wordmark} maxFontSizeMultiplier={WORDMARK_MAX_FONT_SCALE}>
+            Grocery Genie
+          </Text>
           <Text style={styles.tagline}>Snap a receipt, watch your grocery budget take shape.</Text>
         </View>
         <View style={styles.ctaStack}>
@@ -39,13 +53,14 @@ export default function OnboardingWelcome() {
             <Text style={styles.tertiaryBtn}>I already have an account</Text>
           </Pressable>
         </View>
-      </View>
+      </ScrollView>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
+  scrollContent: { flexGrow: 1 },
   heroWrap: {
     flex: 1,
     alignItems: 'center',

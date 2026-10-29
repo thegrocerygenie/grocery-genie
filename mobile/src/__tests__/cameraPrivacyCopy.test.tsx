@@ -11,6 +11,11 @@ import { render, screen } from '@testing-library/react-native';
 import OnboardingCamera from '../../app/onboarding/camera';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+// The screens read safe-area insets; the app root provides them, a bare render does not.
+jest.mock(
+  'react-native-safe-area-context',
+  () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
+);
 jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
   useRouter: () => ({ replace: jest.fn() }),

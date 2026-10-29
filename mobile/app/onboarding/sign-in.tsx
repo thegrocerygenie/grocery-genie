@@ -99,7 +99,7 @@ export default function SignInScreen() {
           {error ? (
             <View style={styles.errorBanner}>
               <SymbolView name="exclamationmark.circle.fill" size={14} tintColor={colors.red} />
-              <Text style={styles.errorText} numberOfLines={2}>
+              <Text style={styles.errorText}>
                 {error}{' '}
                 <Text
                   style={styles.errorLink}
@@ -232,6 +232,7 @@ export default function SignInScreen() {
             <Pressable
               onPress={() => router.replace('/onboarding/sign-up')}
               hitSlop={6}
+              style={styles.footerLinkBtn}
               accessibilityRole="button"
             >
               <Text style={styles.footerLink}>Create account</Text>
@@ -323,7 +324,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnLabel: { ...type.headline, color: colors.onTint },
+  primaryBtnLabel: { ...type.headline, color: colors.onTint, textAlign: 'center' },
 
   divider: {
     flexDirection: 'row',
@@ -343,7 +344,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  appleBtnLabel: { ...type.headline, color: colors.appleButtonLabel, fontWeight: '500' },
+  appleBtnLabel: {
+    ...type.headline,
+    color: colors.appleButtonLabel,
+    fontWeight: '500',
+    flexShrink: 1,
+    textAlign: 'center',
+  },
 
   googleBtn: {
     minHeight: 50,
@@ -357,7 +364,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  googleBtnLabel: { ...type.headline, color: colors.iosLabel, fontWeight: '500' },
+  googleBtnLabel: {
+    ...type.headline,
+    color: colors.iosLabel,
+    fontWeight: '500',
+    flexShrink: 1,
+    textAlign: 'center',
+  },
   googleGlyph: {
     width: 18,
     height: 18,
@@ -376,9 +389,11 @@ const styles = StyleSheet.create({
 
   footerRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  footerText: { ...type.footnote, color: colors.iosLabel2 },
+  footerText: { ...type.footnote, color: colors.iosLabel2, flexShrink: 1 },
+  footerLinkBtn: { flexShrink: 1 },
   footerLink: { ...type.footnote, color: colors.tint, fontWeight: '600' },
 });
