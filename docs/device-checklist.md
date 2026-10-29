@@ -2,7 +2,7 @@
 
 Every check that still needs a real iPhone, in one place. Work from this list in the first device session, and tick items here. Each item names where it came from.
 
-Collected on 2026-10-28, with main at `2048975` (after PR 40). Sources:
+Collected on 2026-10-28, with main at `2edc8d5` (after PR 40). Sources:
 - the Manual Test Checklist in [13-validation-strategy.md](prd/13-validation-strategy.md) (unticked items);
 - [launch-open-items.md](launch-open-items.md) §1, §3 and §4;
 - PR 39 (the import picker after AI consent) and PR 40 (M3, M5, M9).
@@ -14,7 +14,7 @@ Items the Simulator already passed are not repeated here. The Simulator notes in
 The build:
 - [ ] Run `make install-mobile`. It applies the patches (react-native-screens for H3, `@expo/cli` for Xcode 27). Without it, a native build ships without the H3 fix.
 - [ ] Make a development build, not Expo Go. Expo Go can't load the react-native-screens patch, has no remote push, and hides the Google Sign-In button. Run `npx expo prebuild --clean`, then build with Xcode and code signing for the phone. There is no `eas.json` yet, so EAS can't make the build.
-- [ ] Build from `2b506b3` or later, so the build has PR 39 (the picker after AI consent).
+- [ ] Build from `dc3bb2c` or later, so the build has PR 39 (the picker after AI consent).
 
 The backend the phone talks to:
 - [ ] Set `EXPO_PUBLIC_API_URL` to an address the phone can reach: the Mac's LAN IP with `--host 0.0.0.0`, or a deployed staging API.
@@ -38,7 +38,7 @@ The phone:
 
 ## 2. Camera and capture
 
-- [ ] The camera opens with the edge-detection overlay on a receipt. (13 Camera)
+- [ ] The camera opens with the edge-detection overlay on a receipt. (13 Camera) Nothing provides this yet. It waits on the document-scanner work in `launch-open-items.md` §4b, which replaces this screen.
 - [ ] A blur warning appears when the receipt is out of focus. (13 Camera, RC-01)
 - [ ] A low-light warning appears in a dim room. (13 Camera, RC-01)
 - [ ] Retake works before you submit. (13 Camera)
