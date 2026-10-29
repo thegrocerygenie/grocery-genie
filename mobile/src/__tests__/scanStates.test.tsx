@@ -3,6 +3,7 @@
  * state over the captured photo, and a specific hint when the photo is rejected.
  */
 import React from 'react';
+import { AccessibilityInfo } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
@@ -99,6 +100,24 @@ describe('Scan states', () => {
     expect(screen.getByText('Image looks blurry — hold steady')).toBeTruthy();
     expect(screen.queryByText('Reading receipt…')).toBeNull();
     expect(screen.getByLabelText('Capture receipt')).toBeTruthy();
+  });
+
+  it('tells VoiceOver that the capture failed, and why', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    await capture();
+    act(() =>
+      mockHandlers!.onError(
+        new ApiError(422, {
+          detail: 'Image quality insufficient: Image appears blurry (score: 42.0)',
+        }),
+      ),
+    );
+
+    expect(announce).toHaveBeenCalledWith('Image looks blurry — hold steady');
+    const pill = screen.getByTestId('scan-error-pill');
+    expect(pill.props.accessibilityRole).toBe('alert');
+    expect(pill.props.accessibilityLiveRegion).toBe('polite');
+    announce.mockRestore();
   });
 
   it('keeps the generic hint for a reason it does not know', async () => {

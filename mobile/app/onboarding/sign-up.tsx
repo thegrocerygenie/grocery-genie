@@ -258,7 +258,8 @@ const styles = StyleSheet.create({
   },
 
   appleBtn: {
-    height: 50,
+    minHeight: 50,
+    paddingVertical: spacing.sm,
     borderRadius: radii.button,
     backgroundColor: colors.appleButton,
     flexDirection: 'row',
@@ -269,7 +270,8 @@ const styles = StyleSheet.create({
   appleBtnLabel: { ...type.headline, color: colors.appleButtonLabel, fontWeight: '500' },
 
   googleBtn: {
-    height: 50,
+    minHeight: 50,
+    paddingVertical: spacing.sm,
     borderRadius: radii.button,
     backgroundColor: colors.iosBg2,
     borderWidth: StyleSheet.hairlineWidth,
@@ -333,7 +335,8 @@ const styles = StyleSheet.create({
   },
 
   primaryBtn: {
-    height: 50,
+    minHeight: 50,
+    paddingVertical: spacing.sm,
     borderRadius: radii.button,
     backgroundColor: colors.tint,
     alignItems: 'center',

@@ -33,8 +33,16 @@ describe('color tokens', () => {
     expect(colors.cat.groceries).toEqual({ semantic: ['systemGreen'] });
   });
 
-  it('keeps the brand green and uses the design dark value (tokens-v2: --gg-tint)', () => {
-    expect(colors.tint).toEqual({ dynamic: { light: '#1F7A4A', dark: '#34D17A' } });
+  // Increase Contrast: the tint darkens to #195F3A in light mode (design motion.jsx).
+  it('keeps the brand green, the design dark value (tokens-v2: --gg-tint), and high-contrast variants', () => {
+    expect(colors.tint).toEqual({
+      dynamic: {
+        light: '#1F7A4A',
+        dark: '#34D17A',
+        highContrastLight: '#195F3A',
+        highContrastDark: '#6BE59E',
+      },
+    });
   });
 });
 

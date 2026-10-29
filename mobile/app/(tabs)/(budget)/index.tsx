@@ -242,7 +242,12 @@ function EmptyState({ onScan, onSetBudget }: EmptyStateProps) {
         <SymbolView name="camera.viewfinder" size={16} tintColor={colors.onTint} />
         <Text style={styles.primaryBtnLabel}>Scan Receipt</Text>
       </Pressable>
-      <Pressable onPress={onSetBudget} hitSlop={8} accessibilityRole="button">
+      <Pressable
+        onPress={onSetBudget}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Set a budget"
+      >
         <Text style={[type.callout, { color: colors.tint }]}>Set a budget</Text>
       </Pressable>
     </View>
@@ -276,6 +281,7 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
             progress={progress}
             label={over ? `${Math.round(progress * 100)}%` : `$${Math.round(remaining)}`}
             sub={over ? data.monthLabel.split(' · ')[0] : `left · ${data.daysLeft}d`}
+            accessibilityLabel={ringAccessibilityLabel(data.spent, data.cap, data.daysLeft)}
           />
         )}
         <View style={{ flex: 1 }}>
@@ -285,7 +291,12 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
               <Text style={[type.money, { fontSize: 20, color: colors.iosLabel, marginTop: 2 }]}>
                 ${data.spent.toFixed(0)}
               </Text>
-              <Pressable onPress={onSetBudget} hitSlop={8}>
+              <Pressable
+                onPress={onSetBudget}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Set a budget"
+              >
                 <Text style={[type.caption1, { color: colors.tint, marginTop: 2 }]}>
                   Set a budget to track progress →
                 </Text>
@@ -373,6 +384,25 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
   );
 }
 
+function ringAccessibilityLabel(spent: number, cap: number, daysLeft: number): string {
+  const percent = Math.round((spent / cap) * 100);
+  const days = `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`;
+  const amount =
+    spent > cap
+      ? `$${Math.round(spent - cap)} over $${Math.round(cap)}`
+      : `$${Math.round(cap - spent)} left of $${Math.round(cap)}`;
+  return `${amount}, ${percent} percent, ${days}`;
+}
+
+// The design's VoiceOver line: "Groceries, $142, 82 percent of $175 budget."
+function categoryAccessibilityLabel(cat: CategorySpend): string {
+  const amount = `${cat.name}, $${cat.spent.toFixed(0)}`;
+  if (cat.cap <= 0) return amount;
+  const pct = (cat.spent / cat.cap) * 100;
+  const over = pct > 100 ? ', over budget' : '';
+  return `${amount}, ${Math.round(pct)} percent of $${cat.cap.toFixed(0)} budget${over}`;
+}
+
 interface CategoryRowProps {
   cat: CategorySpend;
   showDivider: boolean;
@@ -384,7 +414,11 @@ function CategoryRow({ cat, showDivider }: CategoryRowProps) {
   const over = pct > 100;
 
   return (
-    <View style={[styles.catRow, showDivider && { borderTopWidth: StyleSheet.hairlineWidth }]}>
+    <View
+      style={[styles.catRow, showDivider && { borderTopWidth: StyleSheet.hairlineWidth }]}
+      accessible
+      accessibilityLabel={categoryAccessibilityLabel(cat)}
+    >
       <View style={[styles.catCircle, { backgroundColor: cat.color }]}>
         <SymbolView
           name={cat.symbol as Parameters<typeof SymbolView>[0]['name']}
@@ -406,6 +440,10 @@ function CategoryRow({ cat, showDivider }: CategoryRowProps) {
           />
         </View>
       </View>
+      {over && (
+        // Red is not the only sign of an over-cap category.
+        <SymbolView name="exclamationmark.circle.fill" size={15} tintColor={colors.red} />
+      )}
       <Text
         style={[
           type.money,

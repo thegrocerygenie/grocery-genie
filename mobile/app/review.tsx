@@ -247,7 +247,12 @@ export default function ReviewScreen() {
           // L4: editing a saved receipt says so; a scan being checked is a Review.
           title: edit === '1' ? 'Edit Receipt' : 'Review',
           headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={isReadOnly ? 'Done' : 'Cancel'}
+            >
               <Text style={styles.headerBtn}>{isReadOnly ? 'Done' : 'Cancel'}</Text>
             </Pressable>
           ),
@@ -697,6 +702,10 @@ function ItemRow({
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
           accessibilityRole="button"
           accessibilityLabel={`Price of ${item.name}`}
+          // The label replaces the children, so the amount and the verify tag go here.
+          accessibilityValue={{
+            text: `$${item.totalPrice.toFixed(2)}${lowConf ? ', low confidence' : ''}`,
+          }}
           accessibilityHint={readOnly ? undefined : 'Double-tap to change'}
         >
           {lowConf ? <VerifyTag /> : null}

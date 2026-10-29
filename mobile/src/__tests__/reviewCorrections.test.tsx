@@ -364,6 +364,31 @@ describe('Review screen low-confidence flags (AC 2)', () => {
   });
 });
 
+describe('Review screen VoiceOver', () => {
+  it('reads each price as the value of its button', () => {
+    renderReview();
+
+    expect(screen.getByLabelText('Price of Organic Bananas').props.accessibilityValue).toEqual({
+      text: '$1.29',
+    });
+  });
+
+  it('says a low-confidence price needs checking', () => {
+    withItem({ extraction_confidence: 0.5 });
+    renderReview();
+
+    expect(screen.getByLabelText('Price of Organic Bananas').props.accessibilityValue).toEqual({
+      text: '$1.29, low confidence',
+    });
+  });
+
+  it('makes Cancel a button', () => {
+    renderReview();
+
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
+  });
+});
+
 describe('Review screen store, date and total flags (AC 2)', () => {
   type FieldConfidences = Pick<
     ReceiptScanResponse['extraction'],

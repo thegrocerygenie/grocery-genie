@@ -39,7 +39,13 @@ export const colors = {
   iosLabel2: system('secondaryLabel'),
   iosLabel3: system('tertiaryLabel'),
 
-  tint: pair(TINT_HEX.light, TINT_HEX.dark),
+  // Increase Contrast: darker in light mode (design motion.jsx), brighter in dark.
+  tint: DynamicColorIOS({
+    light: TINT_HEX.light,
+    dark: TINT_HEX.dark,
+    highContrastLight: '#195F3A',
+    highContrastDark: '#6BE59E',
+  }),
   tintPressed: pair('#195F3A', '#2BB86A'),
   tintBg: pair('rgba(31,122,74,0.12)', 'rgba(52,209,122,0.18)'),
 
