@@ -213,5 +213,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnLabel: { ...type.headline, color: colors.onTint },
+  primaryBtnLabel: { ...type.headline, color: colors.onTint, textAlign: 'center' },
 });

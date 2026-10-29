@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useResendVerification, useVerifyEmail } from '@/features/auth/hooks/useAuth';
@@ -18,6 +19,10 @@ export default function VerifyEmailScreen() {
   const verifiedOnce = useRef(false);
   const [verified, setVerified] = useState(false);
   const signedIn = useAuthStore((s) => !!s.accessToken);
+  // Padding the hero by the top inset on both sides keeps it centred at the
+  // default text size and keeps the title clear of the status bar when large
+  // text makes the screen scroll.
+  const heroPad = { paddingVertical: useSafeAreaInsets().top };
 
   useEffect(() => {
     if (token && !verifiedOnce.current) {
@@ -54,8 +59,12 @@ export default function VerifyEmailScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.root}>
-          <View style={styles.heroWrap}>
+        <ScrollView
+          style={styles.root}
+          contentContainerStyle={styles.scrollContent}
+          alwaysBounceVertical={false}
+        >
+          <View style={[styles.heroWrap, heroPad]}>
             <View style={styles.envelope}>
               <SymbolView name="checkmark" size={34} tintColor={colors.onTint} />
             </View>
@@ -79,7 +88,7 @@ export default function VerifyEmailScreen() {
               <Text style={styles.primaryBtnLabel}>Continue</Text>
             </Pressable>
           </View>
-        </View>
+        </ScrollView>
       </>
     );
   }
@@ -98,8 +107,12 @@ export default function VerifyEmailScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.root}>
-        <View style={styles.heroWrap}>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={styles.scrollContent}
+        alwaysBounceVertical={false}
+      >
+        <View style={[styles.heroWrap, heroPad]}>
           <View style={styles.envelope}>
             <SymbolView name="envelope.fill" size={34} tintColor="#fff" />
           </View>
@@ -150,13 +163,14 @@ export default function VerifyEmailScreen() {
             <Text style={styles.tertiaryBtn}>Use a different email</Text>
           </Pressable>
         </View>
-      </View>
+      </ScrollView>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
+  scrollContent: { flexGrow: 1 },
   heroWrap: {
     flex: 1,
     alignItems: 'center',
@@ -197,7 +211,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 4,
   },
-  timerText: { ...type.caption1, color: colors.iosLabel2 },
+  timerText: { ...type.caption1, color: colors.iosLabel2, flexShrink: 1 },
   timerValue: {
     color: colors.iosLabel,
     fontWeight: '600',
