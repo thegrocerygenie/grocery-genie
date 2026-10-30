@@ -6,10 +6,12 @@ the 80% and 100% alerts their sum reaches are never sent.
     backend/.venv/bin/python formal/budget_alerts/repro/h1_concurrent_confirm.py [TRIALS] [--serial]
 
 Needs a running verify-grocery-genie instance (gg-verify launch; doctor clean).
-Each trial signs up a fresh user through the API, sets a 29.54 budget for March
-2026, scans two receipts (14.77 each: 50% alone, 100% together), then sends both
-PATCH confirms at once from warm connections, the way two phones (or a double
-tap on two receipts) would. Run one after the other, the confirms send
+Each trial signs up a fresh user through the API, sets a 29.54 budget for this
+month, scans two receipts (14.77 each: 50% alone, 100% together), and moves each
+receipt's date to today on review. Only the period that holds today alerts (M5),
+and the mock scan is always dated 2026-03-15. It then sends both PATCH confirms
+at once from warm connections, the way two phones (or a double tap on two
+receipts) would. Run one after the other, the confirms send
 "Budget 80% Reached" and "Budget Exceeded"; --serial does that as a control.
 """
 
@@ -19,6 +21,7 @@ import os
 import random
 import secrets
 import sys
+from datetime import date
 
 import httpx
 from PIL import Image
@@ -42,12 +45,20 @@ def receipt_photo() -> bytes:
 
 
 async def trial(n: int, photo: bytes, serial: bool) -> bool:
+    # The server's today; this script runs on the same machine.
+    today = date.today()
     async with httpx.AsyncClient(base_url=BASE, timeout=30) as setup:
         email = f"h1-{n}-{secrets.token_hex(4)}@example.com"
-        r = await setup.post(
-            "/api/auth/sign-up",
-            json={"email": email, "password": secrets.token_hex(16), "name": "h1"},
-        )
+        # Sign-up allows 30 auth requests per IP per minute, and the counts in
+        # Redis outlive a launch. A second run in the same minute waits them out.
+        for _ in range(5):
+            r = await setup.post(
+                "/api/auth/sign-up",
+                json={"email": email, "password": secrets.token_hex(16), "name": "h1"},
+            )
+            if r.status_code != 429:
+                break
+            await asyncio.sleep(int(r.headers.get("Retry-After", "10")))
         r.raise_for_status()
         auth = {"Authorization": f"Bearer {r.json()['access_token']}"}
         # Scans need AI consent, as the app's consent sheet grants it.
@@ -64,7 +75,7 @@ async def trial(n: int, photo: bytes, serial: bool) -> bool:
             json={
                 "amount": 29.54,
                 "period_type": "monthly",
-                "period_start": "2026-03-01",
+                "period_start": today.replace(day=1).isoformat(),
             },
         )
         r.raise_for_status()
@@ -76,7 +87,12 @@ async def trial(n: int, photo: bytes, serial: bool) -> bool:
                 files={"file": ("receipt.jpg", photo, "image/jpeg")},
             )
             r.raise_for_status()
-            ids.append(r.json()["receipt_id"])
+            rid = r.json()["receipt_id"]
+            r = await setup.patch(
+                f"/api/receipts/{rid}", headers=auth, json={"date": today.isoformat()}
+            )
+            r.raise_for_status()
+            ids.append(rid)
 
     # One client per "device"; warm each connection so both PATCHes leave together.
     a, b = (
@@ -93,7 +109,9 @@ async def trial(n: int, photo: bytes, serial: bool) -> bool:
                 b.patch(f"/api/receipts/{ids[1]}", json={"status": "confirmed"}),
             )
         spend = (
-            await a.get("/api/dashboard/spending", params={"period": "2026-03"})
+            await a.get(
+                "/api/dashboard/spending", params={"period": today.strftime("%Y-%m")}
+            )
         ).json()
         notes = (await a.get("/api/notifications", params={"per_page": 100})).json()
     titles = sorted(i["title"] for i in notes["items"])
