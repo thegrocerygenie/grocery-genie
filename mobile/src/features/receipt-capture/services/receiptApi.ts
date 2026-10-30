@@ -1,13 +1,11 @@
 import type { ScanSource } from '@/constants/analyticsEvents';
-import { apiClient, ApiError, getAuthHeaders } from '@/services/api';
+import { API_BASE_URL, apiClient, ApiError, getAuthHeaders } from '@/services/api';
 import type {
   ReceiptListResponse,
   ReceiptResponse,
   ReceiptScanResponse,
   ReceiptUpdateRequest,
 } from '../types';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 const UPLOAD_EXTENSIONS: Record<string, string> = {
   'image/png': 'png',
