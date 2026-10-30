@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import * as authApi from '@/features/auth/services/authApi';
 import { clearLocalAccountData } from '@/features/auth/services/clearLocalAccountData';
@@ -20,14 +20,21 @@ async function persistTokens(pair: TokenPair) {
   });
 }
 
+/**
+ * The profile query. Every observer of ME_QUERY_KEY must use these options:
+ * TanStack Query keeps the options of the observer that updated last, and an
+ * invalidation refetches with them. An observer without fetchMe (for example
+ * queryFn: skipToken) turns every later invalidation into a failed no-op.
+ */
+export const meQueryOptions = queryOptions<UserProfile>({
+  queryKey: ME_QUERY_KEY,
+  queryFn: authApi.fetchMe,
+  staleTime: 30_000,
+});
+
 export function useMe(enabled = true) {
   const accessToken = useAuthStore((s) => s.accessToken);
-  return useQuery<UserProfile>({
-    queryKey: ME_QUERY_KEY,
-    queryFn: authApi.fetchMe,
-    enabled: enabled && !!accessToken,
-    staleTime: 30_000,
-  });
+  return useQuery({ ...meQueryOptions, enabled: enabled && !!accessToken });
 }
 
 export function useSignUp() {

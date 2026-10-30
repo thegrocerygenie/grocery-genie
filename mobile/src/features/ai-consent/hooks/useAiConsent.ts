@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
-import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 
-import { ME_QUERY_KEY } from '@/features/auth/hooks/useAuth';
+import { ME_QUERY_KEY, meQueryOptions } from '@/features/auth/hooks/useAuth';
 import type { UserProfile } from '@/features/auth/types';
 
 import { AI_CONSENT_POLICY_VERSION } from '../constants';
@@ -12,10 +12,12 @@ import { aiConsentGranted, withConsent } from '../utils/aiConsent';
 
 /**
  * The account's consent from the cached profile; undefined while unknown.
- * Reads the cache only: useMe (root layout) fetches it.
+ * Reads the cache only (enabled: false): useMe (root layout) fetches it. It
+ * still passes the real fetcher, because an invalidation refetches with the
+ * options of whichever observer updated last (see meQueryOptions).
  */
 export function useAiConsentStatus(): boolean | undefined {
-  const { data } = useQuery<UserProfile>({ queryKey: ME_QUERY_KEY, queryFn: skipToken });
+  const { data } = useQuery({ ...meQueryOptions, enabled: false });
   return aiConsentGranted(data);
 }
 
