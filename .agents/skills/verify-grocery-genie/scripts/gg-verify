@@ -24,6 +24,9 @@ BASE="http://127.0.0.1:$PORT"
 PG_CONTAINER="grocery_genie_db"
 PG_USER="grocery_genie"
 PG_URL_PREFIX="postgresql+asyncpg://grocery_genie:grocery_genie_dev@localhost:54440"
+# Redis from make db-up (backend/docker-compose.yml maps 54441). DB 1 keeps
+# this run's rate limit counts apart from the dev API on DB 0.
+REDIS_URL="${VERIFY_REDIS_URL:-redis://localhost:54441/1}"
 
 die() { echo "gg-verify: $*" >&2; exit 1; }
 run_dir() { [ -f "$STATE/run_id" ] || die "no instance; run: gg-verify launch"; echo "$ROOT/runs/$(cat "$STATE/run_id")"; }
@@ -72,6 +75,7 @@ cmd_launch() {
   psql_db postgres -c "CREATE DATABASE \"$DB\"" > /dev/null
 
   export GG_DATABASE_URL="$PG_URL_PREFIX/$DB"
+  export GG_REDIS_URL="$REDIS_URL"
   export GG_DEBUG; GG_DEBUG="$([ "$mode" = "debug" ] && echo true || echo false)"
   export GG_JWT_SECRET; GG_JWT_SECRET="$(openssl rand -hex 32)"
   export GG_STORAGE_PATH="$STATE/uploads"
