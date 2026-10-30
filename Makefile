@@ -3,7 +3,7 @@
 	backend-dev backend-test backend-lint backend-format backend-typecheck \
 	backend-migrate backend-migration backend-worker kill-port \
 	db-up db-down db-reset llm-up llm-down \
-	mobile-start mobile-ios mobile-test mobile-lint mobile-format mobile-typecheck \
+	mobile-start mobile-ios mobile-ios-native mobile-test mobile-lint mobile-format mobile-typecheck \
 	test lint format typecheck validate validate-backend validate-mobile \
 	clean
 
@@ -11,6 +11,9 @@
 # Default to 8001 — this dev box already has another service on :8000.
 PORT ?= 8001
 HOST ?= 0.0.0.0
+# mobile-ios-native: the Simulator to install on, and CLEAN=1 to regenerate ios/.
+SIM ?= booted
+CLEAN ?=
 
 # Dependency stamps: targets below install first only when a dependency file
 # is newer than the stamp.
@@ -46,6 +49,7 @@ help:
 	@echo "Mobile (Expo):"
 	@echo "  make mobile-start         expo start"
 	@echo "  make mobile-ios           expo start --ios"
+	@echo "  make mobile-ios-native    Debug native build on the booted Simulator (SIM=, CLEAN=1); needs make mobile-start"
 	@echo "  make mobile-test          jest"
 	@echo "  make mobile-lint          eslint"
 	@echo "  make mobile-format        prettier --check"
@@ -114,7 +118,7 @@ $(MOBILE_DEPS): mobile/package.json mobile/package-lock.json $(wildcard mobile/p
 backend-dev backend-test backend-lint backend-format backend-migrate backend-migration \
 backend-worker backend-beat: $(BACKEND_DEPS)
 
-mobile-start mobile-ios mobile-test mobile-lint mobile-format mobile-typecheck: $(MOBILE_DEPS)
+mobile-start mobile-ios mobile-ios-native mobile-test mobile-lint mobile-format mobile-typecheck: $(MOBILE_DEPS)
 
 # ---------- Backend ----------
 
@@ -200,6 +204,20 @@ mobile-start:
 
 mobile-ios:
 	cd mobile && npx expo start --ios
+
+# A native Debug build, for what Expo Go can't load (native patches, Google Sign-In).
+# It loads JS from Metro, so run `make mobile-start` too. CocoaPods needs a UTF-8
+# locale. `expo run:ios` treats Xcode 27 Simulators as devices, hence xcodebuild.
+MOBILE_IOS_APP := mobile/ios/build/Build/Products/Debug-iphonesimulator/GroceryGenie.app
+mobile-ios-native:
+	@curl -fs -o /dev/null http://localhost:8081/status || \
+		echo "warning: Metro isn't running on :8081. Run make mobile-start, or the app opens on 'No script URL provided'."
+	cd mobile && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 CI=1 npx expo prebuild --platform ios $(if $(CLEAN),--clean)
+	cd mobile/ios && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 xcodebuild -workspace GroceryGenie.xcworkspace \
+		-scheme GroceryGenie -configuration Debug -sdk iphonesimulator \
+		-destination 'generic/platform=iOS Simulator' -derivedDataPath build -quiet
+	xcrun simctl install $(SIM) $(MOBILE_IOS_APP)
+	xcrun simctl launch $(SIM) com.grocerygenie.app
 
 mobile-test:
 	cd mobile && npm test -- --watchAll=false

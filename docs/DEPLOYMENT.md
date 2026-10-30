@@ -349,20 +349,21 @@ sends it, so both must run. Set up once:
 Notification text (spend amounts, category names) passes through Expo's
 servers on the way to Apple.
 
-### 2.3 Configure API URL
+### 2.3 Configure the build's environment
 
-In `mobile/src/constants/config.ts` (or `app.config.js`):
+The app reads three `EXPO_PUBLIC_` variables at build time; `mobile/.env.example` documents them. Metro bakes them into the JS bundle, so none may be a secret.
 
-```typescript
-const API_URL = __DEV__
-  ? "http://localhost:8000"
-  : "https://api.grocerygenie.app";
-```
+| Variable | Value |
+|---|---|
+| `EXPO_PUBLIC_API_URL` | The API's public URL, for example `https://api.grocerygenie.app`. Without it the app uses `http://localhost:8001`. |
+| `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | The iOS OAuth client ID. `app.config.ts` adds Google's URL scheme from it; without it the app hides "Continue with Google". |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | The web OAuth client ID, equal to the backend's `GG_GOOGLE_CLIENT_ID`. |
 
-For EAS builds, set the production API URL as an environment variable:
+For local builds, put them in `mobile/.env.local`. For EAS builds, create them per environment (`mobile/.env.local` isn't uploaded):
 
 ```bash
-eas secret:create --name API_URL --value https://api.grocerygenie.app --type string
+cd mobile
+eas env:create --environment production --name EXPO_PUBLIC_API_URL --value https://api.grocerygenie.app --visibility plaintext
 ```
 
 ### 2.4 Build for TestFlight (Internal Testing)

@@ -1,6 +1,7 @@
 import { useAuthStore } from '@/store/authStore';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
+// make backend-dev serves on 8001; mobile/.env.example documents the override.
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8001';
 
 export class ApiError extends Error {
   constructor(
