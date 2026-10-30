@@ -114,3 +114,71 @@ async def test_max_tokens_is_sent(calls):
     await LiteLLMCategoryAssigner(settings).assign(["Milk"])
 
     assert [c["max_tokens"] for c in calls] == [16000, 16000]
+
+
+# --- Timeout and retries (DoD box 10): LiteLLM's own default is 6000 s. ---
+
+
+async def test_both_calls_send_the_default_timeout_and_one_retry(calls):
+    settings = _settings()
+
+    await LiteLLMReceiptExtractor(settings).extract(b"img", "image/jpeg")
+    await LiteLLMCategoryAssigner(settings).assign(["Milk"])
+
+    assert [(c["timeout"], c["num_retries"]) for c in calls] == [(60.0, 1), (60.0, 1)]
+
+
+async def test_timeout_and_retries_come_from_settings(calls):
+    settings = _settings(llm_timeout_seconds=12.5, llm_num_retries=3)
+
+    await LiteLLMReceiptExtractor(settings).extract(b"img", "image/jpeg")
+
+    assert (calls[0]["timeout"], calls[0]["num_retries"]) == (12.5, 3)
+
+
+# --- Extraction failures become one domain error the route can answer. ---
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        provider.litellm.exceptions.Timeout("slow", "m", "anthropic"),
+        provider.litellm.exceptions.ServiceUnavailableError("down", "anthropic", "m"),
+    ],
+    ids=["timeout", "provider-unavailable"],
+)
+async def test_extractor_wraps_provider_failures(monkeypatch, failure):
+    async def failing(**_kwargs):
+        raise failure
+
+    monkeypatch.setattr(provider.litellm, "acompletion", failing)
+
+    with pytest.raises(provider.ExtractionUnavailableError):
+        await LiteLLMReceiptExtractor(_settings()).extract(b"img", "image/jpeg")
+
+
+@pytest.mark.parametrize(
+    "content",
+    ["not json", json.dumps({"store_name": "S"})],
+    ids=["not-json", "bad-shape"],
+)
+async def test_extractor_wraps_unusable_model_output(monkeypatch, content):
+    async def answer(**_kwargs):
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=content))],
+            usage=None,
+        )
+
+    monkeypatch.setattr(provider.litellm, "acompletion", answer)
+
+    with pytest.raises(provider.ExtractionUnavailableError):
+        await LiteLLMReceiptExtractor(_settings()).extract(b"img", "image/jpeg")
+
+
+def test_extractor_names_its_model_and_prompt_version():
+    settings = _settings(llm_provider="litellm_proxy", llm_model="receipt-vision")
+
+    extractor = LiteLLMReceiptExtractor(settings)
+
+    assert extractor.model_name == "litellm_proxy/receipt-vision"
+    assert extractor.prompt_version == provider.PROMPT_VERSION

@@ -173,6 +173,9 @@ class Receipt(Base):
     store_name_confidence: Mapped[float | None] = mapped_column(Float)
     date_confidence: Mapped[float | None] = mapped_column(Float)
     total_confidence: Mapped[float | None] = mapped_column(Float)
+    # What read a scanned receipt; NULL for manual entries and older receipts.
+    extraction_model: Mapped[str | None] = mapped_column(String(100))
+    extraction_prompt_version: Mapped[str | None] = mapped_column(String(20))
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), index=True
