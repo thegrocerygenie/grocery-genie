@@ -49,10 +49,12 @@ let _googleAvailable: boolean | null = null;
 
 // Synchronous probe — safe to call from render. Memoized so we only attempt
 // the native-module require once. Returns false in Expo Go (no native module),
-// true in dev builds where the module is linked.
+// and in a build without EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: app.config.ts adds
+// Google's URL scheme only when it is set, so sign-in can't complete without it.
 export function isGoogleSignInAvailable(): boolean {
   if (_googleAvailable !== null) return _googleAvailable;
-  _googleAvailable = loadGoogleSdk() !== null;
+  _googleAvailable =
+    !!process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() && loadGoogleSdk() !== null;
   return _googleAvailable;
 }
 
