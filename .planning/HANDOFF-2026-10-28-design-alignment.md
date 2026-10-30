@@ -1,6 +1,6 @@
 # Handoff: MVP design alignment, round 2 (2026-10-28)
 
-**Status: open.** Decisions are made (see below). No step is started. `main` is at `a2d15d9`.
+**Status: open.** Steps 1 and 2 are done: accessibility merged as #50 (plus #51, onboarding at AX5), and behavior and copy is PR 2. Step 3 (visual fidelity) and the document scanner are open. The MVP Definition of Done audit of 2026-10-29 (`.planning/DOD-AUDIT-2026-10-29.md`) ranks what's left.
 
 Goal: close the gaps between the MVP design and the app, so the MVP screens match the design's look, behavior and accessibility rules. Every item has a test where a test can see it, and a Simulator check where only a screen can.
 
@@ -44,28 +44,28 @@ The original options follow, for the record.
 
 Do them in this order: accessibility first (one PR), then behavior and copy (one PR), then visual fidelity (one PR). For each step: TDD where a test can see it, then `make validate`, then a Simulator check, and ask before each commit and push.
 
-### 1. Accessibility (PR 1)
+### 1. Accessibility (PR 1): done in #50 and #51
 
 All items are **checked** and size S unless marked otherwise.
-- [ ] **Budget ring.** VoiceOver reads "$157", then "left · 11d". Make the wrapper `accessible`, with `accessibilityRole="progressbar"`, `accessibilityValue={{ min: 0, max: 100, now, text }}`, and a label like "$157 left of $400, 61 percent, 11 days left". `mobile/src/components/BudgetRing.tsx:34`; design `motion.jsx:64`.
-- [ ] **Dashboard category rows.** They aren't grouped or labelled, and red is the only sign a category is over its cap. Add `accessible` and a composed label ("Groceries, $142, 82 percent of $175 budget", plus "over budget" when it applies). Over the cap, also show a glyph (`exclamationmark.circle.fill`) or "$58 / $40". `mobile/app/(tabs)/(budget)/index.tsx` (`CategoryRow`, about line 387).
-- [ ] **Reduce Motion.** Nothing in `mobile/` reads it. The ring should fade in, not spring: use reanimated's `useReducedMotion()`, and `withTiming` or a fade when it's on. `BudgetRing.tsx:21-24`; design `motion.jsx:62`.
-- [ ] **Increase Contrast.** The tint should shift to `#195F3A`. Add `highContrastLight` and `highContrastDark` to the tint's `DynamicColorIOS` pair. `mobile/src/constants/theme.ts:24,42`; design `motion.jsx:63`.
-- [ ] **Reduce Transparency.** The tab bar should drop its blur for an opaque `iosBg2`. Check `AccessibilityInfo.isReduceTransparencyEnabled()` and listen for changes. `mobile/app/(tabs)/_layout.tsx:45`; design `motion.jsx:65`.
-- [ ] **Tab roles.** Tab items use `accessibilityRole="button"`. Give the bar `tablist` and each item `tab`. `(tabs)/_layout.tsx:62`.
-- [ ] **Dynamic Type (size M).** CTAs have a fixed `height: 50` in 13 places across `mobile/app/onboarding/*.tsx` (index, budget, camera, sign-in, sign-up, verify-email, reset-password, forgot-password, confirm-email-change), so labels clip at AX sizes. Use `minHeight: 50` with vertical padding. Cap the tab-pill labels with `maxFontSizeMultiplier`. Design `motion.jsx:61` ("test up to AX5").
-- [ ] **Review prices.** VoiceOver never reads the amount or the "verify" tag: the "Price of X" label replaces them. Add `accessibilityValue={{ text: '$x.xx' + (low ? ', low confidence' : '') }}`. `mobile/app/review.tsx` (price Pressable, about line 698).
-- [ ] **Review Cancel/Done** has no `accessibilityRole="button"`; Save has one. `review.tsx:250`.
-- [ ] **Scan error pill** has no live region, so VoiceOver isn't told a capture failed. Add `accessibilityLiveRegion="polite"` and `accessibilityRole="alert"`, as the pre-capture pill has. `mobile/app/(tabs)/scan.tsx:425-431`.
-- [ ] **"Set a budget" links** on the dashboard (the no-budget hero and the empty state) have no button role or label. `(budget)/index.tsx` (about lines 245 and 288).
+- [x] **Budget ring.** VoiceOver reads "$157", then "left · 11d". Make the wrapper `accessible`, with `accessibilityRole="progressbar"`, `accessibilityValue={{ min: 0, max: 100, now, text }}`, and a label like "$157 left of $400, 61 percent, 11 days left". `mobile/src/components/BudgetRing.tsx:34`; design `motion.jsx:64`.
+- [x] **Dashboard category rows.** They aren't grouped or labelled, and red is the only sign a category is over its cap. Add `accessible` and a composed label ("Groceries, $142, 82 percent of $175 budget", plus "over budget" when it applies). Over the cap, also show a glyph (`exclamationmark.circle.fill`) or "$58 / $40". `mobile/app/(tabs)/(budget)/index.tsx` (`CategoryRow`, about line 387).
+- [x] **Reduce Motion.** Nothing in `mobile/` reads it. The ring should fade in, not spring: use reanimated's `useReducedMotion()`, and `withTiming` or a fade when it's on. `BudgetRing.tsx:21-24`; design `motion.jsx:62`.
+- [x] **Increase Contrast.** The tint should shift to `#195F3A`. Add `highContrastLight` and `highContrastDark` to the tint's `DynamicColorIOS` pair. `mobile/src/constants/theme.ts:24,42`; design `motion.jsx:63`.
+- [x] **Reduce Transparency.** The tab bar should drop its blur for an opaque `iosBg2`. Check `AccessibilityInfo.isReduceTransparencyEnabled()` and listen for changes. `mobile/app/(tabs)/_layout.tsx:45`; design `motion.jsx:65`.
+- [x] **Tab roles.** Tab items use `accessibilityRole="button"`. Give the bar `tablist` and each item `tab`. `(tabs)/_layout.tsx:62`.
+- [x] **Dynamic Type (size M).** CTAs have a fixed `height: 50` in 13 places across `mobile/app/onboarding/*.tsx` (index, budget, camera, sign-in, sign-up, verify-email, reset-password, forgot-password, confirm-email-change), so labels clip at AX sizes. Use `minHeight: 50` with vertical padding. Cap the tab-pill labels with `maxFontSizeMultiplier`. Design `motion.jsx:61` ("test up to AX5").
+- [x] **Review prices.** VoiceOver never reads the amount or the "verify" tag: the "Price of X" label replaces them. Add `accessibilityValue={{ text: '$x.xx' + (low ? ', low confidence' : '') }}`. `mobile/app/review.tsx` (price Pressable, about line 698).
+- [x] **Review Cancel/Done** has no `accessibilityRole="button"`; Save has one. `review.tsx:250`.
+- [x] **Scan error pill** has no live region, so VoiceOver isn't told a capture failed. Add `accessibilityLiveRegion="polite"` and `accessibilityRole="alert"`, as the pre-capture pill has. `mobile/app/(tabs)/scan.tsx:425-431`.
+- [x] **"Set a budget" links** on the dashboard (the no-budget hero and the empty state) have no button role or label. `(budget)/index.tsx` (about lines 245 and 288).
 
-### 2. Behavior and copy (PR 2)
+### 2. Behavior and copy (PR 2): done
 
-- [ ] **"On pace" is unconditional.** Under the cap it always says "On pace · Nd left", even when spend runs ahead of the month. Compare `spent / cap` with the share of the month gone, and show "On pace · N% under" or "Ahead of pace · N% over". Write the rule as a pure helper with tests. `(budget)/index.tsx:313`; design `mvp-screens.jsx:89`. **checked**, S
-- [ ] **Budget Settings, start day** reads "1 1st": the raw input sits next to an ordinal suffix. The Monthly limit shows "400", not "$400.00". Show the formatted value until the field is focused, and keep inline editing. `mobile/app/budget-settings.tsx:218-228`; design `mvp-screens.jsx:286-287`. **checked**, S
-- [ ] **History "Needs review" rows** drop the date. The design keeps it ("Apr 21 · Pending sync"). Show `${date} · Needs review` in orange. `mobile/app/(tabs)/history/index.tsx:103`; design `mvp-screens.jsx:243`. **checked**, S
-- [ ] **No success haptic on confirm.** The design pairs "Receipt saved · ring fills" with a Success haptic. Review fires none; only scan, manual entry and import do. Fire `notificationAsync(Success)` just before leaving Review after a confirm. `review.tsx`; design `motion.jsx:38,52`. **checked**, S
-- [ ] **Review Category row:** a tap opens `CategoryPickerSheet`, and the chosen category is set on every line item (decision 2). `review.tsx:352`.
+- [x] **"On pace" is unconditional.** Under the cap it always says "On pace · Nd left", even when spend runs ahead of the month. Compare `spent / cap` with the share of the month gone, and show "On pace · N% under" or "Ahead of pace · N% over". Write the rule as a pure helper with tests. `(budget)/index.tsx:313`; design `mvp-screens.jsx:89`. **checked**, S
+- [x] **Budget Settings, start day** reads "1 1st": the raw input sits next to an ordinal suffix. The Monthly limit shows "400", not "$400.00". Show the formatted value until the field is focused, and keep inline editing. `mobile/app/budget-settings.tsx:218-228`; design `mvp-screens.jsx:286-287`. **checked**, S
+- [x] **History "Needs review" rows** drop the date. The design keeps it ("Apr 21 · Pending sync"). Show `${date} · Needs review` in orange. `mobile/app/(tabs)/history/index.tsx:103`; design `mvp-screens.jsx:243`. **checked**, S
+- [x] **No success haptic on confirm.** The design pairs "Receipt saved · ring fills" with a Success haptic. Review fires none; only scan, manual entry and import do. Fire `notificationAsync(Success)` just before leaving Review after a confirm. `review.tsx`; design `motion.jsx:38,52`. **checked**, S
+- [x] **Review Category row:** a tap opens `CategoryPickerSheet`, and the chosen category is set on every line item (decision 2). `review.tsx:352`.
 
 ### 3. Visual fidelity (PR 3)
 
@@ -73,7 +73,7 @@ All items are **from the design** unless marked. Compare each on the Simulator f
 - [ ] **Money font.** `fontFamily: 'SF Pro Rounded'` (`theme.ts:124`) may not resolve on iOS, which would leave money text in plain SF. Try `'ui-rounded'`, and compare on the Simulator. **checked** that the name is used; not checked how it renders.
 - [ ] **Welcome icon glyph** is hard-coded white (`mobile/app/onboarding/index.tsx:17`). In dark mode the tint is bright `#34D17A`, and on-tint content is black elsewhere (`theme.ts:60`). Use `colors.onTint`. **checked**, S
 - [ ] **Ring spring** has almost no overshoot. Damping 18 and stiffness 90 work out to ζ ≈ 0.95; the reference spring (response 0.6, damping 0.7) overshoots slightly. Try about damping 14.7 and stiffness 110. `theme.ts:145`; design `motion.jsx:17`.
-- [ ] **Ring center label.** When on track, the reference uses label color at 22pt with a 13pt sub; the app uses tint at 18pt with a 12pt sub. When over, the reference sub is 11pt. `BudgetRing.tsx:57-58`; design `patterns.jsx:16-17`.
+- [ ] **Ring center label.** When on track, the reference uses label color at 22pt with a 13pt sub; the app uses tint at 18pt with a 12pt sub. When over, the reference sub is 11pt. `BudgetRing.tsx:57-58`; design `patterns.jsx:16-17`. PR 1 capped this text at 1.2× (`CENTER_MAX_FONT_SCALE`) so it fits the 108pt ring at AX5. Recheck that fit at AX5 after any size change.
 - [ ] **Welcome and Camera type and spacing.** The tagline is 15pt, 6pt under the wordmark, with a 20pt gap below the icon. "Not now" is weight 400. The icon shadow opacity is 0.25. `onboarding/index.tsx`, `camera.tsx`; design `mvp-screens.jsx:10-16,48-55`.
 - [ ] **Onboarding budget amount:** 48pt "$400" with ".00" in label-3 and letterSpacing −1. The app shows 56pt with no cents. `onboarding/budget.tsx:124-136`; design `mvp-screens.jsx:34`.
 - [ ] **Scan sizes.** The shutter is 70pt; the reference uses 64. The error pill is a full capsule; the reference uses radius 12 with 8pt padding. `scan.tsx:472-478,526-533`; design `mvp-screens.jsx:143,172`.

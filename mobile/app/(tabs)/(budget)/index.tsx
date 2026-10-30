@@ -19,6 +19,7 @@ import { headerBlurFor } from '@/utils/headerBlur';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { getCategoryMetaByName } from '@/constants/categories';
 import { capBreachMessage } from '@/features/budget/utils/capBreach';
+import { budgetPace, monthShareElapsed } from '@/features/budget/utils/pace';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
 import { useUserRefresh } from '@/hooks/useUserRefresh';
@@ -42,6 +43,8 @@ type DashboardViewState =
       spent: number;
       cap: number;
       daysLeft: number;
+      /** Share of the period gone, 0–1, for the pace line. */
+      monthShare: number;
       categories: CategorySpend[];
     };
 
@@ -111,6 +114,7 @@ function adaptDashboard(api: ApiDashboardData | undefined, period: string): Dash
       spent: api.overall.spent,
       cap: 0,
       daysLeft: computeDaysLeft(period),
+      monthShare: monthShareElapsed(period),
       categories,
     };
   }
@@ -122,6 +126,7 @@ function adaptDashboard(api: ApiDashboardData | undefined, period: string): Dash
     spent: api.overall.spent,
     cap: api.overall.budget,
     daysLeft: computeDaysLeft(period),
+    monthShare: monthShareElapsed(period),
     categories,
   };
 }
@@ -268,6 +273,8 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
   const breachMessage = capBreachMessage(data.categories, over);
   const remaining = noBudget ? 0 : Math.max(0, data.cap - data.spent);
   const overBy = data.spent - data.cap;
+  const pace = budgetPace(data.spent, data.cap, data.monthShare);
+  const paceAhead = !over && !!pace?.ahead;
 
   return (
     <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
@@ -317,11 +324,17 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
                 ${data.spent.toFixed(0)} / ${data.cap.toFixed(0)}
               </Text>
               <Text
-                style={[type.caption1, { color: over ? colors.red : colors.tint, marginTop: 2 }]}
+                style={[
+                  type.caption1,
+                  {
+                    color: over ? colors.red : paceAhead ? colors.orange : colors.tint,
+                    marginTop: 2,
+                  },
+                ]}
               >
                 {over
                   ? `Over by $${overBy.toFixed(0)} · ${data.daysLeft} days left`
-                  : `On pace · ${data.daysLeft}d left`}
+                  : paceLine(pace, data.daysLeft)}
               </Text>
             </>
           )}
@@ -382,6 +395,13 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
       </Pressable>
     </View>
   );
+}
+
+// Design 05: "On pace · 5% under", or "Ahead of pace · N% over" once spend
+// outruns the month.
+function paceLine(pace: ReturnType<typeof budgetPace>, daysLeft: number): string {
+  if (!pace) return `On pace · ${daysLeft}d left`;
+  return pace.ahead ? `Ahead of pace · ${pace.percent}% over` : `On pace · ${pace.percent}% under`;
 }
 
 function ringAccessibilityLabel(spent: number, cap: number, daysLeft: number): string {

@@ -82,7 +82,8 @@ describe('History lists unconfirmed scans as needing review', () => {
   it('labels an unconfirmed scan "Needs review" and a confirmed one with its date', () => {
     renderHistory();
 
-    expect(screen.getByText('Needs review')).toBeTruthy();
+    // Design 13 keeps the date beside the status ("Apr 21 · Pending sync").
+    expect(screen.getByText('Mar 12 · Needs review')).toBeTruthy();
     expect(screen.getByText('Mar 12 · 0 items')).toBeTruthy();
     expect(screen.queryByText('Pending sync')).toBeNull();
   });
@@ -90,7 +91,7 @@ describe('History lists unconfirmed scans as needing review', () => {
   it('opens review for the unconfirmed scan', () => {
     const routerScreen = renderHistory();
 
-    fireEvent.press(screen.getByLabelText(/^Corner Market, Needs review/));
+    fireEvent.press(screen.getByLabelText(/^Corner Market, Mar 12 · Needs review/));
 
     expect(routerScreen.getPathname()).toBe('/review');
     expect(routerScreen.getSearchParams()).toEqual({ receiptId: 'r-pending' });

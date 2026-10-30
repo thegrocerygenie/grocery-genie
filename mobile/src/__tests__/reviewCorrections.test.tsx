@@ -11,8 +11,13 @@ import ReviewScreen from '../../app/review';
 import { useReceiptStore } from '@/store/receiptStore';
 import type { ReceiptResponse, ReceiptScanResponse } from '@/features/receipt-capture/types';
 import { colors } from '@/constants/theme';
+import * as Haptics from 'expo-haptics';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+jest.mock('expo-haptics', () => ({
+  notificationAsync: jest.fn(),
+  NotificationFeedbackType: { Success: 'success' },
+}));
 // The native picker has no JS renderer in Jest; stand in a view that keeps
 // its props so the test can fire the picker's onChange.
 jest.mock('@react-native-community/datetimepicker', () => {
@@ -386,6 +391,85 @@ describe('Review screen VoiceOver', () => {
     renderReview();
 
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
+  });
+});
+
+describe('Review screen Category row', () => {
+  function withTwoItems() {
+    useReceiptStore.getState().setActiveScanResponse({
+      ...scan,
+      extraction: {
+        ...scan.extraction,
+        items: [
+          scan.extraction.items[0],
+          { ...scan.extraction.items[0], id: 'item-2', name: 'Paper Towels' },
+        ],
+      },
+    });
+  }
+
+  it('sets the chosen category on every item', () => {
+    withTwoItems();
+    renderReview();
+
+    fireEvent.press(screen.getByRole('button', { name: /^Category, / }));
+    fireEvent.press(screen.getByLabelText('Household'));
+    save();
+
+    const updates = mockMutate.mock.calls[0][0].updates;
+    expect(updates.items).toHaveLength(2);
+    for (const correction of updates.items) {
+      expect(correction.category_id).toBe('household');
+    }
+  });
+
+  it('cannot be changed on a read-only receipt', async () => {
+    mockGetReceipt.mockResolvedValue({
+      ...scan.extraction,
+      id: 'r-3',
+      user_id: 'u-1',
+      subtotal: 1.29,
+      image_url: null,
+      extraction_confidence: 0.95,
+      status: 'confirmed',
+      created_at: null,
+      items: scan.extraction.items.map((i) => ({ ...i, receipt_id: 'r-3' })),
+    });
+    useReceiptStore.getState().clearScanSession();
+    renderReview();
+    act(() => router.back());
+    act(() => router.push({ pathname: '/review', params: { receiptId: 'r-3' } }));
+
+    await screen.findByLabelText(/^Category, /);
+    expect(screen.queryByRole('button', { name: /^Category, / })).toBeNull();
+  });
+});
+
+describe('Review screen Success haptic', () => {
+  it('confirms a save with a Success haptic before leaving', () => {
+    mockMutate.mockImplementationOnce((_vars, options: { onSuccess: () => void }) =>
+      options.onSuccess(),
+    );
+    renderReview();
+    // A saved scan goes home to '/(tabs)', which this test router doesn't have.
+    const replace = jest.spyOn(router, 'replace').mockImplementation(() => {});
+
+    save();
+
+    expect(Haptics.notificationAsync).toHaveBeenCalledWith('success');
+    expect(replace).toHaveBeenCalledWith('/(tabs)');
+    replace.mockRestore();
+  });
+
+  it('gives no Success haptic when the save fails', () => {
+    mockMutate.mockImplementationOnce((_vars, options: { onError: (e: Error) => void }) =>
+      options.onError(new Error('offline')),
+    );
+    renderReview();
+
+    save();
+
+    expect(Haptics.notificationAsync).not.toHaveBeenCalled();
   });
 });
 

@@ -100,7 +100,7 @@ function ReceiptRow({ receipt, showDivider, categories, onPress, onDelete }: Rec
   const itemCount = receipt.items.length;
   const total = receipt.total ?? 0;
   const sub = needsReview
-    ? 'Needs review'
+    ? `${formatShortDate(receipt.date)} · Needs review`
     : `${formatShortDate(receipt.date)} · ${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
   const label = receipt.store_name ?? 'Receipt';
 

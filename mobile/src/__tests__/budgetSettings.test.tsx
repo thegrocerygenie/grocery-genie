@@ -84,11 +84,51 @@ describe('Budget settings edits budgets in place', () => {
   it('prefills the saved limits and start day', () => {
     renderSettings();
 
-    expect(screen.getByLabelText('Monthly limit').props.value).toBe('500');
-    expect(screen.getByLabelText('Start day').props.value).toBe('15');
-    expect(screen.getByLabelText('Groceries budget amount').props.value).toBe('200');
+    expect(screen.getByLabelText('Monthly limit').props.value).toBe('$500.00');
+    expect(screen.getByLabelText('Start day').props.value).toBe('15th');
+    // Design 14 shows category limits as "$175".
+    expect(screen.getByLabelText('Groceries budget amount').props.value).toBe('$200');
     expect(screen.getByLabelText('Household budget amount').props.value).toBe('');
     expect(screen.getByText('Resets on the 15th of each month.')).toBeTruthy();
+  });
+
+  // Design 14: "$400.00" and "1st", not "400" and "1 1st"; editing shows the raw value.
+  it('shows the raw limit and start day while they are edited', () => {
+    renderSettings();
+
+    fireEvent(screen.getByLabelText('Monthly limit'), 'focus');
+    expect(screen.getByLabelText('Monthly limit').props.value).toBe('500');
+
+    fireEvent(screen.getByLabelText('Start day'), 'focus');
+    expect(screen.getByLabelText('Start day').props.value).toBe('15');
+    // No ordinal suffix beside the raw number ("15 15th").
+    expect(screen.queryByText('15th')).toBeNull();
+
+    fireEvent(screen.getByLabelText('Start day'), 'blur');
+    expect(screen.getByLabelText('Start day').props.value).toBe('15th');
+  });
+
+  it('shows the raw category limit while it is edited, and cents only when it has them', () => {
+    renderSettings();
+    const groceries = screen.getByLabelText('Groceries budget amount');
+
+    fireEvent(groceries, 'focus');
+    expect(screen.getByLabelText('Groceries budget amount').props.value).toBe('200');
+    fireEvent.changeText(groceries, '12.5');
+    fireEvent(groceries, 'blur');
+
+    expect(screen.getByLabelText('Groceries budget amount').props.value).toBe('$12.50');
+  });
+
+  it('formats a typed limit once the field is left', () => {
+    renderSettings();
+    const limit = screen.getByLabelText('Monthly limit');
+
+    fireEvent(limit, 'focus');
+    fireEvent.changeText(limit, '425.5');
+    fireEvent(limit, 'blur');
+
+    expect(screen.getByLabelText('Monthly limit').props.value).toBe('$425.50');
   });
 
   it('updates a changed limit instead of creating another budget', async () => {

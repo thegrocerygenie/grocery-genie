@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -40,6 +41,9 @@ import type { CategoryResponse } from '@/features/budget/types';
 
 const HIGH_VALUE_TOTAL = 500;
 const HIGH_VALUE_ITEM = 100;
+
+/** Picker target meaning "every line item" (the Category row). */
+const ALL_ITEMS = '__all_items__';
 
 export default function ReviewScreen() {
   const router = useRouter();
@@ -150,7 +154,9 @@ export default function ReviewScreen() {
   const updateItemCategory = (itemId: string, categoryId: string) => {
     setItems((prev) =>
       prev.map((item) =>
-        item.id === itemId ? { ...item, categoryId, categoryConfidence: 1, isEdited: true } : item,
+        item.id === itemId || itemId === ALL_ITEMS
+          ? { ...item, categoryId, categoryConfidence: 1, isEdited: true }
+          : item,
       ),
     );
   };
@@ -172,6 +178,8 @@ export default function ReviewScreen() {
       {
         onSuccess: () => {
           confirmed.current = true;
+          // Design: "Receipt saved" pairs with a Success haptic, before the screen leaves.
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           if (activeScanResponse) {
             clearScanSession();
             router.replace('/(tabs)');
@@ -237,6 +245,7 @@ export default function ReviewScreen() {
   // Edge case 4: warn before saving a receipt that looks already scanned.
   const isLikelyDuplicate = !isReadOnly && !!activeScanResponse?.duplicate_warning;
 
+  const pickingAll = categoryPickerItemId === ALL_ITEMS;
   const pickerItem = items.find((i) => i.id === categoryPickerItemId) ?? null;
 
   return (
@@ -354,7 +363,16 @@ export default function ReviewScreen() {
             value={displayTotal != null ? `$${displayTotal.toFixed(2)}` : '—'}
             lowConfidence={lowTotalConf}
           />
-          <ListRow label="Category" value={dominantCategoryName} chevron />
+          <ListRow
+            label="Category"
+            value={dominantCategoryName}
+            chevron={!isReadOnly && items.length > 0}
+            // Decision 2 (design alignment round 2): one pick sets every item's category.
+            onPress={
+              !isReadOnly && items.length > 0 ? () => setCategoryPickerItemId(ALL_ITEMS) : undefined
+            }
+            accessibilityHint="Sets the category of every item"
+          />
         </ListGroup>
 
         <View>
@@ -388,8 +406,12 @@ export default function ReviewScreen() {
 
       <CategoryPickerSheet
         visible={categoryPickerItemId !== null}
-        itemName={pickerItem?.name}
-        selectedId={pickerItem?.categoryId ?? null}
+        itemName={
+          pickingAll
+            ? `All ${items.length} ${items.length === 1 ? 'item' : 'items'}`
+            : pickerItem?.name
+        }
+        selectedId={pickingAll ? dominantCategoryId : (pickerItem?.categoryId ?? null)}
         categories={categories}
         onSelect={(cid) => {
           if (categoryPickerItemId) {
@@ -433,13 +455,27 @@ interface ListRowProps {
   value: string;
   chevron?: boolean;
   lowConfidence?: boolean;
+  /** Makes the row a button. */
+  onPress?: () => void;
+  accessibilityHint?: string;
 }
 
-function ListRow({ label, value, chevron, lowConfidence }: ListRowProps) {
+function ListRow({
+  label,
+  value,
+  chevron,
+  lowConfidence,
+  onPress,
+  accessibilityHint,
+}: ListRowProps) {
   return (
-    <View
+    <Pressable
       style={styles.row}
+      onPress={onPress}
+      disabled={!onPress}
       accessible
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityHint={onPress ? accessibilityHint : undefined}
       accessibilityLabel={`${label}, ${value}${lowConfidence ? ', low confidence' : ''}`}
     >
       <Text style={type.body}>{label}</Text>
@@ -458,7 +494,7 @@ function ListRow({ label, value, chevron, lowConfidence }: ListRowProps) {
           <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
         ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
