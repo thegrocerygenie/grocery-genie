@@ -30,6 +30,8 @@ class Settings(BaseSettings):
 
     # LLM
     llm_provider: str = "anthropic"
+    # Claude Sonnet 5.5 has no dated snapshot ID: "claude-sonnet-5-5" is its
+    # full ID. Each receipt records the model that read it (extraction_model).
     llm_model: str = "claude-sonnet-5-5"
     # Sent only when set. Claude Sonnet 5.5 rejects any non-default value, so
     # leave it unset for that model; set it for a model that accepts it.
@@ -41,6 +43,12 @@ class Settings(BaseSettings):
     # http://litellm:4000 with llm_provider "litellm_proxy". Empty calls the
     # provider's own API.
     llm_api_base: str = ""
+    # Per-call ceiling. LiteLLM's own default is 6000 s, which holds a scan open
+    # long after the phone gave up. A starting value: tune it once extraction
+    # latency is measured on the receipt test set.
+    llm_timeout_seconds: float = 60.0
+    # LiteLLM retries a timeout, rate limit, or 5xx this many times.
+    llm_num_retries: int = 1
 
     # Extraction
     extraction_confidence_threshold: float = 0.7

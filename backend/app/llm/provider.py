@@ -5,6 +5,8 @@ import time
 from typing import Protocol
 
 import litellm
+import openai
+from pydantic import ValidationError
 
 from app.core.config import Settings, get_settings
 from app.llm.prompts.category_assignment import (
@@ -19,7 +21,16 @@ from app.llm.schemas import CategoryAssignmentList, ReceiptExtractionResult
 logger = logging.getLogger(__name__)
 
 
+class ExtractionUnavailableError(Exception):
+    """The receipt couldn't be read this time: the provider failed or timed out,
+    or its answer wasn't a usable extraction. Retrying may work."""
+
+
 class ReceiptExtractor(Protocol):
+    # Saved on each receipt, so a change in model behavior can be traced.
+    model_name: str
+    prompt_version: str
+
     async def extract(
         self, image_data: bytes, content_type: str
     ) -> ReceiptExtractionResult: ...
@@ -32,6 +43,8 @@ def _call_options(settings: Settings) -> dict:
         "max_tokens": settings.llm_max_tokens,
         "api_key": settings.llm_api_key or None,
         "api_base": settings.llm_api_base or None,
+        "timeout": settings.llm_timeout_seconds,
+        "num_retries": settings.llm_num_retries,
     }
     # Only when set: LiteLLM refuses any temperature but 1 for a model without
     # sampling settings, such as Claude Sonnet 5.5.
@@ -43,10 +56,34 @@ def _call_options(settings: Settings) -> dict:
 class LiteLLMReceiptExtractor:
     """Production implementation using LiteLLM."""
 
+    prompt_version = PROMPT_VERSION
+
     def __init__(self, settings: Settings) -> None:
         self.options = _call_options(settings)
+        self.model_name = self.options["model"]
 
     async def extract(
+        self, image_data: bytes, content_type: str
+    ) -> ReceiptExtractionResult:
+        try:
+            return await self._extract(image_data, content_type)
+        except openai.OpenAIError as exc:
+            # Every LiteLLM exception derives from openai.OpenAIError (not from
+            # litellm.exceptions.OpenAIError): timeouts, rate limits, overloads,
+            # and config errors alike.
+            logger.error(
+                "LLM extraction call failed",
+                extra={"error_type": type(exc).__name__, "model": self.model_name},
+            )
+            raise ExtractionUnavailableError(type(exc).__name__) from exc
+        except (json.JSONDecodeError, ValidationError) as exc:
+            logger.error(
+                "LLM extraction returned an unusable answer",
+                extra={"error_type": type(exc).__name__, "model": self.model_name},
+            )
+            raise ExtractionUnavailableError(type(exc).__name__) from exc
+
+    async def _extract(
         self, image_data: bytes, content_type: str
     ) -> ReceiptExtractionResult:
         image_b64 = base64.b64encode(image_data).decode("utf-8")
@@ -95,6 +132,9 @@ class LiteLLMReceiptExtractor:
 
 class MockReceiptExtractor:
     """Test/development implementation returning deterministic results."""
+
+    model_name = "mock"
+    prompt_version = PROMPT_VERSION
 
     def __init__(self) -> None:
         self._result: ReceiptExtractionResult | None = None
@@ -146,6 +186,9 @@ class MockReceiptExtractor:
 
 class LowConfidenceMockExtractor:
     """Mock that returns low-confidence results for testing non-receipt rejection."""
+
+    model_name = "mock"
+    prompt_version = PROMPT_VERSION
 
     async def extract(
         self, image_data: bytes, content_type: str

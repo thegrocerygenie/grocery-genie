@@ -27,7 +27,7 @@ Sources:
 
 ## 1b. Before the next deploy
 
-- [ ] **Run the database migration `20261028_0010`** (`make backend-migrate`). PR 42 (L2) adds `line_items.position`, and the API orders receipt items by it, so the API fails against a database without the column. The migration fills existing rows from their current order.
+- [ ] **Run the database migrations `20261028_0010` and `20261030_0011`** (`make backend-migrate`). `20261030_0011` adds `receipts.extraction_model` and `extraction_prompt_version`, which every scan now writes, so a scan fails against a database without them. `20261028_0010` (PR 42, L2) adds `line_items.position`, and the API orders receipt items by it, so the API fails against a database without the column. The migration fills existing rows from their current order.
 - [ ] **Set `GG_RESEND_API_KEY` in production.** Since PR 32, the API refuses to start without it, so nothing can log email bodies. Only local dev opts out, with `GG_EMAIL_DELIVERY=off`.
 - [x] **Run `npm install` in `mobile/` after pulling.** PR 35's H3 fix is a `patch-package` patch to react-native-screens 4.16. Without the install, `nativeBackButtonPatch.test.ts` fails (seen on 2026-10-27 in a stale checkout), and a native build ships without the fix. Done: mobile `make` targets now install when dependencies change. Direct `npx` or `npm` use still needs `npm install` by hand.
 

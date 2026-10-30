@@ -11,6 +11,8 @@ dependencies = [
     "celery[redis]>=5.4.0",
     "redis>=5.1.0",
     "litellm>=1.50.0",
+    # Imported directly: every LiteLLM exception derives from openai.OpenAIError.
+    "openai>=2.20.0,<3.0.0",
     "pillow>=10.4.0",
     "opencv-python-headless>=4.10.0",
     # RC-03: decode HEIC uploads and render single-page PDFs to an image.

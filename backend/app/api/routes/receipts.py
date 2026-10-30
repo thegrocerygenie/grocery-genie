@@ -23,6 +23,7 @@ from app.image.storage import (
 )
 from app.llm.provider import (
     CategoryAssigner,
+    ExtractionUnavailableError,
     ReceiptExtractor,
     get_category_assigner,
     get_receipt_extractor,
@@ -172,11 +173,18 @@ async def scan_receipt(
         category_assigner=category_assigner,
         analytics=analytics,
     )
-    result = await service.process_receipt(
-        user_id=user.id,
-        image_data=normalized.data,
-        content_type=normalized.content_type,
-    )
+    try:
+        result = await service.process_receipt(
+            user_id=user.id,
+            image_data=normalized.data,
+            content_type=normalized.content_type,
+        )
+    except ExtractionUnavailableError as exc:
+        # 5xx: the app keeps the photo in its offline queue and retries it.
+        raise HTTPException(
+            status_code=503,
+            detail="Couldn't read the receipt right now. Try again in a moment.",
+        ) from exc
 
     # Reject if extraction confidence is too low (likely not a receipt)
     if result.extraction.confidence < 0.3:

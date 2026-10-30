@@ -155,6 +155,8 @@ class ReceiptService:
             store_name_confidence=extraction.store_name_confidence,
             date_confidence=extraction.date_confidence,
             total_confidence=extraction.total_confidence,
+            extraction_model=self.extractor.model_name,
+            extraction_prompt_version=self.extractor.prompt_version,
             status="pending_review",
         )
         self.db.add(receipt)
