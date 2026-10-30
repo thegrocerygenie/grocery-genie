@@ -53,6 +53,18 @@ function startDayOf(budget: BudgetResponse | undefined): string {
   return budget ? String(Number(budget.period_start.slice(8, 10))) : '1';
 }
 
+/** A saved limit as the design shows it: "$400.00"; empty stays empty for the placeholder. */
+function formatLimit(text: string): string {
+  return text.trim() ? `$${parseAmount(text).toFixed(2)}` : '';
+}
+
+/** A category limit as the design shows it: "$175", or "$12.50" when it has cents. */
+function formatCategoryLimit(text: string): string {
+  if (!text.trim()) return '';
+  const amount = parseAmount(text);
+  return Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(2)}`;
+}
+
 function ordinal(n: number): string {
   const s = ['th', 'st', 'nd', 'rd'];
   const v = n % 100;
@@ -225,7 +237,7 @@ export default function BudgetSettingsScreen() {
               label="Start day"
               value={startDay}
               onChangeText={setStartDay}
-              suffix={ordinal(parseInt(startDay, 10) || 1)}
+              format={(v) => ordinal(clampedStartDay(v))}
             />
           </Section>
 
@@ -280,15 +292,19 @@ interface RowAmountInputProps {
   placeholder?: string;
 }
 
+// Design 14 shows "$400.00"; the raw number comes back while the field is edited.
 function RowAmountInput({ label, value, onChangeText, placeholder }: RowAmountInputProps) {
+  const [editing, setEditing] = useState(false);
   return (
     <View style={styles.row}>
       <Text style={type.body}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {value ? <Text style={[type.body, { color: colors.iosLabel }]}>$</Text> : null}
+        {editing && value ? <Text style={[type.body, { color: colors.iosLabel }]}>$</Text> : null}
         <TextInput
           style={[type.body, styles.input, { color: colors.iosLabel }]}
-          value={value}
+          value={editing ? value : formatLimit(value)}
+          onFocus={() => setEditing(true)}
+          onBlur={() => setEditing(false)}
           onChangeText={onChangeText}
           keyboardType="decimal-pad"
           placeholder={placeholder ?? ''}
@@ -304,24 +320,26 @@ interface RowNumericInputProps {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
-  suffix?: string;
+  /** How the value shows when the field isn't being edited, e.g. "1" → "1st". */
+  format: (v: string) => string;
 }
 
-function RowNumericInput({ label, value, onChangeText, suffix }: RowNumericInputProps) {
+// Shows "1st", not "1 1st": the raw number only while it is edited.
+function RowNumericInput({ label, value, onChangeText, format }: RowNumericInputProps) {
+  const [editing, setEditing] = useState(false);
   return (
     <View style={styles.row}>
       <Text style={type.body}>{label}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        <TextInput
-          style={[type.body, styles.input, { color: colors.iosLabel, minWidth: 30 }]}
-          value={value}
-          onChangeText={onChangeText}
-          keyboardType="number-pad"
-          maxLength={2}
-          accessibilityLabel={label}
-        />
-        {suffix ? <Text style={[type.body, { color: colors.iosLabel2 }]}>{suffix}</Text> : null}
-      </View>
+      <TextInput
+        style={[type.body, styles.input, { color: colors.iosLabel, minWidth: 30 }]}
+        value={editing ? value : format(value)}
+        onFocus={() => setEditing(true)}
+        onBlur={() => setEditing(false)}
+        onChangeText={onChangeText}
+        keyboardType="number-pad"
+        maxLength={editing ? 2 : undefined}
+        accessibilityLabel={label}
+      />
     </View>
   );
 }
@@ -334,6 +352,7 @@ interface RowCategoryInputProps {
 }
 
 function RowCategoryInput({ cat, value, onChangeText, showDivider }: RowCategoryInputProps) {
+  const [editing, setEditing] = useState(false);
   return (
     <View style={[styles.row, showDivider && styles.rowDivider]}>
       <View style={[styles.catCircle, { backgroundColor: cat.color }]}>
@@ -345,10 +364,12 @@ function RowCategoryInput({ cat, value, onChangeText, showDivider }: RowCategory
       </View>
       <Text style={[type.body, { flex: 1 }]}>{cat.name}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {value ? <Text style={[type.body, { color: colors.iosLabel2 }]}>$</Text> : null}
+        {editing && value ? <Text style={[type.body, { color: colors.iosLabel2 }]}>$</Text> : null}
         <TextInput
           style={[type.body, styles.input, { color: colors.iosLabel2, minWidth: 60 }]}
-          value={value}
+          value={editing ? value : formatCategoryLimit(value)}
+          onFocus={() => setEditing(true)}
+          onBlur={() => setEditing(false)}
           onChangeText={onChangeText}
           keyboardType="decimal-pad"
           placeholder="$0.00"
