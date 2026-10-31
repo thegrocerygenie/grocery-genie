@@ -175,6 +175,28 @@ async def test_extractor_wraps_unusable_model_output(monkeypatch, content):
         await LiteLLMReceiptExtractor(_settings()).extract(b"img", "image/jpeg")
 
 
+async def test_extractor_returns_an_answer_with_null_fields_and_no_items(
+    monkeypatch,
+):
+    """The prompt asks for null on an unreadable field. That is an answer to
+    review or reject, not an unusable one."""
+    content = json.dumps(
+        {"store_name": None, "date": None, "items": [], "confidence": 0.1}
+    )
+
+    async def answer(**_kwargs):
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=content))],
+            usage=None,
+        )
+
+    monkeypatch.setattr(provider.litellm, "acompletion", answer)
+
+    result = await LiteLLMReceiptExtractor(_settings()).extract(b"img", "image/jpeg")
+    assert result.items == []
+    assert result.store_name is None
+
+
 def test_extractor_names_its_model_and_prompt_version():
     settings = _settings(llm_provider="litellm_proxy", llm_model="receipt-vision")
 

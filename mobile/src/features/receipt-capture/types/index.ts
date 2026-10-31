@@ -9,10 +9,13 @@ export interface LineItemExtraction {
   category_id: string | null;
   category_confidence: number | null;
   extraction_confidence: number | null;
+  /** Checks the server ran on this item, such as a price mismatch. */
+  warnings?: string[];
 }
 
 export interface ReceiptExtraction {
-  store_name: string;
+  /** Null when the store name couldn't be read (store_name_confidence is 0). */
+  store_name: string | null;
   date: string;
   items: LineItemExtraction[];
   subtotal: number | null;
@@ -24,6 +27,8 @@ export interface ReceiptExtraction {
   store_name_confidence: number | null;
   date_confidence: number | null;
   total_confidence: number | null;
+  /** Receipt-level checks: subtotal mismatch, missing store, unreadable date. */
+  warnings?: string[];
 }
 
 export interface ReceiptScanResponse {

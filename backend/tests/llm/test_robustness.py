@@ -146,6 +146,43 @@ def test_unparseable_date_sets_a_low_date_confidence_when_none_was_given():
     assert result.date_confidence <= 0.5
 
 
+# --- Fields the prompt tells the model to leave null (rule 3) ---
+
+
+def test_missing_date_flags_warning_and_low_date_confidence():
+    result = ReceiptExtractionResult(
+        store_name="S", date=None, items=[_item()], confidence=0.95
+    )
+    assert any("missing date" in w for w in result.warnings)
+    assert result.date_confidence is not None
+    assert result.date_confidence <= 0.5
+
+
+@pytest.mark.parametrize(
+    "store_name", [None, "", "   "], ids=["null", "empty", "blank"]
+)
+def test_missing_store_name_flags_warning_and_zero_store_confidence(store_name):
+    result = ReceiptExtractionResult(
+        store_name=store_name,
+        date="2026-03-15",
+        items=[_item()],
+        confidence=0.95,
+        store_name_confidence=0.9,
+    )
+    assert result.store_name is None
+    assert any("missing store name" in w for w in result.warnings)
+    assert result.store_name_confidence == 0.0
+
+
+def test_zero_items_is_a_valid_extraction():
+    """No items means no receipt: the service answers 422, so validation must
+    not reject it as an unusable answer (that is a 503 the app retries)."""
+    result = ReceiptExtractionResult(
+        store_name="S", date="2026-03-15", items=[], confidence=0.2
+    )
+    assert result.items == []
+
+
 # --- Category-assignment output validation ---
 
 
