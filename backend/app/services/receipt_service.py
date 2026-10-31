@@ -44,6 +44,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class NotAReceiptError(Exception):
+    """The extraction found no line items, so the image isn't a receipt."""
+
+
 class ReceiptAlreadyConfirmedError(Exception):
     """A confirmed receipt cannot move to another status."""
 
@@ -111,14 +115,23 @@ class ReceiptService:
                 user_id,
             )
 
-        # Look up or create store
-        store = await self.store_service.find_or_create(extraction.store_name)
+        # Checked before anything is saved: the route answers 422.
+        if not extraction.items:
+            raise NotAReceiptError
+
+        # Look up or create store. A missing name leaves the receipt without
+        # one; review flags the row (store_name_confidence is 0).
+        store = (
+            await self.store_service.find_or_create(extraction.store_name)
+            if extraction.store_name
+            else None
+        )
 
         # Parse date — the LLM is asked for ISO YYYY-MM-DD but compliance isn't
         # guaranteed (esp. non-US receipts). Never 500 on a bad date; fall back
-        # to today and flag for review.
+        # to today. The extraction schema has already flagged it for review.
         try:
-            receipt_date = date.fromisoformat(extraction.date)
+            receipt_date = date.fromisoformat(extraction.date or "")
         except ValueError:
             logger.warning(
                 "Non-ISO date from extractor (%r); defaulting to today",
@@ -129,7 +142,7 @@ class ReceiptService:
         # Check for duplicate receipt before persisting
         is_duplicate = await self._check_duplicate(
             user_id,
-            store.id,
+            store.id if store else None,
             receipt_date,
             extraction.total,
             len(extraction.items),
@@ -145,7 +158,7 @@ class ReceiptService:
         # Create receipt
         receipt = Receipt(
             user_id=user_id,
-            store_id=store.id,
+            store_id=store.id if store else None,
             date=receipt_date,
             subtotal=extraction.subtotal,
             tax=extraction.tax,
@@ -202,6 +215,7 @@ class ReceiptService:
                     category_id=category_id,
                     category_confidence=category_confidence,
                     extraction_confidence=extracted_item.confidence,
+                    warnings=extracted_item.warnings,
                 )
             )
 
@@ -278,6 +292,7 @@ class ReceiptService:
                 store_name_confidence=extraction.store_name_confidence,
                 date_confidence=extraction.date_confidence,
                 total_confidence=extraction.total_confidence,
+                warnings=extraction.warnings,
             ),
             duplicate_warning=is_duplicate,
         )

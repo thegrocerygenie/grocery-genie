@@ -17,10 +17,12 @@ class LineItemExtraction(BaseModel):
     category_id: uuid.UUID | None = None
     category_confidence: float | None = None
     extraction_confidence: float | None = None
+    # What the extraction checks found (price drift), for review.
+    warnings: list[str] = Field(default_factory=list)
 
 
 class ReceiptExtraction(BaseModel):
-    store_name: str
+    store_name: str | None = None
     date: str
     items: list[LineItemExtraction]
     subtotal: float | None = None
@@ -31,6 +33,8 @@ class ReceiptExtraction(BaseModel):
     store_name_confidence: float | None = None
     date_confidence: float | None = None
     total_confidence: float | None = None
+    # Receipt-level findings: subtotal drift, a missing store, a bad date.
+    warnings: list[str] = Field(default_factory=list)
 
 
 class ReceiptScanResponse(BaseModel):

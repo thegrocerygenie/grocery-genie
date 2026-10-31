@@ -23,18 +23,22 @@ Submit receipt image for processing. Returns job ID for async polling or sync re
     "store_name": "...",
     "date": "2026-02-15",
     "items": [
-      { "id": "item-uuid", "name": "Organic Bananas", "quantity": 1.105, "unit_price": 280.00, "total_price": 309.40, "category_id": "cat-uuid", "category_confidence": 0.92, "extraction_confidence": 0.88 }
+      { "id": "item-uuid", "name": "Organic Bananas", "quantity": 1.105, "unit_price": 280.00, "total_price": 309.40, "category_id": "cat-uuid", "category_confidence": 0.92, "extraction_confidence": 0.88, "warnings": [] }
     ],
     "subtotal": 609.40,
     "confidence": 0.85,
     "store_name_confidence": 0.95,
     "date_confidence": 0.90,
-    "total_confidence": 0.88
+    "total_confidence": 0.88,
+    "warnings": []
   }
 }
 ```
 
-- `store_name_confidence`, `date_confidence`, and `total_confidence` are 0.0–1.0, or `null` when the model gave no score. The review screen flags each one below 0.7. A future or unreadable date gives a `date_confidence` of 0.5 or less.
+- `store_name_confidence`, `date_confidence`, and `total_confidence` are 0.0–1.0, or `null` when the model gave no score. The review screen flags each one below 0.7. A future, missing or unreadable date gives a `date_confidence` of 0.5 or less, and a missing or unreadable date is stored as today.
+- `store_name` is `null` when the model can't read it. Then `store_name_confidence` is 0.0 and the receipt has no store until the user enters one.
+- `warnings` lists what the extraction checks found, for review: on the receipt, a subtotal that doesn't match the items, a missing store name, or a missing, unreadable or future date; on an item, a total that doesn't match quantity × unit price. Empty when nothing was found.
+- An extraction with no line items returns `422` with `"This doesn't appear to be a receipt."`, the same as one with an overall `confidence` below 0.3. Nothing is stored. A `503` means the model couldn't be reached or gave an unusable answer; the app retries it.
 - **AI consent** (App Store 5.1.2(i)): the scan sends the image, and the item names on it, to Anthropic's Claude. Without the user's consent to the current policy version (see `PUT /api/users/me/ai-consent`), the scan returns `403` before it reads the file. Nothing is stored or sent:
   ```json
   { "detail": { "code": "ai_consent_required", "message": "...", "policy_version": "2026-10-27" } }

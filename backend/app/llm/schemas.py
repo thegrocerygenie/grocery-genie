@@ -41,10 +41,13 @@ class ExtractedLineItem(BaseModel):
 
 
 class ReceiptExtractionResult(BaseModel):
-    store_name: str
-    date: str
+    # The prompt asks for null on a field the model can't read, so null store,
+    # null date and no items are answers to flag or reject, not invalid output
+    # (a validation error becomes a 503 that the app keeps retrying).
+    store_name: str | None = None
+    date: str | None = None
     currency: str = "USD"
-    items: list[ExtractedLineItem] = Field(min_length=1)
+    items: list[ExtractedLineItem] = Field(default_factory=list)
     subtotal: float | None = None
     tax: float | None = None
     total: float | None = None
@@ -68,8 +71,22 @@ class ReceiptExtractionResult(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def check_store_name_present(self) -> "ReceiptExtractionResult":
+        """Flag a missing store name and score it 0 so review flags the row."""
+        if self.store_name is not None and self.store_name.strip():
+            return self
+        self.store_name = None
+        self.warnings.append("missing store name")
+        self.store_name_confidence = 0.0
+        return self
+
+    @model_validator(mode="after")
     def check_date_not_future(self) -> "ReceiptExtractionResult":
-        """Flag future / unparseable dates and lower confidence."""
+        """Flag missing / future / unparseable dates and lower confidence."""
+        if self.date is None:
+            self.warnings.append("missing date")
+            self._cap_date_confidence()
+            return self
         try:
             parsed = date.fromisoformat(self.date)
         except ValueError:
@@ -83,7 +100,7 @@ class ReceiptExtractionResult(BaseModel):
 
     def _cap_date_confidence(self) -> None:
         self.confidence = min(self.confidence, _FUTURE_DATE_CONFIDENCE_CAP)
-        # An unparseable date is stored as today, so the Date row needs a
+        # A missing or unparseable date is stored as today, so the Date row needs a
         # low score even when the model gave none.
         self.date_confidence = min(
             self.date_confidence if self.date_confidence is not None else 1.0,

@@ -41,7 +41,11 @@ from app.models.schemas import (
 )
 from app.services.ai_consent import require_ai_consent
 from app.services.analytics_service import AnalyticsService, get_analytics_service
-from app.services.receipt_service import ReceiptAlreadyConfirmedError, ReceiptService
+from app.services.receipt_service import (
+    NotAReceiptError,
+    ReceiptAlreadyConfirmedError,
+    ReceiptService,
+)
 
 router = APIRouter(prefix="/api/receipts", tags=["receipts"])
 
@@ -58,6 +62,7 @@ SCAN_SOURCES = {"camera", "library", "pdf", "manual"}
 
 # Hard ceiling on a single receipt upload (defends against OOM via huge bodies).
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+NOT_A_RECEIPT_DETAIL = "This doesn't appear to be a receipt."
 
 _CONTENT_TYPE_EXTS = {
     "image/jpeg": ".jpg",
@@ -185,12 +190,19 @@ async def scan_receipt(
             status_code=503,
             detail="Couldn't read the receipt right now. Try again in a moment.",
         ) from exc
+    except NotAReceiptError as exc:
+        # Same wording as the low-confidence rejection below: the app maps it
+        # to its "not a receipt" hint (scanErrorHint.ts).
+        raise HTTPException(
+            status_code=422,
+            detail=NOT_A_RECEIPT_DETAIL,
+        ) from exc
 
     # Reject if extraction confidence is too low (likely not a receipt)
     if result.extraction.confidence < 0.3:
         raise HTTPException(
             status_code=422,
-            detail="This doesn't appear to be a receipt.",
+            detail=NOT_A_RECEIPT_DETAIL,
         )
 
     # Store receipt image and generate thumbnail

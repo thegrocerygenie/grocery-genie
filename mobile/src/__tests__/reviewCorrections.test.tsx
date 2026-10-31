@@ -505,6 +505,18 @@ describe('Review screen store, date and total flags (AC 2)', () => {
     expect(within(total).getByText('$1.29')).toHaveStyle({ color: colors.orange });
   });
 
+  it('shows an empty, flagged Store field when the scan found no store name', () => {
+    useReceiptStore.getState().setActiveScanResponse({
+      ...scan,
+      extraction: { ...scan.extraction, store_name: null, store_name_confidence: 0 },
+    });
+    renderReview();
+
+    const store = screen.getByLabelText('Store');
+    expect(store.props.value).toBe('');
+    expect(store.props.accessibilityHint).toMatch(/low confidence/i);
+  });
+
   it('does not flag store, date or total at the threshold', () => {
     withFieldConfidences({
       store_name_confidence: 0.7,

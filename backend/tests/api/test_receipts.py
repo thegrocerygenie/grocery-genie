@@ -1107,3 +1107,114 @@ async def test_confirmed_event_logs_counts_not_the_receipt_total(
 
     confirmed = [p for name, p, _ in calls if name == "receipt_confirmed"]
     assert confirmed == [{"item_count": 3, "correction_count": 0}]
+
+
+# --- Extraction edge cases (DoD box 9): no items, missing store, bad date ---
+
+
+def _extraction(**overrides):
+    from app.llm.schemas import ReceiptExtractionResult
+
+    fields = {
+        "store_name": "Corner Market",
+        "date": "2026-03-15",
+        "items": [
+            {
+                "name": "Apples",
+                "quantity": 1,
+                "unit_price": 3.0,
+                "total_price": 3.0,
+                "confidence": 0.9,
+            }
+        ],
+        "subtotal": 3.0,
+        "total": 3.0,
+        "confidence": 0.85,
+    }
+    fields.update(overrides)
+    return ReceiptExtractionResult(**fields)
+
+
+async def _scan(client: AsyncClient, image_bytes: bytes):
+    return await client.post(
+        "/api/receipts/scan",
+        files={"file": ("receipt.jpg", io.BytesIO(image_bytes), "image/jpeg")},
+    )
+
+
+async def test_scan_with_no_items_is_rejected_as_not_a_receipt(
+    client: AsyncClient, test_image_bytes: bytes, mock_extractor
+):
+    """A 422, not a 5xx: the app retries a 5xx from its offline queue, and a
+    photo with no items fails the same way every time."""
+    mock_extractor._result = _extraction(items=[], confidence=0.9)
+
+    response = await _scan(client, test_image_bytes)
+
+    assert response.status_code == 422
+    assert "doesn't appear to be a receipt" in response.json()["detail"]
+    listed = (await client.get("/api/receipts")).json()
+    assert listed["total"] == 0
+
+
+async def test_scan_response_carries_extraction_warnings(
+    client: AsyncClient, test_image_bytes: bytes, mock_extractor
+):
+    mock_extractor._result = _extraction(
+        items=[
+            {
+                "name": "Apples",
+                "quantity": 2,
+                "unit_price": 3.0,
+                "total_price": 9.0,
+                "confidence": 0.9,
+            }
+        ],
+        subtotal=5.0,
+        total=5.0,
+    )
+
+    scan = await _create_receipt(client, test_image_bytes)
+
+    extraction = scan["extraction"]
+    assert any("subtotal mismatch" in w for w in extraction["warnings"])
+    assert any("price mismatch" in w for w in extraction["items"][0]["warnings"])
+
+
+async def test_clean_scan_has_no_warnings(client: AsyncClient, test_image_bytes: bytes):
+    scan = await _create_receipt(client, test_image_bytes)
+
+    assert scan["extraction"]["warnings"] == []
+    assert all(item["warnings"] == [] for item in scan["extraction"]["items"])
+
+
+async def test_scan_without_a_store_name_saves_the_receipt_with_no_store(
+    client: AsyncClient, test_image_bytes: bytes, mock_extractor
+):
+    mock_extractor._result = _extraction(store_name=None)
+
+    scan = await _create_receipt(client, test_image_bytes)
+
+    extraction = scan["extraction"]
+    assert extraction["store_name"] is None
+    # Below the review screen's 0.7 threshold, so the Store row is flagged.
+    assert extraction["store_name_confidence"] == 0.0
+    assert any("missing store name" in w for w in extraction["warnings"])
+    stored = (await client.get(f"/api/receipts/{scan['receipt_id']}")).json()
+    assert stored["store_name"] is None
+
+
+@pytest.mark.parametrize("raw_date", ["15/03/2026", None], ids=["unparseable", "null"])
+async def test_scan_flags_an_unreadable_date(
+    client: AsyncClient, test_image_bytes: bytes, mock_extractor, raw_date
+):
+    from datetime import date
+
+    mock_extractor._result = _extraction(date=raw_date)
+
+    scan = await _create_receipt(client, test_image_bytes)
+
+    extraction = scan["extraction"]
+    assert extraction["date"] == date.today().isoformat()
+    assert extraction["date_confidence"] < 0.7
+    assert any("date" in w for w in extraction["warnings"])
