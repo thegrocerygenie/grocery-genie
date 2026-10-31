@@ -5,8 +5,10 @@ from tests.llm_validation.conftest import llm_configured
 LLM_CONFIGURED = llm_configured()
 
 
-def score_store_name(extracted: str, expected: str) -> bool:
-    """Exact match after normalization."""
+def score_store_name(extracted: str | None, expected: str) -> bool:
+    """Exact match after normalization. A null store name is a miss."""
+    if extracted is None:
+        return False
     return extracted.strip().lower() == expected.strip().lower()
 
 
@@ -183,3 +185,8 @@ class TestExtractionAccuracy:
 
         recall = total_matched / total_expected if total_expected > 0 else 0
         assert recall >= 0.95, f"Item recall {recall:.2%} < 95% target"
+
+
+def test_a_null_store_name_scores_as_a_miss():
+    """The model returns null for a store it can't read; that is a miss."""
+    assert score_store_name(None, "Trader Joe's") is False
