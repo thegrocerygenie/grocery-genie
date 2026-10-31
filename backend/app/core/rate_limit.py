@@ -5,6 +5,7 @@ import uuid
 from collections import defaultdict
 from typing import Protocol
 
+from fastapi import HTTPException
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -12,10 +13,14 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app.core.config import Settings, get_settings
+from app.core.security import decode_token
 
 logger = logging.getLogger(__name__)
 
 REDIS_KEY_PREFIX = "gg:ratelimit:"
+
+# NFR 7 counts receipt submissions on their own: the scan and manual entry.
+RECEIPT_SUBMISSIONS = {("POST", "/api/receipts/scan"), ("POST", "/api/receipts")}
 
 
 class RateLimitStore(Protocol):
@@ -146,9 +151,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """Sliding window rate limiter.
 
     Three tiers:
-    - Authenticated writes (POST/PUT/PATCH/DELETE): keyed by token,
+    - Receipt submissions (RECEIPT_SUBMISSIONS): keyed by user,
       cap = max_receipt_submissions_per_hour
-    - Authenticated reads (GET): keyed by token, cap = max_reads_per_minute
+    - Every other authenticated request, reads and writes alike: keyed by
+      user, cap = max_reads_per_minute. Analytics and push-token calls count
+      here, so they never use up the scan allowance.
     - Unauthenticated /api/auth/* POSTs: keyed by client IP,
       cap = auth_ip_rate_limit_per_minute
 
@@ -161,6 +168,18 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if auth.startswith("Bearer "):
             return auth[7:]
         return None
+
+    def _caller_key(self, token: str) -> str:
+        """The user an access token names, so a new sign-in keeps the count.
+
+        This only reads the user id; get_current_user still checks revocation.
+        A token that isn't a valid access JWT (the debug api_token) is counted
+        on its own.
+        """
+        try:
+            return f"user:{decode_token(token, expected_typ='access').sub}"
+        except HTTPException:
+            return f"token:{token}"
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -175,9 +194,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         store = _store_for(settings)
 
         if token is not None:
-            if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            caller = self._caller_key(token)
+            if (request.method, path) in RECEIPT_SUBMISSIONS:
                 allowed = await store.hit(
-                    f"write:{token}",
+                    f"submit:{caller}",
                     window=3600.0,
                     limit=settings.max_receipt_submissions_per_hour,
                 )
@@ -185,7 +205,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     return _too_many("Rate limit exceeded. Try again later.", "60")
             else:
                 allowed = await store.hit(
-                    f"read:{token}",
+                    f"request:{caller}",
                     window=60.0,
                     limit=settings.max_reads_per_minute,
                 )

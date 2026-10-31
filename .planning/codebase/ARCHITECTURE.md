@@ -111,7 +111,7 @@
   - `config.py` — `Settings` via `pydantic-settings`, reads `.env` with `env_prefix="GG_"`, `@lru_cache` `get_settings()`.
   - `dependencies.py` — async `engine`, `async_session_factory`, `get_db()` dependency with commit/rollback semantics; sync session factory for Celery.
   - `security.py` — `get_current_user` via HTTP Bearer, looks up `User.api_token`.
-  - `rate_limit.py` — `RateLimitMiddleware` (in-memory sliding window, 2 tiers: write per hour / read per minute, keyed by bearer token).
+  - `rate_limit.py` — `RateLimitMiddleware` (sliding window in Redis, per user: receipt submissions per hour, every other request per minute; auth POSTs per IP).
   - `seed.py` — `seed_default_categories` for the 8 default categories.
 
 ## Data Flow
@@ -228,7 +228,7 @@
 
 **Authentication:**
 - Backend: HTTP Bearer via `fastapi.security.HTTPBearer`; `get_current_user` looks up `User.api_token`. MVP uses a seeded dev token (`"dev-token-00000000"` in `mobile/src/services/api.ts`). Every route except `/health` requires `user: User = Depends(get_current_user)`.
-- Rate limiting: keyed by bearer token in `RateLimitMiddleware` (in-memory sliding window — production target is Redis).
+- Rate limiting: keyed by user (the access token's `sub`) in `RateLimitMiddleware`, counted in Redis.
 
 **Dependency injection:**
 - Backend: FastAPI `Depends()` for `get_db`, `get_current_user`, `get_receipt_extractor`, `get_category_assigner`, `get_analytics_service`. No global state — services constructed per-request.
