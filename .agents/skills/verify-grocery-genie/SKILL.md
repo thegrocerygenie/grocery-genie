@@ -26,7 +26,7 @@ Launch runs `make db-up` (it starts the shared dev containers if they are down, 
 
 Debug mode swaps in `MockReceiptExtractor` and `MockCategoryAssigner` (`backend/app/llm/provider.py`). The LLM is an external boundary, so this is the one mock the proof allows. Debug mode also turns on a static `api_token` auth fallback, wildcard CORS, and skips the production config check. The helper authenticates with real JWTs, so the fallback is never used. Use `--live-llm` when the change touches prompts, extraction, or `production_safety_errors`.
 
-The mock scan always returns the same receipt: `Test Grocery Store`, dated `2026-03-15`, total `15.95`, three items (`Organic Bananas` 1.29, `Whole Milk 1 Gal` 4.99, `Paper Towels 6pk` 8.49). Spend sums line-item totals, so tax is left out and each confirmed mock scan adds `14.77`. Budgets for scan journeys use `period_start` `2026-03-01`, and an `18.33` budget puts one confirmed scan at 80.6%.
+The mock scan always returns the same receipt: `Test Grocery Store`, dated `2026-03-15`, total `15.95`, three items (`Organic Bananas` 1.29, `Whole Milk 1 Gal` 4.99, `Paper Towels 6pk` 8.49). Spend sums line-item totals, so tax is left out and each confirmed mock scan adds `14.77`. An `18.33` budget puts one confirmed scan at 80.6%. Alerts fire only in the budget period that holds today, so alert journeys set this month's budget and `PATCH` each scanned receipt to today's date before they confirm it (see [`features/budget-alerts.md`](features/budget-alerts.md)).
 
 Isolation: one instance per checkout. A second `launch` refuses while one runs. To run another checkout at the same time, set `VERIFY_PORT` and `VERIFY_DB` for every command in that checkout. The helper refuses to touch the dev database `grocery_genie`.
 

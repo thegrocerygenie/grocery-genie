@@ -23,19 +23,22 @@ Preconditions:
 
 - Debug-mode instance; `$G doctor` shows no `FAIL`.
 - Each mock scan adds `14.77` to spend (line items; tax is left out). Against an `18.33` budget: one scan is 80.6%, two are 161%, three are 242%.
+- Only the budget period that holds today alerts (M5, `check_thresholds`). So each journey sets this month's budget and gives every receipt today's date. Set the dates once, in server time (UTC): `today=$(date -u +%F); month=${today%-*}`.
+- To confirm a scan dated today, run `rid=$($G scan | jq -r .receipt_id)`, `$G api PATCH /api/receipts/$rid "{\"date\":\"$today\"}"`, and `$G api PATCH /api/receipts/$rid '{"status":"confirmed"}'`. The steps below call this "scan and confirm".
 
-- **Sign up and budget.** Run `$G signup alerts` and `$G api POST /api/budgets '{"amount":18.33,"period_type":"monthly","period_start":"2026-03-01"}'`. Status 201.
-- **First receipt, 80.6% (`alert-thresholds`).** Run `rid=$($G scan | jq -r .receipt_id)` and `$G api PATCH /api/receipts/$rid '{"status":"confirmed"}'`. Then `$G api GET '/api/notifications?per_page=100' | jq -r '.items[].title'` lists only `Budget 80% Reached`.
+- **Sign up and budget.** Run `$G signup alerts` and `$G api POST /api/budgets "{\"amount\":18.33,\"period_type\":\"monthly\",\"period_start\":\"$month-01\"}"`. Status 201.
+- **First receipt, 80.6% (`alert-thresholds`).** Scan and confirm. Then `$G api GET '/api/notifications?per_page=100' | jq -r '.items[].title'` lists only `Budget 80% Reached`.
 - **Second receipt, 161%.** Scan and confirm again. The list adds exactly one `Budget Exceeded`.
 - **Third receipt, 242% (`alert-once`).** Scan and confirm again. The list still has two alerts. `$G sql "SELECT threshold_percent FROM budget_alerts_sent ORDER BY 1"` prints `80` and `100`, and `$G sql "SELECT count(*) FROM notifications WHERE type='budget_threshold'"` prints `2`.
 - **Text (`alert-text`).** Run `$G api GET '/api/notifications?per_page=100' | jq -r '.items[] | "\(.title) | \(.body)"'`. The 80% body is `$3.56 remaining with <n> days left in this period.` The `Budget Exceeded` body is `You've exceeded your budget by $11.21.`
 - **Push queued (`alert-push-queued`).** `$G sql "SELECT count(*) FROM notifications WHERE type='budget_threshold' AND push_status IS NULL"` prints `2`. Delivery itself needs the Celery worker and beat plus Expo, so it is out of this journey.
 - **50% opt-in (`alert-opt-in`).** Run `$G signup alerts-fifty`, then `$G api PATCH /api/users/me '{"notification_thresholds":{"fifty":true}}'`. The response shows `fifty` `true`. Make the same budget call, then scan and confirm once. The list holds `Budget 50% Reached` and `Budget 80% Reached`.
-- **Manual entry (`alert-manual`).** Run `$G signup manual-alert`, the same budget call, then `$G api POST /api/receipts '{"store_name":"Corner Shop","date":"2026-03-20","total":16.00,"items":[{"name":"Rice 5lb","unit_price":16.00,"total_price":16.00}]}'`. Status 201. `$G api GET '/api/dashboard/spending?period=2026-03' | jq .overall.percent` is `87.3`. Expected per BC-03 #1: the notification list holds `Budget 80% Reached`.
+- **Manual entry (`alert-manual`).** Run `$G signup manual-alert`, the same budget call, then `$G api POST /api/receipts "{\"store_name\":\"Corner Shop\",\"date\":\"$today\",\"total\":16.00,\"items\":[{\"name\":\"Rice 5lb\",\"unit_price\":16.00,\"total_price\":16.00}]}"`. Status 201. `$G api GET "/api/dashboard/spending?period=$month" | jq .overall.percent` is `87.3`. Expected per BC-03 #1: the notification list holds `Budget 80% Reached`.
 
 ## Gotchas
 
 - Alert titles are `Budget 50% Reached`, `Budget 80% Reached`, and `Budget Exceeded` (100%). Match on these, not on a percentage field.
-- The March 2026 period has ended, so the alert body says `0 days left`. Do not assert the day count.
+- The day count in the alert body depends on today's date. Do not assert it.
+- A receipt dated in an earlier period gets no alert, even when its spend crosses a threshold there (M5). The mock scan is dated `2026-03-15`, so a journey that confirms it without the date `PATCH` gets no alert. That is the journey setup, not an app bug.
 - A user who turns a threshold off gets no alert for it. The `notif_threshold_*` columns on `users` hold the settings; read them with `$G sql` when an alert is missing.
 - `alert-manual` drives `POST /api/receipts` only, because the Manual entry screen sends no confirming `PATCH`. Never add one to make it pass. It failed until fix `c22be8f` (2026-10-26), which runs the same alert path (`_after_confirm`) when a manual receipt is saved.
