@@ -9,8 +9,10 @@ The foundational ingestion pipeline that powers all downstream features. Users p
 
 **Acceptance Criteria:**
 1. Camera opens with real-time edge detection overlay highlighting receipt boundaries.
-2. Image quality feedback before capture (blur warning, low-light warning).
+2. Image quality feedback before submission (blur warning, low-light warning).
 3. User can retake before submitting.
+
+> Decided 2026-11-01 (`.planning/PLAN-2026-11-01-document-scanner.md`): on a device, Scan opens Apple's document scanner (`VNDocumentCameraViewController`), which provides AC 1 and AC 3. The scanner has no hook for hints before capture, so AC 2 now reads "before submission": the scanned page is checked for blur and light on the device, and a page that fails is held back with Retake and Use Scan. A scan of several pages keeps the first. Expo Go and the Simulator keep the expo-camera screen, which still shows its hints before capture.
 4. Processing completes within 5 seconds for a standard single-page receipt.
 5. Structured data (store name, date, line items with names/quantities/prices, subtotal) displayed for review.
 

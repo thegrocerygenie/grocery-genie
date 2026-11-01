@@ -10,6 +10,11 @@ const { addDeploymentTargetFix } = require('../withPodsMinDeploymentTarget') as 
   addDeploymentTargetFix: Transform;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { disableScannerLocation } = require('../withDocumentScannerNoLocation') as {
+  disableScannerLocation: Transform;
+};
+
 // The didFinishLaunching tail of the Expo SDK 54 template AppDelegate.swift.
 const APP_DELEGATE = `    bindReactNativeFactory(factory)
 
@@ -71,5 +76,20 @@ describe('withPodsMinDeploymentTarget addDeploymentTargetFix', () => {
 
   it('fails when the Podfile has no react_native_post_install call', () => {
     expect(() => addDeploymentTargetFix('target "App" do\nend\n')).toThrow(/not found/);
+  });
+});
+
+describe('withDocumentScannerNoLocation disableScannerLocation', () => {
+  const TOP = "require File.join(File.dirname(`node --print \"require.resolve('expo/package.json')\"`), \"scripts/autolinking\")\n";
+
+  it('sets RNDS_DISABLE_LOCATION before any pod is installed', () => {
+    const out = disableScannerLocation(TOP + PODFILE);
+    expect(out.startsWith('# grocery-genie')).toBe(true);
+    expect(out.indexOf("ENV['RNDS_DISABLE_LOCATION'] = '1'")).toBeLessThan(out.indexOf('require'));
+  });
+
+  it('is idempotent', () => {
+    const once = disableScannerLocation(PODFILE);
+    expect(disableScannerLocation(once)).toBe(once);
   });
 });

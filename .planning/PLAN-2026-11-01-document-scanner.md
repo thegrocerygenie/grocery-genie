@@ -1,6 +1,14 @@
 # Plan: edge detection with Apple's document scanner (RC-01 AC 1, AC 3)
 
-**Status: ready once the three product decisions in §2 are made.**
+**Status: built in code, waiting on a device.** The three decisions in §2 were made on 2026-11-01: A.1, B.1 and C.1, the recommended options. Steps 1–6 are in code. The device proof that gates step 1 has not run: nobody has built the module with Xcode 27. The device checks are in `docs/device-checklist.md` §2, "Document scanner".
+
+What was built, by step:
+1. `@dariyd/react-native-document-scanner` 2.2.0 and `expo-device`; `plugins/withDocumentScannerNoLocation.js`, with a test. `npx expo prebuild --platform ios --no-install` applies it on Linux; pods were not installed. `services/documentScanner.ts` wraps the module.
+2. `scoreImage` split out of `sampleFrame` (`services/frameSampler.ts`).
+3. `hooks/useScanSubmission.ts`, and `DocumentScannerCapture` and `CameraCapture` in `app/(tabs)/scan.tsx`. A held-back page shows its preview, the reason, and Retake and Use Scan. "Use Scan" uploads anyway, because the threshold isn't calibrated for scanned pages, and the server still rejects a page that is truly blurry.
+4. `source: 'camera'` from both paths; one `receipt_abandoned {stage: capture}` for each cancelled scan.
+5. `documentScanner.test.ts`, `scanDocumentScanner.test.tsx`, `frameSampler.test.ts` (scoreImage), `iosBuildPlugins.test.ts`. The fallback tests are unchanged.
+6. RC-01 note, device checklist, launch open items, the design handoff and 13-validation-strategy.
 Written 2026-11-01 on `main` at `c9aa32f`. Decided on 2026-10-28 (design-alignment handoff, decision 1): use `VNDocumentCameraViewController` through a community Expo module, in a native build. This plan is the "plan first" that decision asked for. It covers every step the 2026-10-29 DoD audit listed.
 
 ## 1. What changes, in one paragraph

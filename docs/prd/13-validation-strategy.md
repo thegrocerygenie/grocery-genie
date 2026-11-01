@@ -251,7 +251,7 @@ The open items below, plus device checks from launch work, are collected in [dev
 
 **Camera & Capture:**
 - [ ] Camera opens with edge detection overlay visible on receipt.
-- [ ] Blur warning appears when receipt is out of focus.
+- [ ] Blur warning appears when receipt is out of focus (before submission with the document scanner; before capture on the fallback camera).
 - [ ] Low-light warning appears in dim environment.
 - [ ] Retake button works before submission.
 - [ ] Photo library picker opens and accepts JPEG, PNG, HEIC.
