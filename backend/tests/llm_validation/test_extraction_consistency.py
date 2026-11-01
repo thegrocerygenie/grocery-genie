@@ -1,5 +1,7 @@
 import pytest
 
+from app.core.config import get_settings
+from tests.llm_validation import harness
 from tests.llm_validation.conftest import llm_configured
 
 LLM_CONFIGURED = llm_configured()
@@ -7,36 +9,27 @@ LLM_CONFIGURED = llm_configured()
 
 @pytest.mark.skipif(not LLM_CONFIGURED, reason="LLM API key not configured")
 class TestExtractionConsistency:
-    """Run each receipt through extraction multiple times.
+    """Each receipt runs 5 times with the configured model settings (default
+    sampling for Claude Sonnet 5.5). Target: ≥95% give identical output."""
 
-    Outputs should be identical across runs with the configured model
-    settings (default sampling for Claude Sonnet 5.5).
-    Target: >=95% of receipts produce identical output across 5 runs.
-    """
-
-    RUNS_PER_RECEIPT = 5
-
-    async def test_consistent_output_across_runs(self, receipt_test_set):
-        if not receipt_test_set:
+    async def test_consistent_output_across_runs(self, test_set):
+        if not test_set.scored:
             pytest.skip("No receipt test images available")
 
-        from app.core.config import get_settings
         from app.llm.provider import LiteLLMReceiptExtractor
 
         extractor = LiteLLMReceiptExtractor(get_settings())
-        consistent_count = 0
+        inconsistent: list[str] = []
+        for fixture in test_set.scored:
+            runs = [
+                (await harness.extract_fixture(extractor, fixture)).result
+                for _ in range(harness.CONSISTENCY_RUNS)
+            ]
+            if not harness.is_consistent(runs):
+                inconsistent.append(fixture.receipt_id)
 
-        for image_data, _truth in receipt_test_set:
-            results = []
-            for _ in range(self.RUNS_PER_RECEIPT):
-                result = await extractor.extract(image_data, "image/jpeg")
-                results.append(result.model_dump_json())
-
-            if len(set(results)) == 1:
-                consistent_count += 1
-
-        total = len(receipt_test_set)
-        consistency_rate = consistent_count / total if total > 0 else 1.0
-        assert consistency_rate >= 0.95, (
-            f"Consistency rate {consistency_rate:.2%} < 95% target"
+        total = len(test_set.scored)
+        rate = (total - len(inconsistent)) / total
+        assert rate >= harness.CONSISTENCY_TARGET, (
+            f"Consistency rate {rate:.2%} < 95% target: " + ", ".join(inconsistent)
         )
