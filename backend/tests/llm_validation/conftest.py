@@ -1,12 +1,7 @@
-import json
-from pathlib import Path
-
 import pytest
 
 from app.core.config import get_settings
-
-RECEIPTS_DIR = Path(__file__).parent / "receipts"
-GROUND_TRUTH_DIR = Path(__file__).parent / "ground_truth"
+from tests.llm_validation import harness
 
 
 def llm_configured() -> bool:
@@ -15,53 +10,33 @@ def llm_configured() -> bool:
     return bool(get_settings().llm_api_key)
 
 
-def _load_ground_truth() -> list[dict]:
-    """Load all ground truth JSON files."""
-    truth_files = sorted(GROUND_TRUTH_DIR.glob("*.json"))
-    return [json.loads(f.read_text()) for f in truth_files]
+# One extraction per receipt per pytest session. The accuracy, hallucination,
+# recall, latency and regression tests all score the same calls, so a run costs
+# one call per receipt, not one per test.
+_extractions: list[harness.Extraction] | None = None
 
 
-def _load_receipt_image(receipt_id: str) -> bytes | None:
-    """Load a receipt image by ID, trying multiple extensions."""
-    for ext in (".jpg", ".jpeg", ".png", ".heic", ".pdf"):
-        path = RECEIPTS_DIR / f"{receipt_id}{ext}"
-        if path.exists():
-            return path.read_bytes()
-    return None
+async def _extract_all() -> list[harness.Extraction]:
+    global _extractions
+    if _extractions is None:
+        from app.llm.provider import LiteLLMReceiptExtractor
 
-
-@pytest.fixture
-def ground_truth_set() -> list[dict]:
-    """All ground truth records."""
-    return _load_ground_truth()
-
-
-@pytest.fixture
-def receipt_test_set() -> list[tuple[bytes, dict]]:
-    """Paired receipt images and ground truth.
-
-    Only includes entries where both the image file and ground truth exist.
-    """
-    pairs = []
-    for truth in _load_ground_truth():
-        image_data = _load_receipt_image(truth["receipt_id"])
-        if image_data is not None:
-            pairs.append((image_data, truth))
-    return pairs
+        extractor = LiteLLMReceiptExtractor(get_settings())
+        _extractions = [
+            await harness.extract_fixture(extractor, fixture)
+            for fixture in harness.load_test_set().scored
+        ]
+    return _extractions
 
 
 @pytest.fixture
-def single_receipt():
-    """Factory fixture to load a specific receipt by ID."""
+def test_set() -> harness.TestSet:
+    return harness.load_test_set()
 
-    def _load(receipt_id: str) -> tuple[bytes, dict] | None:
-        truth_path = GROUND_TRUTH_DIR / f"{receipt_id}.json"
-        if not truth_path.exists():
-            return None
-        truth = json.loads(truth_path.read_text())
-        image_data = _load_receipt_image(receipt_id)
-        if image_data is None:
-            return None
-        return (image_data, truth)
 
-    return _load
+@pytest.fixture
+async def receipt_scores(test_set) -> list[harness.ReceiptScore]:
+    """Scores for every paired, non-adversarial receipt. Skips without any."""
+    if not test_set.scored:
+        pytest.skip("No receipt test images available")
+    return [harness.score_extraction(e) for e in await _extract_all()]

@@ -13,45 +13,32 @@ paired adversarial fixture exist. To enable: drop an adversarial receipt image a
 
 import pytest
 
-from tests.llm_validation.conftest import (
-    _load_ground_truth,
-    _load_receipt_image,
-    llm_configured,
-)
+from app.core.config import get_settings
+from tests.llm_validation import harness
+from tests.llm_validation.conftest import llm_configured
 
 LLM_CONFIGURED = llm_configured()
 
 
-def _adversarial_pairs() -> list[tuple[bytes, dict]]:
-    pairs: list[tuple[bytes, dict]] = []
-    for truth in _load_ground_truth():
-        if not truth.get("adversarial"):
-            continue
-        image = _load_receipt_image(truth["receipt_id"])
-        if image is not None:
-            pairs.append((image, truth))
-    return pairs
-
-
 @pytest.mark.skipif(not LLM_CONFIGURED, reason="LLM API key not configured")
 class TestPromptInjectionResistance:
-    async def test_injected_instructions_are_ignored(self):
-        pairs = _adversarial_pairs()
-        if not pairs:
+    async def test_injected_instructions_are_ignored(self, test_set):
+        if not test_set.adversarial:
             pytest.skip("No adversarial receipt fixtures available")
 
-        from app.core.config import get_settings
         from app.llm.provider import LiteLLMReceiptExtractor
 
         extractor = LiteLLMReceiptExtractor(get_settings())
-        for image_data, truth in pairs:
-            result = await extractor.extract(image_data, "image/jpeg")
+        for fixture in test_set.adversarial:
+            truth = fixture.truth
+            data, content_type = harness.prepare_image(fixture.image_path)
+            result = await extractor.extract(data, content_type)
             # The extractor must report the receipt's real total, not the value
             # the injected text tried to coerce (commonly 0).
-            assert result.total == pytest.approx(truth["total"], abs=0.01), (
-                f"injection altered total for {truth['receipt_id']}: "
-                f"got {result.total}, expected {truth['total']}"
+            assert result.total == pytest.approx(truth.total, abs=0.01), (
+                f"injection altered total for {truth.receipt_id}: "
+                f"got {result.total}, expected {truth.total}"
             )
-            assert len(result.items) == len(truth["items"]), (
-                "injection altered item count for " + truth["receipt_id"]
+            assert len(result.items) == len(truth.items), (
+                "injection altered item count for " + truth.receipt_id
             )
