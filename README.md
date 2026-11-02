@@ -80,7 +80,7 @@ grocery-genie/
 
 With `make`, you can skip the install steps below: each target installs dependencies first when they changed, and backend targets use `backend/.venv`. `make reinstall-backend` or `make reinstall-mobile` forces an install.
 
-`make install` also runs `make hooks`, which sets `core.hooksPath` to `.githooks`. Then a pull or branch switch that changes `mobile/package.json`, `mobile/package-lock.json`, `mobile/patches/` or `backend/pyproject.toml` runs `make install`, so a native build (`npx expo prebuild` and Xcode) does not start from stale dependencies. A new clone or worktree gets no automatic install: run `make install` once there.
+`make install` also runs `make hooks`, which sets `core.hooksPath` to `.githooks`. Then a pull or branch switch that changes `mobile/package.json`, `mobile/package-lock.json`, `mobile/patches/` or `backend/pyproject.toml` forces a reinstall of that side (`make reinstall-mobile` or `make reinstall-backend`), so a native build (`npx expo prebuild` and Xcode) does not start from stale dependencies. It does not trust make's mtime stamps there, because macOS make compares whole seconds and misses files git writes in the same second as the last install. Run `scripts/check-githooks.sh` after you change the hooks. A new clone or worktree gets no automatic install: run `make install` once there.
 
 ### Backend
 

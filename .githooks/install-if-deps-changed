@@ -1,8 +1,13 @@
 #!/bin/sh
-# Shared by post-merge and post-checkout: run `make install` when a
-# dependency file differs between two commits. A native build (expo prebuild
-# plus Xcode) never runs make, so a stale node_modules would ship without its
+# Shared by post-merge and post-checkout: reinstall when a dependency file
+# differs between two commits. A native build (expo prebuild plus Xcode) never
+# runs make, so a stale node_modules would ship without a package or its
 # patches; this installs at the moment node_modules goes stale.
+#
+# The install is forced (make reinstall-*), not left to make's stamps: make
+# 3.81 compares whole-second mtimes, so files git writes in the same second
+# as the last install's stamp look up to date. That happens when a switch and
+# a pull run back to back, and the second install was skipped.
 old=$1
 new=$2
 
@@ -13,13 +18,16 @@ case $old in
   *) exit 0 ;;
 esac
 
-if git diff --quiet "$old" "$new" -- \
-  mobile/package.json mobile/package-lock.json mobile/patches backend/pyproject.toml
-then
-  exit 0
-fi
+changed() { ! git diff --quiet "$old" "$new" -- "$@"; }
 
-echo "githooks: dependency files changed; running make install"
-make install || echo "githooks: make install failed; run it by hand" >&2
+targets=
+changed backend/pyproject.toml && targets="$targets reinstall-backend"
+changed mobile/package.json mobile/package-lock.json mobile/patches &&
+  targets="$targets reinstall-mobile"
+[ -n "$targets" ] || exit 0
+
+echo "githooks: dependency files changed; running make$targets"
+# shellcheck disable=SC2086 # $targets is a list of make targets
+make $targets || echo "githooks: make$targets failed; run it by hand" >&2
 # A failed install must not look like a failed checkout or merge.
 exit 0
