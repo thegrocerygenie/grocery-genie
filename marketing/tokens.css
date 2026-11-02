@@ -36,6 +36,9 @@
   --sys-pink:         #FF2D55;
   --sys-brown:        #A2845E;
   --sys-gray:         #8E8E93;
+  /* Text-weight reds and greens for the mockups (4.5:1 on the iOS grouped surfaces) */
+  --sys-red-text:     #D70015;   /* iOS increased-contrast systemRed */
+  --sys-green-text:   #1E7B34;
 
   /* Category — direct map to iOS palette so they auto-adapt */
   --cat-groceries:     var(--sys-green);
@@ -67,6 +70,16 @@
   /* Wordmark only — never UI body */
   --font-wordmark:  'Instrument Serif', 'New York', Georgia, serif;
 
+  /* Marketing phone mockups: device frame, receipt and camera */
+  --mock-frame:          #1C1C1E;
+  --mock-island:         #000000;
+  --mock-camera:         #0A0A0A;
+  --mock-paper:          #FFFFFF;
+  --mock-ink:            #000000;
+  --mock-shadow:         rgba(21,20,15,0.35);
+  --mock-sheen:          rgba(255,255,255,0.4);
+  --mock-receipt-shadow: rgba(0,0,0,0.5);
+
   /* Touch target */
   --touch-min: 44px;
 }
@@ -77,7 +90,7 @@
   --ios-fill-1:       rgba(120,120,128,0.36);
   --ios-fill-2:       rgba(120,120,128,0.32);
   --ios-separator:    rgba(84,84,88,0.65);
-  --ios-label:        #FFFFFF;
+  --ios-label:        #F5F5F7;
   --ios-label-2:      rgba(235,235,245,0.60);
   --ios-label-3:      rgba(235,235,245,0.30);
   --gg-tint:          #34D17A;
