@@ -25,6 +25,7 @@ from app.image.storage import (
     generate_thumbnail_path,
 )
 from app.models.database import (
+    AnalyticsEvent,
     AuthEvent,
     Base,
     Budget,
@@ -151,6 +152,11 @@ async def _give_user_everything(
                 threshold_percent=80,
             ),
             Notification(user_id=user_id, type="budget_alert", title="t", body="b"),
+            AnalyticsEvent(
+                user_id=user_id,
+                event_name="receipt_scan_started",
+                properties={"source": "camera"},
+            ),
             UserItemMapping(
                 user_id=user_id, raw_text_pattern="APPLS", category_id=custom.id
             ),

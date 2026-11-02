@@ -24,6 +24,7 @@ from app.image.storage import (
     generate_thumbnail_path,
 )
 from app.models.database import (
+    AnalyticsEvent,
     AuthEvent,
     Budget,
     BudgetAlertSent,
@@ -119,6 +120,7 @@ async def delete_account(
         delete(PushToken).where(PushToken.user_id == user_id),
         delete(Category).where(Category.user_id == user_id),
         delete(AuthEvent).where(AuthEvent.user_id == user_id),
+        delete(AnalyticsEvent).where(AnalyticsEvent.user_id == user_id),
     ]
     if email is not None:
         # Failed sign-ins for an unknown email log it with no user_id.

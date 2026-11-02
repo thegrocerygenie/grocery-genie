@@ -756,6 +756,7 @@ class BudgetService:
                             remaining_amount=round(-current_spend, 2),
                             days_left_in_period=days_left,
                             period_start=period_start,
+                            category_id=budget.category_id,
                         )
                     )
                 continue
@@ -780,6 +781,7 @@ class BudgetService:
                             remaining_amount=round(remaining, 2),
                             days_left_in_period=days_left,
                             period_start=period_start,
+                            category_id=budget.category_id,
                         )
                     )
 

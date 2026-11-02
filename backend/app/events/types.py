@@ -32,3 +32,4 @@ class BudgetThresholdBreached:
     remaining_amount: float
     days_left_in_period: int
     period_start: date  # with budget_id + threshold: the once-per-period key
+    category_id: uuid.UUID | None = None  # None for the overall budget

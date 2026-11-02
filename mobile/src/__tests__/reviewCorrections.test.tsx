@@ -34,8 +34,9 @@ jest.mock('@/features/receipt-capture/hooks/useReceiptReview', () => ({
 jest.mock('@/features/budget/hooks/useCategories', () => ({
   useCategories: () => ({ data: [] }),
 }));
+const mockEmit = jest.fn();
 jest.mock('@/hooks/useAnalytics', () => ({
-  useAnalytics: () => ({ emit: jest.fn() }),
+  useAnalytics: () => ({ emit: mockEmit }),
 }));
 const mockGetReceipt = jest.fn();
 jest.mock('@/features/receipt-capture/services/receiptApi', () => ({
@@ -88,6 +89,8 @@ function renderReview() {
         </QueryClientProvider>
       ),
       index: () => null,
+      // Where a saved scan goes (router.replace('/(tabs)')).
+      '(tabs)/index': () => null,
       review: ReviewScreen,
     },
     { initialUrl: '/' },
@@ -719,3 +722,40 @@ function headerTitles(): string[] {
   (Array.isArray(root) ? root : root ? [root] : []).forEach(walk);
   return titles;
 }
+
+describe('Review screen abandon stage', () => {
+  type MutateCallbacks = { onSuccess?: () => void; onError?: (error: Error) => void };
+
+  it('reports review when the user leaves without saving', () => {
+    const view = renderReview();
+
+    view.unmount();
+
+    expect(mockEmit).toHaveBeenCalledWith('receipt_abandoned', { stage: 'review' });
+  });
+
+  it('reports confirmation when the user leaves after a save that failed', () => {
+    mockMutate.mockImplementation((_vars: unknown, callbacks: MutateCallbacks) =>
+      callbacks.onError?.(new Error('offline')),
+    );
+    const view = renderReview();
+
+    save();
+    view.unmount();
+
+    expect(mockEmit).toHaveBeenCalledWith('receipt_abandoned', { stage: 'confirmation' });
+    expect(mockEmit).not.toHaveBeenCalledWith('receipt_abandoned', { stage: 'review' });
+  });
+
+  it('reports nothing once the receipt is saved', () => {
+    mockMutate.mockImplementation((_vars: unknown, callbacks: MutateCallbacks) =>
+      callbacks.onSuccess?.(),
+    );
+    const view = renderReview();
+
+    save();
+    view.unmount();
+
+    expect(mockEmit).not.toHaveBeenCalledWith('receipt_abandoned', expect.anything());
+  });
+});

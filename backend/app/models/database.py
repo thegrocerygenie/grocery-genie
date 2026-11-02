@@ -123,6 +123,31 @@ class AuthEvent(Base):
     user: Mapped["User | None"] = relationship(back_populates="auth_events")
 
 
+class AnalyticsEvent(Base):
+    """A product analytics event (docs/prd/12-analytics.md).
+
+    Kept analytics_event_retention_days (13 months), then purged; deleting the
+    account deletes its events. device_type and app_version come from the
+    app's X-Device-Type and X-App-Version headers, and are null without them.
+    """
+
+    __tablename__ = "analytics_events"
+    __table_args__ = (
+        Index("ix_analytics_events_name_created", "event_name", "created_at"),
+        Index("ix_analytics_events_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    event_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    properties: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    device_type: Mapped[str | None] = mapped_column(String(64))
+    app_version: Mapped[str | None] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class Store(Base):
     __tablename__ = "stores"
 
