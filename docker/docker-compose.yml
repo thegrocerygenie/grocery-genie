@@ -6,6 +6,15 @@
 # in docs/DEPLOYMENT.md 1.10 relies on it).
 name: grocery-genie
 
+# Every service's logs rotate as they fill: at most 5 files of 10 MB, the
+# oldest deleted first. The privacy text's server-log promise rests on this
+# plus the host's 30-day cleanup (docs/DEPLOYMENT.md 1.9).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 x-app: &app
   build:
     context: ..
@@ -15,6 +24,7 @@ x-app: &app
   depends_on:
     - redis
   restart: unless-stopped
+  logging: *logging
 
 services:
   api:
@@ -39,12 +49,14 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    logging: *logging
     volumes:
       - redis_data:/data
 
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging: *logging
     depends_on:
       - api
     ports:
