@@ -15,7 +15,7 @@ import { SymbolView } from 'expo-symbols';
 import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 
-import { colors, radii, spacing, type } from '@/constants/theme';
+import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { resolveCategoryMeta } from '@/constants/categories';
 import { CaptureActionSheet } from '@/components/CaptureActionSheet';
 import { LoadErrorState } from '@/components/LoadErrorState';
@@ -423,6 +423,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: radii.list,
   },
   row: {
+    minHeight: touchTarget.minHeight,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -432,6 +433,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.iosBg2,
   },
   swipeDelete: {
+    minHeight: touchTarget.minHeight,
     width: 88,
     alignItems: 'center',
     justifyContent: 'center',

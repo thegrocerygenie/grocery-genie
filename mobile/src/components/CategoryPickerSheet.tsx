@@ -55,12 +55,14 @@ export function CategoryPickerSheet({
   const options = buildOptions(categories);
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button">
-        <Pressable
-          style={styles.sheet}
-          onPress={(e) => e.stopPropagation()}
-          accessibilityRole="none"
-        >
+      {/* Taps only: accessible, these would hide the options from VoiceOver. */}
+      <Pressable
+        style={styles.backdrop}
+        onPress={onClose}
+        accessible={false}
+        onAccessibilityEscape={onClose}
+      >
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()} accessible={false}>
           <View style={styles.headerRow}>
             <View style={{ width: 56 }}>
               <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button">

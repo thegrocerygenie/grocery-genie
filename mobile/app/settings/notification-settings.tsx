@@ -173,8 +173,18 @@ interface DayPickerSheetProps {
 function DayPickerSheet({ visible, selected, onSelect, onClose }: DayPickerSheetProps) {
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-      <Pressable style={sheetStyles.backdrop} onPress={onClose}>
-        <Pressable style={sheetStyles.sheet} onPress={(e) => e.stopPropagation()}>
+      {/* Taps only: accessible, these would hide the options from VoiceOver. */}
+      <Pressable
+        style={sheetStyles.backdrop}
+        onPress={onClose}
+        accessible={false}
+        onAccessibilityEscape={onClose}
+      >
+        <Pressable
+          style={sheetStyles.sheet}
+          onPress={(e) => e.stopPropagation()}
+          accessible={false}
+        >
           <View style={styles.listCard}>
             {DAYS.map((d, i) => (
               <Pressable
