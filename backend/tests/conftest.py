@@ -1,9 +1,12 @@
 import io
 import os
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
+from pathlib import Path
 
+import litellm
 import pytest
 from httpx import ASGITransport, AsyncClient
 from PIL import Image
@@ -15,7 +18,11 @@ from sqlalchemy.ext.asyncio import (
 
 from app.core import clock
 from app.core.config import get_settings
-from app.llm.provider import MockReceiptExtractor
+from app.llm.provider import (
+    MockCategoryAssigner,
+    MockReceiptExtractor,
+    get_category_assigner,
+)
 from app.models.database import Base
 from app.services.ai_consent import AI_CONSENT_POLICY_VERSION
 
@@ -53,6 +60,67 @@ TEST_TODAY = date(2026, 3, 20)
 def pinned_today(monkeypatch) -> date:
     monkeypatch.setattr(clock, "today", lambda: TEST_TODAY)
     return TEST_TODAY
+
+
+class RealLLMCallError(RuntimeError):
+    """A test reached litellm.acompletion without monkeypatching it."""
+
+
+@dataclass
+class LLMGuard:
+    calls: list[dict] = field(default_factory=list)
+
+
+# The LLM validation harness calls the real model on purpose when its env is set.
+_LLM_VALIDATION_DIR = Path(__file__).parent / "llm_validation"
+
+
+@pytest.fixture(autouse=True)
+def llm_guard(request, monkeypatch) -> Iterator[LLMGuard]:
+    """Block real LLM calls: a call raises, and the test fails at teardown.
+
+    The raise alone isn't enough, because ReceiptService catches the
+    assigner's error and falls back to rule-based categories. A test that
+    fakes the call monkeypatches ``litellm.acompletion`` itself, which
+    replaces this guard for that test.
+    """
+    guard = LLMGuard()
+    if request.node.path.is_relative_to(_LLM_VALIDATION_DIR):
+        yield guard
+        return
+
+    async def blocked_acompletion(**kwargs):
+        guard.calls.append(kwargs)
+        raise RealLLMCallError(
+            f"Test called the real LLM (model={kwargs.get('model')!r}). "
+            "Override the dependency with a mock or monkeypatch "
+            "litellm.acompletion."
+        )
+
+    monkeypatch.setattr(litellm, "acompletion", blocked_acompletion)
+    yield guard
+    if guard.calls:
+        pytest.fail(
+            f"{len(guard.calls)} real LLM call(s) blocked; "
+            "see RealLLMCallError in the log",
+            pytrace=False,
+        )
+
+
+@pytest.fixture(autouse=True)
+def mock_category_assigner() -> Iterator[None]:
+    """Use the mock category assigner in every test app.
+
+    Fixtures that build a test app clear ``dependency_overrides`` on
+    teardown, so set it again for each test. A fixture that clears the
+    overrides before its test runs drops this one; ``llm_guard`` then fails
+    that test.
+    """
+    from main import app
+
+    app.dependency_overrides[get_category_assigner] = MockCategoryAssigner
+    yield
+    app.dependency_overrides.pop(get_category_assigner, None)
 
 
 @pytest.fixture

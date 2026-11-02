@@ -33,31 +33,46 @@ grocery-genie/
 ├── backend/
 │   ├── app/
 │   │   ├── api/routes/       # FastAPI route handlers
-│   │   ├── core/             # Config, auth, rate limiting
+│   │   ├── core/             # Config, auth, rate limiting, logging, retention
 │   │   ├── events/           # Domain event dispatcher
 │   │   ├── image/            # Receipt image preprocessing
 │   │   ├── llm/              # LLM provider abstraction + prompts
 │   │   ├── models/           # SQLAlchemy models + Pydantic schemas
 │   │   ├── services/         # Business logic layer
-│   │   └── tasks/            # Celery async tasks
-│   ├── tests/
+│   │   └── tasks/            # Celery tasks (receipts, push, purge, summaries)
+│   ├── migrations/           # Alembic migrations
+│   ├── llm-proxy/            # LiteLLM proxy config for local development
+│   ├── tests/                # pytest: unit, API, e2e, LLM extraction harness
 │   └── main.py
 ├── mobile/
 │   ├── app/                  # Expo Router screens
+│   ├── plugins/              # Expo config plugins (native iOS changes)
+│   ├── patches/              # patch-package fixes for dependencies
 │   └── src/
 │       ├── components/       # Shared UI components
 │       ├── constants/        # Theme, strings, categories
-│       ├── features/         # Feature modules (receipt-capture, budget)
+│       ├── features/         # Feature modules (auth, receipt-capture, budget, notifications, settings, ai-consent, lifecycle)
 │       ├── hooks/            # Custom hooks (analytics, network, sync)
-│       └── store/            # Zustand stores
-└── docs/prd/                 # Product requirements
+│       ├── services/         # API client
+│       ├── store/            # Zustand stores
+│       ├── types/            # Shared TypeScript types
+│       └── utils/            # Helpers
+├── marketing/                # Pre-launch landing page
+├── docker/                   # Production Dockerfile, Compose, Caddy
+├── formal/budget_alerts/     # TLA+ models of budget alerts and push delivery
+├── scripts/                  # Dev and calibration scripts
+└── docs/
+    ├── prd/                  # Product requirements
+    ├── wireframes/           # UI wireframes
+    ├── legal/                # Privacy review
+    └── DEPLOYMENT.md         # Deployment guide
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) (recommended; it downloads Python 3.12 when needed), or Python 3.12+
 - Node.js 18+
 - PostgreSQL (or SQLite for development)
 - Redis (for Celery task queue)
@@ -71,8 +86,13 @@ With `make`, you can skip the install steps below: each target installs dependen
 
 ```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+# With uv (recommended; downloads Python 3.12 if needed):
+uv venv --python 3.12 && source .venv/bin/activate
+uv pip install -e ".[dev]"
+
+# Without uv (needs Python 3.12+ on your PATH; macOS python3 is too old):
+# python3.12 -m venv .venv && source .venv/bin/activate
+# pip install -e ".[dev]"
 
 # Set environment variables
 export GG_DATABASE_URL="postgresql+asyncpg://localhost:5432/grocery_genie"
