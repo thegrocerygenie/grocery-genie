@@ -8,7 +8,10 @@
   const SUCCESS_NOTE = "Welcome aboard. We'll only email when there's something to ship.";
 
   function setMessage(form, tone, text) {
-    const msg = form.querySelector('.form-message');
+    // The message sits right after the form in index.html, not inside it.
+    const next = form.nextElementSibling;
+    const msg = form.querySelector('.form-message') ||
+      (next && next.classList.contains('form-message') ? next : null);
     if (!msg) return;
     msg.textContent = text || '';
     if (tone) msg.setAttribute('data-tone', tone);

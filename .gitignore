@@ -56,3 +56,6 @@ backend/uploads/
 
 # Production secrets (docker/.env.production.example is the committed template)
 docker/.env.production
+
+# Hallmark design-skill output (audit screenshots and records)
+.hallmark/
