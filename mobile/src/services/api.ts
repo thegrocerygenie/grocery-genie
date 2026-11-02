@@ -1,3 +1,6 @@
+import Constants from 'expo-constants';
+import * as Device from 'expo-device';
+
 import { useAuthStore } from '@/store/authStore';
 
 // make backend-dev serves on 8001; mobile/.env.example documents the override.
@@ -54,6 +57,19 @@ interface ApiOptions extends RequestInit {
   retried?: boolean;
 }
 
+/**
+ * 12-analytics.md: every event carries the device type and app version. The
+ * server reads them from these headers and stores them with each event.
+ */
+export function clientHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const version = Constants.expoConfig?.version;
+  if (version) headers['X-App-Version'] = version;
+  const device = Device.modelId ?? Device.modelName;
+  if (device) headers['X-Device-Type'] = device;
+  return headers;
+}
+
 export function getAuthHeaders(): Record<string, string> {
   const token = useAuthStore.getState().accessToken;
   if (!token) return {};
@@ -65,6 +81,7 @@ export async function apiClient<T>(path: string, options?: ApiOptions): Promise<
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    ...clientHeaders(),
     ...(skipAuth ? {} : getAuthHeaders()),
     ...((rest.headers as Record<string, string> | undefined) ?? {}),
   };

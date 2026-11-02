@@ -4,6 +4,16 @@
 
 All events include: user_id, timestamp, device type, app version.
 
+**Storage [MVP].** The API stores each event in the `analytics_events` table in our own Postgres. The privacy policy says app activity stays with us and our hosting providers, so no third-party analytics service receives it. Rows are kept 13 months (`GG_ANALYTICS_EVENT_RETENTION_DAYS`, default 396), then a daily task deletes them; deleting an account deletes its events. Events are written in a transaction of their own when the request ends, so a request that fails (a rejected scan) still records its events, and a failed write never fails the request.
+
+**Device type and app version** come from the app's `X-Device-Type` (the iOS model ID, such as `iPhone16,2`) and `X-App-Version` headers on every API call. They are null on a request without them.
+
+MVP notes on the table below:
+- `receipt_confirmed` also has `source` (`scan` or `manual`). A manual receipt is saved as confirmed, so it records `receipt_confirmed` with `correction_count` 0.
+- `budget_alert_triggered.category` is the budget's category ID, or `overall` for the overall budget.
+- `receipt_abandoned.stage` `confirmation` means the user tapped Save on review, the save did not succeed, and they left.
+- `language_detected` on `receipt_extraction_completed` is not sent yet: the extraction prompt does not return a language.
+
 | Event | Properties | Purpose |
 |-------|-----------|---------|
 | `receipt_scan_started` | source (camera/library/pdf) | Scan initiation rate and source mix |

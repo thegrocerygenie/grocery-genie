@@ -23,7 +23,7 @@ export const PRIVACY_POLICY: {
 } = {
   reviewed: false,
   effective: 'October 27, 2026',
-  updated: 'October 27, 2026',
+  updated: 'November 1, 2026',
   sections: [
     {
       heading: 'Who we are',
@@ -68,7 +68,7 @@ export const PRIVACY_POLICY: {
       paragraphs: [
         'Your account and receipts: until you delete them.',
         'Receipts and budgets you delete: you can restore them from Settings → Recently deleted for 30 days. After that they are permanently erased, including receipt images.',
-        'Sign-in security records: up to 12 months. Server logs: up to 30 days.',
+        'Sign-in security records: up to 12 months. App activity events: up to 13 months. Server logs: up to 30 days.',
       ],
     },
     {

@@ -1,5 +1,5 @@
 import type { ScanSource } from '@/constants/analyticsEvents';
-import { API_BASE_URL, apiClient, ApiError, getAuthHeaders } from '@/services/api';
+import { API_BASE_URL, apiClient, ApiError, clientHeaders, getAuthHeaders } from '@/services/api';
 import type {
   ReceiptListResponse,
   ReceiptResponse,
@@ -35,7 +35,7 @@ export async function scanReceipt(
   const response = await fetch(`${API_BASE_URL}/api/receipts/scan`, {
     method: 'POST',
     body: formData,
-    headers: getAuthHeaders(),
+    headers: { ...clientHeaders(), ...getAuthHeaders() },
     // Content-Type auto-set by fetch for FormData (includes boundary)
   });
 

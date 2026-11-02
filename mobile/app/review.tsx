@@ -25,6 +25,7 @@ import { getReceipt } from '@/features/receipt-capture/services/receiptApi';
 import { useCategories } from '@/features/budget/hooks/useCategories';
 import { useReceiptStore } from '@/store/receiptStore';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import type { AbandonStage } from '@/constants/analyticsEvents';
 import { buildReceiptUpdate } from '@/features/receipt-capture/utils/buildReceiptUpdate';
 import { isLowConfidence } from '@/features/receipt-capture/utils/confidence';
 import { extractionFromReceipt } from '@/features/receipt-capture/utils/extractionFromReceipt';
@@ -53,6 +54,8 @@ export default function ReviewScreen() {
   const analytics = useAnalytics();
   const { data: categories } = useCategories();
   const confirmed = useRef(false);
+  // Set when Save is tapped: leaving after a failed save abandons at confirmation.
+  const confirmAttempted = useRef(false);
 
   // Opened from History: a stored receipt. One the user has not confirmed
   // yet (pending_review) stays editable, and Save confirms it.
@@ -109,7 +112,8 @@ export default function ReviewScreen() {
   useEffect(() => {
     return () => {
       if (!confirmed.current && activeScanResponse && !isReadOnly) {
-        analytics.emit('receipt_abandoned', { stage: 'review' });
+        const stage: AbandonStage = confirmAttempted.current ? 'confirmation' : 'review';
+        analytics.emit('receipt_abandoned', { stage });
       }
     };
   }, [activeScanResponse, isReadOnly, analytics]);
@@ -168,6 +172,7 @@ export default function ReviewScreen() {
     }
     if (!baseline || !editingReceiptId || !canConfirm) return;
 
+    confirmAttempted.current = true;
     confirmMutation.mutate(
       {
         receiptId: editingReceiptId,

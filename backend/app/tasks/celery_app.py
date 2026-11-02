@@ -10,6 +10,7 @@ celery_app = Celery(
     broker=settings.redis_url,
     # Task modules the worker imports at startup so their tasks register.
     include=[
+        "app.tasks.analytics_event_tasks",
         "app.tasks.auth_event_tasks",
         "app.tasks.purge_tasks",
         "app.tasks.push_tasks",
@@ -45,5 +46,10 @@ celery_app.conf.beat_schedule = {
     "purge-old-auth-events": {
         "task": "app.tasks.auth_event_tasks.purge_old_auth_events",
         "schedule": crontab(hour=3, minute=45),
+    },
+    # Erase product analytics events past analytics_event_retention_days.
+    "purge-old-analytics-events": {
+        "task": "app.tasks.analytics_event_tasks.purge_old_analytics_events",
+        "schedule": crontab(hour=4, minute=0),
     },
 }

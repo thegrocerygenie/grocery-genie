@@ -103,6 +103,13 @@ class Settings(BaseSettings):
     # is erased by a daily beat task. The privacy policy states the period.
     auth_event_retention_days: int = Field(default=365, ge=1)
 
+    # Analytics — product events (analytics_events) older than this are erased
+    # by a daily beat task: 13 months, stated in the privacy policy.
+    analytics_event_retention_days: int = Field(default=396, ge=1)
+    # Where analytics events go: "database" (analytics_events) or "log" (the
+    # analytics logger only). Tests use "log".
+    analytics_storage: Literal["database", "log"] = "database"
+
     # Email — Resend
     resend_api_key: str = ""
     resend_from: str = "Grocery Genie <noreply@onresend.dev>"

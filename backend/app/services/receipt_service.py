@@ -322,6 +322,7 @@ class ReceiptService:
                 {
                     "item_count": len(receipt.line_items),
                     "correction_count": correction_count,
+                    "source": "scan",
                 },
                 user_id,
             )
@@ -400,7 +401,9 @@ class ReceiptService:
                     "budget_alert_triggered",
                     {
                         "threshold_percent": breach.threshold_percent,
-                        "category": str(breach.budget_id),
+                        "category": (
+                            str(breach.category_id) if breach.category_id else "overall"
+                        ),
                     },
                     user_id,
                 )
@@ -785,6 +788,17 @@ class ReceiptService:
 
         # Re-fetch with eager loading
         receipt = await self._get_receipt(receipt.id, user_id)
+        if self.analytics:
+            # Saved as confirmed, so this is its confirmation (12-analytics.md).
+            self.analytics.emit(
+                "receipt_confirmed",
+                {
+                    "item_count": len(receipt.line_items),
+                    "correction_count": 0,
+                    "source": "manual",
+                },
+                user_id,
+            )
         await self._after_confirm(receipt)
         return receipt
 

@@ -172,7 +172,7 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
 { "apple_authorization_code": "fresh code from Sign in with Apple" }
 ```
 
-- **Deleted:** the user row (profile, preferences, password hash, Apple and Google subject IDs), all receipts (soft-deleted ones too), their line items and corrections, budgets and the alerts sent for them, notifications, push tokens, item mappings, the user's own categories, sign-in activity (`auth_events`, including failed sign-ins logged under the account's email), and each receipt's image, converted JPEG, and thumbnail files.
+- **Deleted:** the user row (profile, preferences, password hash, Apple and Google subject IDs), all receipts (soft-deleted ones too), their line items and corrections, budgets and the alerts sent for them, notifications, push tokens, item mappings, the user's own categories, sign-in activity (`auth_events`, including failed sign-ins logged under the account's email), analytics events (`analytics_events`), and each receipt's image, converted JPEG, and thumbnail files.
 - **Kept:** stores (shared by all users, with no user link) and the default categories.
 - **Sessions:** the calling token's family is revoked. Every other token of the account fails too, because its user no longer exists (`/me` returns 401, `/api/auth/refresh` returns 400 `invalid_token`).
 - **Idempotent:** image files go first (a missing file is fine), then all rows in one transaction. A run cut off before the commit leaves the account in place, so the user can call again. A second call after success returns 401: its token no longer resolves to a user.

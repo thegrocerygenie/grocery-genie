@@ -29,6 +29,7 @@ from app.services.ai_consent import AI_CONSENT_POLICY_VERSION
 # Count rate limits in memory: the suite has no Redis. Clear the cache in case
 # an import above already read the settings.
 os.environ.setdefault("GG_RATE_LIMIT_STORAGE", "memory")
+os.environ.setdefault("GG_ANALYTICS_STORAGE", "log")
 get_settings.cache_clear()
 
 # Use SQLite for tests (async via aiosqlite)

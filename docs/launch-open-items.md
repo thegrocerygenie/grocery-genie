@@ -27,13 +27,14 @@ Sources:
 
 ## 1b. Before the next deploy
 
-- [ ] **Run the database migrations `20261028_0010` and `20261030_0011`** (`make backend-migrate`). `20261030_0011` adds `receipts.extraction_model` and `extraction_prompt_version`, which every scan now writes, so a scan fails against a database without them. `20261028_0010` (PR 42, L2) adds `line_items.position`, and the API orders receipt items by it, so the API fails against a database without the column. The migration fills existing rows from their current order.
+- [ ] **Run the database migrations `20261028_0010`, `20261030_0011` and `20261101_0012`** (`make backend-migrate`). `20261101_0012` adds `analytics_events`, which every request with an analytics event writes; without it the events are dropped (logged as "Analytics events not saved"), and requests still succeed. `20261030_0011` adds `receipts.extraction_model` and `extraction_prompt_version`, which every scan now writes, so a scan fails against a database without them. `20261028_0010` (PR 42, L2) adds `line_items.position`, and the API orders receipt items by it, so the API fails against a database without the column. The migration fills existing rows from their current order.
 - [ ] **Set `GG_RESEND_API_KEY` in production.** Since PR 32, the API refuses to start without it, so nothing can log email bodies. Only local dev opts out, with `GG_EMAIL_DELIVERY=off`.
 - [x] **Run `npm install` in `mobile/` after pulling.** PR 35's H3 fix is a `patch-package` patch to react-native-screens 4.16. Without the install, `nativeBackButtonPatch.test.ts` fails (seen on 2026-10-27 in a stale checkout), and a native build ships without the fix. Done: mobile `make` targets now install when dependencies change. Direct `npx` or `npm` use still needs `npm install` by hand.
 
 ## 2. Claims the privacy text makes that code doesn't enforce yet
 
 - [x] **Sign-in security records kept up to 12 months:** a daily beat task purges `auth_events` older than `GG_AUTH_EVENT_RETENTION_DAYS` (default 365).
+- [x] **App activity events kept up to 13 months:** a daily beat task purges `analytics_events` older than `GG_ANALYTICS_EVENT_RETENTION_DAYS` (default 396). Deleting an account deletes its events.
 - [ ] **Server logs kept up to 30 days:** set Docker log rotation or the host's retention (`docker/docker-compose.yml` has no `logging:`), or change the text.
 - [x] **The other minimization fixes:**
   - stop requesting the unused Apple full name;

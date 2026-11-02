@@ -1106,7 +1106,7 @@ async def test_confirmed_event_logs_counts_not_the_receipt_total(
     )
 
     confirmed = [p for name, p, _ in calls if name == "receipt_confirmed"]
-    assert confirmed == [{"item_count": 3, "correction_count": 0}]
+    assert confirmed == [{"item_count": 3, "correction_count": 0, "source": "scan"}]
 
 
 # --- Extraction edge cases (DoD box 9): no items, missing store, bad date ---

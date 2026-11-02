@@ -11,8 +11,12 @@ export const ANALYTICS_EVENTS = {
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];
 
-/** Stage at which a receipt flow was abandoned (see docs/prd/12-analytics.md). */
-export type AbandonStage = 'capture' | 'review';
+/**
+ * Stage at which a receipt flow was abandoned (see docs/prd/12-analytics.md).
+ * confirmation: the user tapped Save on review, the save did not succeed, and
+ * they left.
+ */
+export type AbandonStage = 'capture' | 'review' | 'confirmation';
 
 /** Where a receipt scan originated. */
 export type ScanSource = 'camera' | 'library' | 'pdf' | 'manual';
