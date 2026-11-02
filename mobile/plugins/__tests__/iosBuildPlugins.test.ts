@@ -93,3 +93,55 @@ describe('withDocumentScannerNoLocation disableScannerLocation', () => {
     expect(disableScannerLocation(once)).toBe(once);
   });
 });
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { disableUserScriptSandboxing } = require('../withUserScriptSandboxingOff') as {
+  disableUserScriptSandboxing: (project: FakeProject) => FakeProject;
+};
+
+interface FakeProject {
+  configs: Record<string, { buildSettings: Record<string, string> } | string>;
+  pbxXCBuildConfigurationSection: () => FakeProject['configs'];
+}
+
+function fakeProject(sandboxing?: string): FakeProject {
+  const settings: Record<string, string> = { PRODUCT_NAME: 'GroceryGenie' };
+  if (sandboxing) settings.ENABLE_USER_SCRIPT_SANDBOXING = sandboxing;
+  const configs = {
+    // The xcode package keeps a "<id>_comment" string beside each entry.
+    debug: { buildSettings: { ...settings } },
+    debug_comment: 'Debug',
+    release: { buildSettings: { ...settings } },
+    release_comment: 'Release',
+  };
+  return { configs, pbxXCBuildConfigurationSection: () => configs };
+}
+
+describe('withUserScriptSandboxingOff disableUserScriptSandboxing', () => {
+  // Xcode 27's script sandbox stops the CocoaPods "Copy Pods Resources" phase
+  // writing resources-to-copy-GroceryGenie.txt into Pods/ (seen 2026-11-02).
+  it('turns script sandboxing off in every build configuration', () => {
+    const project = disableUserScriptSandboxing(fakeProject('YES'));
+
+    for (const config of [project.configs.debug, project.configs.release]) {
+      expect(config).toMatchObject({ buildSettings: { ENABLE_USER_SCRIPT_SANDBOXING: 'NO' } });
+    }
+  });
+
+  it('sets it when the template leaves it out', () => {
+    const project = disableUserScriptSandboxing(fakeProject());
+
+    expect(project.configs.debug).toMatchObject({
+      buildSettings: { ENABLE_USER_SCRIPT_SANDBOXING: 'NO', PRODUCT_NAME: 'GroceryGenie' },
+    });
+  });
+
+  it('is idempotent and leaves the comment entries alone', () => {
+    const project = disableUserScriptSandboxing(disableUserScriptSandboxing(fakeProject('YES')));
+
+    expect(project.configs.debug_comment).toBe('Debug');
+    expect(project.configs.release).toMatchObject({
+      buildSettings: { ENABLE_USER_SCRIPT_SANDBOXING: 'NO' },
+    });
+  });
+});
