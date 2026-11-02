@@ -57,7 +57,12 @@ export default function OnboardingBudget() {
           title: 'Set Budget',
           headerBackTitle: 'Back',
           headerRight: () => (
-            <Pressable onPress={() => onContinue(true)} hitSlop={12} disabled={saving}>
+            <Pressable
+              onPress={() => onContinue(true)}
+              hitSlop={12}
+              disabled={saving}
+              accessibilityRole="button"
+            >
               <Text style={styles.headerBtn} maxFontSizeMultiplier={HEADER_BUTTON_MAX_FONT_SCALE}>
                 Skip
               </Text>

@@ -116,6 +116,8 @@ The Simulator has no VoiceOver, and Accessibility Inspector doesn't count.
 - [ ] On Review, VoiceOver reads each field's label and value, and the low-confidence "verify" tags. (13 Accessibility, RC-02)
 - [ ] The dashboard charts give their summary to VoiceOver. (13 Accessibility)
 - [ ] Every button has a clear label. (13 Accessibility)
+- [ ] Sheets: open the capture sheet (Scan), the category picker (Review, a category dot) and the day picker (Settings, Notifications). VoiceOver reaches each option on its own, and a two-finger scrub closes the sheet. Each sheet read as one element before the accessibility sweep fix. (13 Accessibility)
+- [ ] Touch targets: on a small phone, tap Review's category dot, item name and price, and the Cancel, Done and Skip header buttons. Each responds on the first tap. `accessibilitySweep.test.ts` checks the 44pt rule in code; this checks it on glass. (14 Touch targets)
 - [ ] Account deletion: VoiceOver reads the erased list in order, announces "Delete account, button", reads the alert's two choices, and announces the "not deleted" error. (13 Deletion)
 - [ ] The largest Dynamic Type size doesn't break any layout. (13 Accessibility)
 

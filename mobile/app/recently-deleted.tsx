@@ -39,7 +39,7 @@ export default function RecentlyDeletedScreen() {
           presentation: 'modal',
           title: 'Recently Deleted',
           headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button">
               <Text style={styles.headerBtn}>Done</Text>
             </Pressable>
           ),

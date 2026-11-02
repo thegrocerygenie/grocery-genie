@@ -4,7 +4,7 @@ import Constants from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
-import { colors, radii, spacing, type } from '@/constants/theme';
+import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { AiConsentSettingsSection } from '@/features/ai-consent/components/AiConsentSettingsSection';
 import { useMe, useSignOut } from '@/features/auth/hooks/useAuth';
 import { useBudgets } from '@/features/budget/hooks/useBudget';
@@ -82,7 +82,7 @@ export default function SettingsScreen() {
           title: 'Settings',
           headerLargeTitle: true,
           headerRight: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button">
               <Text style={styles.headerBtn}>Done</Text>
             </Pressable>
           ),
@@ -255,6 +255,7 @@ const styles = StyleSheet.create({
   headerBtn: { ...type.body, color: colors.tint, fontWeight: '600', paddingHorizontal: spacing.xs },
 
   profileCard: {
+    minHeight: touchTarget.minHeight,
     backgroundColor: colors.iosBg2,
     borderRadius: 14,
     padding: 14,

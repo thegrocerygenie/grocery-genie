@@ -60,7 +60,7 @@ export default function EmailChangeScreen() {
           presentation: 'modal',
           title: 'Change Email',
           headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button">
               <Text style={styles.headerBtn}>Cancel</Text>
             </Pressable>
           ),

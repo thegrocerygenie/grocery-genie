@@ -16,7 +16,7 @@ import * as Haptics from 'expo-haptics';
 
 import { BudgetRing } from '@/components/BudgetRing';
 import { headerBlurFor } from '@/utils/headerBlur';
-import { colors, radii, spacing, type } from '@/constants/theme';
+import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { getCategoryMetaByName } from '@/constants/categories';
 import { capBreachMessage } from '@/features/budget/utils/capBreach';
 import { budgetPace, monthShareElapsed } from '@/features/budget/utils/pace';
@@ -529,6 +529,7 @@ const styles = StyleSheet.create({
   },
 
   alertBanner: {
+    minHeight: touchTarget.minHeight,
     backgroundColor: colors.redBg,
     borderRadius: 12,
     padding: spacing.md,

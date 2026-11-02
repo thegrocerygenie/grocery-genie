@@ -58,12 +58,14 @@ export function CaptureActionSheet({
       onRequestClose={onClose}
       onDismiss={runPendingAction}
     >
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button">
-        <Pressable
-          style={styles.wrap}
-          onPress={(e) => e.stopPropagation()}
-          accessibilityRole="none"
-        >
+      {/* Taps only: accessible, these would hide the options from VoiceOver. */}
+      <Pressable
+        style={styles.backdrop}
+        onPress={onClose}
+        accessible={false}
+        onAccessibilityEscape={onClose}
+      >
+        <Pressable style={styles.wrap} onPress={(e) => e.stopPropagation()} accessible={false}>
           <View style={styles.card}>
             {actions.map((a, i) => (
               <Pressable

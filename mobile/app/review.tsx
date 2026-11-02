@@ -640,6 +640,8 @@ function ItemRow({
       <Pressable
         onPress={onPickCategory}
         disabled={readOnly}
+        // The 22pt dot reaches 44pt with the slop.
+        hitSlop={11}
         style={[
           styles.itemDot,
           { backgroundColor: meta.color },
@@ -676,6 +678,8 @@ function ItemRow({
               setEditingName(true);
             }}
             disabled={readOnly}
+            // A one-line label in a 44pt row: the slop fills the row's height.
+            hitSlop={{ top: 11, bottom: 11 }}
             accessibilityRole="button"
             accessibilityLabel={`Name of ${item.name}`}
             accessibilityHint={readOnly ? undefined : 'Double-tap to change'}
@@ -740,6 +744,7 @@ function ItemRow({
             setEditing(true);
           }}
           disabled={readOnly}
+          hitSlop={{ top: 11, bottom: 11 }}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
           accessibilityRole="button"
           accessibilityLabel={`Price of ${item.name}`}
