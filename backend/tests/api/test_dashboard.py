@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.seed import seed_default_categories
 from app.models.database import Category, LineItem, Receipt
-from tests.conftest import DEV_USER_ID, USER_B_ID
+from tests.conftest import DEV_USER_ID, USER_B_ID, ensure_user
 
 
 @pytest.fixture
@@ -154,6 +154,7 @@ async def _add_receipt(
     user_id: uuid.UUID = DEV_USER_ID,
     status: str = "confirmed",
 ) -> None:
+    await ensure_user(db_session, user_id)
     receipt = Receipt(user_id=user_id, date=on, status=status, currency="USD")
     db_session.add(receipt)
     await db_session.flush()

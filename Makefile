@@ -1,6 +1,6 @@
 .PHONY: help \
 	install install-backend install-mobile reinstall-backend reinstall-mobile hooks \
-	backend-dev backend-test backend-lint backend-format backend-typecheck \
+	backend-dev backend-test backend-test-pg backend-lint backend-format backend-typecheck \
 	backend-migrate backend-migration backend-worker kill-port \
 	db-up db-down db-reset llm-up llm-down \
 	mobile-start mobile-ios mobile-ios-native mobile-test mobile-lint mobile-format mobile-typecheck \
@@ -37,6 +37,7 @@ help:
 	@echo "  make backend-dev          Run uvicorn dev server with reload (frees PORT first; override: PORT=, HOST=)"
 	@echo "  make kill-port            Kill any process listening on PORT (default $(PORT))"
 	@echo "  make backend-test         Run pytest"
+	@echo "  make backend-test-pg      Run pytest on the dev Postgres (fresh gg_test database)"
 	@echo "  make backend-lint         ruff check + ruff format --check"
 	@echo "  make backend-format       ruff format"
 	@echo "  make backend-migrate      alembic upgrade head"
@@ -115,7 +116,7 @@ $(MOBILE_DEPS): mobile/package.json mobile/package-lock.json $(wildcard mobile/p
 	cd mobile && npm install
 	touch $@
 
-backend-dev backend-test backend-lint backend-format backend-migrate backend-migration \
+backend-dev backend-test backend-test-pg backend-lint backend-format backend-migrate backend-migration \
 backend-worker backend-beat: $(BACKEND_DEPS)
 
 mobile-start mobile-ios mobile-ios-native mobile-test mobile-lint mobile-format mobile-typecheck: $(MOBILE_DEPS)
@@ -139,6 +140,15 @@ backend-dev: kill-port
 
 backend-test:
 	cd backend && $(BIN)/pytest
+
+# The suite on Postgres, as production runs: SQLite skips foreign keys,
+# FOR UPDATE and some ON CONFLICT behavior. Recreates gg_test on the dev
+# container (make db-up); each test builds and drops its own schema.
+TEST_PG_URL := postgresql+asyncpg://grocery_genie:grocery_genie_dev@localhost:54440/gg_test
+backend-test-pg: db-up
+	docker exec grocery_genie_db psql -U grocery_genie -d postgres -q \
+		-c "DROP DATABASE IF EXISTS gg_test" -c "CREATE DATABASE gg_test"
+	cd backend && GG_TEST_DATABASE_URL=$(TEST_PG_URL) $(BIN)/pytest -p no:randomly
 
 backend-lint:
 	cd backend && $(BIN)/ruff check . && $(BIN)/ruff format --check .

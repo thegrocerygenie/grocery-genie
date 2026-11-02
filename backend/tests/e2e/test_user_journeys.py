@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.seed import seed_default_categories
 from app.llm.schemas import ExtractedLineItem, ReceiptExtractionResult
 from app.models.database import LineItem, Receipt
-from tests.conftest import DEV_USER_ID
+from tests.conftest import DEV_USER_ID, ensure_user
 
 
 @pytest.fixture
@@ -488,6 +488,7 @@ async def test_journey_user_data_isolation(
     )
     cat = result.scalar_one()
 
+    await ensure_user(db_session, DEV_USER_ID)
     user_a_receipt = Receipt(
         user_id=DEV_USER_ID,
         date=date(2026, 3, 15),

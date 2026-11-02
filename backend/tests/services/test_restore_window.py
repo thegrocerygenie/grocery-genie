@@ -13,6 +13,7 @@ from app.core.retention import RESTORE_WINDOW, days_remaining
 from app.models.database import Budget, Receipt
 from app.services.budget_service import BudgetService
 from app.services.receipt_service import ReceiptService
+from tests.conftest import ensure_user  # noqa: E402
 
 USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
@@ -44,6 +45,7 @@ def test_days_remaining_accepts_a_naive_timestamp():
 
 
 async def _receipt(db: AsyncSession, days_ago: int) -> Receipt:
+    await ensure_user(db, USER_ID)
     receipt = Receipt(
         user_id=USER_ID,
         date=date(2026, 9, 1),
@@ -55,6 +57,7 @@ async def _receipt(db: AsyncSession, days_ago: int) -> Receipt:
 
 
 async def _budget(db: AsyncSession, days_ago: int) -> Budget:
+    await ensure_user(db, USER_ID)
     budget = Budget(
         user_id=USER_ID,
         amount=400,

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.seed import seed_default_categories
 from app.models.database import Category, LineItem, Receipt
+from tests.conftest import ensure_user
 
 
 @pytest.fixture
@@ -233,6 +234,7 @@ async def test_list_budgets_returns_only_the_users_active_budgets(
     kept = (await client.post("/api/budgets", json=_budget(groceries, 200.0))).json()
     dropped = (await client.post("/api/budgets", json=_budget(household, 50.0))).json()
     await client.delete(f"/api/budgets/{dropped['id']}")
+    await ensure_user(db_session, USER_B_ID)
     db_session.add(
         Budget(
             user_id=USER_B_ID,

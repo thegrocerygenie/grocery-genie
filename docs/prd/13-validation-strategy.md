@@ -126,16 +126,85 @@ Every user story in the PRD has numbered acceptance criteria. This layer ensures
 
 For each epic, maintain a mapping:
 
-| Story ID | Criterion # | Test Type | Test Location | Status |
-|----------|------------|-----------|---------------|--------|
-| RC-01 | 1 | Manual | Mobile E2E checklist | — |
-| RC-01 | 2 | Manual | Mobile E2E checklist | — |
-| RC-01 | 3 | Manual | Mobile E2E checklist | — |
-| RC-01 | 4 | Integration | backend/tests/api/test_receipts.py | — |
-| RC-01 | 5 | Integration | backend/tests/api/test_receipts.py | — |
-| RC-02 | 1 | Component | mobile/src/features/receipt-capture/__tests__/ | — |
-| RC-02 | 2 | Integration | backend/tests/api/test_receipts.py | — |
-| ... | ... | ... | ... | ... |
+MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks that every test named here exists (pytest ids collect; jest titles appear in their files). Gap rows are open: RC-01 AC 4 and RC-05 AC 1–3 wait on the receipt test set (audit rank 1); BC-05 AC 3 is premium-only, and MVP has no premium tier.
+
+| Story | AC | Criterion | Type | Test | Status |
+|---|---|---|---|---|---|
+| RC-01 | 1 | Real-time edge detection overlay | Component | `mobile/src/__tests__/scanDocumentScanner.test.tsx` "opens the scanner when Scan opens, instead of the custom camera (AC 1)" | Pass |
+| RC-01 | 1 | Real-time edge detection overlay | Manual | `docs/device-checklist.md` §2: Edges | Manual |
+| RC-01 | 2 | Blur/low-light feedback before submission | Component | `mobile/src/__tests__/scanDocumentScanner.test.tsx` "holds back a blurry page and says why, before anything uploads (AC 2)" | Pass |
+| RC-01 | 2 | Blur/low-light feedback before submission | Unit | `mobile/src/features/receipt-capture/__tests__/frameQuality.test.ts` "says dark before blurry, since a dark frame also reads blurry" | Pass |
+| RC-01 | 3 | Retake before submitting | Component | `mobile/src/__tests__/scanDocumentScanner.test.tsx` "retakes a held-back page: the scanner opens again and the page is deleted (AC 3)" | Pass |
+| RC-01 | 3 | Retake before submitting | Manual | `docs/device-checklist.md` §2: Capture and retake | Manual |
+| RC-01 | 4 | Processing within 5 seconds | Integration | `backend/tests/llm_validation/test_extraction_accuracy.py::TestExtractionAccuracy::test_extraction_latency_p95` | Gap: skips until the receipt test set exists (audit rank 1) |
+| RC-01 | 5 | Structured data displayed for review | Integration | `backend/tests/api/test_receipts.py::test_successful_extraction` | Pass |
+| RC-01 | 5 | Structured data displayed for review | Component | `mobile/src/__tests__/reviewCorrections.test.tsx` "shows each item quantity" | Pass |
+| RC-02 | 1 | Each field editable inline | Component | `mobile/src/__tests__/reviewCorrections.test.tsx` "sends an edited item name when the user saves" | Pass |
+| RC-02 | 1 | Each field editable inline | Integration | `backend/tests/api/test_receipts.py::test_update_receipt_corrects_store_name` | Pass |
+| RC-02 | 2 | Confidence below 0.7 flagged amber | Component | `mobile/src/__tests__/reviewCorrections.test.tsx` "flags each of store, date and total read with low confidence" | Pass |
+| RC-02 | 2 | Confidence below 0.7 flagged amber | Component | `mobile/src/__tests__/reviewCorrections.test.tsx` "flags the price of an item read with low confidence" | Pass |
+| RC-02 | 3 | Corrections saved with original extraction | Integration | `backend/tests/api/test_receipts.py::test_every_corrected_field_keeps_its_original_value` | Pass |
+| RC-02 | 3 | Corrections saved with original extraction | Integration | `backend/tests/api/test_receipts.py::test_a_correction_records_who_made_it` | Pass |
+| RC-02 | 4 | Nothing committed without explicit confirm | Integration | `backend/tests/api/test_receipts.py::test_update_receipt_confirm` | Pass |
+| RC-02 | 4 | Nothing committed without explicit confirm | Integration | `backend/tests/services/test_budget_service.py::test_spending_excludes_pending` | Pass |
+| RC-02 | 5 | Original image stored with data | Integration | `backend/tests/api/test_scanned_images.py::test_every_confirmed_scan_has_its_image_and_thumbnail` | Pass |
+| RC-02 | 5 | Original image stored with data | Integration | `backend/tests/api/test_receipts.py::test_receipt_image_served_to_owner` | Pass |
+| RC-03 | 1 | JPEG, PNG, HEIC supported | Integration | `backend/tests/api/test_receipt_upload_formats.py::test_heic_scan_sends_jpeg_to_extractor` | Pass |
+| RC-03 | 1 | JPEG, PNG, HEIC supported | Integration | `backend/tests/api/test_scanned_images.py::test_every_confirmed_scan_has_its_image_and_thumbnail` | Pass |
+| RC-03 | 2 | Single-page PDF supported | Integration | `backend/tests/api/test_receipt_upload_formats.py::test_pdf_scan_sends_rendered_jpeg_to_extractor` | Pass |
+| RC-03 | 2 | Single-page PDF supported | Integration | `backend/tests/api/test_receipt_upload_formats.py::test_multi_page_pdf_is_rejected_with_422` | Pass |
+| RC-03 | 3 | Same extraction and review flow | Component | `mobile/src/features/receipt-capture/__tests__/useReceiptImport.test.tsx` "uploads a library photo and opens the same review screen as a camera scan" | Pass |
+| RC-03 | 4 | Minimum 300px width validated | Unit | `mobile/src/features/receipt-capture/__tests__/receiptImport.test.ts` "rejects an image narrower than 300px before uploading" | Pass |
+| RC-03 | 4 | Minimum 300px width validated | Integration | `backend/tests/api/test_receipt_upload_formats.py::test_narrow_heic_is_rejected_before_extraction` | Pass |
+| RC-04 | 1 | Reverse chronological order | Integration | `backend/tests/api/test_receipts.py::test_list_receipts_ordered_reverse_chronological` | Pass |
+| RC-04 | 2 | Store, date, total, item count shown | Component | `mobile/src/__tests__/historyRowActions.test.tsx` "counts items in the singular and plural (L4)" | Pass |
+| RC-04 | 2 | Store, date, total, item count shown | Component | `mobile/src/__tests__/historyCurrency.test.tsx` "shows each receipt in its own currency" | Pass |
+| RC-04 | 3 | Tap shows full data and image | Component | `mobile/src/__tests__/receiptDetail.test.tsx` "shows the saved receipt, titled by its store" | Pass |
+| RC-04 | 3 | Tap shows full data and image | Integration | `backend/tests/api/test_receipts.py::test_get_receipt` | Pass |
+| RC-04 | 4 | Search by store or date range | Integration | `backend/tests/api/test_receipts.py::test_list_receipts_store_and_date_filters_compose` | Pass |
+| RC-04 | 4 | Search by store or date range | Component | `mobile/src/__tests__/historyDateRange.test.tsx` "searches the range the user picks" | Pass |
+| RC-05 | 1 | Six languages processed correctly | Integration | `backend/tests/llm_validation/test_prompt_regression.py::TestPromptRegression::test_no_accuracy_regression_in_any_language` | Gap: skips until the receipt test set exists (audit rank 1) |
+| RC-05 | 2 | Decimal separator detected from context | — | none | Gap: needs a comma-decimal receipt in the test set (audit rank 1) |
+| RC-05 | 3 | Money normalized to period decimal | — | none | Gap: same fixture as AC 2 |
+| RC-05 | 4 | Currency symbol/code extracted | Integration | `backend/tests/api/test_currency.py::test_a_currency_symbol_becomes_its_code` | Pass |
+| RC-05 | 4 | Currency symbol/code extracted | Unit | `backend/tests/core/test_money.py::test_normalizes_codes_and_unambiguous_symbols` | Pass |
+| BC-01 | 1 | Eight default categories | Integration | `backend/tests/api/test_categories.py::test_list_categories_returns_eight_defaults` | Pass |
+| BC-01 | 2 | LLM category with confidence per item | Integration | `backend/tests/api/test_receipts.py::test_scan_returns_a_category_confidence_per_item` | Pass |
+| BC-01 | 3 | Low category confidence flagged for review | Component | `mobile/src/__tests__/reviewCorrections.test.tsx` "rings the category of an item categorised with low confidence" | Pass |
+| BC-01 | 4 | User corrections override LLM | Integration | `backend/tests/api/test_receipts.py::test_category_only_correction_applies_on_next_scan` | Pass |
+| BC-01 | 4 | User corrections override LLM | Integration | `backend/tests/api/test_receipts.py::test_name_and_category_correction_applies_on_next_scan` | Pass |
+| BC-02 | 1 | Overall monthly budget configurable | Integration | `backend/tests/api/test_budgets.py::test_create_budget_success` | Pass |
+| BC-02 | 2 | Per-category budgets configurable | Integration | `backend/tests/api/test_budgets.py::test_create_budget_with_category` | Pass |
+| BC-02 | 2 | Per-category budgets configurable | E2E | `backend/tests/e2e/test_user_journeys.py::test_journey_per_category_budget` | Pass |
+| BC-02 | 3 | Calendar months default; custom start | Integration | `backend/tests/services/test_budget_service.py::test_get_period_dates_custom_start` | Pass |
+| BC-02 | 3 | Calendar months default; custom start | Integration | `backend/tests/services/test_budget_service.py::test_get_period_dates_default` | Pass |
+| BC-02 | 4 | Edits apply immediately to current period | Integration | `backend/tests/api/test_edge_cases.py::test_mid_month_budget_change` | Pass |
+| BC-02 | 4 | Edits apply immediately to current period | Component | `mobile/src/__tests__/budgetSettings.test.tsx` "updates a changed limit instead of creating another budget" | Pass |
+| BC-03 | 1 | Push at 80% (50/80/100 configurable) | Integration | `backend/tests/services/test_budget_service.py::test_check_thresholds_at_80` | Pass |
+| BC-03 | 1 | Push at 80% (50/80/100 configurable) | Integration | `backend/tests/services/test_budget_service.py::test_check_thresholds_respects_user_opt_out` | Pass |
+| BC-03 | 2 | Includes remaining budget and days left | Integration | `backend/tests/api/test_budget_alerts.py::test_a_threshold_alert_gives_the_remaining_budget_and_days_left` | Pass |
+| BC-03 | 3 | 100% alert gives overage amount | Integration | `backend/tests/api/test_budget_alerts.py::test_the_100_percent_alert_gives_the_overage` | Pass |
+| BC-03 | 4 | Per-category mute; overall still alerts | Integration | `backend/tests/api/test_budget_alerts.py::test_muting_one_category_keeps_the_overall_alerts` | Pass |
+| BC-03 | 4 | Per-category mute; overall still alerts | Component | `mobile/src/__tests__/categoryAlerts.test.tsx` "mutes a category when its switch is turned off" | Pass |
+| BC-04 | 1 | Per-category progress vs budget | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_with_spending` | Pass |
+| BC-04 | 1 | Per-category progress vs budget | Component | `mobile/src/__tests__/dashboardAccessibility.test.tsx` "reads a capped category as one sentence" | Pass |
+| BC-04 | 2 | Month-over-month, total and per category | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_compares_each_category_with_the_previous_month` | Pass |
+| BC-04 | 2 | Month-over-month, total and per category | Component | `mobile/src/__tests__/trendScreen.test.tsx` "compares this month's total with last month's" | Pass |
+| BC-04 | 3 | Top 10 items by spend | Integration | `backend/tests/services/test_budget_service.py::test_top_items_limited_to_10` | Pass |
+| BC-04 | 3 | Top 10 items by spend | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_top_items_limit` | Pass |
+| BC-04 | 4 | Rolling 3-month trend | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_trend_3_months` | Pass |
+| BC-04 | 4 | Rolling 3-month trend | Component | `mobile/src/__tests__/trendScreen.test.tsx` "charts the rolling 3 months (BC-04 AC 4)" | Pass |
+| BC-04 | 5 | Dashboard loads within 2 seconds | Integration | `backend/tests/api/test_p95_postgres.py::test_dashboard_p95_under_2s` (Postgres: `make backend-test-pg`) | Pass |
+| BC-05 | 1 | Tap item to reassign category | E2E | `backend/tests/e2e/test_user_journeys.py::test_journey_item_correction` | Pass |
+| BC-05 | 2 | Correction applied retroactively to history | Integration | `backend/tests/api/test_budget_alerts.py::test_category_correction_alerts_in_every_period_it_moves_spend` | Pass (indirect, through alerts) |
+| BC-05 | 3 | Up to 10 custom categories (premium) | — | none | Gap: premium only; MVP has no premium tier (V1.1) |
+| BC-05 | 4 | Corrections feed per-user mapping | Integration | `backend/tests/api/test_receipts.py::test_category_only_correction_applies_on_next_scan` | Pass |
+| BC-06 | 1 | Push with total, top category, budget status | Integration | `backend/tests/tasks/test_summary_tasks.py::test_summary_gives_the_budget_status` | Pass |
+| BC-06 | 1 | Push with total, top category, budget status | Integration | `backend/tests/tasks/test_summary_tasks.py::test_summary_includes_top_category` | Pass |
+| BC-06 | 2 | Comparison to prior week | Integration | `backend/tests/tasks/test_summary_tasks.py::test_summary_comparison_more` | Pass |
+| BC-06 | 3 | Chosen day, 9 AM local time | Integration | `backend/tests/tasks/test_summary_tasks.py::test_recipients_wait_for_9am_in_the_users_time_zone` | Pass |
+| BC-06 | 3 | Chosen day, 9 AM local time | Integration | `backend/tests/tasks/test_summary_tasks.py::test_recipients_only_on_users_chosen_day` | Pass |
+| BC-06 | 4 | Links to full dashboard | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "falls back to the dashboard when the route is missing" | Pass |
 
 This matrix is the source of truth for completeness. A phase is not done until every row has a passing test.
 
@@ -160,8 +229,8 @@ This matrix is the source of truth for completeness. A phase is not done until e
 
 **Non-functional:**
 - [ ] Receipt extraction ≤5 seconds (p95) measured against test set.
-- [ ] Dashboard API response ≤2 seconds (p95).
-- [ ] Receipt history search ≤1 second for 1,000 receipts.
+- [ ] Dashboard API response ≤2 seconds (p95). `backend/tests/api/test_p95_postgres.py`, run on Postgres by `make backend-test-pg` (1,000 receipts, 20 runs).
+- [ ] Receipt history search ≤1 second for 1,000 receipts. Same file: a store plus date-range search at p95.
 - [ ] WCAG 2.1 AA audit on all screens (automated via axe-core + manual VoiceOver test).
 - [ ] Touch targets ≥44×44pt verified.
 
@@ -169,14 +238,14 @@ This matrix is the source of truth for completeness. A phase is not done until e
 - [ ] All MVP analytics events from 12-analytics.md are instrumented and firing (receipt_scan_started, receipt_extraction_completed, receipt_correction_made, receipt_confirmed, receipt_abandoned, budget_created, budget_alert_triggered, budget_alert_opened).
 
 **Data integrity:**
-- [ ] Budget aggregation matches sum of confirmed line items (verified by SQL query against test data).
+- [ ] Budget aggregation matches sum of confirmed line items (verified by SQL query against test data). `backend/tests/api/test_spend_matches_sql.py` compares the API with a hand-written SUM.
 - [ ] No orphaned line items (every LineItem belongs to a Receipt).
 - [ ] UserItemMapping corrections persist and are applied on subsequent extractions.
-- [ ] Original receipt images stored and retrievable for every confirmed receipt.
+- [ ] Original receipt images stored and retrievable for every confirmed scanned receipt. Manual receipts have no image by design (decided 2026-11-02); `backend/tests/api/test_scanned_images.py` covers JPEG, PNG and PDF scans.
 
 **Security (basic):**
 - [ ] API endpoints require authentication (except health check).
-- [ ] User A cannot access User B's receipts or budgets.
+- [ ] User A cannot access User B's receipts or budgets. `backend/tests/api/test_cross_user_writes.py` (every receipt and budget route answers 404; the rows are unchanged).
 - [ ] Rate limiting enforced (50 submissions/hour, 300 reads/minute).
 
 ## LLM Validation Harness
