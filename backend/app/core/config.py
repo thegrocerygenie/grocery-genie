@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     thumbnail_width: int = 200
 
     # Limits
+    # Per user (NFR 7). The hourly cap counts only receipt submissions (scan
+    # and manual entry); every other request, writes included, counts toward
+    # the per-minute cap.
     max_receipt_submissions_per_hour: int = 50
     max_reads_per_minute: int = 300
 

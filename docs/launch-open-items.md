@@ -88,7 +88,7 @@ A comparison of the design (removed in `041f38f`, still in git) with `main` on 2
 
 ## 5. Known gaps, accepted for now
 
-- **Rate limits count per token, not per user** (noted in PR 24), so signing in again resets the count.
+- ~~**Rate limits count per token, not per user** (noted in PR 24), so signing in again resets the count.~~ Fixed: the limits count per user, and the 50/hr cap applies only to receipt submissions.
 - **Dev loop:** `LogOnlyEmailClient` logs at INFO, but the backend sets no logging config, so verify and reset links never appear locally.
 - **Backend dependencies aren't locked.** `backend/pyproject.toml` has version ranges and there's no `uv.lock`, so two machines can install different versions. `uv lock` plus `uv sync` would pin them and let `uv` check freshness (raised in the PR 43 review).
 - **`make hooks` says "Git hooks on" on every run in Claude worktrees** (PR 47). Their git config holds the hooks path as a full path, so the check never matches `.githooks`. It does no harm.

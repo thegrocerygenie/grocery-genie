@@ -105,7 +105,7 @@
 
 - **Domain events (in-process):** `EventDispatcher` in `backend/app/events/dispatcher.py` is a synchronous in-process bus (`defaultdict`-backed handler registry, `dispatcher.dispatch(event)`). Event types in `backend/app/events/types.py` (e.g., `ReceiptConfirmed`, `ItemCorrected`). Comment in `dispatcher.py` notes it is "designed for drop-in replacement with Celery/Redis-backed dispatch later."
 - **CORS:** Wide-open in MVP — `allow_origins=["*"]` in `backend/main.py`, flagged `# Tighten for production`.
-- **Rate limiting:** In-app `RateLimitMiddleware` keyed by bearer token. Tiered windows: `max_receipt_submissions_per_hour` for `POST/PUT/PATCH/DELETE`, `max_reads_per_minute` for `GET`. Skips `/health` and unauthenticated requests.
+- **Rate limiting:** In-app `RateLimitMiddleware` keyed by user (the access token's `sub`). Tiered windows: `max_receipt_submissions_per_hour` for `POST /api/receipts/scan` and `POST /api/receipts`, `max_reads_per_minute` for every other authenticated request. Unauthenticated `/api/auth/*` POSTs are limited per IP. Skips `/health`.
 
 ---
 
