@@ -24,6 +24,8 @@ import {
 } from '@/features/budget/hooks/useBudget';
 import { useCategories } from '@/features/budget/hooks/useCategories';
 import type { BudgetResponse } from '@/features/budget/types';
+import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
+import { currencySymbol, formatMoney } from '@/utils/money';
 
 /** Amount text for an input: "200", "12.5". */
 function amountText(amount: number): string {
@@ -54,15 +56,15 @@ function startDayOf(budget: BudgetResponse | undefined): string {
 }
 
 /** A saved limit as the design shows it: "$400.00"; empty stays empty for the placeholder. */
-function formatLimit(text: string): string {
-  return text.trim() ? `$${parseAmount(text).toFixed(2)}` : '';
+function formatLimit(text: string, currency: string): string {
+  return text.trim() ? formatMoney(parseAmount(text), currency) : '';
 }
 
 /** A category limit as the design shows it: "$175", or "$12.50" when it has cents. */
-function formatCategoryLimit(text: string): string {
+function formatCategoryLimit(text: string, currency: string): string {
   if (!text.trim()) return '';
   const amount = parseAmount(text);
-  return Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(2)}`;
+  return formatMoney(amount, currency, { decimals: Number.isInteger(amount) ? 0 : 2 });
 }
 
 function ordinal(n: number): string {
@@ -295,14 +297,17 @@ interface RowAmountInputProps {
 // Design 14 shows "$400.00"; the raw number comes back while the field is edited.
 function RowAmountInput({ label, value, onChangeText, placeholder }: RowAmountInputProps) {
   const [editing, setEditing] = useState(false);
+  const currency = useBudgetCurrency();
   return (
     <View style={styles.row}>
       <Text style={type.body}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {editing && value ? <Text style={[type.body, { color: colors.iosLabel }]}>$</Text> : null}
+        {editing && value ? (
+          <Text style={[type.body, { color: colors.iosLabel }]}>{currencySymbol(currency)}</Text>
+        ) : null}
         <TextInput
           style={[type.body, styles.input, { color: colors.iosLabel }]}
-          value={editing ? value : formatLimit(value)}
+          value={editing ? value : formatLimit(value, currency)}
           onFocus={() => setEditing(true)}
           onBlur={() => setEditing(false)}
           onChangeText={onChangeText}
@@ -353,6 +358,7 @@ interface RowCategoryInputProps {
 
 function RowCategoryInput({ cat, value, onChangeText, showDivider }: RowCategoryInputProps) {
   const [editing, setEditing] = useState(false);
+  const currency = useBudgetCurrency();
   return (
     <View style={[styles.row, showDivider && styles.rowDivider]}>
       <View style={[styles.catCircle, { backgroundColor: cat.color }]}>
@@ -364,10 +370,12 @@ function RowCategoryInput({ cat, value, onChangeText, showDivider }: RowCategory
       </View>
       <Text style={[type.body, { flex: 1 }]}>{cat.name}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {editing && value ? <Text style={[type.body, { color: colors.iosLabel2 }]}>$</Text> : null}
+        {editing && value ? (
+          <Text style={[type.body, { color: colors.iosLabel2 }]}>{currencySymbol(currency)}</Text>
+        ) : null}
         <TextInput
           style={[type.body, styles.input, { color: colors.iosLabel2, minWidth: 60 }]}
-          value={editing ? value : formatCategoryLimit(value)}
+          value={editing ? value : formatCategoryLimit(value, currency)}
           onFocus={() => setEditing(true)}
           onBlur={() => setEditing(false)}
           onChangeText={onChangeText}

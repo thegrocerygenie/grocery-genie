@@ -5,12 +5,15 @@ import { Stack } from 'expo-router';
 import { getCategoryMetaByName } from '@/constants/categories';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
+import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
 import { useBudgetStore } from '@/store/budgetStore';
+import { formatMoney } from '@/utils/money';
 import { monthName } from '@/utils/period';
 
 export default function TopItemsScreen() {
   const { selectedPeriod } = useBudgetStore();
   const { data, isLoading } = useDashboardSpending(selectedPeriod);
+  const currency = useBudgetCurrency();
 
   const items = useMemo(() => {
     const list = data?.top_items ?? [];
@@ -68,7 +71,9 @@ export default function TopItemsScreen() {
                     </Text>
                     <Text style={[type.caption1, { color: colors.iosLabel2 }]}>{it.trips}</Text>
                   </View>
-                  <Text style={[type.money, { fontSize: 15 }]}>${it.amount.toFixed(2)}</Text>
+                  <Text style={[type.money, { fontSize: 15 }]}>
+                    {formatMoney(it.amount, currency)}
+                  </Text>
                 </View>
                 <View style={styles.barTrack}>
                   <View

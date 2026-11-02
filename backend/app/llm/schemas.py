@@ -46,7 +46,9 @@ class ReceiptExtractionResult(BaseModel):
     # (a validation error becomes a 503 that the app keeps retrying).
     store_name: str | None = None
     date: str | None = None
-    currency: str = "USD"
+    # As printed (a code or a symbol), or None when the receipt shows none;
+    # the receipt service turns it into a code (app/core/money.py).
+    currency: str | None = None
     items: list[ExtractedLineItem] = Field(default_factory=list)
     subtotal: float | None = None
     tax: float | None = None

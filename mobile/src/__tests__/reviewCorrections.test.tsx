@@ -759,3 +759,24 @@ describe('Review screen abandon stage', () => {
     expect(mockEmit).not.toHaveBeenCalledWith('receipt_abandoned', expect.anything());
   });
 });
+
+describe('Review screen currency', () => {
+  it('shows a receipt in another currency in that currency, with a note', () => {
+    useReceiptStore.getState().setActiveScanResponse({
+      ...scan,
+      extraction: { ...scan.extraction, currency: 'EUR' },
+    });
+    renderReview();
+
+    expect(screen.getByText('Not counted in your budget')).toBeTruthy();
+    expect(screen.getByText(/This receipt is in EUR and your budget is in USD/)).toBeTruthy();
+    expect(screen.getAllByText('€1.29').length).toBeGreaterThan(0);
+  });
+
+  it('shows no note for a receipt in the budget currency', () => {
+    renderReview();
+
+    expect(screen.queryByText('Not counted in your budget')).toBeNull();
+    expect(screen.getAllByText('$1.29').length).toBeGreaterThan(0);
+  });
+});

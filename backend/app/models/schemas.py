@@ -1,9 +1,12 @@
 import datetime as dt
+import re
 import uuid
 from datetime import date, datetime, timedelta
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+_CURRENCY_CODE = re.compile(r"^[A-Z]{3}$")
 
 # --- Receipt Extraction (from scan endpoint) ---
 
@@ -262,10 +265,23 @@ class ErrorResponse(BaseModel):
 # --- Auth ---
 
 
+def _device_currency(value: str | None) -> str | None:
+    """The device's currency at sign-up. A bad value is dropped, not a 422:
+    sign-up never fails over it, and the account keeps the USD default."""
+    if value is None:
+        return None
+    code = value.strip().upper()
+    return code if _CURRENCY_CODE.match(code) else None
+
+
 class SignUpRequest(BaseModel):
     email: str
     password: str
     name: str | None = None
+    # The iPhone's region currency; becomes the budget currency.
+    currency_preference: str | None = None
+
+    _check_currency = field_validator("currency_preference")(_device_currency)
 
 
 class SignInRequest(BaseModel):
@@ -312,10 +328,18 @@ class AppleSignInRequest(BaseModel):
     nonce: str | None = None
     # No name: the app asks Apple for the email only (data minimization).
     # Older builds still send one; it is ignored as an unknown field.
+    # Used only when this sign-in creates the account.
+    currency_preference: str | None = None
+
+    _check_currency = field_validator("currency_preference")(_device_currency)
 
 
 class GoogleSignInRequest(BaseModel):
     id_token: str
+    # Used only when this sign-in creates the account.
+    currency_preference: str | None = None
+
+    _check_currency = field_validator("currency_preference")(_device_currency)
 
 
 class EmailChangeRequestPayload(BaseModel):
@@ -373,12 +397,25 @@ class UserProfileResponse(BaseModel):
     ai_consent: AiConsentPublic
 
 
+def _currency_code(value: str | None) -> str | None:
+    """An ISO 4217 code, upper-cased; anything else is a 422."""
+    if value is None:
+        return None
+    code = value.strip().upper()
+    if not _CURRENCY_CODE.match(code):
+        raise ValueError("currency must be a 3-letter ISO 4217 code")
+    return code
+
+
 class UserPreferencesUpdate(BaseModel):
     locale: str | None = None
+    # The budget currency: only receipts in it count toward budgets.
     currency_preference: str | None = None
     notification_thresholds: NotificationThresholds | None = None
     weekly_summary: WeeklySummaryUpdate | None = None
     ocr_languages: list[str] | None = None
+
+    _check_currency = field_validator("currency_preference")(_currency_code)
 
 
 # --- Manual receipt ---
@@ -398,8 +435,11 @@ class ManualReceiptCreateRequest(BaseModel):
     total: float
     subtotal: float | None = None
     tax: float | None = None
-    currency: str = "USD"
+    # None: the user's currency.
+    currency: str | None = None
     items: list[ManualLineItem] = Field(default_factory=list)
+
+    _check_currency = field_validator("currency")(_currency_code)
 
 
 # --- Soft-delete listings ---

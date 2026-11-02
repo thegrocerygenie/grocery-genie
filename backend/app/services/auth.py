@@ -119,6 +119,7 @@ async def sign_up(
     name: str | None,
     ip: str | None = None,
     user_agent: str | None = None,
+    currency_preference: str | None = None,
 ) -> tuple[User, TokenPair]:
     settings = get_settings()
     email = _normalize_email(email)
@@ -150,6 +151,8 @@ async def sign_up(
         email_verification_token_hash=hash_email_token(raw_token),
         email_verification_expires_at=datetime.now(tz=UTC) + timedelta(hours=24),
     )
+    if currency_preference:
+        user.currency_preference = currency_preference
     db.add(user)
     await db.flush()
 
@@ -496,6 +499,7 @@ async def upsert_apple_user(
     sub: str,
     email: str | None,
     email_verified: bool,
+    currency_preference: str | None = None,
 ) -> User:
     return await _upsert_social_user(
         db,
@@ -503,6 +507,7 @@ async def upsert_apple_user(
         provider_value=sub,
         email=email,
         email_verified=email_verified,
+        currency_preference=currency_preference,
     )
 
 
@@ -513,11 +518,13 @@ async def upsert_google_user(
     email: str,
     email_verified: bool,
     name: str | None,
+    currency_preference: str | None = None,
 ) -> User:
     return await _upsert_social_user(
         db,
         provider_field="google_subject",
         provider_value=sub,
+        currency_preference=currency_preference,
         email=email,
         email_verified=email_verified,
         name=name,
@@ -532,6 +539,7 @@ async def _upsert_social_user(
     email: str | None,
     email_verified: bool,
     name: str | None = None,
+    currency_preference: str | None = None,
 ) -> User:
     # First match by provider subject.
     column = getattr(User, provider_field)
@@ -561,6 +569,8 @@ async def _upsert_social_user(
         name=name or (email.split("@")[0] if email else "User"),
         email_verified_at=datetime.now(tz=UTC) if email_verified else None,
     )
+    if currency_preference:
+        new_user.currency_preference = currency_preference
     setattr(new_user, provider_field, provider_value)
     db.add(new_user)
     await db.flush()

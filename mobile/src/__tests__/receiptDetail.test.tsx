@@ -165,3 +165,21 @@ describe('Receipt detail delete', () => {
     expect(routerScreen.getPathname()).toBe('/receipt/r-1');
   });
 });
+
+describe('Receipt detail currency', () => {
+  it('shows a receipt in another currency in it, and says it is not counted', async () => {
+    mockGetReceipt.mockResolvedValue({ ...receipt, currency: 'EUR' });
+    openDetail();
+
+    expect(await screen.findByText('Not counted (EUR)')).toBeTruthy();
+    expect(screen.queryByText(/\$/)).toBeNull();
+  });
+
+  it('shows no budget row for a receipt in the budget currency', async () => {
+    mockGetReceipt.mockResolvedValue(receipt);
+    openDetail();
+
+    expect(await screen.findByText('Total')).toBeTruthy();
+    expect(screen.queryByText('Budget')).toBeNull();
+  });
+});

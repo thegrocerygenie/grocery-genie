@@ -231,6 +231,29 @@ def test_a_perfect_extraction_scores_every_field():
     assert score.matched == 2
 
 
+@pytest.mark.parametrize(
+    ("returned", "correct"),
+    [
+        ("USD", True),
+        ("usd", True),
+        (None, True),
+        ("$", True),
+        ("€", False),
+        ("EUR", False),
+    ],
+)
+def test_currency_is_scored_as_the_app_saves_it(returned, correct):
+    """Prompt v3 returns a code, a one-currency symbol, the symbol as printed
+    ($), or null. The app saves the code, or the user's currency for null or
+    an ambiguous symbol; the set assumes a local shopper, so the user's
+    currency is the receipt's (ground truth)."""
+    score = harness.score_receipt(
+        _result(currency=returned), harness.GroundTruth(**_truth()), 1.0
+    )
+
+    assert ("currency" not in score.wrong_fields) is correct
+
+
 def test_wrong_receipt_fields_are_named():
     result = _result(currency="EUR", total=9.99, date="2026-02-11")
 

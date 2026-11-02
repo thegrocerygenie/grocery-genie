@@ -27,9 +27,11 @@ Sources:
 
 ## 1b. Before the next deploy
 
-- [ ] **Run the database migrations `20261028_0010`, `20261030_0011` and `20261101_0012`** (`make backend-migrate`). `20261101_0012` adds `analytics_events`, which every request with an analytics event writes; without it the events are dropped (logged as "Analytics events not saved"), and requests still succeed. `20261030_0011` adds `receipts.extraction_model` and `extraction_prompt_version`, which every scan now writes, so a scan fails against a database without them. `20261028_0010` (PR 42, L2) adds `line_items.position`, and the API orders receipt items by it, so the API fails against a database without the column. The migration fills existing rows from their current order.
+- [ ] **Run the database migrations `20261028_0010`, `20261030_0011`, `20261101_0012` and `20261102_0013`** (`make backend-migrate`). `20261102_0013` turns any receipt currency that isn't an ISO code ("€", "usd") into one, so budgets count it correctly; it is safe to run twice. `20261101_0012` adds `analytics_events`, which every request with an analytics event writes; without it the events are dropped (logged as "Analytics events not saved"), and requests still succeed. `20261030_0011` adds `receipts.extraction_model` and `extraction_prompt_version`, which every scan now writes, so a scan fails against a database without them. `20261028_0010` (PR 42, L2) adds `line_items.position`, and the API orders receipt items by it, so the API fails against a database without the column. The migration fills existing rows from their current order.
 - [ ] **Set `GG_RESEND_API_KEY` in production.** Since PR 32, the API refuses to start without it, so nothing can log email bodies. Only local dev opts out, with `GG_EMAIL_DELIVERY=off`.
 - [x] **Run `npm install` in `mobile/` after pulling.** PR 35's H3 fix is a `patch-package` patch to react-native-screens 4.16. Without the install, `nativeBackButtonPatch.test.ts` fails (seen on 2026-10-27 in a stale checkout), and a native build ships without the fix. Done: mobile `make` targets now install when dependencies change. Direct `npx` or `npm` use still needs `npm install` by hand.
+
+- [ ] **Rebuild the native app** (`make mobile-ios-native`, or an EAS build) after pulling the currency change: it adds `expo-localization`, a native module, to read the iPhone's currency at sign-up.
 
 ## 2. Claims the privacy text makes that code doesn't enforce yet
 

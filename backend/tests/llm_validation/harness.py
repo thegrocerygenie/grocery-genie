@@ -18,6 +18,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from app.core.money import normalize_currency
 from app.image.normalize import normalize_upload
 from app.llm.schemas import ReceiptExtractionResult
 
@@ -311,7 +312,11 @@ def score_receipt(
     receipt_fields = {
         "store_name": score_store_name(result.store_name, truth.store_name),
         "date": score_date(result.date, truth.date),
-        "currency": result.currency.upper() == truth.currency,
+        # As the app saves it (receipt_service): the code, or the user's
+        # currency for null or an ambiguous symbol. The set assumes a local
+        # shopper, so the user's currency is the receipt's.
+        "currency": (normalize_currency(result.currency) or truth.currency)
+        == truth.currency,
         "total": score_numeric(result.total, truth.total),
     }
     return ReceiptScore(

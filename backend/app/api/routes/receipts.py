@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.dependencies import get_db
+from app.core.money import format_money
 from app.core.retention import days_remaining
 from app.core.security import get_current_user
 from app.image.normalize import PDF_TYPE, UnreadableUploadError, normalize_upload
@@ -311,7 +312,7 @@ async def recently_deleted(
             deleted_at = deleted_at.replace(tzinfo=UTC)
         days_left = days_remaining(deleted_at, now)
         store_label = r.store.name if r.store else "Receipt"
-        total_label = f"${float(r.total):.2f}" if r.total else ""
+        total_label = format_money(float(r.total), r.currency) if r.total else ""
         out.append(
             DeletedItemResponse(
                 id=r.id,

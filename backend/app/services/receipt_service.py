@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.money import format_money, normalize_currency
 from app.core.retention import restore_cutoff
 from app.events.dispatcher import dispatcher
 from app.events.types import ItemCorrected, ReceiptConfirmed
@@ -26,6 +27,7 @@ from app.models.database import (
     Receipt,
     ReceiptCorrection,
     Store,
+    User,
     UserItemMapping,
 )
 from app.models.schemas import (
@@ -127,6 +129,18 @@ class ReceiptService:
             else None
         )
 
+        # The receipt keeps its own currency; with none printed, or one that
+        # isn't a code or an unambiguous symbol ("$"), it takes the user's.
+        user_currency = await self._user_currency(user_id)
+        currency = normalize_currency(extraction.currency)
+        if currency is None:
+            if extraction.currency:
+                extraction.warnings.append(
+                    f"unrecognized currency {extraction.currency!r}; "
+                    f"using {user_currency}"
+                )
+            currency = user_currency
+
         # Parse date — the LLM is asked for ISO YYYY-MM-DD but compliance isn't
         # guaranteed (esp. non-US receipts). Never 500 on a bad date; fall back
         # to today. The extraction schema has already flagged it for review.
@@ -163,7 +177,7 @@ class ReceiptService:
             subtotal=extraction.subtotal,
             tax=extraction.tax,
             total=extraction.total,
-            currency=extraction.currency,
+            currency=currency,
             extraction_confidence=extraction.confidence,
             store_name_confidence=extraction.store_name_confidence,
             date_confidence=extraction.date_confidence,
@@ -287,7 +301,7 @@ class ReceiptService:
                 subtotal=extraction.subtotal,
                 tax=extraction.tax,
                 total=extraction.total,
-                currency=extraction.currency,
+                currency=currency,
                 confidence=extraction.confidence,
                 store_name_confidence=extraction.store_name_confidence,
                 date_confidence=extraction.date_confidence,
@@ -373,17 +387,20 @@ class ReceiptService:
         budget_service = BudgetService(self.db)
         notification_service = NotificationService(self.db)
         breaches = await budget_service.check_thresholds(user_id, *sorted(dates))
+        currency = await self._user_currency(user_id) if breaches else "USD"
         for breach in breaches:
             if not await budget_service.claim_alert(breach):
                 continue  # already alerted for this threshold this period
             if breach.threshold_percent >= 100:
                 overage = breach.current_spend - breach.budget_amount
                 title = "Budget Exceeded"
-                body = f"You've exceeded your budget by ${overage:.2f}."
+                body = (
+                    f"You've exceeded your budget by {format_money(overage, currency)}."
+                )
             else:
                 title = f"Budget {breach.threshold_percent}% Reached"
                 body = (
-                    f"${breach.remaining_amount:.2f} remaining with "
+                    f"{format_money(breach.remaining_amount, currency)} remaining with "
                     f"{breach.days_left_in_period} days left in this period."
                 )
             await notification_service.create_notification(
@@ -750,7 +767,7 @@ class ReceiptService:
         total: float,
         subtotal: float | None,
         tax: float | None,
-        currency: str,
+        currency: str | None,
         items: list[dict],
     ) -> Receipt:
         """Create a receipt without an image (manual entry fallback)."""
@@ -762,7 +779,7 @@ class ReceiptService:
             subtotal=subtotal,
             tax=tax,
             total=total,
-            currency=currency,
+            currency=currency or await self._user_currency(user_id),
             extraction_confidence=None,
             image_url=None,
             thumbnail_url=None,
@@ -801,6 +818,13 @@ class ReceiptService:
             )
         await self._after_confirm(receipt)
         return receipt
+
+    async def _user_currency(self, user_id: uuid.UUID) -> str:
+        """The user's budget currency (USD, the column default, if unset)."""
+        result = await self.db.execute(
+            select(User.currency_preference).where(User.id == user_id)
+        )
+        return result.scalar_one_or_none() or "USD"
 
     async def _get_user_mappings(
         self, user_id: uuid.UUID

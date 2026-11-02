@@ -5,7 +5,9 @@ from datetime import UTC, date, datetime, time, timedelta
 from sqlalchemy import func, select
 
 from app.core.dependencies import get_sync_session_factory
+from app.core.money import format_money
 from app.models.database import Category, LineItem, Notification, Receipt, User
+from app.services.budget_service import in_budget_currency
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -100,8 +102,13 @@ def _generate_summary_for_user(
     else:
         comparison = "No data from last week to compare."
 
+    currency = (
+        db.execute(select(User.currency_preference).where(User.id == user_id)).scalar()
+        or "USD"
+    )
     body = (
-        f"This week: ${current_total:.2f}. Top category: {top_category}. {comparison}"
+        f"This week: {format_money(current_total, currency)}. "
+        f"Top category: {top_category}. {comparison}"
     )
 
     notification = Notification(
@@ -129,6 +136,7 @@ def _get_total_spending(db, user_id, start: date, end: date) -> float:
             Receipt.user_id == user_id,
             Receipt.status == "confirmed",
             Receipt.deleted_at.is_(None),
+            in_budget_currency(user_id),
             Receipt.date >= start,
             Receipt.date <= end,
         )
@@ -150,6 +158,7 @@ def _get_top_category(db, user_id, start: date, end: date) -> str:
             Receipt.user_id == user_id,
             Receipt.status == "confirmed",
             Receipt.deleted_at.is_(None),
+            in_budget_currency(user_id),
             Receipt.date >= start,
             Receipt.date <= end,
         )
