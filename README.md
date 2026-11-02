@@ -57,7 +57,7 @@ grocery-genie/
 
 ### Prerequisites
 
-- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) (recommended; it downloads Python 3.12 when needed), or Python 3.12+
 - Node.js 18+
 - PostgreSQL (or SQLite for development)
 - Redis (for Celery task queue)
@@ -71,8 +71,13 @@ With `make`, you can skip the install steps below: each target installs dependen
 
 ```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+# With uv (recommended; downloads Python 3.12 if needed):
+uv venv --python 3.12 && source .venv/bin/activate
+uv pip install -e ".[dev]"
+
+# Without uv (needs Python 3.12+ on your PATH; macOS python3 is too old):
+# python3.12 -m venv .venv && source .venv/bin/activate
+# pip install -e ".[dev]"
 
 # Set environment variables
 export GG_DATABASE_URL="postgresql+asyncpg://localhost:5432/grocery_genie"
