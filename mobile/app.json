@@ -60,6 +60,7 @@
       ],
       "expo-notifications",
       "./plugins/withPodsMinDeploymentTarget",
+      "./plugins/withDocumentScannerNoLocation",
       "./plugins/ios-scene-lifecycle"
     ]
   }

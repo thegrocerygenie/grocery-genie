@@ -38,7 +38,20 @@ The phone:
 
 ## 2. Camera and capture
 
-- [ ] The camera opens with the edge-detection overlay on a receipt. (13 Camera) Nothing provides this yet. It waits on the document-scanner work in `launch-open-items.md` §4b, which replaces this screen.
+**Document scanner** (RC-01, `.planning/PLAN-2026-11-01-document-scanner.md`). Only a native build on a phone shows it; Expo Go and the Simulator show the fallback camera.
+- [ ] **It opens.** Open Scan: Apple's document scanner appears, not the custom camera. Open Scan again from another tab: it appears again. If nothing appears, the module couldn't find the foreground scene; note the iOS version.
+- [ ] **Edges.** On a busy table, the scanner outlines the receipt and follows it as you move the phone. (13 Camera, AC 1)
+- [ ] **Capture and retake.** It captures automatically, or with its shutter. Retake inside the scanner works before you tap Save. (13 Camera, AC 3)
+- [ ] **Cancel.** Cancel in the scanner returns to the previous tab, and nothing uploads.
+- [ ] **A good page.** Save a clear receipt: Reading receipt…, then Review, with the cropped, straightened page.
+- [ ] **A blurry page.** Scan a receipt while moving the phone, or with a finger over the lens, and Save. "Image looks blurry — hold steady" shows over the page, with Retake and Use Scan. Retake opens the scanner; Use Scan uploads.
+- [ ] **A dark room.** Scan with the lights off and flash off. "Too dark — find more light" shows. Then scan with the scanner's flash on.
+- [ ] **Two pages.** Scan two pages and Save. "Only the first page was kept…" shows, and Use Scan uploads page one.
+- [ ] **Offline.** In airplane mode, scan and Save: "Saved · will upload automatically", and it uploads when you reconnect.
+- [ ] **VoiceOver.** The scanner's own buttons are read (Apple's labels). Back in the app, the warning is announced, and Retake, Use Scan and Scan are read as buttons.
+- [ ] **Release build.** Check the App Store build's warnings: no ITMS-90683 (location purpose string). `plugins/withDocumentScannerNoLocation.js` builds the scanner without CoreLocation.
+
+**Fallback camera** (Expo Go and the Simulator). Check these on a phone in Expo Go:
 - [ ] A blur warning appears when the receipt is out of focus. (13 Camera, RC-01)
 - [ ] A low-light warning appears in a dim room. (13 Camera, RC-01)
 - [ ] Retake works before you submit. (13 Camera)
@@ -53,7 +66,7 @@ The phone:
 - [ ] A PDF from the Files app is accepted. (13 Camera, RC-03)
 - [ ] **Duplicate warning.** Scan the same receipt twice within 24 hours. The second Review shows "Possible duplicate". Delete both, then scan again: no banner. A receipt queued offline and opened from History shows no banner; that's known. (M3, PR 40)
 
-**Blur calibration.** `DEVICE_BLUR_THRESHOLD` in `mobile/src/features/receipt-capture/utils/frameQuality.ts` is still 900, a guess.
+**Blur calibration.** `DEVICE_BLUR_THRESHOLD` in `mobile/src/features/receipt-capture/utils/frameQuality.ts` is still 900, a guess. It now judges two kinds of image: the fallback camera's raw frames, and the scanner's cropped, flattened pages, which score sharper. Calibrate on scanned pages first, since that is the main path. If one number can't serve both, split the threshold.
 - [ ] Take 20–30 receipt photos with the phone: half sharp, half blurry, in mixed light. Put them in `sharp/` and `blurry/` folders outside the repo (receipts carry personal data).
 - [ ] Run `backend/.venv/bin/python -I scripts/calibrate-device-blur.py --photos DIR`. (Another way: scan the receipts in the app and keep the labeled `[FrameQuality]` lines from the Metro log.) Set `DEVICE_BLUR_THRESHOLD` from its report, and update its test. (launch-open-items §3)
 - [ ] With the new threshold, check the blur warning again on a sharp and a blurry receipt.

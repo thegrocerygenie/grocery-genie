@@ -1,6 +1,6 @@
 # Handoff: MVP design alignment, round 2 (2026-10-28)
 
-**Status: open.** Steps 1 and 2 are done: accessibility merged as #50 (plus #51, onboarding at AX5), and behavior and copy is PR 2. Step 3 (visual fidelity) and the document scanner are open. The MVP Definition of Done audit of 2026-10-29 (`.planning/DOD-AUDIT-2026-10-29.md`) ranks what's left.
+**Status: open.** Steps 1 and 2 are done: accessibility merged as #50 (plus #51, onboarding at AX5), and behavior and copy is PR 2. Step 3 (visual fidelity) is open. The document scanner is built in code (`.planning/PLAN-2026-11-01-document-scanner.md`) and waits on a device check. The MVP Definition of Done audit of 2026-10-29 (`.planning/DOD-AUDIT-2026-10-29.md`) ranks what's left.
 
 Goal: close the gaps between the MVP design and the app, so the MVP screens match the design's look, behavior and accessibility rules. Every item has a test where a test can see it, and a Simulator check where only a screen can.
 

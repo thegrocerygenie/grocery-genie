@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -12,11 +12,9 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
-import NetInfo from '@react-native-community/netinfo';
-import { Stack, Tabs, useRouter } from 'expo-router';
+import { Stack, Tabs, useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ANALYTICS_EVENTS } from '@/constants/analyticsEvents';
 import { AiConsentContent } from '@/features/ai-consent/components/AiConsentContent';
 import { AI_CONSENT_COPY } from '@/features/ai-consent/constants';
 import {
@@ -24,74 +22,43 @@ import {
   useGrantAiConsent,
   useMarkAiConsentRequired,
 } from '@/features/ai-consent/hooks/useAiConsent';
-import { isAiConsentRequiredError } from '@/features/ai-consent/utils/aiConsent';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { ImportProgressOverlay } from '@/features/receipt-capture/components/ImportProgressOverlay';
 import { useReceiptImport } from '@/features/receipt-capture/hooks/useReceiptImport';
-import { useReceiptScan } from '@/features/receipt-capture/hooks/useReceiptScan';
-import { isRetryableScanError } from '@/features/receipt-capture/services/offlineQueue';
-import { persistCapturedImage } from '@/features/receipt-capture/services/pendingImageFiles';
-import { tokenSubject } from '@/features/auth/utils/tokenSubject';
-import { useAuthStore } from '@/store/authStore';
-import { QUALITY_HINTS, scanErrorHint } from '@/features/receipt-capture/utils/scanErrorHint';
+import {
+  useScanSubmission,
+  type ScanFlowState,
+} from '@/features/receipt-capture/hooks/useScanSubmission';
+import {
+  isDocumentScannerAvailable,
+  scanDocument,
+} from '@/features/receipt-capture/services/documentScanner';
+import { deleteQuietly } from '@/features/receipt-capture/services/pendingImageFiles';
+import { QUALITY_HINTS } from '@/features/receipt-capture/utils/scanErrorHint';
 import { useFrameQuality } from '@/features/receipt-capture/hooks/useFrameQuality';
-import { sampleFrame } from '@/features/receipt-capture/services/frameSampler';
+import { sampleFrame, scoreImage } from '@/features/receipt-capture/services/frameSampler';
 import type { FrameVerdict } from '@/features/receipt-capture/utils/frameQuality';
-import { useOfflineStore } from '@/store/offlineStore';
-import { useReceiptStore } from '@/store/receiptStore';
-import { useAnalytics } from '@/hooks/useAnalytics';
 
-type ScanFlowState = 'ready' | 'capturing' | 'processing' | 'low-quality' | 'queued';
+type Submission = ReturnType<typeof useScanSubmission>;
 
-/** How long the "Saved" pill stays before the camera is ready again. */
-const QUEUED_PILL_MS = 2500;
+/** Shown when a multi-page scan comes back: the backend links no pages yet. */
+export const EXTRA_PAGES_HINT = 'Only the first page was kept. Scan each page as its own receipt.';
 
 export default function ScanScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
-  const [flowState, setFlowState] = useState<ScanFlowState>('ready');
-  const [processingUri, setProcessingUri] = useState<string | null>(null);
-  const [errorHint, setErrorHint] = useState(() => scanErrorHint(undefined));
-  // RC-01 AC 2: check blur and light before capture, only while waiting for one.
-  // Not gated on onCameraReady (the simulator never sends it): a sample taken
-  // before the camera is ready fails, and the next one retries.
-  const frameQuality = useFrameQuality(
-    () => (cameraRef.current ? sampleFrame(cameraRef.current) : Promise.resolve(null)),
-    flowState === 'ready',
-  );
-  const cameraRef = useRef<CameraView>(null);
-
-  const scanMutation = useReceiptScan();
+  // Apple's document scanner where it can run (RC-01 AC 1); expo-camera in
+  // Expo Go and on the Simulator. Decided once: it can't change while mounted.
+  const [useScanner] = useState(isDocumentScannerAvailable);
   const receiptImport = useReceiptImport();
-  const { setCapturedImageUri, setActiveScanResponse } = useReceiptStore();
-  const addPendingReceipt = useOfflineStore((s) => s.addPendingReceipt);
-  const ownerId = tokenSubject(useAuthStore((s) => s.accessToken));
-  const analytics = useAnalytics();
   // App Store 5.1.2(i): the photo goes to Anthropic, so the tab asks first.
   const aiConsent = useAiConsentStatus();
   const grantConsent = useGrantAiConsent();
   const markConsentRequired = useMarkAiConsentRequired();
-  // The consent screen is not the camera: leaving it is not a capture abandonment.
-  const askingConsent = useRef(false);
-  askingConsent.current = aiConsent === false;
-
-  // Tracks whether a scan was submitted, so leaving the camera without ever
-  // capturing is recorded as a capture-stage abandonment.
-  const scanSubmitted = useRef(false);
-
-  useEffect(() => {
-    if (flowState !== 'queued') return;
-    const timer = setTimeout(() => setFlowState('ready'), QUEUED_PILL_MS);
-    return () => clearTimeout(timer);
-  }, [flowState]);
-
-  useEffect(() => {
-    return () => {
-      if (!scanSubmitted.current && !askingConsent.current) {
-        analytics.emit(ANALYTICS_EVENTS.RECEIPT_ABANDONED, { stage: 'capture' });
-      }
-    };
-  }, [analytics]);
+  const submission = useScanSubmission({
+    askingConsent: aiConsent === false,
+    onConsentRequired: markConsentRequired,
+  });
 
   if (aiConsent === false) {
     return (
@@ -137,32 +104,240 @@ export default function ScanScreen() {
     );
   }
 
-  // NFR reliability 3: keep a photo that cannot upload now; useSyncQueue
-  // uploads it when the connection or the server comes back.
-  const fail = (error?: unknown) => {
-    setErrorHint(scanErrorHint(error));
-    setFlowState('low-quality');
+  return (
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      {/* Design "Scan · capture": full-screen capture; Cancel is the way out. */}
+      <Tabs.Screen options={{ tabBarStyle: { display: 'none' } }} />
+      {useScanner ? (
+        <DocumentScannerCapture submission={submission} />
+      ) : (
+        <CameraCapture submission={submission} />
+      )}
+    </>
+  );
+}
+
+/** A scanned page held back for the user to keep or retake. */
+interface PagePrompt {
+  uri: string;
+  mimeType: string;
+  hints: string[];
+}
+
+/**
+ * RC-01 AC 1 and AC 3: Apple's scanner finds the receipt's edges, captures it
+ * and offers its own retake. AC 2: the page is checked for blur and light on
+ * the device before it uploads (decision A, the scanner has no pre-capture hook).
+ */
+function DocumentScannerCapture({ submission }: { submission: Submission }) {
+  const router = useRouter();
+  const [scanning, setScanning] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [prompt, setPrompt] = useState<PagePrompt | null>(null);
+  const busy = useRef(false);
+
+  const launch = useCallback(async () => {
+    if (busy.current) return;
+    busy.current = true;
+    submission.startAttempt();
+    submission.setFlowState('ready');
+    setPrompt(null);
+    setScanning(true);
+    try {
+      const outcome = await scanDocument();
+      setScanning(false);
+      if (outcome.kind === 'cancelled') {
+        submission.recordAbandon();
+        router.back();
+        return;
+      }
+      if (outcome.kind === 'failed') {
+        submission.fail();
+        return;
+      }
+
+      setChecking(true);
+      const verdict = await scoreImage(outcome.uri, outcome.width, outcome.height).catch(
+        () => null,
+      );
+      setChecking(false);
+      const hints: string[] = [];
+      if (verdict && verdict !== 'ok') hints.push(QUALITY_HINTS[verdict]);
+      if (outcome.droppedPages > 0) hints.push(EXTRA_PAGES_HINT);
+      if (hints.length > 0) {
+        setPrompt({ uri: outcome.uri, mimeType: outcome.mimeType, hints });
+        return;
+      }
+      await submission.submit(outcome.uri, outcome.mimeType);
+    } finally {
+      busy.current = false;
+    }
+    // submission's callbacks are stable; its state is read at call time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
+
+  // The scanner opens each time Scan comes into focus, as the camera did.
+  const launchRef = useRef(launch);
+  launchRef.current = launch;
+  useFocusEffect(
+    useCallback(() => {
+      void launchRef.current();
+    }, []),
+  );
+
+  const retake = () => {
+    if (prompt) deleteQuietly(prompt.uri);
+    void launch();
   };
 
-  const queuePhoto = (uri: string) => {
-    // A photo with no owner could never upload under any session; don't keep it.
-    if (!ownerId) {
-      fail();
-      return;
-    }
-    try {
-      addPendingReceipt({
-        imageUri: persistCapturedImage(uri),
-        mimeType: 'image/jpeg',
-        capturedAt: new Date().toISOString(),
-        ownerId,
-      });
-    } catch {
-      fail();
-      return;
-    }
-    setFlowState('queued');
+  const usePage = () => {
+    if (!prompt) return;
+    const page = prompt;
+    setPrompt(null);
+    void submission.submit(page.uri, page.mimeType);
   };
+
+  const cancel = () => {
+    if (prompt) deleteQuietly(prompt.uri);
+    submission.recordAbandon();
+    router.back();
+  };
+
+  if (submission.processing && submission.processingUri) {
+    return (
+      <View style={styles.root}>
+        <ProcessingOverlay uri={submission.processingUri} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.root}>
+      {prompt ? (
+        <Image
+          testID="scan-page-preview"
+          source={{ uri: prompt.uri }}
+          resizeMode="contain"
+          style={styles.pagePreview}
+          accessibilityIgnoresInvertColors
+        />
+      ) : null}
+
+      <View style={styles.topHintRow}>
+        <ScannerPill
+          state={submission.flowState}
+          errorHint={submission.errorHint}
+          busy={scanning || checking}
+          hints={prompt?.hints ?? null}
+        />
+      </View>
+
+      <View style={styles.bottomBar}>
+        <Pressable onPress={cancel} hitSlop={12} accessibilityRole="button">
+          <Text style={styles.cancelLabel}>Cancel</Text>
+        </Pressable>
+        {prompt ? (
+          <>
+            <Pressable
+              onPress={retake}
+              style={styles.scanButton}
+              accessibilityRole="button"
+              accessibilityLabel="Retake receipt"
+            >
+              <Text style={styles.scanButtonLabel}>Retake</Text>
+            </Pressable>
+            <Pressable
+              onPress={usePage}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Use this scan"
+            >
+              <Text style={styles.modeLabel}>Use Scan</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Pressable
+              onPress={() => void launch()}
+              disabled={scanning || checking}
+              style={styles.scanButton}
+              accessibilityRole="button"
+              accessibilityLabel="Scan receipt"
+            >
+              <Text style={styles.scanButtonLabel}>Scan</Text>
+            </Pressable>
+            <View style={styles.bottomSpacer} />
+          </>
+        )}
+      </View>
+    </View>
+  );
+}
+
+interface ScannerPillProps {
+  state: ScanFlowState;
+  errorHint: string;
+  busy: boolean;
+  /** Why a scanned page is held back; null when none is. */
+  hints: string[] | null;
+}
+
+function ScannerPill({ state, errorHint, busy, hints }: ScannerPillProps) {
+  const warning = hints?.join(' ') ?? (state === 'low-quality' ? errorHint : null);
+  // iOS ignores accessibilityLiveRegion, so VoiceOver is told outright.
+  useEffect(() => {
+    if (warning) AccessibilityInfo.announceForAccessibility(warning);
+  }, [warning]);
+
+  if (warning) {
+    return (
+      <View
+        style={[styles.pill, styles.pillWarning]}
+        testID="scan-error-pill"
+        accessibilityLiveRegion="polite"
+        accessibilityRole="alert"
+      >
+        <SymbolView name="exclamationmark.triangle.fill" size={14} tintColor="#fff" />
+        <Text style={[type.footnote, styles.pillWarningText]}>{warning}</Text>
+      </View>
+    );
+  }
+  if (state === 'queued') {
+    return (
+      <View style={[styles.pill, styles.pillGlass]}>
+        <SymbolView name="checkmark.circle.fill" size={14} tintColor="#fff" />
+        <Text style={[type.footnote, styles.pillText]}>Saved · will upload automatically</Text>
+      </View>
+    );
+  }
+  if (busy) {
+    return (
+      <View style={[styles.pill, styles.pillGlass]}>
+        <ActivityIndicator size="small" color="#fff" />
+        <Text style={[type.footnote, styles.pillText]}>Scanning…</Text>
+      </View>
+    );
+  }
+  return (
+    <View style={[styles.pill, styles.pillGlass]}>
+      <Text style={[type.footnote, styles.pillText]}>Tap Scan to capture a receipt</Text>
+    </View>
+  );
+}
+
+/** The expo-camera capture screen, for Expo Go and the Simulator. */
+function CameraCapture({ submission }: { submission: Submission }) {
+  const router = useRouter();
+  const { flowState, setFlowState } = submission;
+  // RC-01 AC 2: check blur and light before capture, only while waiting for one.
+  // Not gated on onCameraReady (the simulator never sends it): a sample taken
+  // before the camera is ready fails, and the next one retries.
+  const frameQuality = useFrameQuality(
+    () => (cameraRef.current ? sampleFrame(cameraRef.current) : Promise.resolve(null)),
+    flowState === 'ready',
+  );
+  const cameraRef = useRef<CameraView>(null);
 
   const onShutter = async () => {
     if (flowState === 'capturing' || flowState === 'processing') return;
@@ -178,95 +353,54 @@ export default function ScanScreen() {
         skipProcessing: false,
       });
       if (!photo?.uri) {
-        fail();
+        submission.fail();
         return;
       }
-
-      // A scan is being submitted — this is no longer a capture abandonment.
-      // The server emits receipt_scan_started from the request's source field.
-      scanSubmitted.current = true;
-
-      const network = await NetInfo.fetch();
-      if (network.isConnected === false) {
-        queuePhoto(photo.uri);
-        return;
-      }
-
-      setProcessingUri(photo.uri);
-      setFlowState('processing');
-      scanMutation.mutate(
-        { imageUri: photo.uri, mimeType: 'image/jpeg', source: 'camera' },
-        {
-          onSuccess: (response) => {
-            setCapturedImageUri(photo.uri);
-            setActiveScanResponse(response);
-            setFlowState('ready');
-            router.push('/review');
-          },
-          onError: (error) => {
-            if (isAiConsentRequiredError(error)) {
-              // Withdrawn on another device, or the policy changed: show the
-              // consent screen in place of the camera.
-              setFlowState('ready');
-              markConsentRequired();
-            } else if (isRetryableScanError(error)) {
-              queuePhoto(photo.uri);
-            } else {
-              fail(error);
-            }
-          },
-        },
-      );
+      await submission.submit(photo.uri, 'image/jpeg');
     } catch {
-      fail();
+      submission.fail();
     }
   };
 
-  // Keep the camera mounted under the overlay so a retake is instant.
-  const processing = flowState === 'processing' && processingUri !== null;
-
   return (
-    <>
-      <Stack.Screen options={{ headerShown: false }} />
-      {/* Design "Scan · capture": full-screen camera; Cancel is the way out. */}
-      <Tabs.Screen options={{ tabBarStyle: { display: 'none' } }} />
-      <View style={styles.root}>
-        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
+    <View style={styles.root}>
+      {/* Kept mounted under the overlay so a retake is instant. */}
+      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
 
-        {processing ? (
-          <ProcessingOverlay uri={processingUri} />
-        ) : (
-          <>
-            <Brackets />
+      {submission.processing && submission.processingUri ? (
+        <ProcessingOverlay uri={submission.processingUri} />
+      ) : (
+        <>
+          <Brackets />
 
-            <View style={styles.topHintRow}>
-              <HintPill state={flowState} errorHint={errorHint} frame={frameQuality.verdict} />
-            </View>
+          <View style={styles.topHintRow}>
+            <HintPill
+              state={flowState}
+              errorHint={submission.errorHint}
+              frame={frameQuality.verdict}
+            />
+          </View>
 
-            <View style={styles.bottomBar}>
-              <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button">
-                <Text style={styles.cancelLabel}>Cancel</Text>
-              </Pressable>
+          <View style={styles.bottomBar}>
+            <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button">
+              <Text style={styles.cancelLabel}>Cancel</Text>
+            </Pressable>
 
-              <Pressable
-                onPress={onShutter}
-                disabled={flowState === 'capturing' || flowState === 'processing'}
-                style={({ pressed }) => [
-                  styles.shutter,
-                  pressed && { transform: [{ scale: 0.94 }] },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel="Capture receipt"
-              >
-                <View style={styles.shutterInner} />
-              </Pressable>
+            <Pressable
+              onPress={onShutter}
+              disabled={flowState === 'capturing' || flowState === 'processing'}
+              style={({ pressed }) => [styles.shutter, pressed && styles.shutterPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Capture receipt"
+            >
+              <View style={styles.shutterInner} />
+            </Pressable>
 
-              <Text style={styles.modeLabel}>Auto</Text>
-            </View>
-          </>
-        )}
-      </View>
-    </>
+            <Text style={styles.modeLabel}>Auto</Text>
+          </View>
+        </>
+      )}
+    </View>
   );
 }
 
@@ -499,6 +633,26 @@ const styles = StyleSheet.create({
   pillGlass: {
     backgroundColor: 'rgba(255,255,255,0.18)',
   },
+  pillText: { color: '#fff' },
+  pillWarning: { backgroundColor: colors.orange, maxWidth: 340 },
+  pillWarningText: { color: '#fff', fontWeight: '600', flexShrink: 1 },
+
+  pagePreview: {
+    ...StyleSheet.absoluteFillObject,
+    top: 110,
+    bottom: 130,
+  },
+  scanButton: {
+    minWidth: 120,
+    minHeight: 50,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radii.button,
+    backgroundColor: '#fff', // fixed: the capture UI is white on black in both appearances
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanButtonLabel: { ...type.headline, color: '#000' },
+  bottomSpacer: { width: 52 },
 
   processingRoot: {
     ...StyleSheet.absoluteFillObject,
@@ -550,6 +704,7 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
     padding: 4,
   },
+  shutterPressed: { transform: [{ scale: 0.94 }] },
   shutterInner: {
     flex: 1,
     borderRadius: 999,

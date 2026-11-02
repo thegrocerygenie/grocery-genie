@@ -84,7 +84,7 @@ A comparison of the design (removed in `041f38f`, still in git) with `main` on 2
 
 [.planning/HANDOFF-2026-10-28-design-alignment.md](../.planning/HANDOFF-2026-10-28-design-alignment.md) has every item, with file and line, size and order. Its two decisions were made on 2026-10-28:
 - [x] **Review's Category row** has a chevron but does nothing. Decided: it opens `CategoryPickerSheet` and sets the category on every item (PR 2 of the handoff).
-- [ ] **Edge detection on the camera (RC-01 AC 1, MVP).** Nothing provides it. Decided: Apple's document scanner (`VNDocumentCameraViewController`), through a community Expo module, in a native build. It replaces the custom capture screen, so it is its own piece of work and needs a plan first.
+- [ ] **Edge detection on the camera (RC-01 AC 1, MVP).** Built in code: on a device, Scan opens Apple's document scanner (`VNDocumentCameraViewController`) through `@dariyd/react-native-document-scanner`. Expo Go and the Simulator keep the expo-camera screen. The plan and its decisions are in [.planning/PLAN-2026-11-01-document-scanner.md](../.planning/PLAN-2026-11-01-document-scanner.md). Still unproven: nobody has built the module with Xcode 27. Run the "Document scanner" checks in [device-checklist.md](device-checklist.md) §2 on a native build, then tick this.
 
 ## 5. Known gaps, accepted for now
 

@@ -1,7 +1,7 @@
 import { encode } from 'jpeg-js';
 
 import { CROP_POINTS, CROP_SIZE } from '../utils/frameQuality';
-import { sampleFrame } from '../services/frameSampler';
+import { sampleFrame, scoreImage } from '../services/frameSampler';
 
 /** A real JPEG, as the image manipulator would return it. */
 function jpegBase64(fill: (x: number, y: number) => number, size = 64): string {
@@ -129,5 +129,24 @@ describe('sampleFrame', () => {
   it('returns null when the camera gives no photo', async () => {
     takePictureAsync.mockResolvedValue(undefined);
     expect(await sampleFrame(camera)).toBeNull();
+  });
+});
+
+describe('scoreImage', () => {
+  it('judges a scanned page at its own size', async () => {
+    mockCropB64 = SHARP;
+    expect(await scoreImage('file:///tmp/page-1.jpg', 1500, 2000)).toBe('ok');
+    expect(mockCrops).toHaveLength(CROP_POINTS.length);
+  });
+
+  it('says blurry for a page with no detail', async () => {
+    mockCropB64 = FLAT;
+    expect(await scoreImage('file:///tmp/page-1.jpg', 1500, 2000)).toBe('blurry');
+  });
+
+  it('keeps the page: it is the image that uploads', async () => {
+    await scoreImage('file:///tmp/page-1.jpg', 1500, 2000);
+    expect(mockDeleted).not.toContain('file:///tmp/page-1.jpg');
+    expect(mockDeleted.every((uri) => uri === 'file:///cache/crop.jpg')).toBe(true);
   });
 });
