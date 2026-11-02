@@ -53,6 +53,7 @@ mkdir -p mobile backend/.venv/bin
 printf '#!/bin/sh\nexit 0\n' >backend/.venv/bin/python
 chmod +x backend/.venv/bin/python
 printf '[project]\nname = "b"\n' >backend/pyproject.toml
+echo 'lock 1' >backend/uv.lock
 deps old '"expo":"1"'
 commit "base"
 git switch -qc feat
@@ -65,6 +66,7 @@ commit "upstream: add expo-localization"
 echo docs >README.md
 commit "upstream: docs only"
 printf '[project]\nname = "b"\nversion = "2"\n' >backend/pyproject.toml
+echo 'lock 2' >backend/uv.lock
 commit "upstream: backend dep"
 git switch -q feat
 make -s install >/dev/null

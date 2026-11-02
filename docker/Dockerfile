@@ -9,12 +9,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Dependencies first, so a code-only change reuses this layer. Every runtime
-# dependency ships a wheel (opencv-python-headless, psycopg[binary], asyncpg),
-# so no compiler or system libraries are needed.
-COPY backend/pyproject.toml .
-RUN python -c "import tomllib; print('\n'.join(tomllib.load(open('pyproject.toml', 'rb'))['project']['dependencies']))" > requirements.txt \
-    && pip install -r requirements.txt
+# Dependencies first, so a code-only change reuses this layer. They come
+# from the lockfile export (make backend-lock), pinned with hashes, so every
+# build installs the versions the tests ran on. Every runtime dependency ships
+# a wheel (opencv-python-headless, psycopg[binary], asyncpg), so no compiler
+# or system libraries are needed.
+COPY backend/requirements.lock.txt .
+RUN pip install --require-hashes -r requirements.lock.txt
 
 COPY backend/ .
 

@@ -302,7 +302,8 @@
     </details>
     <details>
       <summary>Will my receipts be private?<span class="plus">+</span></summary>
-      <p>Yes. Receipts are processed on-device for OCR, then encrypted in transit and at rest. We never sell or share your data. Anonymized, aggregated price points may inform the community-pricing feature — and that's fully opt-in.</p>
+      <!-- Must match the in-app privacy policy (mobile/src/features/settings/content/privacy.ts). -->
+      <p>Yes. We never sell your data or share it for advertising, and we don't show ads. To read a receipt, the app sends its photo to Anthropic's Claude, but only after you allow it, and Anthropic doesn't use it to train its models. You can turn that off and enter receipts by hand. Receipts are encrypted in transit, and you can delete your account and everything in it from Settings.</p>
     </details>
     <details>
       <summary>What does it cost?<span class="plus">+</span></summary>

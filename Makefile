@@ -1,6 +1,6 @@
 .PHONY: help \
 	install install-backend install-mobile reinstall-backend reinstall-mobile hooks \
-	backend-dev backend-test backend-test-pg backend-lint backend-format backend-typecheck \
+	backend-dev backend-test backend-test-pg backend-lock backend-lint backend-format backend-typecheck \
 	backend-migrate backend-migration backend-worker kill-port \
 	db-up db-down db-reset llm-up llm-down \
 	mobile-start mobile-ios mobile-ios-native mobile-test mobile-lint mobile-format mobile-typecheck \
@@ -40,6 +40,7 @@ help:
 	@echo "  make kill-port            Kill any process listening on PORT (default $(PORT))"
 	@echo "  make backend-test         Run pytest"
 	@echo "  make backend-test-pg      Run pytest on the dev Postgres (fresh gg_test database)"
+	@echo "  make backend-lock         Re-lock backend dependencies (uv.lock + requirements.lock.txt)"
 	@echo "  make backend-lint         ruff check + ruff format --check"
 	@echo "  make backend-format       ruff format"
 	@echo "  make backend-migrate      alembic upgrade head"
@@ -93,7 +94,7 @@ reinstall-mobile:
 # an older Python is removed and made again: with uv (which downloads 3.12
 # when needed), else with the first python3.1x found that is 3.12 or newer.
 PY_OK := -c 'import sys; sys.exit(sys.version_info < (3, 12))'
-$(BACKEND_DEPS): backend/pyproject.toml
+$(BACKEND_DEPS): backend/pyproject.toml backend/uv.lock
 	@if ! $(VENV)/bin/python $(PY_OK) 2>/dev/null; then \
 		rm -rf $(VENV); \
 		if command -v uv >/dev/null 2>&1; then \
@@ -110,7 +111,7 @@ $(BACKEND_DEPS): backend/pyproject.toml
 			rm -rf $(VENV); exit 1; }; \
 	fi
 	cd backend && if command -v uv >/dev/null 2>&1; \
-		then uv pip install --python $(BIN)/python -e ".[dev]"; \
+		then UV_PROJECT_ENVIRONMENT=.venv uv sync --frozen --extra dev; \
 		else $(BIN)/python -m pip install -e ".[dev]"; fi
 	touch $@
 
@@ -143,6 +144,12 @@ backend-dev: kill-port
 
 backend-test:
 	cd backend && $(BIN)/pytest
+
+# Re-resolve backend dependencies after editing pyproject.toml: updates uv.lock
+# and the hashed export the Docker image installs. Commit both.
+backend-lock:
+	cd backend && uv lock && uv export --frozen --no-emit-project \
+		--format requirements-txt -o requirements.lock.txt
 
 # The suite on Postgres, as production runs: SQLite skips foreign keys,
 # FOR UPDATE and some ON CONFLICT behavior. Recreates gg_test on the dev
