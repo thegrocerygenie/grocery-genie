@@ -1,6 +1,7 @@
 # BuildKit reads this for docker/Dockerfile; the build context is the repo root.
 **
 !backend/pyproject.toml
+!backend/requirements.lock.txt
 !backend/main.py
 !backend/alembic.ini
 !backend/app/

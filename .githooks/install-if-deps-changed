@@ -21,7 +21,7 @@ esac
 changed() { ! git diff --quiet "$old" "$new" -- "$@"; }
 
 targets=
-changed backend/pyproject.toml && targets="$targets reinstall-backend"
+changed backend/pyproject.toml backend/uv.lock && targets="$targets reinstall-backend"
 changed mobile/package.json mobile/package-lock.json mobile/patches &&
   targets="$targets reinstall-mobile"
 [ -n "$targets" ] || exit 0

@@ -10,5 +10,6 @@ Run from backend/ directory:
 2. `ruff format --check .` — fix any formatting issues.
 3. `pytest -x -q` — run tests. If any fail, fix the code and re-run until all pass.
 4. `alembic check` — verify migrations match models (skip if DB not configured yet).
+5. `../scripts/check-backend-lock.sh` — `uv.lock` and `requirements.lock.txt` match `pyproject.toml` (fix with `make backend-lock`).
 
 After all pass, report: tests passed count, any issues found and fixed.

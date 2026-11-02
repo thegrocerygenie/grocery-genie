@@ -11,7 +11,7 @@ Sources:
 
 - [x] **AI consent before the first scan** (Apple 5.1.2(i), review blocker 3). Shipped in PR 34: a one-time consent sheet, a Settings switch to withdraw it, server-side consent (a 403 without it), and the consent wording in `privacy.ts`.
 - [ ] **Public privacy policy URL** for App Store Connect (5.1.1(i)), for example on the `marketing/` site. It must match the in-app text.
-- [ ] **Marketing FAQ makes a false privacy claim.** `marketing/index.html` (the "Will my receipts be private?" answer) says receipts are "processed on-device for OCR" and that "we never sell or share your data". Receipts are uploaded to our servers, and Anthropic reads them. The same answer promises an opt-in community-pricing feature, which is a later-phase feature. Rewrite it to match `privacy.ts` before the site goes public.
+- [x] **Marketing FAQ makes a false privacy claim.** `marketing/index.html` (the "Will my receipts be private?" answer) says receipts are "processed on-device for OCR" and that "we never sell or share your data". Receipts are uploaded to our servers, and Anthropic reads them. The same answer promises an opt-in community-pricing feature, which is a later-phase feature. Rewrite it to match `privacy.ts` before the site goes public. Done 2026-11-02: the answer now says only what `privacy.ts` says (Anthropic reads receipts after consent, no selling or ad sharing, encrypted in transit, account deletion). It goes to legal review with the privacy text. The rest of the page still describes roadmap features (price tracking, household sharing, recipes, a Q3 2026 launch, Premium pricing); rework it before the site goes public.
 - [ ] **App Store privacy label** filled in from the table in the privacy review.
 - [x] **Sign-up "Privacy Policy" link works.** It opens the in-app policy at `onboarding/privacy`. "Terms" was dropped: no Terms document exists.
 - [ ] **Legal sign-off** on `privacy.ts`, then set `reviewed: true` to remove the draft banner. Replace the placeholder company name ("The Grocery Genie Inc.").
@@ -93,6 +93,6 @@ A comparison of the design (removed in `041f38f`, still in git) with `main` on 2
 
 - ~~**Rate limits count per token, not per user** (noted in PR 24), so signing in again resets the count.~~ Fixed: the limits count per user, and the 50/hr cap applies only to receipt submissions.
 - **Dev loop:** `LogOnlyEmailClient` logs at INFO, but the backend sets no logging config, so verify and reset links never appear locally.
-- **Backend dependencies aren't locked.** `backend/pyproject.toml` has version ranges and there's no `uv.lock`, so two machines can install different versions. `uv lock` plus `uv sync` would pin them and let `uv` check freshness (raised in the PR 43 review).
+- ~~**Backend dependencies aren't locked.**~~ Fixed: `backend/uv.lock`, and `backend/requirements.lock.txt` (hashed) for the Docker image. `make backend-lock` re-locks; `scripts/check-backend-lock.sh` fails when they drift.
 - **`make hooks` says "Git hooks on" on every run in Claude worktrees** (PR 47). Their git config holds the hooks path as a full path, so the check never matches `.githooks`. It does no harm.
 - **Your shell:** a stale `GITHUB_TOKEN` in your profile breaks `gh` until it's removed. `.claude/launch.json` is untracked.

@@ -56,10 +56,19 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     await engine.dispose()
 
 
+def docs_urls(debug: bool) -> dict:
+    """API docs only in debug builds. In production /docs, /redoc and
+    /openapi.json answer 404: they describe every route and schema."""
+    if debug:
+        return {}
+    return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+
+
 app = FastAPI(
     title="Grocery Genie API",
     version="0.1.0",
     lifespan=lifespan,
+    **docs_urls(settings.debug),
 )
 
 # CORS — wildcard only in debug; production must enumerate origins (and a
