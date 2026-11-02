@@ -14,6 +14,7 @@
 2. **Zero-budget categories:** $0 budget triggers alert on any spend. Valid for categories user wants to eliminate.
 3. **Receipts spanning periods:** Receipt date determines budget period, not scan date. Jan 31 receipt scanned Feb 2 counts toward January.
 4. **Currency mismatch:** Receipt currency differs from budget currency → convert at extraction-date exchange rate. Original currency/amount preserved.
+   - **MVP rule (decided 2026-11-02):** no conversion. The receipt keeps and shows its own currency, and is left out of budget spend, marked "Not counted in your budget" on Review and "Not in budget" in History. The budget currency starts as the iPhone region's currency at sign-up and can be changed in Settings → Currency. Conversion can replace this later without a data migration: receipts already store their currency.
 
 ## Price Intelligence
 

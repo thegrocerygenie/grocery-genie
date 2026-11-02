@@ -38,6 +38,7 @@ Submit receipt image for processing. Returns job ID for async polling or sync re
 - `store_name_confidence`, `date_confidence`, and `total_confidence` are 0.0–1.0, or `null` when the model gave no score. The review screen flags each one below 0.7. A future, missing or unreadable date gives a `date_confidence` of 0.5 or less, and a missing or unreadable date is stored as today.
 - `store_name` is `null` when the model can't read it. Then `store_name_confidence` is 0.0 and the receipt has no store until the user enters one.
 - `warnings` lists what the extraction checks found, for review: on the receipt, a subtotal that doesn't match the items, a missing store name, or a missing, unreadable or future date; on an item, a total that doesn't match quantity × unit price. Empty when nothing was found.
+- `currency` is the receipt's own ISO 4217 code. The model returns a code, a symbol that names one currency (€ becomes EUR), or null; null, or a symbol that names several (such as $), takes the user's `currency_preference`, and an unrecognized value adds a warning. A receipt in another currency than the user's is saved and shown in its own currency but left out of budget spend (see Budget).
 - An extraction with no line items returns `422` with `"This doesn't appear to be a receipt."`, the same as one with an overall `confidence` below 0.3. Nothing is stored. A `503` means the model couldn't be reached or gave an unusable answer; the app retries it.
 - **AI consent** (App Store 5.1.2(i)): the scan sends the image, and the item names on it, to Anthropic's Claude. Without the user's consent to the current policy version (see `PUT /api/users/me/ai-consent`), the scan returns `403` before it reads the file. Nothing is stored or sent:
   ```json
@@ -69,6 +70,8 @@ Submit user corrections. Accepts partial updates; send only the fields the user 
 Paginated receipt history with optional filters.
 
 ## Budget
+
+**Currency [MVP].** Budgets are in the user's `currency_preference`. Every spend total (`/budgets/summary`, `/dashboard/spending`, threshold alerts, the weekly summary) counts only confirmed receipts in that currency; a receipt in another currency stays in History, marked "Not in budget" by the app. Amounts are not converted (decision 2026-11-02; `11-edge-cases.md`). Changing the currency changes which receipts count, and leaves budget amounts as they are.
 
 ### POST /api/budgets [MVP]
 Set a budget. A user has at most one active budget per category (`null` = overall). If one exists, POST updates its amount and period start and returns 200; otherwise it creates one and returns 201.
@@ -132,6 +135,17 @@ Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-mont
   "has_receipts": true
 }
 ```
+
+## User currency
+
+### POST /api/auth/sign-up · /api/auth/apple · /api/auth/google [MVP]
+Each takes an optional `currency_preference`: the iPhone region's currency, used only when the call creates the account. A value that isn't a 3-letter code is ignored (the account keeps `USD`); it never fails sign-up.
+
+### PATCH /api/users/me [MVP]
+`currency_preference` must be a 3-letter ISO 4217 code (stored upper-case), or the call returns `422`. The app sets it in Settings → Currency.
+
+### POST /api/receipts (manual) [MVP]
+`currency` is optional and defaults to the user's `currency_preference`; it must be a 3-letter code.
 
 ## Onboarding
 

@@ -23,7 +23,9 @@ import { budgetPace, monthShareElapsed } from '@/features/budget/utils/pace';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
 import { useUserRefresh } from '@/hooks/useUserRefresh';
+import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
 import { useBudgetStore } from '@/store/budgetStore';
+import { formatMoney } from '@/utils/money';
 import type { DashboardData as ApiDashboardData } from '@/features/budget/types';
 
 interface CategorySpend {
@@ -267,6 +269,8 @@ interface FilledStateProps {
 }
 
 function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProps) {
+  const currency = useBudgetCurrency();
+  const whole = (amount: number) => formatMoney(amount, currency, { decimals: 0 });
   const noBudget = data.cap <= 0;
   const progress = noBudget ? 0 : data.spent / data.cap;
   const over = data.state === 'over';
@@ -286,9 +290,14 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
         ) : (
           <BudgetRing
             progress={progress}
-            label={over ? `${Math.round(progress * 100)}%` : `$${Math.round(remaining)}`}
+            label={over ? `${Math.round(progress * 100)}%` : whole(remaining)}
             sub={over ? data.monthLabel.split(' · ')[0] : `left · ${data.daysLeft}d`}
-            accessibilityLabel={ringAccessibilityLabel(data.spent, data.cap, data.daysLeft)}
+            accessibilityLabel={ringAccessibilityLabel(
+              data.spent,
+              data.cap,
+              data.daysLeft,
+              currency,
+            )}
           />
         )}
         <View style={{ flex: 1 }}>
@@ -296,7 +305,7 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
           {noBudget ? (
             <>
               <Text style={[type.money, { fontSize: 20, color: colors.iosLabel, marginTop: 2 }]}>
-                ${data.spent.toFixed(0)}
+                {whole(data.spent)}
               </Text>
               <Pressable
                 onPress={onSetBudget}
@@ -321,7 +330,7 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
                   },
                 ]}
               >
-                ${data.spent.toFixed(0)} / ${data.cap.toFixed(0)}
+                {whole(data.spent)} / {whole(data.cap)}
               </Text>
               <Text
                 style={[
@@ -333,7 +342,7 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
                 ]}
               >
                 {over
-                  ? `Over by $${overBy.toFixed(0)} · ${data.daysLeft} days left`
+                  ? `Over by ${whole(overBy)} · ${data.daysLeft} days left`
                   : paceLine(pace, data.daysLeft)}
               </Text>
             </>
@@ -404,23 +413,30 @@ function paceLine(pace: ReturnType<typeof budgetPace>, daysLeft: number): string
   return pace.ahead ? `Ahead of pace · ${pace.percent}% over` : `On pace · ${pace.percent}% under`;
 }
 
-function ringAccessibilityLabel(spent: number, cap: number, daysLeft: number): string {
+function ringAccessibilityLabel(
+  spent: number,
+  cap: number,
+  daysLeft: number,
+  currency: string,
+): string {
+  const whole = (amount: number) => formatMoney(amount, currency, { decimals: 0 });
   const percent = Math.round((spent / cap) * 100);
   const days = `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`;
   const amount =
     spent > cap
-      ? `$${Math.round(spent - cap)} over $${Math.round(cap)}`
-      : `$${Math.round(cap - spent)} left of $${Math.round(cap)}`;
+      ? `${whole(spent - cap)} over ${whole(cap)}`
+      : `${whole(cap - spent)} left of ${whole(cap)}`;
   return `${amount}, ${percent} percent, ${days}`;
 }
 
 // The design's VoiceOver line: "Groceries, $142, 82 percent of $175 budget."
-function categoryAccessibilityLabel(cat: CategorySpend): string {
-  const amount = `${cat.name}, $${cat.spent.toFixed(0)}`;
+function categoryAccessibilityLabel(cat: CategorySpend, currency: string): string {
+  const whole = (amount: number) => formatMoney(amount, currency, { decimals: 0 });
+  const amount = `${cat.name}, ${whole(cat.spent)}`;
   if (cat.cap <= 0) return amount;
   const pct = (cat.spent / cat.cap) * 100;
   const over = pct > 100 ? ', over budget' : '';
-  return `${amount}, ${Math.round(pct)} percent of $${cat.cap.toFixed(0)} budget${over}`;
+  return `${amount}, ${Math.round(pct)} percent of ${whole(cat.cap)} budget${over}`;
 }
 
 interface CategoryRowProps {
@@ -429,6 +445,7 @@ interface CategoryRowProps {
 }
 
 function CategoryRow({ cat, showDivider }: CategoryRowProps) {
+  const currency = useBudgetCurrency();
   const hasCap = cat.cap > 0;
   const pct = hasCap ? (cat.spent / cat.cap) * 100 : 0;
   const over = pct > 100;
@@ -437,7 +454,7 @@ function CategoryRow({ cat, showDivider }: CategoryRowProps) {
     <View
       style={[styles.catRow, showDivider && { borderTopWidth: StyleSheet.hairlineWidth }]}
       accessible
-      accessibilityLabel={categoryAccessibilityLabel(cat)}
+      accessibilityLabel={categoryAccessibilityLabel(cat, currency)}
     >
       <View style={[styles.catCircle, { backgroundColor: cat.color }]}>
         <SymbolView
@@ -473,7 +490,7 @@ function CategoryRow({ cat, showDivider }: CategoryRowProps) {
           },
         ]}
       >
-        ${cat.spent.toFixed(0)}
+        {formatMoney(cat.spent, currency, { decimals: 0 })}
       </Text>
     </View>
   );

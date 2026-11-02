@@ -61,6 +61,7 @@ function renderSettings() {
       'settings/privacy': () => null,
       'settings/help': () => null,
       'settings/delete-account': () => null,
+      'settings/currency-settings': () => null,
     },
     { initialUrl: '/' },
   );
@@ -86,6 +87,23 @@ describe('Settings hub', () => {
 
     expect(screen.getByText('$400/mo · 4 caps')).toBeTruthy();
     expect(screen.getByText('80% · 100% · weekly')).toBeTruthy();
+  });
+
+  it('shows the budget currency and opens Currency', () => {
+    const app = renderSettings();
+
+    // The label replaces the row's text, so VoiceOver reads the setting as its value.
+    expect(screen.getByLabelText('Currency').props.accessibilityValue).toEqual({ text: 'USD' });
+    fireEvent.press(screen.getByLabelText('Currency'));
+    expect(app.getPathname()).toBe('/settings/currency-settings');
+  });
+
+  it('shows budget amounts in the budget currency', () => {
+    profile.currency_preference = 'EUR';
+    renderSettings();
+
+    expect(screen.getByText('€400/mo · 4 caps')).toBeTruthy();
+    profile.currency_preference = 'USD';
   });
 
   it('has a switch to withdraw AI receipt reading (App Store 5.1.2(i))', () => {

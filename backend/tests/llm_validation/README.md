@@ -82,6 +82,9 @@ Each receipt is extracted once per session, and every gate test scores the same 
 
 - **Field accuracy** (≥90%): store name, date, currency and total, plus quantity,
   unit price and line total for each item paired by name. Numbers match within 2%.
+  Currency is scored as the app saves it (prompt v3): the code the model returns, or, for
+  null or a symbol that names several currencies (`$`), the user's currency. The set assumes
+  a local shopper, so that is the ground truth currency.
 - **Hallucination** (0%): extracted items with no paired item on the receipt.
 - **Item recall** (≥95%): receipt items the model found.
 - **Latency p95** (≤5 s): image conversion plus the model call, nearest-rank p95.

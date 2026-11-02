@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
+from app.core.money import format_money
 from app.core.retention import days_remaining
 from app.core.security import get_current_user
 from app.models.database import User
@@ -135,7 +136,7 @@ async def recently_deleted(
             continue
         days_left = days_remaining(b.deleted_at, now)
         scope = "Overall" if b.category_id is None else "Category"
-        amount = f"${float(b.amount):.0f}"
+        amount = format_money(float(b.amount), user.currency_preference, decimals=0)
         out.append(
             DeletedItemResponse(
                 id=b.id,

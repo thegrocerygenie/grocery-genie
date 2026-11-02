@@ -1,5 +1,6 @@
 import { apiClient } from '@/services/api';
 import type { TokenPair, UserProfile } from '@/features/auth/types';
+import { deviceCurrency } from '@/utils/money';
 
 export async function signUp(payload: {
   email: string;
@@ -8,7 +9,8 @@ export async function signUp(payload: {
 }): Promise<TokenPair> {
   return apiClient<TokenPair>('/api/auth/sign-up', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    // The budget currency starts as the iPhone region's currency.
+    body: JSON.stringify({ ...payload, currency_preference: deviceCurrency() }),
     skipAuth: true,
   });
 }
@@ -82,7 +84,8 @@ export async function appleSignIn(payload: {
 }): Promise<TokenPair> {
   return apiClient<TokenPair>('/api/auth/apple', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    // Used only when this sign-in creates the account.
+    body: JSON.stringify({ ...payload, currency_preference: deviceCurrency() }),
     skipAuth: true,
   });
 }
@@ -90,7 +93,7 @@ export async function appleSignIn(payload: {
 export async function googleSignIn(idToken: string): Promise<TokenPair> {
   return apiClient<TokenPair>('/api/auth/google', {
     method: 'POST',
-    body: JSON.stringify({ id_token: idToken }),
+    body: JSON.stringify({ id_token: idToken, currency_preference: deviceCurrency() }),
     skipAuth: true,
   });
 }

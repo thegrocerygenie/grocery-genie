@@ -19,11 +19,9 @@ import { confirmDeleteReceipt } from '@/features/lifecycle/utils/confirmDeleteRe
 import { getReceipt } from '@/features/receipt-capture/services/receiptApi';
 import { formatLongDate } from '@/features/receipt-capture/utils/receiptDate';
 import { receiptImageSource } from '@/features/receipt-capture/utils/receiptImageSource';
+import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
 import { API_BASE_URL, getAuthHeaders } from '@/services/api';
-
-function money(amount: number | null): string {
-  return amount === null ? '—' : `$${amount.toFixed(2)}`;
-}
+import { countsTowardBudget, formatMoney } from '@/utils/money';
 
 /**
  * Design "RC-04 · Receipt detail": a saved receipt, read-only, with its photo
@@ -33,6 +31,7 @@ export default function ReceiptDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: categories } = useCategories();
+  const budgetCurrency = useBudgetCurrency();
   const { data: receipt, isLoading } = useQuery({
     queryKey: ['receipt', id],
     queryFn: () => getReceipt(id),
@@ -86,6 +85,8 @@ export default function ReceiptDetailScreen() {
   const photo = receiptImageSource(receipt.image_url, API_BASE_URL, getAuthHeaders());
   const categoryId = receipt.items.find((i) => i.category_id)?.category_id ?? null;
   const category = resolveCategoryMeta(categoryId, categories).name;
+  const money = (amount: number | null) =>
+    amount === null ? '—' : formatMoney(amount, receipt.currency);
   const rows: [string, string][] = [
     ['Store', receipt.store_name ?? 'Unknown store'],
     ['Date', formatLongDate(receipt.date)],
@@ -94,6 +95,10 @@ export default function ReceiptDetailScreen() {
   ];
   if (receipt.subtotal !== null || receipt.tax !== null) {
     rows.push(['Subtotal · Tax', `${money(receipt.subtotal)} · ${money(receipt.tax)}`]);
+  }
+  if (!countsTowardBudget(receipt.currency, budgetCurrency)) {
+    // Short enough for the row; Review's note says why.
+    rows.push(['Budget', `Not counted (${receipt.currency})`]);
   }
 
   return (

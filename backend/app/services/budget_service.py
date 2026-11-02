@@ -72,6 +72,16 @@ def _same_category(category_id: uuid.UUID | None):
     return Budget.category_id == category_id
 
 
+def in_budget_currency(user_id: uuid.UUID):
+    """Only receipts in the user's currency count toward budgets (MVP rule,
+    app/core/money.py). A signed-in user always has a row; without one,
+    every receipt counts."""
+    user_currency = (
+        select(User.currency_preference).where(User.id == user_id).scalar_subquery()
+    )
+    return Receipt.currency == func.coalesce(user_currency, Receipt.currency)
+
+
 class BudgetService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
@@ -321,6 +331,7 @@ class BudgetService:
                 Receipt.user_id == user_id,
                 Receipt.status == "confirmed",
                 Receipt.deleted_at.is_(None),
+                in_budget_currency(user_id),
                 Receipt.date >= start,
                 Receipt.date <= end,
             )
@@ -340,6 +351,7 @@ class BudgetService:
                 Receipt.user_id == user_id,
                 Receipt.status == "confirmed",
                 Receipt.deleted_at.is_(None),
+                in_budget_currency(user_id),
                 Receipt.date >= start,
                 Receipt.date <= end,
             )
@@ -447,6 +459,7 @@ class BudgetService:
                 Receipt.user_id == user_id,
                 Receipt.status == "confirmed",
                 Receipt.deleted_at.is_(None),
+                in_budget_currency(user_id),
                 Receipt.date >= start,
                 Receipt.date <= end,
             )
@@ -495,6 +508,7 @@ class BudgetService:
                 Receipt.user_id == user_id,
                 Receipt.status == "confirmed",
                 Receipt.deleted_at.is_(None),
+                in_budget_currency(user_id),
                 Receipt.date >= start,
                 Receipt.date <= end,
                 LineItem.raw_name.in_(item_names),

@@ -168,7 +168,14 @@ export function useUpdatePreferences() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: authApi.updatePreferences,
-    onSuccess: (profile) => qc.setQueryData(ME_QUERY_KEY, profile),
+    onSuccess: (profile, payload) => {
+      qc.setQueryData(ME_QUERY_KEY, profile);
+      // Only receipts in the budget currency count, so every spend total changes.
+      if (payload.currency_preference) {
+        qc.invalidateQueries({ queryKey: ['dashboard'] });
+        qc.invalidateQueries({ queryKey: ['budgets'] });
+      }
+    },
   });
 }
 

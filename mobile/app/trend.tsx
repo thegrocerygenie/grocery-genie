@@ -12,7 +12,9 @@ import { SymbolView } from 'expo-symbols';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
+import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
 import { useBudgetStore } from '@/store/budgetStore';
+import { formatMoney } from '@/utils/money';
 import { getCategoryMetaByName } from '@/constants/categories';
 import { percentChange } from '@/features/budget/utils/monthOverMonth';
 import { buildTrendBreakdown, type TrendSegment } from '@/features/budget/utils/trendBreakdown';
@@ -79,12 +81,10 @@ function changeColor(change: number): ColorValue {
   return colors.iosLabel2;
 }
 
-function money(amount: number): string {
-  return `$${amount.toFixed(0)}`;
-}
-
 export default function TrendScreen() {
   const { selectedPeriod } = useBudgetStore();
+  const currency = useBudgetCurrency();
+  const money = (amount: number) => formatMoney(amount, currency, { decimals: 0 });
   const { data, isLoading } = useDashboardSpending(selectedPeriod);
 
   const breakdown = useMemo(() => buildTrendBreakdown((data?.trend ?? []).slice(0, 3)), [data]);
@@ -286,6 +286,8 @@ interface CategoryChangeRowProps {
 }
 
 function CategoryChangeRow({ change, previousPeriod, divider }: CategoryChangeRowProps) {
+  const currency = useBudgetCurrency();
+  const money = (amount: number) => formatMoney(amount, currency, { decimals: 0 });
   const meta = getCategoryMetaByName(change.name);
   const pct = percentChange(change.spent, change.previous_spent);
   const detail =

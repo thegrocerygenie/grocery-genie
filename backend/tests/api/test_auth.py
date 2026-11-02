@@ -943,3 +943,51 @@ def test_apple_signin_request_has_no_name_field():
     from app.models.schemas import AppleSignInRequest
 
     assert "name" not in AppleSignInRequest.model_fields
+
+
+# ── The budget currency, set from the device at sign-up ─────────
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("sent", "stored"),
+    [("eur", "EUR"), ("GBP", "GBP"), (None, "USD"), ("not-a-code", "USD")],
+)
+async def test_sign_up_takes_the_devices_currency(auth_client, sent, stored):
+    """A bad value never blocks sign-up: the account keeps the USD default."""
+    body = {"email": f"cur-{stored}-{sent}@test.com", "password": "TestPass1234!"}
+    if sent is not None:
+        body["currency_preference"] = sent
+
+    resp = await auth_client.post("/api/auth/sign-up", json=body)
+
+    assert resp.status_code == 201, resp.text
+    headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    me = await auth_client.get("/api/users/me", headers=headers)
+    assert me.json()["currency_preference"] == stored
+
+
+@pytest.mark.asyncio
+async def test_social_sign_in_sets_the_currency_only_for_a_new_account(db_session):
+    from app.services import auth as auth_service
+
+    created = await auth_service.upsert_google_user(
+        db_session,
+        sub="g-currency",
+        email="g-currency@test.com",
+        email_verified=True,
+        name=None,
+        currency_preference="EUR",
+    )
+    assert created.currency_preference == "EUR"
+
+    again = await auth_service.upsert_google_user(
+        db_session,
+        sub="g-currency",
+        email="g-currency@test.com",
+        email_verified=True,
+        name=None,
+        currency_preference="GBP",
+    )
+    assert again.id == created.id
+    assert again.currency_preference == "EUR"

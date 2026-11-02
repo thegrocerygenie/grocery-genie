@@ -1,4 +1,4 @@
-PROMPT_VERSION = "v2"
+PROMPT_VERSION = "v3"
 
 SYSTEM_PROMPT = """\
 You are a receipt data extraction system. Your job is to analyze receipt images \
@@ -28,8 +28,11 @@ clearly printed. It is better to return null than to guess.
 (store_name_confidence, date_confidence, total_confidence), apart from the \
 overall receipt confidence.
 
-5. **Currency detection**: Extract the currency symbol or code if present on the \
-receipt. If no currency is indicated, default to "USD".
+5. **Currency detection**: Return the ISO 4217 code (such as "EUR" or "GBP") when \
+the receipt prints a code, or a symbol that names one currency (such as €). A \
+symbol that names several currencies (such as $ or ¥) is returned as printed. If \
+no currency is printed, return null; never guess one from the language or the \
+store.
 
 6. **Multi-language support**: Handle receipts in English, French, Spanish, German, \
 Serbian/Cyrillic, Mandarin, and other languages. Extract item names as-is in the \
@@ -43,7 +46,7 @@ Return ONLY valid JSON matching this schema:
 {
   "store_name": "string",
   "date": "YYYY-MM-DD",
-  "currency": "USD",
+  "currency": "ISO 4217 code, symbol as printed, or null",
   "items": [
     {
       "name": "item name as printed",
@@ -88,7 +91,7 @@ A US grocery receipt from "Trader Joe's" dated 03/15/2026 with 3 items.
 {
   "store_name": "Trader Joe's",
   "date": "2026-03-15",
-  "currency": "USD",
+  "currency": "$",
   "items": [
     {
       "name": "Organic Bananas",

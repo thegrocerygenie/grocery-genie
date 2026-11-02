@@ -61,7 +61,8 @@
       "expo-notifications",
       "./plugins/withPodsMinDeploymentTarget",
       "./plugins/withDocumentScannerNoLocation",
-      "./plugins/ios-scene-lifecycle"
+      "./plugins/ios-scene-lifecycle",
+      "./plugins/withUserScriptSandboxingOff"
     ]
   }
 }

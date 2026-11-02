@@ -16,6 +16,8 @@ import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeabl
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 
 import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
+import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
+import { countsTowardBudget, formatMoney } from '@/utils/money';
 import { resolveCategoryMeta } from '@/constants/categories';
 import { CaptureActionSheet } from '@/components/CaptureActionSheet';
 import { LoadErrorState } from '@/components/LoadErrorState';
@@ -99,9 +101,11 @@ function ReceiptRow({ receipt, showDivider, categories, onPress, onDelete }: Rec
   const needsReview = receipt.status === 'pending_review';
   const itemCount = receipt.items.length;
   const total = receipt.total ?? 0;
+  const budgetCurrency = useBudgetCurrency();
+  const notCounted = !countsTowardBudget(receipt.currency, budgetCurrency);
   const sub = needsReview
     ? `${formatShortDate(receipt.date)} · Needs review`
-    : `${formatShortDate(receipt.date)} · ${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
+    : `${formatShortDate(receipt.date)} · ${itemCount} ${itemCount === 1 ? 'item' : 'items'}${notCounted ? ' · Not in budget' : ''}`;
   const label = receipt.store_name ?? 'Receipt';
 
   // L6: swipe left for Delete, as in Mail. Long-press still works, and
@@ -136,7 +140,7 @@ function ReceiptRow({ receipt, showDivider, categories, onPress, onDelete }: Rec
           pressed && { backgroundColor: colors.iosFill3 },
         ]}
         accessibilityRole="button"
-        accessibilityLabel={`${label}, ${sub}, $${total.toFixed(2)}`}
+        accessibilityLabel={`${label}, ${sub}, ${formatMoney(total, receipt.currency)}`}
         accessibilityActions={[{ name: 'delete', label: 'Delete' }]}
         onAccessibilityAction={(e) => {
           if (e.nativeEvent.actionName === 'delete') onDelete();
@@ -165,7 +169,7 @@ function ReceiptRow({ receipt, showDivider, categories, onPress, onDelete }: Rec
             {sub}
           </Text>
         </View>
-        <Text style={[type.money, { fontSize: 15 }]}>${total.toFixed(2)}</Text>
+        <Text style={[type.money, { fontSize: 15 }]}>{formatMoney(total, receipt.currency)}</Text>
         <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
       </Pressable>
     </ReanimatedSwipeable>

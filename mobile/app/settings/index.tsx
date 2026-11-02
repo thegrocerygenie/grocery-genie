@@ -43,13 +43,14 @@ export default function SettingsScreen() {
   // Alerts read the server first and fall back to the local copy, as the
   // Notifications screen does.
   const prefs = profile?.preferences;
+  const currency = profile?.currency_preference ?? 'USD';
   const spendingRows: RowDef[] = [
     {
       key: 'budget',
       symbol: 'cart.fill',
       iconBg: colors.green,
       title: 'Budgets',
-      detail: budgetsSummary(budgets),
+      detail: budgetsSummary(budgets, currency),
       href: '/budget-settings',
     },
     {
@@ -64,6 +65,14 @@ export default function SettingsScreen() {
         weekly: prefs?.weekly_summary.enabled ?? localAlerts.weeklySummaryEnabled,
       }),
       href: '/settings/notification-settings',
+    },
+    {
+      key: 'currency',
+      symbol: 'banknote.fill',
+      iconBg: colors.tint,
+      title: 'Currency',
+      detail: currency,
+      href: '/settings/currency-settings',
     },
   ];
   const version = Constants.expoConfig?.version;
@@ -207,6 +216,8 @@ function SettingsRow({ row, onPress }: SettingsRowProps) {
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.iosFill3 }]}
       accessibilityRole="button"
       accessibilityLabel={row.title}
+      // The label replaces the row's text, so the setting is read as its value.
+      accessibilityValue={row.detail ? { text: row.detail } : undefined}
     >
       <View style={[styles.iconSquare, { backgroundColor: row.iconBg }]}>
         <SymbolView

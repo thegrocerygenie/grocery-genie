@@ -41,13 +41,15 @@ def category(sync_db, user):
     return cat
 
 
-def _create_receipt_with_items(db, user_id, receipt_date, items_data, category_id=None):
+def _create_receipt_with_items(
+    db, user_id, receipt_date, items_data, category_id=None, currency="USD"
+):
     """Helper: create a confirmed receipt with line items."""
     receipt = Receipt(
         user_id=user_id,
         date=receipt_date,
         status="confirmed",
-        currency="USD",
+        currency=currency,
         total=sum(item[1] for item in items_data),
     )
     db.add(receipt)
@@ -339,3 +341,65 @@ def test_beat_schedule_runs_daily():
 
     schedule = celery_app.conf.beat_schedule["weekly-spending-summary"]["schedule"]
     assert schedule.day_of_week == set(range(7))
+
+
+def _summary_body(db) -> str:
+    return db.execute(
+        select(Notification.body).where(
+            Notification.user_id == TEST_USER_ID,
+            Notification.type == "weekly_summary",
+        )
+    ).scalar_one()
+
+
+def test_summary_leaves_out_receipts_in_another_currency(sync_db, user, category):
+    today = date(2026, 3, 22)
+    _create_receipt_with_items(
+        sync_db, TEST_USER_ID, date(2026, 3, 18), [("Milk", 4.50)], category.id
+    )
+    _create_receipt_with_items(
+        sync_db,
+        TEST_USER_ID,
+        date(2026, 3, 19),
+        [("Cheese", 40.00)],
+        category.id,
+        currency="EUR",
+    )
+
+    _generate_summary_for_user(
+        sync_db,
+        TEST_USER_ID,
+        today,
+        today - timedelta(days=7),
+        today - timedelta(days=14),
+    )
+    sync_db.flush()
+
+    assert "$4.50" in _summary_body(sync_db)
+
+
+def test_summary_writes_the_users_currency(sync_db, user, category):
+    user.currency_preference = "EUR"
+    sync_db.commit()
+    today = date(2026, 3, 22)
+    _create_receipt_with_items(
+        sync_db,
+        TEST_USER_ID,
+        date(2026, 3, 18),
+        [("Cheese", 12.50)],
+        category.id,
+        currency="EUR",
+    )
+
+    _generate_summary_for_user(
+        sync_db,
+        TEST_USER_ID,
+        today,
+        today - timedelta(days=7),
+        today - timedelta(days=14),
+    )
+    sync_db.flush()
+
+    body = _summary_body(sync_db)
+    assert "€12.50" in body
+    assert "$" not in body

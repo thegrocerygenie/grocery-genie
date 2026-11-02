@@ -25,6 +25,8 @@ import { getReceipt } from '@/features/receipt-capture/services/receiptApi';
 import { useCategories } from '@/features/budget/hooks/useCategories';
 import { useReceiptStore } from '@/store/receiptStore';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
+import { countsTowardBudget, formatMoney } from '@/utils/money';
 import type { AbandonStage } from '@/constants/analyticsEvents';
 import { buildReceiptUpdate } from '@/features/receipt-capture/utils/buildReceiptUpdate';
 import { isLowConfidence } from '@/features/receipt-capture/utils/confidence';
@@ -52,6 +54,7 @@ export default function ReviewScreen() {
   const { capturedImageUri, activeScanResponse, clearScanSession } = useReceiptStore();
   const confirmMutation = useReceiptConfirm();
   const analytics = useAnalytics();
+  const budgetCurrency = useBudgetCurrency();
   const { data: categories } = useCategories();
   const confirmed = useRef(false);
   // Set when Save is tapped: leaving after a failed save abandons at confirmation.
@@ -249,6 +252,9 @@ export default function ReviewScreen() {
 
   // Edge case 4: warn before saving a receipt that looks already scanned.
   const isLikelyDuplicate = !isReadOnly && !!activeScanResponse?.duplicate_warning;
+  // The receipt's own currency; the MVP leaves other currencies out of budgets.
+  const currency = baseline?.currency ?? budgetCurrency;
+  const notCounted = baseline != null && !countsTowardBudget(currency, budgetCurrency);
 
   const pickingAll = categoryPickerItemId === ALL_ITEMS;
   const pickerItem = items.find((i) => i.id === categoryPickerItemId) ?? null;
@@ -317,6 +323,24 @@ export default function ReviewScreen() {
           </View>
         ) : null}
 
+        {notCounted ? (
+          <View style={styles.highValueBanner}>
+            <View style={styles.highValueIcon}>
+              <SymbolView name="banknote.fill" size={14} tintColor="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[type.footnote, { fontWeight: '600' }]}>Not counted in your budget</Text>
+              <Text
+                style={[type.caption1, { color: colors.iosLabel2, marginTop: 2, lineHeight: 16 }]}
+              >
+                This receipt is in {currency} and your budget is in {budgetCurrency}, so it stays in
+                History but doesn’t count toward your budget. You can change your budget currency in
+                Settings.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         {isHighValueReceipt ? (
           <View style={styles.highValueBanner}>
             <View style={styles.highValueIcon}>
@@ -365,7 +389,7 @@ export default function ReviewScreen() {
           )}
           <ListRow
             label="Total"
-            value={displayTotal != null ? `$${displayTotal.toFixed(2)}` : '—'}
+            value={displayTotal != null ? formatMoney(displayTotal, currency) : '—'}
             lowConfidence={lowTotalConf}
           />
           <ListRow
@@ -389,6 +413,7 @@ export default function ReviewScreen() {
                 item={item}
                 showDivider={i > 0}
                 readOnly={isReadOnly}
+                currency={currency}
                 categories={categories}
                 onChangeName={(n) => updateItemName(item.id, n)}
                 onChangePrice={(p) => updateItemPrice(item.id, p)}
@@ -402,9 +427,11 @@ export default function ReviewScreen() {
         {(displaySubtotal != null || displayTax != null) && (
           <View style={styles.listCard}>
             {displaySubtotal != null && (
-              <ListRow label="Subtotal" value={`$${displaySubtotal.toFixed(2)}`} />
+              <ListRow label="Subtotal" value={formatMoney(displaySubtotal, currency)} />
             )}
-            {displayTax != null && <ListRow label="Tax" value={`$${displayTax.toFixed(2)}`} />}
+            {displayTax != null && (
+              <ListRow label="Tax" value={formatMoney(displayTax, currency)} />
+            )}
           </View>
         )}
       </ScrollView>
@@ -577,6 +604,8 @@ interface ItemRowProps {
   item: EditableLineItem;
   showDivider: boolean;
   readOnly: boolean;
+  /** The receipt's currency. */
+  currency: string;
   categories?: CategoryResponse[];
   onChangeName: (n: string) => void;
   onChangePrice: (p: number) => void;
@@ -609,6 +638,7 @@ function ItemRow({
   item,
   showDivider,
   readOnly,
+  currency,
   categories,
   onChangeName,
   onChangePrice,
@@ -632,7 +662,7 @@ function ItemRow({
   const quantityLabel =
     item.quantity === 1
       ? 'Qty 1'
-      : `Qty ${formatQuantity(item.quantity)} · $${(item.totalPrice / item.quantity).toFixed(2)} each`;
+      : `Qty ${formatQuantity(item.quantity)} · ${formatMoney(item.totalPrice / item.quantity, currency)} each`;
   const meta = resolveCategoryMeta(item.categoryId, categories);
 
   return (
@@ -750,7 +780,7 @@ function ItemRow({
           accessibilityLabel={`Price of ${item.name}`}
           // The label replaces the children, so the amount and the verify tag go here.
           accessibilityValue={{
-            text: `$${item.totalPrice.toFixed(2)}${lowConf ? ', low confidence' : ''}`,
+            text: `${formatMoney(item.totalPrice, currency)}${lowConf ? ', low confidence' : ''}`,
           }}
           accessibilityHint={readOnly ? undefined : 'Double-tap to change'}
         >
@@ -764,7 +794,7 @@ function ItemRow({
               },
             ]}
           >
-            ${item.totalPrice.toFixed(2)}
+            {formatMoney(item.totalPrice, currency)}
           </Text>
         </Pressable>
       )}
