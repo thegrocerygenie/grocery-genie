@@ -120,6 +120,7 @@ async def sign_up(
     ip: str | None = None,
     user_agent: str | None = None,
     currency_preference: str | None = None,
+    timezone: str | None = None,
 ) -> tuple[User, TokenPair]:
     settings = get_settings()
     email = _normalize_email(email)
@@ -153,6 +154,8 @@ async def sign_up(
     )
     if currency_preference:
         user.currency_preference = currency_preference
+    if timezone:
+        user.timezone = timezone
     db.add(user)
     await db.flush()
 
@@ -500,6 +503,7 @@ async def upsert_apple_user(
     email: str | None,
     email_verified: bool,
     currency_preference: str | None = None,
+    timezone: str | None = None,
 ) -> User:
     return await _upsert_social_user(
         db,
@@ -508,6 +512,7 @@ async def upsert_apple_user(
         email=email,
         email_verified=email_verified,
         currency_preference=currency_preference,
+        timezone=timezone,
     )
 
 
@@ -519,12 +524,14 @@ async def upsert_google_user(
     email_verified: bool,
     name: str | None,
     currency_preference: str | None = None,
+    timezone: str | None = None,
 ) -> User:
     return await _upsert_social_user(
         db,
         provider_field="google_subject",
         provider_value=sub,
         currency_preference=currency_preference,
+        timezone=timezone,
         email=email,
         email_verified=email_verified,
         name=name,
@@ -540,6 +547,7 @@ async def _upsert_social_user(
     email_verified: bool,
     name: str | None = None,
     currency_preference: str | None = None,
+    timezone: str | None = None,
 ) -> User:
     # First match by provider subject.
     column = getattr(User, provider_field)
@@ -571,6 +579,8 @@ async def _upsert_social_user(
     )
     if currency_preference:
         new_user.currency_preference = currency_preference
+    if timezone:
+        new_user.timezone = timezone
     setattr(new_user, provider_field, provider_value)
     db.add(new_user)
     await db.flush()

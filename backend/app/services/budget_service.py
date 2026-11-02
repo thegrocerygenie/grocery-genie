@@ -48,6 +48,17 @@ def previous_period(period: str) -> str:
     return f"{year:04d}-{month - 1:02d}"
 
 
+def period_containing(day: date, start_day: int) -> tuple[str, date, date]:
+    """The 'YYYY-MM' period holding ``day`` for periods that start on
+    ``start_day``, with its start and end dates. Shared by the weekly summary."""
+    year, month = day.year, day.month
+    period_start, period_end = _period_bounds(year, month, start_day)
+    if day < period_start:
+        year, month = (year - 1, 12) if month == 1 else (year, month - 1)
+        period_start, period_end = _period_bounds(year, month, start_day)
+    return f"{year:04d}-{month:02d}", period_start, period_end
+
+
 def _period_bounds(year: int, month: int, start_day: int) -> tuple[date, date]:
     """Start and end dates of the period that starts in ``year``-``month``."""
     # Clamp to valid day for this month
@@ -293,13 +304,7 @@ class BudgetService:
         March 10 falls in the period that began February 15, so it is
         '2026-02', not '2026-03'.
         """
-        start_day = await self._start_day(user_id)
-        year, month = day.year, day.month
-        period_start, period_end = _period_bounds(year, month, start_day)
-        if day < period_start:
-            year, month = (year - 1, 12) if month == 1 else (year, month - 1)
-            period_start, period_end = _period_bounds(year, month, start_day)
-        return f"{year:04d}-{month:02d}", period_start, period_end
+        return period_containing(day, await self._start_day(user_id))
 
     async def _start_day(self, user_id: uuid.UUID) -> int:
         """Day of the month the user's budget periods start on."""
@@ -719,6 +724,13 @@ class BudgetService:
         if not budgets:
             return []
 
+        # BC-03 AC 4: a muted category's budget sends no alert. Filtered after
+        # the lock, so every budget stays locked as above.
+        muted = await self._muted_alert_categories(user_id)
+        budgets = [b for b in budgets if str(b.category_id) not in muted]
+        if not budgets:
+            return []
+
         # Respect the user's per-threshold notification preferences (BC-03).
         # A threshold only fires if both it is globally configured AND the user
         # has it enabled. Unknown users fall back to all configured thresholds.
@@ -824,6 +836,13 @@ class BudgetService:
             .returning(BudgetAlertSent.id)
         )
         return result.scalar_one_or_none() is not None
+
+    async def _muted_alert_categories(self, user_id: uuid.UUID) -> set[str]:
+        """Category ids the user turned alerts off for (users.preferences)."""
+        prefs = (
+            await self.db.execute(select(User.preferences).where(User.id == user_id))
+        ).scalar_one_or_none()
+        return set((prefs or {}).get("muted_alert_categories", []))
 
     async def _active_thresholds(self, user_id: uuid.UUID) -> list[int]:
         """Configured alert thresholds the user has not opted out of.

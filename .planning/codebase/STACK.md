@@ -81,7 +81,7 @@
 
 **Environment:**
 - Backend settings loaded via `Settings(BaseSettings)` with `env_prefix="GG_"` and `env_file=".env"` (`backend/app/core/config.py`). All settings accessed through the cached `get_settings()` helper.
-- Keys (env-var form with `GG_` prefix): `GG_APP_NAME`, `GG_DEBUG`, `GG_DATABASE_URL`, `GG_DATABASE_ECHO`, `GG_REDIS_URL`, `GG_LLM_PROVIDER`, `GG_LLM_MODEL`, `GG_LLM_TEMPERATURE`, `GG_LLM_API_KEY`, `GG_EXTRACTION_CONFIDENCE_THRESHOLD`, `GG_CATEGORY_CONFIDENCE_THRESHOLD`, `GG_STORAGE_PATH`, `GG_THUMBNAIL_WIDTH`, `GG_MAX_RECEIPT_SUBMISSIONS_PER_HOUR`, `GG_MAX_READS_PER_MINUTE`.
+- Keys (env-var form with `GG_` prefix): `GG_APP_NAME`, `GG_DEBUG`, `GG_DATABASE_URL`, `GG_DATABASE_ECHO`, `GG_REDIS_URL`, `GG_LLM_PROVIDER`, `GG_LLM_MODEL`, `GG_LLM_TEMPERATURE`, `GG_LLM_API_KEY`, `GG_STORAGE_PATH`, `GG_THUMBNAIL_WIDTH`, `GG_MAX_RECEIPT_SUBMISSIONS_PER_HOUR`, `GG_MAX_READS_PER_MINUTE`.
 - Defaults (development): DB `postgresql+asyncpg://localhost:5432/grocery_genie`, Redis `redis://localhost:6379/0`, storage `./uploads`, write rate 50/hr, read rate 300/min.
 - LiteLLM's Anthropic path also reads `ANTHROPIC_API_KEY` directly from env — `LiteLLMReceiptExtractor.__init__` copies `settings.llm_api_key` into `os.environ["ANTHROPIC_API_KEY"]` when `llm_provider == "anthropic"`.
 - Mobile reads `EXPO_PUBLIC_API_URL` (fallback `http://localhost:8000`) in `mobile/src/services/api.ts` and `mobile/src/features/receipt-capture/services/receiptApi.ts`.

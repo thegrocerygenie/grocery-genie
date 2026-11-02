@@ -6,6 +6,7 @@ import { appleSignIn, googleSignIn, signUp } from '../services/authApi';
 
 jest.mock('expo-localization', () => ({
   getLocales: () => [{ currencyCode: 'EUR' }],
+  getCalendars: () => [{ timeZone: 'Europe/Berlin' }],
 }));
 
 const mockFetch = jest.fn();
@@ -33,4 +34,16 @@ it('sends it with Sign in with Apple', async () => {
 it('sends it with Google sign-in', async () => {
   await googleSignIn('id-token');
   expect(sentBody()).toMatchObject({ id_token: 'id-token', currency_preference: 'EUR' });
+});
+
+describe('time zone at sign-up (BC-06: summary at 9 AM local)', () => {
+  it('sends the device time zone with every sign-up', async () => {
+    await signUp({ email: 'a@example.test', password: 'pw' });
+    await appleSignIn({ identity_token: 't', authorization_code: 'c' });
+    await googleSignIn('id-token');
+
+    for (const call of mockFetch.mock.calls) {
+      expect(JSON.parse(call[1].body as string)).toMatchObject({ timezone: 'Europe/Berlin' });
+    }
+  });
 });

@@ -5,3 +5,6 @@
 jest.mock('@/hooks/useBudgetCurrency', () => ({
   useBudgetCurrency: jest.fn(() => 'USD'),
 }));
+
+// Profile writes from a layout; the hook has its own test (jest.unmock there).
+jest.mock('@/hooks/useTimeZoneSync', () => ({ useTimeZoneSync: jest.fn() }));

@@ -144,6 +144,10 @@ Each takes an optional `currency_preference`: the iPhone region's currency, used
 ### PATCH /api/users/me [MVP]
 `currency_preference` must be a 3-letter ISO 4217 code (stored upper-case), or the call returns `422`. The app sets it in Settings → Currency.
 
+`timezone` must be an IANA time zone name (such as `Europe/Berlin`), or the call returns `422`. Sign-up, Apple and Google sign-in also take it, for a new account only (a bad value is ignored, and the account keeps `UTC`). The weekly summary goes out at 9 AM in it. The profile returns `timezone`.
+
+`muted_alert_categories` is a list of category ids, replaced whole; their budgets send no threshold alerts (BC-03 AC 4). The profile returns it under `preferences`.
+
 ### POST /api/receipts (manual) [MVP]
 `currency` is optional and defaults to the user's `currency_preference`; it must be a 3-letter code.
 

@@ -506,3 +506,114 @@ async def test_only_the_current_period_alerts(
     await _manual_entry(client, 17.0, on=receipt_date)  # 85%
 
     assert await _alert_thresholds(client) == expected_alerts
+
+
+# --- BC-03 AC 2 and AC 3: what the alert says ---
+
+
+async def _alert_bodies(client: AsyncClient) -> dict[str, str]:
+    resp = await client.get("/api/notifications", params={"per_page": 100})
+    return {
+        n["title"]: n["body"]
+        for n in resp.json()["items"]
+        if n["type"] == "budget_threshold"
+    }
+
+
+async def test_a_threshold_alert_gives_the_remaining_budget_and_days_left(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    """AC 2. Pinned to 2026-03-20: 11 days left in March (the 20th to the 31st)."""
+    await _overall_budget(client, 17.0)
+
+    await _scan_and_confirm(client, test_image_bytes)  # $14.77 of $17
+
+    assert (await _alert_bodies(client))["Budget 80% Reached"] == (
+        "$2.23 remaining with 11 days left in this period."
+    )
+
+
+async def test_the_100_percent_alert_gives_the_overage(
+    client: AsyncClient, test_image_bytes: bytes
+):
+    """AC 3."""
+    await _overall_budget(client, 10.0)
+
+    await _scan_and_confirm(client, test_image_bytes)  # $14.77 of $10
+
+    assert (await _alert_bodies(client))["Budget Exceeded"] == (
+        "You've exceeded your budget by $4.77."
+    )
+
+
+# --- BC-03 AC 4: alerts can be turned off per category ---
+
+
+async def _category_budget(client, db_session, name: str, amount: float) -> str:
+    from app.models.database import Category
+
+    await seed_default_categories(db_session)
+    category = (
+        await db_session.execute(select(Category).where(Category.name == name))
+    ).scalar_one()
+    resp = await client.post(
+        "/api/budgets",
+        json={
+            "amount": amount,
+            "period_type": "monthly",
+            "period_start": "2026-03-01",
+            "category_id": str(category.id),
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    return str(category.id)
+
+
+async def _mute(client: AsyncClient, category_ids: list[str]) -> dict:
+    resp = await client.patch(
+        "/api/users/me", json={"muted_alert_categories": category_ids}
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()
+
+
+async def test_a_muted_category_sends_no_alert(
+    stored_client: AsyncClient, db_session: AsyncSession, test_image_bytes: bytes
+):
+    client = stored_client
+    # The mock receipt puts $6.28 in Groceries.
+    groceries = await _category_budget(client, db_session, "Groceries", 5.0)
+    await _mute(client, [groceries])
+
+    await _scan_and_confirm(client, test_image_bytes)
+
+    assert await _alert_thresholds(client) == []
+
+
+async def test_muting_one_category_keeps_the_overall_alerts(
+    stored_client: AsyncClient, db_session: AsyncSession, test_image_bytes: bytes
+):
+    client = stored_client
+    groceries = await _category_budget(client, db_session, "Groceries", 5.0)
+    await _overall_budget(client, 10.0)
+    await _mute(client, [groceries])
+
+    await _scan_and_confirm(client, test_image_bytes)  # overall $14.77 of $10
+
+    # One alert per threshold, from the overall budget only: an unmuted
+    # Groceries budget would add its own 50/80/100.
+    assert await _alert_thresholds(client) == [50, 80, 100]
+    assert "$4.77" in (await _alert_bodies(client))["Budget Exceeded"]
+
+
+async def test_an_unmuted_category_alerts(
+    stored_client: AsyncClient, db_session: AsyncSession, test_image_bytes: bytes
+):
+    client = stored_client
+    groceries = await _category_budget(client, db_session, "Groceries", 5.0)
+    await _mute(client, [groceries])
+    await _mute(client, [])
+
+    await _scan_and_confirm(client, test_image_bytes)
+
+    assert 100 in await _alert_thresholds(client)

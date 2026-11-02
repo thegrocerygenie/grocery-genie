@@ -30,7 +30,8 @@ celery_app.config_from_object(
 celery_app.conf.beat_schedule = {
     "weekly-spending-summary": {
         "task": "app.tasks.summary_tasks.generate_weekly_summaries",
-        "schedule": crontab(hour=9, minute=0),  # daily 9 AM UTC; users pick their day
+        # Hourly: each user's summary goes out at 9 AM in their own time zone.
+        "schedule": crontab(minute=0),
     },
     # NFR: push delivered within 5 minutes of the trigger.
     "deliver-pending-pushes": {

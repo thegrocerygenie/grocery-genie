@@ -276,6 +276,11 @@ SUNDAY = date(2026, 3, 22)
 WEDNESDAY = date(2026, 3, 25)
 
 
+def _at(day: date, hour: int) -> datetime:
+    """A beat run at hour:00 UTC on day."""
+    return datetime(day.year, day.month, day.day, hour, tzinfo=UTC)
+
+
 def test_recipients_include_default_user_on_sunday(sync_db, user, category):
     from app.tasks.summary_tasks import _summary_recipients
 
@@ -283,7 +288,7 @@ def test_recipients_include_default_user_on_sunday(sync_db, user, category):
         sync_db, TEST_USER_ID, date(2026, 3, 20), [("Milk", 4.50)], category.id
     )
 
-    assert _summary_recipients(sync_db, SUNDAY) == [TEST_USER_ID]
+    assert _summary_recipients(sync_db, _at(SUNDAY, 9)) == [(TEST_USER_ID, SUNDAY)]
 
 
 def test_recipients_skip_opted_out_users(sync_db, user, category):
@@ -295,7 +300,7 @@ def test_recipients_skip_opted_out_users(sync_db, user, category):
         sync_db, TEST_USER_ID, date(2026, 3, 20), [("Milk", 4.50)], category.id
     )
 
-    assert _summary_recipients(sync_db, SUNDAY) == []
+    assert _summary_recipients(sync_db, _at(SUNDAY, 9)) == []
 
 
 def test_recipients_only_on_users_chosen_day(sync_db, user, category):
@@ -307,8 +312,10 @@ def test_recipients_only_on_users_chosen_day(sync_db, user, category):
         sync_db, TEST_USER_ID, date(2026, 3, 21), [("Milk", 4.50)], category.id
     )
 
-    assert _summary_recipients(sync_db, SUNDAY) == []
-    assert _summary_recipients(sync_db, WEDNESDAY) == [TEST_USER_ID]
+    assert _summary_recipients(sync_db, _at(SUNDAY, 9)) == []
+    assert _summary_recipients(sync_db, _at(WEDNESDAY, 9)) == [
+        (TEST_USER_ID, WEDNESDAY)
+    ]
 
 
 def test_summary_not_duplicated_when_run_twice(sync_db, user, category):
@@ -335,12 +342,15 @@ def test_summary_not_duplicated_when_run_twice(sync_db, user, category):
     assert len(notifications) == 1
 
 
-def test_beat_schedule_runs_daily():
-    """Users pick their summary day, so the beat must fire every day."""
+def test_beat_schedule_runs_every_hour():
+    """Users pick their day, and 9 AM comes at a different UTC hour in each time
+    zone, so the beat fires every hour of every day."""
     from app.tasks.celery_app import celery_app
 
     schedule = celery_app.conf.beat_schedule["weekly-spending-summary"]["schedule"]
     assert schedule.day_of_week == set(range(7))
+    assert schedule.hour == set(range(24))
+    assert schedule.minute == {0}
 
 
 def _summary_body(db) -> str:
@@ -403,3 +413,134 @@ def test_summary_writes_the_users_currency(sync_db, user, category):
     body = _summary_body(sync_db)
     assert "€12.50" in body
     assert "$" not in body
+
+
+# --- BC-06 AC 3: delivered on the chosen day at 9 AM local time ---
+
+
+def test_recipients_wait_for_9am_in_the_users_time_zone(sync_db, user, category):
+    from app.tasks.summary_tasks import _summary_recipients
+
+    user.timezone = "America/Los_Angeles"  # UTC-7 on 2026-03-22 (PDT)
+    sync_db.commit()
+    _create_receipt_with_items(
+        sync_db, TEST_USER_ID, date(2026, 3, 20), [("Milk", 4.50)], category.id
+    )
+
+    assert _summary_recipients(sync_db, _at(SUNDAY, 9)) == []  # 2 AM in LA
+    assert _summary_recipients(sync_db, _at(SUNDAY, 16)) == [(TEST_USER_ID, SUNDAY)]
+
+
+def test_recipients_east_of_utc_get_their_local_sunday(sync_db, user, category):
+    """9 AM Sunday in Sydney (UTC+11 on 2026-03-22) is 22:00 Saturday UTC."""
+    from app.tasks.summary_tasks import _summary_recipients
+
+    user.timezone = "Australia/Sydney"
+    sync_db.commit()
+    _create_receipt_with_items(
+        sync_db, TEST_USER_ID, date(2026, 3, 20), [("Milk", 4.50)], category.id
+    )
+
+    saturday = SUNDAY - timedelta(days=1)
+    assert _summary_recipients(sync_db, _at(saturday, 22)) == [(TEST_USER_ID, SUNDAY)]
+
+
+def test_an_unknown_time_zone_falls_back_to_utc(sync_db, user, category):
+    from app.tasks.summary_tasks import _summary_recipients
+
+    user.timezone = "Mars/Olympus"
+    sync_db.commit()
+    _create_receipt_with_items(
+        sync_db, TEST_USER_ID, date(2026, 3, 20), [("Milk", 4.50)], category.id
+    )
+
+    assert _summary_recipients(sync_db, _at(SUNDAY, 9)) == [(TEST_USER_ID, SUNDAY)]
+
+
+def test_a_rerun_in_the_same_local_day_sends_nothing_new(sync_db, user, category):
+    """Sydney's Sunday starts on Saturday UTC: the once-a-day check must use
+    the local day, or a second run in the hour sends a second summary."""
+    from app.tasks.summary_tasks import generate_weekly_summaries_at
+
+    user.timezone = "Australia/Sydney"
+    sync_db.commit()
+    _create_receipt_with_items(
+        sync_db, TEST_USER_ID, date(2026, 3, 20), [("Milk", 4.50)], category.id
+    )
+    saturday = SUNDAY - timedelta(days=1)
+
+    for _ in range(2):
+        generate_weekly_summaries_at(sync_db, _at(saturday, 22))
+
+    sent = (
+        sync_db.execute(
+            select(Notification).where(Notification.type == "weekly_summary")
+        )
+        .scalars()
+        .all()
+    )
+    assert len(sent) == 1
+
+
+# --- BC-06 AC 1: budget status ---
+
+
+def _overall_budget(db, amount: float, start: date = date(2026, 3, 1)) -> None:
+    from app.models.database import Budget
+
+    db.add(
+        Budget(
+            user_id=TEST_USER_ID,
+            category_id=None,
+            amount=amount,
+            period_type="monthly",
+            period_start=start,
+        )
+    )
+    db.commit()
+
+
+def _summary_on_sunday(db) -> str:
+    _generate_summary_for_user(
+        db,
+        TEST_USER_ID,
+        SUNDAY,
+        SUNDAY - timedelta(days=7),
+        SUNDAY - timedelta(days=14),
+    )
+    db.flush()
+    return _summary_body(db)
+
+
+def test_summary_gives_the_budget_status(sync_db, user, category):
+    _overall_budget(sync_db, 400.0)
+    _create_receipt_with_items(
+        sync_db,
+        TEST_USER_ID,
+        date(2026, 3, 18),
+        [("Milk", 4.50), ("Bread", 3.00)],
+        category.id,
+    )
+    # Earlier this month, outside the week: counts toward the month's budget.
+    _create_receipt_with_items(
+        sync_db, TEST_USER_ID, date(2026, 3, 2), [("Cheese", 92.50)], category.id
+    )
+
+    assert "Budget: $100.00 of $400.00 used (25%)." in _summary_on_sunday(sync_db)
+
+
+def test_summary_says_when_the_budget_is_over(sync_db, user, category):
+    _overall_budget(sync_db, 5.0)
+    _create_receipt_with_items(
+        sync_db, TEST_USER_ID, date(2026, 3, 18), [("Milk", 7.50)], category.id
+    )
+
+    assert "Budget: $2.50 over your $5.00 budget." in _summary_on_sunday(sync_db)
+
+
+def test_summary_without_a_budget_has_no_budget_status(sync_db, user, category):
+    _create_receipt_with_items(
+        sync_db, TEST_USER_ID, date(2026, 3, 18), [("Milk", 4.50)], category.id
+    )
+
+    assert "Budget" not in _summary_on_sunday(sync_db)

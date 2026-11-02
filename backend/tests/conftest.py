@@ -240,3 +240,29 @@ async def client_user_b(
         yield ac
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def stored_client(db_session, mock_extractor):
+    """A signed-in user stored in the database, as in production. Use it when a
+    route reads or writes the user's own row (PATCH /users/me, the budget
+    currency, preferences); the default `client` user exists only in memory."""
+    from app.models.database import User
+    from main import app
+
+    user = User(
+        email="currency@test.com",
+        name="Currency",
+        notif_threshold_50=True,
+        notif_threshold_80=True,
+        notif_threshold_100=True,
+        **consented(),
+    )
+    db_session.add(user)
+    await db_session.flush()
+    _create_test_client(app, db_session, mock_extractor, user)
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        yield ac
+    app.dependency_overrides.clear()

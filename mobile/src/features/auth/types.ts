@@ -16,6 +16,8 @@ export interface UserPreferences {
     day: number;
   };
   ocr_languages: string[];
+  /** BC-03 AC 4: category ids whose budgets send no alerts. */
+  muted_alert_categories?: string[];
 }
 
 /** Consent to send receipts to third-party AI (backend app/services/ai_consent.py). */
@@ -33,6 +35,8 @@ export interface UserProfile {
   name: string;
   locale: string;
   currency_preference: string;
+  /** IANA time zone; the weekly summary goes out at 9 AM in it. */
+  timezone?: string;
   email_verified_at: string | null;
   preferences: UserPreferences;
   needs_onboarding?: boolean;
