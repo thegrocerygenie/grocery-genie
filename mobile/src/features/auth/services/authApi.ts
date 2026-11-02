@@ -1,6 +1,6 @@
 import { apiClient } from '@/services/api';
 import type { TokenPair, UserProfile } from '@/features/auth/types';
-import { deviceCurrency } from '@/utils/money';
+import { deviceCurrency, deviceTimeZone } from '@/utils/money';
 
 export async function signUp(payload: {
   email: string;
@@ -10,7 +10,11 @@ export async function signUp(payload: {
   return apiClient<TokenPair>('/api/auth/sign-up', {
     method: 'POST',
     // The budget currency starts as the iPhone region's currency.
-    body: JSON.stringify({ ...payload, currency_preference: deviceCurrency() }),
+    body: JSON.stringify({
+      ...payload,
+      currency_preference: deviceCurrency(),
+      timezone: deviceTimeZone(),
+    }),
     skipAuth: true,
   });
 }
@@ -85,7 +89,11 @@ export async function appleSignIn(payload: {
   return apiClient<TokenPair>('/api/auth/apple', {
     method: 'POST',
     // Used only when this sign-in creates the account.
-    body: JSON.stringify({ ...payload, currency_preference: deviceCurrency() }),
+    body: JSON.stringify({
+      ...payload,
+      currency_preference: deviceCurrency(),
+      timezone: deviceTimeZone(),
+    }),
     skipAuth: true,
   });
 }
@@ -93,7 +101,11 @@ export async function appleSignIn(payload: {
 export async function googleSignIn(idToken: string): Promise<TokenPair> {
   return apiClient<TokenPair>('/api/auth/google', {
     method: 'POST',
-    body: JSON.stringify({ id_token: idToken, currency_preference: deviceCurrency() }),
+    body: JSON.stringify({
+      id_token: idToken,
+      currency_preference: deviceCurrency(),
+      timezone: deviceTimeZone(),
+    }),
     skipAuth: true,
   });
 }
@@ -119,9 +131,11 @@ export async function confirmEmailChange(token: string): Promise<{ email: string
 export async function updatePreferences(payload: {
   locale?: string;
   currency_preference?: string;
+  timezone?: string;
   notification_thresholds?: { fifty?: boolean; eighty?: boolean; hundred?: boolean };
   weekly_summary?: { enabled?: boolean; day?: number };
   ocr_languages?: string[];
+  muted_alert_categories?: string[];
 }): Promise<UserProfile> {
   return apiClient<UserProfile>('/api/users/me', {
     method: 'PATCH',

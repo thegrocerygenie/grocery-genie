@@ -1218,3 +1218,16 @@ async def test_scan_flags_an_unreadable_date(
     assert extraction["date"] == date.today().isoformat()
     assert extraction["date_confidence"] < 0.7
     assert any("date" in w for w in extraction["warnings"])
+
+
+async def test_scan_returns_a_category_confidence_per_item(
+    client: AsyncClient, test_image_bytes: bytes, db_session
+):
+    """BC-01 AC 2: the app flags an item for review from this score
+    (LOW_CONFIDENCE_THRESHOLD, mobile/.../receipt-capture/utils/confidence.ts)."""
+    await seed_default_categories(db_session)
+    scan = await _create_receipt(client, test_image_bytes)
+
+    for item in scan["extraction"]["items"]:
+        assert item["category_id"] is not None
+        assert 0.0 <= item["category_confidence"] <= 1.0

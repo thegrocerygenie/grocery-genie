@@ -35,6 +35,10 @@ class User(Base):
     api_token: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     locale: Mapped[str] = mapped_column(String(10), default="en_US")
     currency_preference: Mapped[str] = mapped_column(String(3), default="USD")
+    # IANA time zone from the iPhone; the weekly summary goes out at 9 AM in it.
+    timezone: Mapped[str] = mapped_column(
+        String(64), default="UTC", server_default="UTC", nullable=False
+    )
 
     # Auth columns (Phase A)
     password_hash: Mapped[str | None] = mapped_column(String(255))

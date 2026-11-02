@@ -99,6 +99,7 @@ async def sign_up(
             ip=_ip(request),
             user_agent=_ua(request),
             currency_preference=body.currency_preference,
+            timezone=body.timezone,
         )
     except auth_service.AuthError as e:
         _raise_auth(e)
@@ -226,6 +227,7 @@ async def apple_sign_in(
         email=identity.email,
         email_verified=identity.email_verified,
         currency_preference=body.currency_preference,
+        timezone=body.timezone,
     )
     pair = auth_service.issue_tokens(user.id)
     needs = await auth_service.user_needs_onboarding(db, user.id)
@@ -249,6 +251,7 @@ async def google_sign_in(
         email_verified=identity.email_verified,
         name=identity.name,
         currency_preference=body.currency_preference,
+        timezone=body.timezone,
     )
     pair = auth_service.issue_tokens(user.id)
     needs = await auth_service.user_needs_onboarding(db, user.id)

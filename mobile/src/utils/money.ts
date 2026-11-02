@@ -36,6 +36,11 @@ export function deviceCurrency(): string | undefined {
   return Localization.getLocales()[0]?.currencyCode ?? undefined;
 }
 
+/** The iPhone's IANA time zone; the weekly summary goes out at 9 AM in it. */
+export function deviceTimeZone(): string | undefined {
+  return Localization.getCalendars()[0]?.timeZone ?? undefined;
+}
+
 export function countsTowardBudget(receiptCurrency: string, budgetCurrency: string): boolean {
   return receiptCurrency === budgetCurrency;
 }

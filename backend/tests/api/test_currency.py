@@ -24,31 +24,9 @@ def pinned_today(monkeypatch):
 
 
 @pytest.fixture
-async def client(db_session, mock_extractor):
-    """A signed-in user stored in the database, as in production: the spend
-    queries read the user's currency from its row."""
-    from httpx import ASGITransport
-
-    from app.models.database import User
-    from main import app
-    from tests.conftest import _create_test_client, consented
-
-    user = User(
-        email="currency@test.com",
-        name="Currency",
-        notif_threshold_50=True,
-        notif_threshold_80=True,
-        notif_threshold_100=True,
-        **consented(),
-    )
-    db_session.add(user)
-    await db_session.flush()
-    _create_test_client(app, db_session, mock_extractor, user)
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
-        yield ac
-    app.dependency_overrides.clear()
+def client(stored_client):
+    """Spend queries read the user's currency from its row: a stored user."""
+    return stored_client
 
 
 def _extraction(currency: str | None, total: float = 10.0) -> ReceiptExtractionResult:
@@ -261,3 +239,43 @@ async def test_a_deleted_receipt_is_labelled_in_its_currency(
         )
     ).scalar_one()
     assert stored == "GBP"
+
+
+# --- Muted alert categories round-trip (BC-03 AC 4) ---
+
+
+async def test_muted_alert_categories_are_saved_and_returned(client):
+    import uuid as _uuid
+
+    category = str(_uuid.uuid4())
+    resp = await client.patch(
+        "/api/users/me", json={"muted_alert_categories": [category, category]}
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["preferences"]["muted_alert_categories"] == [category]
+    me = (await client.get("/api/users/me")).json()
+    assert me["preferences"]["muted_alert_categories"] == [category]
+
+
+async def test_a_muted_category_must_be_an_id(client):
+    resp = await client.patch(
+        "/api/users/me", json={"muted_alert_categories": ["groceries"]}
+    )
+    assert resp.status_code == 422
+
+
+# --- Time zone (BC-06: summary at 9 AM local) ---
+
+
+async def test_the_time_zone_can_be_updated(client):
+    resp = await client.patch("/api/users/me", json={"timezone": "America/New_York"})
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["timezone"] == "America/New_York"
+
+
+async def test_an_unknown_time_zone_is_rejected(client):
+    resp = await client.patch("/api/users/me", json={"timezone": "Mars/Olympus"})
+
+    assert resp.status_code == 422

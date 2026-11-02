@@ -5,6 +5,8 @@ import { SymbolView } from 'expo-symbols';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useMe, useUpdatePreferences } from '@/features/auth/hooks/useAuth';
+import { useBudgets } from '@/features/budget/hooks/useBudget';
+import { useCategories } from '@/features/budget/hooks/useCategories';
 import { useNotificationStore } from '@/store/notificationStore';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -14,6 +16,8 @@ export default function NotificationSettingsScreen() {
   const update = useUpdatePreferences();
   const localStore = useNotificationStore();
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
+  const { data: budgets } = useBudgets();
+  const { data: categories } = useCategories();
 
   // Server is source of truth; local store stays as offline fallback.
   const prefs = profile?.preferences;
@@ -23,6 +27,18 @@ export default function NotificationSettingsScreen() {
   const summaryEnabled =
     prefs?.weekly_summary.enabled ?? localStore.preferences.weeklySummaryEnabled;
   const summaryDay = prefs?.weekly_summary.day ?? localStore.preferences.weeklySummaryDay;
+
+  // BC-03 AC 4: only a category with a budget can alert, so only those are listed.
+  const muted = prefs?.muted_alert_categories ?? [];
+  const budgetedCategories = (categories ?? []).filter((c) =>
+    (budgets ?? []).some((b) => b.category_id === c.id),
+  );
+  const setCategoryAlerts = (categoryId: string, on: boolean) => {
+    const next = on
+      ? muted.filter((id) => id !== categoryId)
+      : [...muted.filter((id) => id !== categoryId), categoryId];
+    update.mutate({ muted_alert_categories: next });
+  };
 
   const setThreshold = (key: 'fifty' | 'eighty' | 'hundred', value: boolean) => {
     update.mutate({ notification_thresholds: { [key]: value } });
@@ -65,6 +81,23 @@ export default function NotificationSettingsScreen() {
             onChange={(v) => setThreshold('hundred', v)}
           />
         </Section>
+
+        {budgetedCategories.length > 0 ? (
+          <Section
+            header="CATEGORY ALERTS"
+            footer="Turn off alerts for one category's budget. Your overall budget still alerts."
+          >
+            {budgetedCategories.map((c) => (
+              <ToggleRow
+                key={c.id}
+                label={c.name}
+                accessibilityLabel={`${c.name} alerts`}
+                on={!muted.includes(c.id)}
+                onChange={(v) => setCategoryAlerts(c.id, v)}
+              />
+            ))}
+          </Section>
+        ) : null}
 
         <Section header="WEEKLY SUMMARY">
           <ToggleRow
@@ -123,9 +156,11 @@ interface ToggleRowProps {
   label: string;
   on: boolean;
   onChange: (v: boolean) => void;
+  /** Defaults to the label. */
+  accessibilityLabel?: string;
 }
 
-function ToggleRow({ label, on, onChange }: ToggleRowProps) {
+function ToggleRow({ label, on, onChange, accessibilityLabel }: ToggleRowProps) {
   return (
     <View style={styles.row}>
       <Text style={type.body}>{label}</Text>
@@ -134,7 +169,7 @@ function ToggleRow({ label, on, onChange }: ToggleRowProps) {
         onValueChange={onChange}
         trackColor={{ false: colors.iosFill1, true: colors.green }}
         ios_backgroundColor={colors.iosFill1}
-        accessibilityLabel={label}
+        accessibilityLabel={accessibilityLabel ?? label}
       />
     </View>
   );

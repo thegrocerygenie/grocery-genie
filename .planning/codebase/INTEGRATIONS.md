@@ -83,7 +83,6 @@
   - `GG_LLM_API_KEY` / `ANTHROPIC_API_KEY` — Anthropic credentials (the first is copied to the second at LiteLLM init when provider is Anthropic).
   - `GG_LLM_PROVIDER`, `GG_LLM_MODEL`, `GG_LLM_TEMPERATURE` — LLM routing knobs.
   - `GG_STORAGE_PATH`, `GG_THUMBNAIL_WIDTH` — Local image storage config.
-  - `GG_EXTRACTION_CONFIDENCE_THRESHOLD`, `GG_CATEGORY_CONFIDENCE_THRESHOLD` — Business-rule thresholds.
   - `GG_MAX_RECEIPT_SUBMISSIONS_PER_HOUR`, `GG_MAX_READS_PER_MINUTE` — Rate-limit bounds.
   - `GG_APP_NAME`, `GG_DEBUG`, `GG_DATABASE_ECHO` — App toggles; `DEBUG=true` swaps LLM factories to mock extractors.
 - Deployment-only (per `docs/DEPLOYMENT.md`): `SECRET_KEY`, `ALLOWED_ORIGINS`, `ENVIRONMENT`, `STORAGE_BASE_URL`, and future `APNS_KEY_ID` / `APNS_TEAM_ID` / `APNS_AUTH_KEY_PATH`.

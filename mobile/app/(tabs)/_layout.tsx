@@ -6,6 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { colors, type } from '@/constants/theme';
 import { useReduceTransparency } from '@/hooks/useAccessibilitySetting';
+import { useTimeZoneSync } from '@/hooks/useTimeZoneSync';
 import type { BottomTabBarProps, BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 
 interface TabDef {
@@ -25,6 +26,8 @@ const TABS: TabDef[] = [
 const TAB_LABEL_MAX_FONT_SCALE = 1.3;
 
 export default function TabsLayout() {
+  // Signed in from here: keep the profile's time zone on the iPhone's (BC-06).
+  useTimeZoneSync();
   return (
     <Tabs
       // Scan's Cancel returns to the tab the user came from, not always Budget.

@@ -51,6 +51,7 @@ def _to_profile(user: User, *, needs_onboarding: bool = False) -> UserProfileRes
         name=user.name,
         locale=user.locale,
         currency_preference=user.currency_preference,
+        timezone=user.timezone,
         email_verified_at=user.email_verified_at,
         preferences=UserPreferencesPublic(
             notification_thresholds={
@@ -63,6 +64,7 @@ def _to_profile(user: User, *, needs_onboarding: bool = False) -> UserProfileRes
                 "day": user.weekly_summary_day,
             },
             ocr_languages=prefs.get("ocr_languages", []),
+            muted_alert_categories=prefs.get("muted_alert_categories", []),
         ),
         needs_onboarding=needs_onboarding,
         ai_consent=ai_consent.public(user),
@@ -88,6 +90,8 @@ async def update_me(
         user.locale = body.locale
     if body.currency_preference is not None:
         user.currency_preference = body.currency_preference
+    if body.timezone is not None:
+        user.timezone = body.timezone
 
     if body.notification_thresholds is not None:
         if body.notification_thresholds.fifty is not None:
@@ -107,6 +111,13 @@ async def update_me(
         prefs = dict(user.preferences or {})
         # Arrays replace, never deep-merge — multi-select semantics.
         prefs["ocr_languages"] = list(body.ocr_languages)
+        user.preferences = prefs
+
+    if body.muted_alert_categories is not None:
+        prefs = dict(user.preferences or {})
+        # Replaced whole, duplicates dropped, order kept.
+        muted = dict.fromkeys(str(c) for c in body.muted_alert_categories)
+        prefs["muted_alert_categories"] = list(muted)
         user.preferences = prefs
 
     await db.flush()

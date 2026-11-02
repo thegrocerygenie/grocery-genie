@@ -991,3 +991,26 @@ async def test_social_sign_in_sets_the_currency_only_for_a_new_account(db_sessio
     )
     assert again.id == created.id
     assert again.currency_preference == "EUR"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("sent", "stored"),
+    [("Europe/Berlin", "Europe/Berlin"), (None, "UTC"), ("Mars/Olympus", "UTC")],
+)
+async def test_sign_up_takes_the_devices_time_zone(auth_client, sent, stored):
+    """BC-06: the weekly summary goes out at 9 AM in it. A bad value never
+    blocks sign-up."""
+    body = {
+        "email": f"tz-{stored}-{sent}@test.com".replace("/", "-"),
+        "password": "TestPass1234!",
+    }
+    if sent is not None:
+        body["timezone"] = sent
+
+    resp = await auth_client.post("/api/auth/sign-up", json=body)
+
+    assert resp.status_code == 201, resp.text
+    headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    me = await auth_client.get("/api/users/me", headers=headers)
+    assert me.json()["timezone"] == stored

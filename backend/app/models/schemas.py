@@ -3,6 +3,7 @@ import re
 import uuid
 from datetime import date, datetime, timedelta
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -265,6 +266,27 @@ class ErrorResponse(BaseModel):
 # --- Auth ---
 
 
+def _is_time_zone(name: str) -> bool:
+    try:
+        ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        return False
+    return True
+
+
+def _time_zone(value: str | None) -> str | None:
+    """An IANA time zone name; anything else is a 422."""
+    if value is not None and not _is_time_zone(value):
+        raise ValueError("timezone must be an IANA time zone, such as Europe/Berlin")
+    return value
+
+
+def _device_time_zone(value: str | None) -> str | None:
+    """The device's time zone at sign-up. A bad value is dropped, as for the
+    currency: the account keeps UTC."""
+    return value if value is not None and _is_time_zone(value) else None
+
+
 def _device_currency(value: str | None) -> str | None:
     """The device's currency at sign-up. A bad value is dropped, not a 422:
     sign-up never fails over it, and the account keeps the USD default."""
@@ -280,8 +302,11 @@ class SignUpRequest(BaseModel):
     name: str | None = None
     # The iPhone's region currency; becomes the budget currency.
     currency_preference: str | None = None
+    # The iPhone's IANA time zone; the weekly summary goes out at 9 AM in it.
+    timezone: str | None = None
 
     _check_currency = field_validator("currency_preference")(_device_currency)
+    _check_time_zone = field_validator("timezone")(_device_time_zone)
 
 
 class SignInRequest(BaseModel):
@@ -330,16 +355,20 @@ class AppleSignInRequest(BaseModel):
     # Older builds still send one; it is ignored as an unknown field.
     # Used only when this sign-in creates the account.
     currency_preference: str | None = None
+    timezone: str | None = None
 
     _check_currency = field_validator("currency_preference")(_device_currency)
+    _check_time_zone = field_validator("timezone")(_device_time_zone)
 
 
 class GoogleSignInRequest(BaseModel):
     id_token: str
     # Used only when this sign-in creates the account.
     currency_preference: str | None = None
+    timezone: str | None = None
 
     _check_currency = field_validator("currency_preference")(_device_currency)
+    _check_time_zone = field_validator("timezone")(_device_time_zone)
 
 
 class EmailChangeRequestPayload(BaseModel):
@@ -369,6 +398,8 @@ class UserPreferencesPublic(BaseModel):
     notification_thresholds: dict
     weekly_summary: dict
     ocr_languages: list[str] = Field(default_factory=list)
+    # BC-03 AC 4: categories whose budgets send no alerts.
+    muted_alert_categories: list[uuid.UUID] = Field(default_factory=list)
 
 
 class AiConsentPublic(BaseModel):
@@ -391,6 +422,7 @@ class UserProfileResponse(BaseModel):
     name: str
     locale: str
     currency_preference: str
+    timezone: str = "UTC"
     email_verified_at: datetime | None
     preferences: UserPreferencesPublic
     needs_onboarding: bool = False
@@ -411,11 +443,16 @@ class UserPreferencesUpdate(BaseModel):
     locale: str | None = None
     # The budget currency: only receipts in it count toward budgets.
     currency_preference: str | None = None
+    # IANA name; the app sends it when the iPhone's time zone changes.
+    timezone: str | None = None
     notification_thresholds: NotificationThresholds | None = None
     weekly_summary: WeeklySummaryUpdate | None = None
     ocr_languages: list[str] | None = None
+    # Replaces the whole list. Category ids whose budgets send no alerts.
+    muted_alert_categories: list[uuid.UUID] | None = None
 
     _check_currency = field_validator("currency_preference")(_currency_code)
+    _check_time_zone = field_validator("timezone")(_time_zone)
 
 
 # --- Manual receipt ---

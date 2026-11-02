@@ -30,6 +30,7 @@ Real-time spending awareness with intelligent alerts. Turns receipt data into ac
 2. Notification includes remaining budget and days left in period.
 3. Notification at 100% confirms overspend with overage amount.
 4. Alerts respect device notification preferences; toggleable per category.
+   - MVP (2026-11-02): Settings → Alerts lists each category with a budget, with a switch. A muted category's budget sends no alert; the overall budget still does.
 
 ### BC-04: Spending Dashboard [MVP]
 **As a** user, **I want to** view a spending dashboard with breakdowns and trends, **so that** I understand my patterns over time.
@@ -55,8 +56,10 @@ Real-time spending awareness with intelligent alerts. Turns receipt data into ac
 
 **Acceptance Criteria:**
 1. Push notification or email (user preference) with total spend, top category, budget status.
+   - MVP (decided 2026-11-02): push and in-app only. Email is deferred; the summary reads "This week: $X. Top category: Y. <comparison> Budget: $A of $B used (N%)."
 2. Includes comparison to prior week ("You spent 12% more than last week").
 3. Delivered on user-configurable day (default: Sunday morning).
+   - MVP (2026-11-02): at 9 AM in the user's time zone, which the app sets from the iPhone at sign-up and keeps current.
 4. Links to full dashboard.
 
 ## Functional Requirements

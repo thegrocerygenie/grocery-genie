@@ -50,10 +50,6 @@ class Settings(BaseSettings):
     # LiteLLM retries a timeout, rate limit, or 5xx this many times.
     llm_num_retries: int = 1
 
-    # Extraction
-    extraction_confidence_threshold: float = 0.7
-    category_confidence_threshold: float = 0.7
-
     # Storage
     storage_path: str = "./uploads"
     thumbnail_width: int = 200

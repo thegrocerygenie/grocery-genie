@@ -9,13 +9,15 @@ import {
   StyleSheet,
   Text,
   View,
+  useColorScheme,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
-import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
+import { TINT_HEX, colors, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
 import { countsTowardBudget, formatMoney } from '@/utils/money';
 import { resolveCategoryMeta } from '@/constants/categories';
@@ -41,7 +43,14 @@ import { useOfflineStore, type PendingReceipt } from '@/store/offlineStore';
 import { useAuthStore } from '@/store/authStore';
 import { tokenSubject } from '@/features/auth/utils/tokenSubject';
 
-type FilterIndex = 0 | 1 | 2;
+// Week, Month, All, Custom (RC-04 AC 4: any date range).
+type FilterIndex = 0 | 1 | 2 | 3;
+const CUSTOM: FilterIndex = 3;
+
+interface CustomRange {
+  from: Date;
+  to: Date;
+}
 
 const MONTH_SHORT = [
   'Jan',
@@ -66,8 +75,14 @@ function formatISO(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function getDateRange(filter: FilterIndex): { from_date?: string; to_date?: string } {
+function getDateRange(
+  filter: FilterIndex,
+  custom: CustomRange,
+): { from_date?: string; to_date?: string } {
   const now = new Date();
+  if (filter === CUSTOM) {
+    return { from_date: formatISO(custom.from), to_date: formatISO(custom.to) };
+  }
   if (filter === 0) {
     const day = now.getDay();
     const start = new Date(now);
@@ -78,6 +93,51 @@ function getDateRange(filter: FilterIndex): { from_date?: string; to_date?: stri
     return { from_date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01` };
   }
   return {};
+}
+
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+interface CustomRangeRowProps {
+  range: CustomRange;
+  onChange: (edge: keyof CustomRange, picked: Date) => void;
+}
+
+/** RC-04 AC 4: From and To pickers for the Custom range. */
+function CustomRangeRow({ range, onChange }: CustomRangeRowProps) {
+  const scheme = useColorScheme();
+  const today = startOfDay(new Date());
+  const accent = scheme === 'dark' ? TINT_HEX.dark : TINT_HEX.light;
+  return (
+    <View style={styles.customRange}>
+      <Text style={type.subheadline}>From</Text>
+      <DateTimePicker
+        mode="date"
+        display="compact"
+        value={range.from}
+        maximumDate={today}
+        onChange={(event, picked) => {
+          if (event.type === 'set' && picked) onChange('from', picked);
+        }}
+        accentColor={accent}
+        accessibilityLabel="From date"
+      />
+      <Text style={type.subheadline}>to</Text>
+      <DateTimePicker
+        mode="date"
+        display="compact"
+        value={range.to}
+        minimumDate={range.from}
+        maximumDate={today}
+        onChange={(event, picked) => {
+          if (event.type === 'set' && picked) onChange('to', picked);
+        }}
+        accentColor={accent}
+        accessibilityLabel="To date"
+      />
+    </View>
+  );
 }
 
 function formatShortDate(iso: string): string {
@@ -211,6 +271,11 @@ function EmptyState({ hasQuery }: EmptyStateProps) {
 export default function HistoryScreen() {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterIndex>(1);
+  // Custom starts as this month so far; the pickers keep from <= to <= today.
+  const [custom, setCustom] = useState<CustomRange>(() => {
+    const today = startOfDay(new Date());
+    return { from: new Date(today.getFullYear(), today.getMonth(), 1), to: today };
+  });
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [actionSheetOpen, setActionSheetOpen] = useState(false);
@@ -260,7 +325,16 @@ export default function HistoryScreen() {
       void deleteReceipt.mutateAsync(id);
     });
 
-  const dateRange = useMemo(() => getDateRange(filter), [filter]);
+  const dateRange = useMemo(() => getDateRange(filter, custom), [filter, custom]);
+  const setCustomDate = (edge: keyof CustomRange, picked: Date) => {
+    setCustom((r) => {
+      const next = { ...r, [edge]: startOfDay(picked) };
+      // Moving From past To pulls To along, so the range is never empty.
+      if (next.from > next.to) next.to = next.from;
+      return next;
+    });
+    setPage(1);
+  };
   const queryParams = useMemo(
     () => ({
       page,
@@ -322,13 +396,16 @@ export default function HistoryScreen() {
           <View>
             <View style={{ marginBottom: spacing.md }}>
               <SegmentedControl
-                values={['Week', 'Month', 'All']}
+                values={['Week', 'Month', 'All', 'Custom']}
                 selectedIndex={filter}
                 onChange={(e) => {
                   setFilter(e.nativeEvent.selectedSegmentIndex as FilterIndex);
                   setPage(1);
                 }}
               />
+              {filter === CUSTOM ? (
+                <CustomRangeRow range={custom} onChange={setCustomDate} />
+              ) : null}
             </View>
             <OfflineQueueSection
               pending={pendingReceipts}
@@ -410,6 +487,14 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
+  customRange: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    minHeight: touchTarget.minHeight,
+  },
   listContent: {
     padding: spacing.lg,
     paddingBottom: 120,

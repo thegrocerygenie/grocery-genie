@@ -27,6 +27,9 @@ jest.mock('@/features/auth/hooks/useAuth', () => ({
 jest.mock('@/features/budget/hooks/useBudget', () => ({
   useBudgets: () => ({ data: [] }),
 }));
+jest.mock('@/features/budget/hooks/useCategories', () => ({
+  useCategories: () => ({ data: [] }),
+}));
 
 interface HostNode {
   type: string;
