@@ -250,6 +250,15 @@ docker stats
 docker compose -f docker/docker-compose.yml exec redis redis-cli ping
 ```
 
+**Log retention (the privacy policy depends on this).** Each service's logs rotate as they fill: `docker/docker-compose.yml` keeps at most 5 files of 10 MB per container, and deletes the oldest. A quiet service can take months to fill that, so add a daily host cron job that deletes rotated log files older than 30 days:
+
+```bash
+# crontab -e (as root)
+15 4 * * * find /var/lib/docker/containers -name '*-json.log.*' -mtime +30 -delete
+```
+
+The job deletes only rotated files (`*-json.log.1` to `.4`). The active `*-json.log` file is not touched, so a quiet service's current file can still hold lines older than 30 days. The privacy text says only what this setup enforces. Logs are not in any backup (1.10). Do not add log shipping or archiving without changing the privacy text first.
+
 ### 1.10 Backup Strategy
 
 - **Database:** Supabase handles automatic daily backups (Pro plan includes point-in-time recovery).
@@ -472,6 +481,7 @@ Set `EXPO_TOKEN` in GitHub repository secrets (generate at expo.dev → Account 
 - [ ] CORS configured to allow requests from the iOS app
 - [ ] Rate limiting active
 - [ ] Receipt image upload and retrieval working
+- [ ] Log cleanup cron job installed (1.9): `crontab -l` shows the `find /var/lib/docker/containers` line
 
 ### Mobile
 - [ ] Production build succeeds via EAS Build

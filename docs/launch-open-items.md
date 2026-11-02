@@ -37,7 +37,7 @@ Sources:
 
 - [x] **Sign-in security records kept up to 12 months:** a daily beat task purges `auth_events` older than `GG_AUTH_EVENT_RETENTION_DAYS` (default 365).
 - [x] **App activity events kept up to 13 months:** a daily beat task purges `analytics_events` older than `GG_ANALYTICS_EVENT_RETENTION_DAYS` (default 396). Deleting an account deletes its events.
-- [ ] **Server logs kept up to 30 days:** set Docker log rotation or the host's retention (`docker/docker-compose.yml` has no `logging:`), or change the text.
+- [x] **Server logs:** every service in `docker/docker-compose.yml` uses the `x-logging` anchor (json-file, 5 files of 10 MB, oldest deleted first). The privacy text now says this: about 50 MB per service, never archived, older log files deleted after 30 days. Still to do on the host: add the daily cron job in [DEPLOYMENT.md](DEPLOYMENT.md) 1.9 that deletes rotated log files older than 30 days.
 - [x] **The other minimization fixes:**
   - stop requesting the unused Apple full name;
   - drop raw receipt values from the analytics logs;
