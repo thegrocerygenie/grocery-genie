@@ -5,7 +5,7 @@ import uuid
 import pytest
 
 from app.models.database import Notification
-from tests.conftest import DEV_USER_ID
+from tests.conftest import DEV_USER_ID, ensure_user
 
 
 @pytest.fixture
@@ -32,6 +32,7 @@ async def notifications(db_session):
         body="You exceeded your budget.",
         read=False,
     )
+    await ensure_user(db_session, DEV_USER_ID)
     db_session.add_all([n1, n2, n3])
     await db_session.flush()
     return [n1, n2, n3]

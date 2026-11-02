@@ -4,7 +4,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.models.database import PushToken
-from tests.conftest import DEV_USER_ID, USER_B_ID
+from tests.conftest import DEV_USER_ID, USER_B_ID, ensure_user
 
 TOKEN = "ExponentPushToken[abc123XYZ]"
 
@@ -34,6 +34,7 @@ async def test_token_moves_to_the_account_that_registers_it(
     client: AsyncClient, db_session
 ):
     """A device that signs in to a new account stops getting the old one's alerts."""
+    await ensure_user(db_session, USER_B_ID)
     db_session.add(PushToken(user_id=USER_B_ID, token=TOKEN))
     await db_session.flush()
 
@@ -63,6 +64,7 @@ async def test_unregister_push_token(client: AsyncClient, db_session):
 
 
 async def test_unregister_leaves_other_users_token(client: AsyncClient, db_session):
+    await ensure_user(db_session, USER_B_ID)
     db_session.add(PushToken(user_id=USER_B_ID, token=TOKEN))
     await db_session.flush()
 

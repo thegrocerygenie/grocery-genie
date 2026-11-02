@@ -32,8 +32,10 @@ os.environ.setdefault("GG_RATE_LIMIT_STORAGE", "memory")
 os.environ.setdefault("GG_ANALYTICS_STORAGE", "log")
 get_settings.cache_clear()
 
-# Use SQLite for tests (async via aiosqlite)
-TEST_DATABASE_URL = "sqlite+aiosqlite://"
+# SQLite in memory by default (fast). Set GG_TEST_DATABASE_URL to a Postgres
+# database to run the suite the way production runs (`make backend-test-pg`):
+# SQLite ignores FOR UPDATE and some ON CONFLICT and JSON behavior.
+TEST_DATABASE_URL = os.environ.get("GG_TEST_DATABASE_URL", "sqlite+aiosqlite://")
 
 DEV_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 DEV_USER_TOKEN = "test-token-user-a-00000000"
@@ -148,7 +150,7 @@ def test_image_bytes() -> bytes:
 
 @pytest.fixture
 async def db_engine():
-    """Create async engine with in-memory SQLite."""
+    """A fresh schema per test, on TEST_DATABASE_URL."""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -201,8 +203,17 @@ async def client(mock_extractor, db_session) -> AsyncGenerator[AsyncClient, None
         email="test@test.com",
         name="Test User",
         api_token=DEV_USER_TOKEN,
+        # All three alert thresholds on: the behavior these tests were written
+        # against (the column default turns 50% off).
+        notif_threshold_50=True,
+        notif_threshold_80=True,
+        notif_threshold_100=True,
         **consented(),
     )
+    # Stored, as a signed-in user always is: Postgres enforces the foreign
+    # keys from receipts, budgets and notifications (SQLite does not).
+    test_user = await db_session.merge(test_user)
+    await db_session.flush()
 
     _create_test_client(app, db_session, mock_extractor, test_user)
 
@@ -228,8 +239,17 @@ async def client_user_b(
         email="userb@test.com",
         name="User B",
         api_token=USER_B_TOKEN,
+        # All three alert thresholds on: the behavior these tests were written
+        # against (the column default turns 50% off).
+        notif_threshold_50=True,
+        notif_threshold_80=True,
+        notif_threshold_100=True,
         **consented(),
     )
+    # Stored, as a signed-in user always is: Postgres enforces the foreign
+    # keys from receipts, budgets and notifications (SQLite does not).
+    user_b = await db_session.merge(user_b)
+    await db_session.flush()
 
     _create_test_client(app, db_session, mock_extractor, user_b)
 
@@ -266,3 +286,24 @@ async def stored_client(db_session, mock_extractor):
     ) as ac:
         yield ac
     app.dependency_overrides.clear()
+
+
+async def ensure_user(db_session, user_id: uuid.UUID) -> uuid.UUID:
+    """Store a user row for ``user_id`` if there is none. For tests that write
+    rows for a user directly: Postgres enforces their foreign keys."""
+    from app.models.database import User
+
+    if await db_session.get(User, user_id) is None:
+        db_session.add(
+            User(
+                id=user_id,
+                email=f"{user_id}@test.com",
+                name="Test",
+                notif_threshold_50=True,
+                notif_threshold_80=True,
+                notif_threshold_100=True,
+                **consented(),
+            )
+        )
+        await db_session.flush()
+    return user_id

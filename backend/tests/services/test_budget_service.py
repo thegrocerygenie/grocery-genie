@@ -28,8 +28,13 @@ async def default_categories(db_session: AsyncSession) -> list[Category]:
 
 
 @pytest.fixture
-def user_id() -> uuid.UUID:
-    return uuid.UUID("00000000-0000-0000-0000-000000000001")
+async def user_id(db_session) -> uuid.UUID:
+    """A stored user: Postgres enforces the foreign keys to it."""
+    from tests.conftest import ensure_user
+
+    return await ensure_user(
+        db_session, uuid.UUID("00000000-0000-0000-0000-000000000001")
+    )
 
 
 @pytest.fixture
@@ -346,7 +351,7 @@ async def test_check_thresholds_respects_user_opt_out(
         notif_threshold_80=False,
         notif_threshold_100=True,
     )
-    db_session.add(user)
+    user = await db_session.merge(user)  # the user_id fixture stored it
     await db_session.flush()
 
     cat = default_categories[0]
