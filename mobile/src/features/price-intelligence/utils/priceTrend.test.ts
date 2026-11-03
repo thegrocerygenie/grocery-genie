@@ -6,6 +6,9 @@ import {
   priceChange,
   timelinePoints,
 } from './priceTrend';
+import * as receiptDate from '@/features/receipt-capture/utils/receiptDate';
+
+const HOUR_MS = 60 * 60 * 1000;
 
 function point(date: string, unitPrice: number, inTimeline = true): PricePoint {
   return {
@@ -85,6 +88,28 @@ describe('chartGeometry (PI-01 AC 2)', () => {
       [50, 10], // 2 of 10 days in, highest price: top
       [210, 60], // last day, middle price
     ]);
+  });
+
+  it('spaces dots by whole days across a daylight saving change', () => {
+    // Local midnights after a DST change sit an hour off from whole days
+    // (America/New_York springs forward on 2026-03-08). Shift those dates the
+    // same way so the test fails in any time zone.
+    const realFromIsoDate = receiptDate.fromIsoDate;
+    const spy = jest.spyOn(receiptDate, 'fromIsoDate').mockImplementation((iso) => {
+      const date = realFromIsoDate(iso);
+      return iso >= '2026-03-08' ? new Date(date.getTime() - HOUR_MS) : date;
+    });
+    try {
+      const geo = chartGeometry(
+        [point('2026-03-01', 1), point('2026-03-03', 3), point('2026-03-11', 2)],
+        220,
+        120,
+        10,
+      );
+      expect(geo.points.map((p) => p.x)).toEqual([10, 50, 210]);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('centres a flat price and spreads same-day prices evenly', () => {

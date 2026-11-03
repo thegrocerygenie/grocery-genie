@@ -2,6 +2,8 @@ import { fromIsoDate } from '@/features/receipt-capture/utils/receiptDate';
 import { formatMoney } from '@/utils/money';
 import type { PriceHistory, PricePoint } from '../types';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const EACH_UNITS = new Set(['each', 'ea', 'unit', 'units', 'item', 'items', 'pc', 'pcs']);
 
 /** PI-01 AC 3: "$0.69/lb", "$1.29 each", or just "$4.99" with no unit. */
@@ -73,9 +75,12 @@ export function chartGeometry(
   const high = Math.max(...prices);
   // The range labels and VoiceOver need low and high before the first layout.
   if (width <= 0 || height <= 0) return { points: [], low, high };
+  // Whole days from the first purchase. Local midnights on either side of a
+  // daylight saving change sit 23 or 25 hours apart, so round to the day.
   const times = points.map((p) => fromIsoDate(p.date).getTime());
-  const start = Math.min(...times);
-  const span = Math.max(...times) - start;
+  const first = Math.min(...times);
+  const days = times.map((t) => Math.round((t - first) / DAY_MS));
+  const span = Math.max(...days);
   const innerW = Math.max(width - inset * 2, 0);
   const innerH = Math.max(height - inset * 2, 0);
   const last = Math.max(points.length - 1, 1);
@@ -84,7 +89,7 @@ export function chartGeometry(
     low,
     high,
     points: points.map((point, i) => {
-      const xFraction = span > 0 ? (times[i] - start) / span : points.length > 1 ? i / last : 0.5;
+      const xFraction = span > 0 ? days[i] / span : points.length > 1 ? i / last : 0.5;
       const yFraction = high > low ? (point.unit_price - low) / (high - low) : 0.5;
       return {
         x: inset + xFraction * innerW,
