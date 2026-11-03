@@ -214,6 +214,7 @@ export default function DashboardScreen() {
             onSetBudget={onSetBudget}
             onTopItems={() => router.push('/top-items')}
             onTrend={() => router.push('/trend')}
+            onPrices={() => router.push('/items')}
           />
         )}
       </ScrollView>
@@ -267,9 +268,11 @@ interface FilledStateProps {
   onSetBudget: () => void;
   onTopItems: () => void;
   onTrend: () => void;
+  /** PI-01: the price history of everything the user buys. */
+  onPrices: () => void;
 }
 
-function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProps) {
+function FilledState({ data, onSetBudget, onTopItems, onTrend, onPrices }: FilledStateProps) {
   const currency = useBudgetCurrency();
   const whole = (amount: number) => formatMoney(amount, currency, { decimals: 0 });
   const noBudget = data.cap <= 0;
@@ -401,6 +404,17 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
       >
         <SymbolView name="chart.bar.fill" size={16} tintColor={colors.tint} />
         <Text style={styles.trendLabel}>See 3-month trend</Text>
+      </Pressable>
+
+      <Pressable
+        onPress={onPrices}
+        style={({ pressed }) => [styles.trendBtn, pressed && styles.trendBtnPressed]}
+        accessibilityRole="button"
+        accessibilityLabel="Price history"
+        accessibilityHint="What you paid for each item over time"
+      >
+        <SymbolView name="chart.line.uptrend.xyaxis" size={16} tintColor={colors.tint} />
+        <Text style={styles.trendLabel}>Price history</Text>
       </Pressable>
     </View>
   );
@@ -605,6 +619,7 @@ const styles = StyleSheet.create({
     color: colors.tint,
     fontWeight: '600',
   },
+  trendBtnPressed: { backgroundColor: colors.iosFill3 },
   trendBtn: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -52,6 +52,8 @@ export interface LineItemResponse {
   category_confidence: number | null;
   extraction_confidence: number | null;
   corrected: boolean;
+  /** PI-02: the item this line was matched to once confirmed; opens its prices. */
+  canonical_item_id?: string | null;
 }
 
 export interface ReceiptResponse {

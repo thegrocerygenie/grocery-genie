@@ -1,0 +1,260 @@
+"""Price history (PI-01): what the user paid for each canonical item over time.
+
+Every confirmed line linked to a canonical item has one PriceObservation.
+sync_receipt rebuilds a receipt's observations whenever the receipt changes,
+so they always match its lines. Reads leave out deleted receipts by joining
+receipts, so a deleted receipt's prices disappear and come back on restore.
+"""
+
+from __future__ import annotations
+
+import uuid
+from collections import Counter
+from dataclasses import dataclass
+from datetime import date
+from decimal import Decimal
+
+from sqlalchemy import delete, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.database import (
+    CanonicalItem,
+    CanonicalItemAlias,
+    PriceObservation,
+    Receipt,
+    Store,
+)
+
+# PI-01 AC 4: a timeline needs at least this many prices.
+MIN_TIMELINE_POINTS = 2
+
+
+@dataclass(frozen=True)
+class ItemSummary:
+    item: CanonicalItem
+    observation_count: int
+    store_count: int
+    latest: PriceObservation | None
+
+
+@dataclass(frozen=True)
+class PricePoint:
+    observation: PriceObservation
+    store_name: str | None
+
+
+@dataclass(frozen=True)
+class PriceHistory:
+    item: CanonicalItem
+    points: list[PricePoint]
+    # The unit and currency most of the item's prices are in; the timeline
+    # compares only like with like (edge case: unit price ambiguity).
+    unit_of_measure: str | None
+    currency: str | None
+    store_count: int
+
+    @property
+    def timeline_points(self) -> list[PricePoint]:
+        return [
+            p
+            for p in self.points
+            if p.observation.unit_of_measure == self.unit_of_measure
+            and p.observation.currency == self.currency
+        ]
+
+    @property
+    def has_timeline(self) -> bool:
+        return len(self.timeline_points) >= MIN_TIMELINE_POINTS
+
+
+class PriceService:
+    def __init__(self, db: AsyncSession) -> None:
+        self.db = db
+
+    async def sync_receipt(self, receipt: Receipt) -> None:
+        """Rebuild the receipt's observations from its lines.
+
+        Only a confirmed receipt has prices; a line without an item or with
+        no quantity records none.
+        """
+        await self.db.execute(
+            delete(PriceObservation).where(PriceObservation.receipt_id == receipt.id)
+        )
+        if receipt.status != "confirmed":
+            return
+        for line_item in receipt.line_items:
+            quantity = Decimal(str(line_item.quantity or 0))
+            if line_item.canonical_item_id is None or quantity <= 0:
+                continue
+            self.db.add(
+                PriceObservation(
+                    user_id=receipt.user_id,
+                    household_id=receipt.household_id,
+                    canonical_item_id=line_item.canonical_item_id,
+                    receipt_id=receipt.id,
+                    line_item_id=line_item.id,
+                    store_id=receipt.store_id,
+                    date=receipt.date,
+                    unit_price=line_item.unit_price,
+                    quantity=quantity,
+                    unit_of_measure=line_item.unit_of_measure,
+                    currency=receipt.currency,
+                )
+            )
+        await self.db.flush()
+
+    def _visible(self, user_id: uuid.UUID) -> tuple:
+        """Observations of this user's receipts that are not deleted."""
+        return (
+            PriceObservation.user_id == user_id,
+            Receipt.deleted_at.is_(None),
+        )
+
+    async def list_items(
+        self,
+        user_id: uuid.UUID,
+        *,
+        query: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple[list[ItemSummary], int]:
+        """Items with at least one price, most recently bought first."""
+        stats = (
+            select(
+                PriceObservation.canonical_item_id.label("item_id"),
+                func.count(PriceObservation.id).label("observation_count"),
+                func.count(func.distinct(PriceObservation.store_id)).label(
+                    "store_count"
+                ),
+                func.max(PriceObservation.date).label("last_date"),
+            )
+            .join(Receipt, PriceObservation.receipt_id == Receipt.id)
+            .where(*self._visible(user_id))
+            .group_by(PriceObservation.canonical_item_id)
+            .subquery()
+        )
+        conditions = [CanonicalItem.user_id == user_id]
+        if query and query.strip():
+            pattern = f"%{query.strip().casefold()}%"
+            alias_hit = (
+                select(CanonicalItemAlias.id)
+                .where(
+                    CanonicalItemAlias.canonical_item_id == CanonicalItem.id,
+                    CanonicalItemAlias.normalized_name.like(pattern),
+                )
+                .exists()
+            )
+            conditions.append(
+                or_(func.lower(CanonicalItem.canonical_name).like(pattern), alias_hit)
+            )
+
+        base = (
+            select(CanonicalItem, stats.c.observation_count, stats.c.store_count)
+            .join(stats, stats.c.item_id == CanonicalItem.id)
+            .where(*conditions)
+        )
+        total = await self.db.scalar(select(func.count()).select_from(base.subquery()))
+        rows = (
+            await self.db.execute(
+                base.order_by(stats.c.last_date.desc(), CanonicalItem.canonical_name)
+                .offset((page - 1) * per_page)
+                .limit(per_page)
+            )
+        ).all()
+
+        latest = await self._latest_by_item(user_id, [row[0].id for row in rows])
+        summaries = [
+            ItemSummary(
+                item=item,
+                observation_count=int(count),
+                store_count=int(stores),
+                latest=latest.get(item.id),
+            )
+            for item, count, stores in rows
+        ]
+        return summaries, int(total or 0)
+
+    async def _latest_by_item(
+        self, user_id: uuid.UUID, item_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, PriceObservation]:
+        if not item_ids:
+            return {}
+        rows = await self.db.execute(
+            select(PriceObservation)
+            .join(Receipt, PriceObservation.receipt_id == Receipt.id)
+            .where(
+                *self._visible(user_id),
+                PriceObservation.canonical_item_id.in_(item_ids),
+            )
+            .order_by(PriceObservation.date.desc(), Receipt.created_at.desc())
+        )
+        latest: dict[uuid.UUID, PriceObservation] = {}
+        for observation in rows.scalars():
+            latest.setdefault(observation.canonical_item_id, observation)
+        return latest
+
+    async def item_stats(
+        self, user_id: uuid.UUID, item_id: uuid.UUID
+    ) -> tuple[int, int, PriceObservation | None]:
+        """(observation count, store count, latest observation) for one item."""
+        count, stores = (
+            await self.db.execute(
+                select(
+                    func.count(PriceObservation.id),
+                    func.count(func.distinct(PriceObservation.store_id)),
+                )
+                .join(Receipt, PriceObservation.receipt_id == Receipt.id)
+                .where(
+                    *self._visible(user_id),
+                    PriceObservation.canonical_item_id == item_id,
+                )
+            )
+        ).one()
+        latest = (await self._latest_by_item(user_id, [item_id])).get(item_id)
+        return int(count), int(stores), latest
+
+    async def history(
+        self,
+        user_id: uuid.UUID,
+        item: CanonicalItem,
+        *,
+        store_id: uuid.UUID | None = None,
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ) -> PriceHistory:
+        """Every price paid for ``item``, oldest first (PI-01 AC 1)."""
+        conditions = [
+            *self._visible(user_id),
+            PriceObservation.canonical_item_id == item.id,
+        ]
+        all_rows = (
+            await self.db.execute(
+                select(PriceObservation, Store.name)
+                .join(Receipt, PriceObservation.receipt_id == Receipt.id)
+                .outerjoin(Store, PriceObservation.store_id == Store.id)
+                .where(*conditions)
+                .order_by(PriceObservation.date, Receipt.created_at)
+            )
+        ).all()
+
+        # The series is the unit and currency most prices are in, over all of
+        # the item's prices, so a filter cannot change which one is plotted.
+        series = Counter(
+            (obs.unit_of_measure, obs.currency) for obs, _ in all_rows
+        ).most_common(1)
+        unit, currency = series[0][0] if series else (item.unit_of_measure, None)
+
+        points = [
+            PricePoint(observation=obs, store_name=store_name)
+            for obs, store_name in all_rows
+            if (store_id is None or obs.store_id == store_id)
+            and (from_date is None or obs.date >= from_date)
+            and (to_date is None or obs.date <= to_date)
+        ]
+        return PriceHistory(
+            item=item,
+            points=points,
+            unit_of_measure=unit,
+            currency=currency,
+            store_count=len({p.observation.store_id for p in points}),
+        )

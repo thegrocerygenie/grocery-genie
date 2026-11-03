@@ -24,9 +24,11 @@ from app.image.storage import (
 )
 from app.llm.provider import (
     CategoryAssigner,
+    Embedder,
     ExtractionUnavailableError,
     ReceiptExtractor,
     get_category_assigner,
+    get_embedder,
     get_receipt_extractor,
 )
 from app.models.database import Receipt as ReceiptModel
@@ -348,8 +350,9 @@ async def update_receipt(
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
     analytics: AnalyticsService = Depends(get_analytics_service),
+    embedder: Embedder | None = Depends(get_embedder),
 ) -> ReceiptResponse:
-    service = ReceiptService(db=db, analytics=analytics)
+    service = ReceiptService(db=db, analytics=analytics, embedder=embedder)
     try:
         receipt = await service.update_receipt(uuid.UUID(receipt_id), user.id, updates)
     except ReceiptAlreadyConfirmedError as e:
@@ -367,9 +370,10 @@ async def create_manual_receipt(
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
     analytics: AnalyticsService = Depends(get_analytics_service),
+    embedder: Embedder | None = Depends(get_embedder),
 ) -> ReceiptResponse:
     """Manual receipt entry — fallback for failed extraction."""
-    service = ReceiptService(db=db, analytics=analytics)
+    service = ReceiptService(db=db, analytics=analytics, embedder=embedder)
     receipt = await service.create_manual_receipt(
         user_id=user.id,
         store_name=body.store_name,

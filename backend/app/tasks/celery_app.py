@@ -12,6 +12,7 @@ celery_app = Celery(
     include=[
         "app.tasks.analytics_event_tasks",
         "app.tasks.auth_event_tasks",
+        "app.tasks.item_matching_tasks",
         "app.tasks.purge_tasks",
         "app.tasks.push_tasks",
         "app.tasks.receipt_tasks",
@@ -47,6 +48,12 @@ celery_app.conf.beat_schedule = {
     "purge-old-auth-events": {
         "task": "app.tasks.auth_event_tasks.purge_old_auth_events",
         "schedule": crontab(hour=3, minute=45),
+    },
+    # PI-02: match confirmed lines left without an item (the V1.1 backfill,
+    # and any matching that failed) and fill in missing name embeddings.
+    "match-unmatched-items": {
+        "task": "app.tasks.item_matching_tasks.match_unmatched_items",
+        "schedule": crontab(hour=4, minute=15),
     },
     # Erase product analytics events past analytics_event_retention_days.
     "purge-old-analytics-events": {

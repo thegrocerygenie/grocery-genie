@@ -148,7 +148,7 @@ backend-test:
 # Re-resolve backend dependencies after editing pyproject.toml: updates uv.lock
 # and the hashed export the Docker image installs. Commit both.
 backend-lock:
-	cd backend && uv lock && uv export --frozen --no-emit-project \
+	cd backend && uv lock && uv export --frozen --no-emit-project --emit-index-url \
 		--format requirements-txt -o requirements.lock.txt
 
 # The suite on Postgres, as production runs: SQLite skips foreign keys,

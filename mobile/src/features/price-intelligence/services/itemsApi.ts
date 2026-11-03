@@ -1,0 +1,50 @@
+import { apiClient } from '@/services/api';
+import type { ItemDetail, ItemList, ItemSuggestion, PriceHistory } from '../types';
+
+export async function listItems(query?: string): Promise<ItemList> {
+  const params = new URLSearchParams({ per_page: '100' });
+  if (query?.trim()) params.set('q', query.trim());
+  return apiClient<ItemList>(`/api/items?${params.toString()}`);
+}
+
+export async function getItem(id: string): Promise<ItemDetail> {
+  return apiClient<ItemDetail>(`/api/items/${id}`);
+}
+
+export async function getPriceHistory(id: string): Promise<PriceHistory> {
+  return apiClient<PriceHistory>(`/api/items/${id}/prices`);
+}
+
+export async function renameItem(id: string, canonicalName: string): Promise<ItemDetail> {
+  return apiClient<ItemDetail>(`/api/items/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ canonical_name: canonicalName }),
+  });
+}
+
+/** PI-02 AC 3 (link): `id` folds into `intoId`, which keeps its name. */
+export async function mergeItem(id: string, intoId: string): Promise<ItemDetail> {
+  return apiClient<ItemDetail>(`/api/items/${id}/merge`, {
+    method: 'POST',
+    body: JSON.stringify({ into_item_id: intoId }),
+  });
+}
+
+/** PI-02 AC 3 (unlink): the name becomes its own item. Returns the new item. */
+export async function splitAlias(id: string, aliasId: string): Promise<ItemDetail> {
+  return apiClient<ItemDetail>(`/api/items/${id}/aliases/${aliasId}/split`, {
+    method: 'POST',
+  });
+}
+
+export async function listSuggestions(): Promise<ItemSuggestion[]> {
+  return apiClient<ItemSuggestion[]>('/api/items/suggestions');
+}
+
+export async function acceptSuggestion(id: string): Promise<ItemDetail> {
+  return apiClient<ItemDetail>(`/api/items/suggestions/${id}/accept`, { method: 'POST' });
+}
+
+export async function rejectSuggestion(id: string): Promise<void> {
+  await apiClient<void>(`/api/items/suggestions/${id}/reject`, { method: 'POST' });
+}

@@ -26,6 +26,11 @@ RUN useradd --create-home --uid 1000 app \
     && chown app:app /app/storage
 USER app
 
+# V1.1 item matching (PI-02): download the default embedding model
+# (settings.embedding_model) now, so no container fetches it at runtime.
+ENV HF_HOME=/home/app/.cache/huggingface
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', device='cpu')"
+
 EXPOSE 8000
 
 # Caddy is the only client, so trust its X-Forwarded-For: the per-IP auth rate
