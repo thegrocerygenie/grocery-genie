@@ -218,9 +218,8 @@ const icon = (name: string) => readFileSync(join(iconDir, `${name}.svg`), 'utf8'
         <div class="section-head"><div class="label">FAQ</div><h2>Straight answers.</h2></div>
         <details data-track="faq_free">
           <summary>Is it free?<span class="plus" aria-hidden="true">+</span></summary>
-          <p>
-            Yes. Grocery Genie is free on iPhone. You can scan up to 20 receipts a month (about five a week) and add as many as you like by hand.{A && ' Join the waitlist and get a free year of Premium, our upcoming paid plan, when it launches.'}
-          </p>
+          {/* Same markup as the design (span around the State A sentence) so text renders identically. */}
+          <p>Yes. Grocery Genie is free on iPhone. You can scan up to 20 receipts a month (about five a week) and add as many as you like by hand.{A && <span class="only-a">{' Join the waitlist and get a free year of Premium, our upcoming paid plan, when it launches.'}</span>}</p>
         </details>
         <details data-track="faq_wrong">
           <summary>What if it reads my receipt wrong?<span class="plus" aria-hidden="true">+</span></summary>
@@ -240,13 +239,13 @@ const icon = (name: string) => readFileSync(join(iconDir, `${name}.svg`), 'utf8'
         </details>
         <details data-track="faq_launch">
           <summary>When does it launch?<span class="plus" aria-hidden="true">+</span></summary>
-          <p id="faq-launch">
-            {
-              A
-                ? "Grocery Genie launches on iPhone in Q4 2026. Early sign-ups get TestFlight access first, ahead of the public launch on the App Store. We'll email you once, at launch."
-                : "It's out now. Grocery Genie is free on the App Store."
-            }
-          </p>
+          <p id="faq-launch">{
+            A ? (
+              <span class="only-a">Grocery Genie launches on iPhone in Q4 2026. Early sign-ups get TestFlight access first, ahead of the public launch on the App Store. We'll email you once, at launch.</span>
+            ) : (
+              <span class="only-b">It's out now. Grocery Genie is free on the App Store.</span>
+            )
+          }</p>
         </details>
       </section>
 
