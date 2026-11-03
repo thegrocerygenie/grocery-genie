@@ -29,6 +29,7 @@ MVP notes on the table below:
 | `price_alert_muted` | scope (item/store) | Price alert fatigue: how often users mute |
 | `price_comparison_viewed` | canonical_item_id, store_count (stores compared) | Cross-store comparison engagement (PI-04) |
 | `premium_status_changed` | is_premium, source (webhook/refresh), event_type (RevenueCat's, webhook only) | Conversion and churn by tier: sent by the server only when a user becomes Premium or stops being Premium |
+| `custom_category_changed` | action (created/renamed/deleted), custom_count (after the change) | Custom category adoption (BC-05 AC 3, Premium): how many users make their own, and how many they keep |
 | `item_match_resolved` | decision (accepted/rejected), method (fuzzy/semantic), confidence | Item matching precision against user-confirmed matches |
 | `recipe_suggestion_viewed` | recipe_id, match_score, had_expiring_ingredient | Recipe relevance |
 | `recipe_suggestion_cooked` | recipe_id, ingredients_from_pantry, ingredients_purchased | End-to-end meal planner value |

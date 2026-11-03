@@ -116,8 +116,12 @@ class BudgetService:
         Returns the budget and whether it is new to the user.
         """
         if request.category_id is not None:
+            # A default or the user's own custom category, never another's.
             result = await self.db.execute(
-                select(Category).where(Category.id == request.category_id)
+                select(Category).where(
+                    Category.id == request.category_id,
+                    (Category.is_default.is_(True)) | (Category.user_id == user_id),
+                )
             )
             if result.scalar_one_or_none() is None:
                 raise ValueError(f"Category {request.category_id} not found")

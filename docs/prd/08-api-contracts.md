@@ -65,6 +65,7 @@ Submit user corrections. Accepts partial updates; send only the fields the user 
 - `date` later than today + 1 day returns 422. `quantity` must be > 0 and `total_price` >= 0, or 422.
 - A quantity edit keeps `total_price` (what was paid) and recomputes `unit_price`.
 - Subtotal and total are not editable. A `total_price` correction moves both by the same amount; tax is kept as extracted.
+- An item's `category_id` must be a default category or one of the user's own custom categories ([Categories](#categories-v11)); any other id returns 400 and nothing is saved.
 
 ### GET /api/receipts?page=1&per_page=20&store=...&from=...&to=... [MVP]
 Paginated receipt history with optional filters.
@@ -94,6 +95,8 @@ Edit a budget; takes effect immediately. `period_start` is optional and moves th
 
 ### DELETE /api/budgets/{id} [MVP] · POST /api/budgets/{id}/restore [MVP]
 Soft-delete, and restore within 30 days. Restore returns 409 when the category already has another active budget.
+
+`category_id` on POST must be a default category or one of the user's own custom categories, or the call returns 400.
 
 ### GET /api/budgets/summary?period=2026-02 [MVP]
 Budget vs. actual for specified period.
@@ -160,6 +163,33 @@ Each takes an optional `currency_preference`: the iPhone region's currency, used
 
 ### POST /api/receipts (manual) [MVP]
 `currency` is optional and defaults to the user's `currency_preference`; it must be a 3-letter code.
+An item's `category_id`, when given, must be a default category or one of the user's own; any other id returns 400.
+
+## Categories [V1.1]
+
+The eight default categories, plus up to 10 custom categories per user (BC-05 AC 3). A custom category belongs to one user (Category has no household in the data model). Custom categories work everywhere a default does: correcting an item (and the item mapping it teaches the next scan, BC-05 AC 4), budgets, the budget summary and the dashboard. The LLM assigns only the defaults; a custom category reaches a new scan through the user's corrections.
+
+Creating and renaming are Premium (decision D2): a free user gets `403 premium_required` with `feature: "custom_categories"`. **When Premium lapses** the user's categories stay: they list, keep their items, still take corrections and budgets, and can be deleted; only create and rename return 403 until Premium is back.
+
+### GET /api/categories
+Defaults first (by `sort_order`), then the user's own in the order they were made. Each: `{ "id", "name", "is_default", "sort_order" }`. Another user's categories never list.
+
+### POST /api/categories
+Request `{ "name": "Garden" }`; whitespace is collapsed, and the name must be 1–40 characters (422 otherwise). Returns `201` with the category.
+- `409 { "detail": { "code": "category_limit_reached", "limit": 10, "message": … } }` when the user already has 10.
+- `409 { "detail": { "code": "category_name_taken", "message": … } }` when a default or one of the user's own categories has the name, ignoring case. Two users may use the same name.
+
+### PATCH /api/categories/{id}
+Rename: `{ "name": "Yard" }`, same rules and errors as POST. Premium. A default category or another user's returns 404.
+
+### DELETE /api/categories/{id}
+Returns `204`. Not Premium-gated, so a lapsed user can still remove what they made. The spending it held is kept:
+- its line items move to the default "Other" category, so totals and history don't change;
+- item mappings that pointed at it lose their category, so the next scan of those items is assigned afresh;
+- its budgets (active or in Recently Deleted) are removed, with the alerts sent for them;
+- it leaves `muted_alert_categories`.
+
+A default category or another user's returns 404. Deleting sends no budget alert; spend that moved into "Other" counts toward its budget from the next receipt on.
 
 ## Onboarding
 
@@ -212,7 +242,7 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
 
 ## Premium [V1.1]
 
-Premium ($5.99/month, decision D1) is an App Store subscription sold through RevenueCat. The backend trusts only RevenueCat for it: the webhook below and RevenueCat's REST API, never the app. Premium gates only the V1.1 extras (D2): the 12-month trend, custom categories, data export, budget rollover, and unlimited receipts. A free user asking for one gets `403 premium_required` (above).
+Premium ($5.99/month, decision D1) is an App Store subscription sold through RevenueCat. The backend trusts only RevenueCat for it: the webhook below and RevenueCat's REST API, never the app. Premium gates only the V1.1 extras (D2): the 12-month trend, custom categories, data export, budget rollover, and unlimited receipts. A free user asking for one gets `403 premium_required` (above). Custom categories: [Categories](#categories-v11).
 
 The profile (`/api/auth/me`, `/api/users/me`, and every route that returns it) carries the entitlement:
 ```json

@@ -2,8 +2,8 @@
  * User-facing strings for Premium (V11-P0): the paywall and the Settings row.
  * Externalized for i18n.
  *
- * The benefit list names only what Premium unlocks today (D2). Custom
- * categories, data export and budget rollover join it as they ship.
+ * The benefit list names only what Premium unlocks today (D2). Data export
+ * and budget rollover join it as they ship.
  */
 export const PREMIUM_STRINGS = {
   /** The locale these strings are written in; dates on the paywall use it. */
@@ -18,6 +18,12 @@ export const PREMIUM_STRINGS = {
       symbol: 'chart.bar.xaxis',
       title: '12-month spending trend',
       detail: 'See how your grocery spending moves across the whole year.',
+    },
+    {
+      key: 'categories',
+      symbol: 'tag.fill',
+      title: 'Your own categories',
+      detail: 'Add up to 10 categories for budgets and corrections, named your way.',
     },
     {
       key: 'receipts',

@@ -64,6 +64,8 @@ export const colors = {
   redBg: pair('rgba(255,59,48,0.12)', 'rgba(255,69,58,0.20)'),
   /** Text and glyphs on a brand-green fill: white, black on the brighter dark-mode green. */
   onTint: pair('#FFFFFF', '#000000'),
+  /** Glyphs on a Settings-style colored icon square: white in both modes (HIG). */
+  onIconSquare: pair('#FFFFFF', '#FFFFFF'),
   /** systemRed at 40% — the border of a field with an error. */
   redBorder: pair('rgba(255,59,48,0.40)', 'rgba(255,69,58,0.50)'),
   /** systemBlue at 8% (16% in dark) — tip cards. */

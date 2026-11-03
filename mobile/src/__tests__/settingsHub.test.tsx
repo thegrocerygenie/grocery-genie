@@ -62,6 +62,7 @@ function renderSettings() {
       'settings/help': () => null,
       'settings/delete-account': () => null,
       'settings/currency-settings': () => null,
+      'settings/categories': () => null,
       paywall: () => null,
     },
     { initialUrl: '/' },
@@ -126,6 +127,15 @@ describe('Settings hub', () => {
       text: 'Premium',
     });
     profile.is_premium = false;
+  });
+
+  it('opens Categories, and tells a free user they are Premium (V11-P1)', () => {
+    const app = renderSettings();
+
+    const row = screen.getByLabelText('Categories');
+    expect(row.props.accessibilityValue).toEqual({ text: 'Your own categories with Premium' });
+    fireEvent.press(row);
+    expect(app.getPathname()).toBe('/settings/categories');
   });
 
   it('has a switch to withdraw AI receipt reading (App Store 5.1.2(i))', () => {

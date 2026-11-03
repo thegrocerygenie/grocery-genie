@@ -39,6 +39,7 @@ from app.models.schemas import (
     ReceiptUpdateRequest,
 )
 from app.services.budget_service import BudgetService
+from app.services.category_service import CategoryService
 from app.services.item_matching_service import ItemMatchingService
 from app.services.notification_service import NotificationService
 from app.services.price_alert_service import NOTIFICATION_TYPE, PriceAlertService
@@ -547,6 +548,10 @@ class ReceiptService:
             receipt.date = updates.date
 
         if updates.items:
+            # Before any change: a default or the user's own category only.
+            await CategoryService(self.db).ensure_usable(
+                user_id, (c.category_id for c in updates.items)
+            )
             line_items_by_id = {li.id: li for li in receipt.line_items}
             # Subtotal and total are not edited; they move by what price
             # corrections changed, which keeps any unitemised discount.
@@ -855,6 +860,9 @@ class ReceiptService:
         items: list[dict],
     ) -> Receipt:
         """Create a receipt without an image (manual entry fallback)."""
+        await CategoryService(self.db).ensure_usable(
+            user_id, (item.get("category_id") for item in items)
+        )
         store = await self.store_service.find_or_create(store_name)
         receipt = Receipt(
             user_id=user_id,

@@ -1,6 +1,6 @@
 # Premium through RevenueCat
 
-Premium ($5.99/month, V1.1 decision D1) is an App Store subscription sold through RevenueCat. The backend never believes the app about it: RevenueCat's webhook (`POST /api/webhooks/revenuecat`, authenticated by a shared secret) and its REST API set the entitlement on the user row, the profile shows it as `is_premium`, and every Premium gate reads it. Premium unlocks the 12-month trend and unlimited receipts today (D2); a free user asking for either gets `403 premium_required` or the monthly `429`.
+Premium ($5.99/month, V1.1 decision D1) is an App Store subscription sold through RevenueCat. The backend never believes the app about it: RevenueCat's webhook (`POST /api/webhooks/revenuecat`, authenticated by a shared secret) and its REST API set the entitlement on the user row, the profile shows it as `is_premium`, and every Premium gate reads it. Premium unlocks the 12-month trend, custom categories ([`custom-categories.md`](./custom-categories.md)) and unlimited receipts today (D2); a free user asking for one gets `403 premium_required` or the monthly `429`.
 
 ## Sub-features
 
@@ -61,4 +61,4 @@ ev() {  # ev ID TYPE EVENT_AT EXPIRES_AT [APP_USER_ID]
 - Each event id must be new per run: the ids above end in the user's id. Reusing an id from an earlier step is the replay check, not a new event.
 - Order matters: `event_timestamp_ms` older than the last applied event is `stale`, which is why each step's event time grows (`now+1000`, `+2000`, ...).
 - `premium-unlimited` makes 21 scans: run it before the delete, and keep the hourly limit (50 receipt submissions) in mind if you rerun it on the same user.
-- The REST refresh with a real key (and a webhook landing during its read), `TRANSFER` events, refund cancellations and two concurrent deliveries of one event are covered by pytest (`backend/tests/services/test_premium_service.py` too) (`backend/tests/api/test_revenuecat_webhook.py`, `backend/tests/services/test_revenuecat_client.py`) with RevenueCat's API mocked: this instance never calls RevenueCat.
+- The REST refresh with a real key (and a webhook landing during its read), `TRANSFER` events, refund cancellations and two concurrent deliveries of one event are covered by pytest (`backend/tests/api/test_revenuecat_webhook.py`, `backend/tests/services/test_premium_service.py`, `backend/tests/services/test_revenuecat_client.py`) with RevenueCat's API mocked: this instance never calls RevenueCat.
