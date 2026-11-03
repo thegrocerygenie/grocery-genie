@@ -210,6 +210,9 @@ class DashboardCategoryChange(BaseModel):
 
 class DashboardSpendingResponse(BaseModel):
     period: str
+    # First and last day of ``period``, from the overall budget's reset day.
+    period_start: date
+    period_end: date
     overall: BudgetOverallSummary
     categories: list[BudgetCategorySummary]
     top_items: list[DashboardTopItem]

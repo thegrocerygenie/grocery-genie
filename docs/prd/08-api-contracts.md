@@ -112,10 +112,14 @@ Budget vs. actual for specified period.
 ### GET /api/dashboard/spending?period=2026-03 [MVP]
 Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-month trend (oldest first, ending at `period`), and a month-over-month comparison per category. `category_changes` lists every category with spend in `period` or `previous_period`, largest current spend first; uncategorized spend is left out. `prior_average` is the mean monthly spend over the 3 months before the trend window (0.0 when there was none), for comparing with the trend's own average. `has_receipts` is true when the user has any receipt outside Recently Deleted, in any period; the app shows its first-scan state only when it is false. Each top item carries the category that holds most of its spend (`category_id` and `category_name` are null when uncategorized). Each trend month splits its `spent` into `categories`, largest first; uncategorized spend is kept there (`category_id` null, name "Uncategorized") so the parts add up to `spent`.
 
+**Current period.** Without `period`, the response is about the period that holds today in the user's time zone (`users.timezone`; UTC when unset). Periods reset on the overall budget's start day and are named for the month they start in, so with a start day of 15, October 10 is in `2026-09` (September 15 – October 14). The app sends no `period` and reads it from the response. `period_start` and `period_end` are the period's first and last days, for any `period`; the app takes the day count, days left, and pace from them.
+
 **Response:**
 ```json
 {
   "period": "2026-03",
+  "period_start": "2026-03-01",
+  "period_end": "2026-03-31",
   "overall": { "budget": 500, "spent": 35.0, "remaining": 465.0, "percent": 7.0 },
   "categories": [ "…as in /api/budgets/summary" ],
   "top_items": [ { "name": "Bananas", "total_spent": 5.0, "count": 1, "category_id": "uuid", "category_name": "Groceries" } ],
