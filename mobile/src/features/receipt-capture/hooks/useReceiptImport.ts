@@ -16,6 +16,7 @@ import {
   pickFromLibrary,
   type PickedReceipt,
 } from '../services/receiptImport';
+import { showQuotaUpgradePrompt } from '../utils/scanQuota';
 import { useReceiptScan } from './useReceiptScan';
 
 export type ImportKind = 'library' | 'files';
@@ -105,6 +106,11 @@ export function useReceiptImport() {
           markRequired();
           phase.current = 'idle';
           await askForConsent();
+        } else if (result.status === 'quota') {
+          showQuotaUpgradePrompt({
+            onUpgrade: () => router.push('/paywall'),
+            onManualEntry: () => router.push('/manual-entry'),
+          });
         } else if (result.status === 'error') {
           Alert.alert('Couldn’t import receipt', result.message);
         }

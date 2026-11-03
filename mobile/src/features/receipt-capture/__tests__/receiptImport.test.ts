@@ -262,19 +262,28 @@ describe('importReceipt', () => {
     expect(result).toEqual({ status: 'error', message: 'Image quality insufficient' });
   });
 
-  it('does not queue a file over the monthly quota, and says why', async () => {
+  it('does not queue a file over the monthly quota, and reports the quota', async () => {
     const queue = jest.fn();
     const result = await importReceipt({
       pick: async () => ({ status: 'picked', receipt: picked }),
       upload: async () => {
         throw new ApiError(429, {
           detail: 'Monthly receipt quota exceeded (20 receipts/month on Free tier).',
+          code: 'receipt_quota_exceeded',
         });
       },
       queue,
     });
     expect(queue).not.toHaveBeenCalled();
-    expect(result).toEqual({ status: 'error', message: QUOTA_MESSAGE });
+    expect(result).toEqual({ status: 'quota' });
+  });
+
+  it('keeps the quota message for anything that shows the error as text', () => {
+    expect(
+      scanErrorMessage(
+        new ApiError(429, { detail: 'Monthly receipt quota exceeded (20 receipts/month).' }),
+      ),
+    ).toBe(QUOTA_MESSAGE);
   });
 
   it('reports the error when saving to the queue fails', async () => {
