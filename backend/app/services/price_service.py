@@ -12,7 +12,7 @@ import uuid
 from collections import Counter
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -338,7 +338,10 @@ class PriceService:
                     store_name=store_name,
                     # Rows are oldest first, so the last is the latest.
                     latest=observations[-1],
-                    average=(total / len(observations)).quantize(Decimal("0.01")),
+                    # "Rounded to the cent" (08-api-contracts.md): half up.
+                    average=(total / len(observations)).quantize(
+                        Decimal("0.01"), rounding=ROUND_HALF_UP
+                    ),
                     observation_count=len(observations),
                 )
             )

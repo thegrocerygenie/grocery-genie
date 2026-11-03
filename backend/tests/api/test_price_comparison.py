@@ -5,11 +5,14 @@ and scans confirmed with PATCH status.
 """
 
 import uuid
+from datetime import date
 
 from httpx import AsyncClient
 
-from app.models.database import Store
+from app.models.database import PriceObservation, Store
 from tests.api.test_items import _item_id, _scan_and_confirm, analytics_spy  # noqa: F401
+from tests.conftest import USER_B_ID
+from tests.services.test_item_matching import _receipt
 
 
 async def _manual(
@@ -112,6 +115,18 @@ async def test_a_store_needs_two_prices_to_be_compared(client):
     assert body["stores_below_minimum"] == 1
 
 
+async def test_average_is_rounded_half_up_to_the_cent(client):
+    """08-api-contracts.md: avg_price is "rounded to the cent", half up, so an
+    average of 0.705 is 0.71 (banker's rounding would give 0.70)."""
+    await _manual(client, "FreshCo", "2026-03-01", "Limes", 0.70)
+    await _manual(client, "FreshCo", "2026-03-08", "Limes", 0.71)
+    item_id = await _item_id(client, "limes")
+
+    body = await _compare(client, item_id)
+
+    assert _by_store(body)["FreshCo"]["avg_price"] == 0.71
+
+
 async def test_one_price_anywhere_compares_nothing(client):
     await _manual(client, "FreshCo", "2026-03-01", "Limes", 0.5)
     item_id = await _item_id(client, "limes")
@@ -126,8 +141,10 @@ async def test_only_stores_the_user_bought_from_are_shown(
     client, mock_extractor, test_image_bytes, db_session
 ):
     """PI-04 AC 3: a store the user never scanned from is not listed, nor is
-    a receipt with no store, nor a deleted receipt."""
-    db_session.add(Store(name="Costco", normalized_name="costco"))
+    a receipt with no store, nor a deleted receipt. Another user's cheaper
+    Costco prices for this very item stay out too."""
+    costco = Store(name="Costco", normalized_name="costco")
+    db_session.add(costco)
     await db_session.flush()
     await _manual(client, "FreshCo", "2026-03-01", "Limes", 0.5)
     await _manual(client, "FreshCo", "2026-03-08", "Limes", 0.6)
@@ -148,6 +165,27 @@ async def test_only_stores_the_user_bought_from_are_shown(
         resp = await client.delete(f"/api/receipts/{receipt['id']}")
         assert resp.status_code in (200, 204), resp.text
     item_id = await _item_id(client, "limes")
+    # Two prices from another user at Costco, filed against this item: enough
+    # to be compared, and cheapest, if the comparison stopped scoping by user.
+    for day in [date(2026, 3, 4), date(2026, 3, 11)]:
+        receipt, [line] = await _receipt(db_session, "Limes", user_id=USER_B_ID)
+        receipt.store_id = costco.id
+        receipt.date = day
+        line.unit_price = line.total_price = 0.1
+        db_session.add(
+            PriceObservation(
+                user_id=USER_B_ID,
+                canonical_item_id=uuid.UUID(item_id),
+                receipt_id=receipt.id,
+                line_item_id=line.id,
+                store_id=costco.id,
+                date=day,
+                unit_price=0.1,
+                quantity=1,
+                currency="USD",
+            )
+        )
+    await db_session.flush()
 
     body = await _compare(client, item_id)
 
