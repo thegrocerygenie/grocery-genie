@@ -20,6 +20,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from app.models.types import EmbeddingVector
+
 
 class Base(DeclarativeBase):
     pass
@@ -234,7 +236,13 @@ class LineItem(Base):
     raw_name: Mapped[str] = mapped_column(String(500), nullable=False)
     # 0-based place on the receipt; Receipt.line_items orders by it.
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    canonical_item_id: Mapped[uuid.UUID | None] = mapped_column()
+    # PI-02: the product this line is, set when its receipt is confirmed.
+    canonical_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("canonical_items.id", ondelete="SET NULL"), index=True
+    )
+    # How the line was matched: 0..1, and alias | fuzzy | semantic | new | manual.
+    match_confidence: Mapped[float | None] = mapped_column(Float)
+    match_method: Mapped[str | None] = mapped_column(String(16))
     quantity: Mapped[float] = mapped_column(Numeric(10, 3), default=1)
     unit_price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     total_price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
@@ -414,3 +422,143 @@ class UserItemMapping(Base):
 
     user: Mapped["User"] = relationship(back_populates="item_mappings")
     category: Mapped["Category | None"] = relationship()
+
+
+class CanonicalItem(Base):
+    """One product in a user's item registry (PI-02).
+
+    Each user has their own registry: merging or splitting items is the
+    user's own call, and item names never cross accounts. household_id is
+    there for V1.5. Line items and price observations point here.
+    """
+
+    __tablename__ = "canonical_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    household_id: Mapped[uuid.UUID | None] = mapped_column()
+    canonical_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    unit_of_measure: Mapped[str | None] = mapped_column(String(50))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now()
+    )
+
+    aliases: Mapped[list["CanonicalItemAlias"]] = relationship(
+        back_populates="item",
+        cascade="all, delete-orphan",
+        order_by="CanonicalItemAlias.created_at",
+    )
+
+
+class CanonicalItemAlias(Base):
+    """A name a receipt gave a canonical item, e.g. "ORG BANANAS".
+
+    normalized_name is unique per user, so a name always resolves to one item
+    (the exact-alias step of matching). embedding is the name's sentence
+    embedding for the semantic step; null until it is computed.
+    """
+
+    __tablename__ = "canonical_item_aliases"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "normalized_name", name="uq_canonical_alias_user_name"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    canonical_item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("canonical_items.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    alias: Mapped[str] = mapped_column(String(500), nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    embedding: Mapped[list[float] | None] = mapped_column(EmbeddingVector())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    item: Mapped["CanonicalItem"] = relationship(back_populates="aliases")
+
+
+class PriceObservation(Base):
+    """One price paid for a canonical item (PI-01): one per confirmed line item.
+
+    Rebuilt from the receipt whenever a confirmed receipt changes. Reads join
+    receipts to leave out deleted ones, so deleting and restoring a receipt
+    needs no change here.
+    """
+
+    __tablename__ = "price_observations"
+    __table_args__ = (
+        Index("ix_price_observations_item_date", "canonical_item_id", "date"),
+        Index("ix_price_observations_user", "user_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    household_id: Mapped[uuid.UUID | None] = mapped_column()
+    canonical_item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("canonical_items.id", ondelete="CASCADE"), nullable=False
+    )
+    receipt_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("receipts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    line_item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("line_items.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    store_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("stores.id"))
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    unit_price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    quantity: Mapped[float] = mapped_column(Numeric(10, 3), nullable=False)
+    unit_of_measure: Mapped[str | None] = mapped_column(String(50))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    store: Mapped["Store | None"] = relationship()
+
+
+class ItemMatchSuggestion(Base):
+    """A medium-confidence match the user is asked to confirm (PI-02 AC 2).
+
+    The line went to a new item (item_id); accepting merges that item into
+    suggested_item_id, rejecting keeps the two apart.
+    status: pending | accepted | rejected.
+    """
+
+    __tablename__ = "item_match_suggestions"
+    __table_args__ = (
+        UniqueConstraint(
+            "item_id", "suggested_item_id", name="uq_item_match_suggestion_pair"
+        ),
+        Index("ix_item_match_suggestions_user_status", "user_id", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("canonical_items.id", ondelete="CASCADE"), nullable=False
+    )
+    suggested_item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("canonical_items.id", ondelete="CASCADE"), nullable=False
+    )
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    method: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    item: Mapped["CanonicalItem"] = relationship(foreign_keys=[item_id])
+    suggested_item: Mapped["CanonicalItem"] = relationship(
+        foreign_keys=[suggested_item_id]
+    )

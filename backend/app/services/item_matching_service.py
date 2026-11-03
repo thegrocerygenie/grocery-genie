@@ -1,0 +1,616 @@
+"""Item matching (PI-02): resolve receipt line names to canonical items.
+
+Each user has their own registry of canonical items, and each item has the
+names receipts gave it (aliases). A confirmed line goes through, in order:
+
+1. exact alias: its normalized name is already an alias -> that item.
+2. fuzzy: string similarity to an alias >= item_match_fuzzy_threshold.
+3. semantic: cosine similarity of name embeddings
+   >= item_match_semantic_threshold.
+4. new: a new canonical item. If the best candidate scored at least
+   item_match_suggest_threshold, the user is asked whether the two are the
+   same (an ItemMatchSuggestion); accepting merges them.
+
+A name linked by step 2 or 3 becomes an alias of the item, so the next scan
+of it is an exact match. Names whose numbers differ ("milk 1%" and "milk 2%",
+"cola 1l" and "cola 2l") never match by similarity: the numbers are what tell
+those products apart, and both similarity scores rate them close.
+
+The user can also merge two items, split an alias off into its own item,
+and rename an item.
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+import re
+import unicodedata
+import uuid
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
+
+from pgvector.sqlalchemy import Vector
+from rapidfuzz.distance import JaroWinkler, Levenshtein
+from sqlalchemy import Float, cast, delete, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import Settings, get_settings
+from app.events.dispatcher import dispatcher
+from app.events.types import ItemMatched
+from app.llm.provider import Embedder, EmbeddingUnavailableError
+from app.models.database import (
+    CanonicalItem,
+    CanonicalItemAlias,
+    ItemMatchSuggestion,
+    LineItem,
+    PriceObservation,
+    Receipt,
+)
+from app.models.types import EMBEDDING_DIMENSIONS
+
+logger = logging.getLogger(__name__)
+
+MATCH_ALIAS = "alias"
+MATCH_FUZZY = "fuzzy"
+MATCH_SEMANTIC = "semantic"
+MATCH_NEW = "new"
+MATCH_MANUAL = "manual"
+
+# Nearest aliases fetched per semantic lookup: the closest may fail the
+# number check, so look a little further.
+_SEMANTIC_CANDIDATES = 5
+
+_NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+class ItemNotFoundError(Exception):
+    """No canonical item (or alias, or suggestion) with that id for this user."""
+
+
+class ItemMatchConflictError(Exception):
+    """The operation would leave the registry inconsistent (e.g. split the
+    only alias, or merge an item into itself)."""
+
+
+def normalize_item_name(name: str) -> str:
+    """Casefold, drop punctuation, collapse spaces: "Org. Bananas!" -> "org bananas".
+
+    Decimal points and commas inside numbers stay ("2.5kg"), as does "%".
+    """
+    text = unicodedata.normalize("NFKC", name).casefold()
+    text = re.sub(r"(?<!\d)[.,]|[.,](?!\d)", " ", text)
+    text = re.sub(r"[^\w%.,]+", " ", text)
+    return " ".join(text.split())
+
+
+def _numbers(normalized: str) -> list[str]:
+    return sorted(n.replace(",", ".") for n in _NUMBER.findall(normalized))
+
+
+def numbers_compatible(a: str, b: str) -> bool:
+    """False when both names carry numbers and the numbers differ."""
+    numbers_a, numbers_b = _numbers(a), _numbers(b)
+    return not (numbers_a and numbers_b and numbers_a != numbers_b)
+
+
+def fuzzy_similarity(a: str, b: str) -> float:
+    """0..1: mean of Jaro-Winkler and Levenshtein similarity on word-sorted names.
+
+    Sorting the words makes "gala apples" equal "apples gala". Jaro-Winkler
+    alone rewards a shared prefix too much ("chicken breast" and "chicken
+    thighs" score 0.87); averaging with Levenshtein pulls such pairs down.
+    """
+    sorted_a = " ".join(sorted(a.split()))
+    sorted_b = " ".join(sorted(b.split()))
+    return (
+        JaroWinkler.normalized_similarity(sorted_a, sorted_b)
+        + Levenshtein.normalized_similarity(sorted_a, sorted_b)
+    ) / 2
+
+
+def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b, strict=False))
+    norm = math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(y * y for y in b))
+    return dot / norm if norm else 0.0
+
+
+@dataclass
+class _Alias:
+    item_id: uuid.UUID
+    normalized: str
+
+
+@dataclass
+class _Candidate:
+    item_id: uuid.UUID
+    score: float
+    method: str
+
+
+@dataclass(frozen=True)
+class MatchResult:
+    item_id: uuid.UUID
+    confidence: float
+    method: str
+
+
+class ItemMatchingService:
+    def __init__(
+        self,
+        db: AsyncSession,
+        embedder: Embedder | None = None,
+        settings: Settings | None = None,
+    ) -> None:
+        self.db = db
+        self.embedder = embedder
+        self.settings = settings or get_settings()
+
+    # --- Matching ---------------------------------------------------------
+
+    async def match_receipt(self, receipt: Receipt) -> list[MatchResult]:
+        """Link every line of a confirmed receipt to a canonical item."""
+        return await self.match_line_items(receipt.user_id, list(receipt.line_items))
+
+    async def match_line_items(
+        self, user_id: uuid.UUID, line_items: Sequence[LineItem]
+    ) -> list[MatchResult]:
+        """Match ``line_items`` (all the user's) and link each one.
+
+        The same name twice resolves once; a name new on this receipt is
+        matched by the lines after it.
+        """
+        aliases = await self._load_aliases(user_id)
+        by_name = {a.normalized: a for a in aliases}
+
+        names = [normalize_item_name(li.raw_name) for li in line_items]
+        to_embed = sorted({n for n in names if n and n not in by_name})
+        embeddings = await self._embed(to_embed)
+
+        resolved: dict[str, MatchResult] = {}
+        results: list[MatchResult] = []
+        for line_item, name in zip(line_items, names, strict=True):
+            if not name:
+                continue
+            result = resolved.get(name)
+            if result is None:
+                result = await self._resolve(
+                    user_id, line_item, name, aliases, by_name, embeddings.get(name)
+                )
+                resolved[name] = result
+            await self._link(line_item, result)
+            results.append(result)
+        return results
+
+    async def _resolve(
+        self,
+        user_id: uuid.UUID,
+        line_item: LineItem,
+        name: str,
+        aliases: list[_Alias],
+        by_name: dict[str, _Alias],
+        embedding: list[float] | None,
+    ) -> MatchResult:
+        exact = by_name.get(name)
+        if exact is not None:
+            return MatchResult(exact.item_id, 1.0, MATCH_ALIAS)
+
+        fuzzy = self._best_fuzzy(name, aliases)
+        semantic = (
+            await self._best_semantic(user_id, name, embedding)
+            if embedding is not None
+            else None
+        )
+
+        if fuzzy and fuzzy.score >= self.settings.item_match_fuzzy_threshold:
+            chosen = fuzzy
+        elif semantic and semantic.score >= self.settings.item_match_semantic_threshold:
+            chosen = semantic
+        else:
+            chosen = None
+
+        if chosen is not None:
+            await self._add_alias(
+                user_id, chosen.item_id, line_item.raw_name, name, embedding
+            )
+            alias = _Alias(chosen.item_id, name)
+            aliases.append(alias)
+            by_name[name] = alias
+            return MatchResult(chosen.item_id, round(chosen.score, 4), chosen.method)
+
+        item = CanonicalItem(
+            user_id=user_id,
+            canonical_name=line_item.raw_name.strip()[:255],
+            unit_of_measure=line_item.unit_of_measure,
+        )
+        self.db.add(item)
+        await self.db.flush()
+        await self._add_alias(user_id, item.id, line_item.raw_name, name, embedding)
+        alias = _Alias(item.id, name)
+        aliases.append(alias)
+        by_name[name] = alias
+
+        best = max(
+            (c for c in (fuzzy, semantic) if c is not None),
+            key=lambda c: c.score,
+            default=None,
+        )
+        if best and best.score >= self.settings.item_match_suggest_threshold:
+            self.db.add(
+                ItemMatchSuggestion(
+                    user_id=user_id,
+                    item_id=item.id,
+                    suggested_item_id=best.item_id,
+                    confidence=round(best.score, 4),
+                    method=best.method,
+                    status="pending",
+                )
+            )
+        return MatchResult(item.id, 1.0, MATCH_NEW)
+
+    def _best_fuzzy(self, name: str, aliases: list[_Alias]) -> _Candidate | None:
+        best: _Candidate | None = None
+        for alias in aliases:
+            if not numbers_compatible(name, alias.normalized):
+                continue
+            score = fuzzy_similarity(name, alias.normalized)
+            if best is None or score > best.score:
+                best = _Candidate(alias.item_id, score, MATCH_FUZZY)
+        return best
+
+    async def _best_semantic(
+        self, user_id: uuid.UUID, name: str, embedding: list[float]
+    ) -> _Candidate | None:
+        for alias_name, item_id, similarity in await self._nearest(user_id, embedding):
+            if numbers_compatible(name, alias_name):
+                return _Candidate(item_id, similarity, MATCH_SEMANTIC)
+        return None
+
+    async def _nearest(
+        self, user_id: uuid.UUID, embedding: list[float]
+    ) -> list[tuple[str, uuid.UUID, float]]:
+        """The user's aliases nearest ``embedding``: (name, item_id, cosine)."""
+        has_embedding = (
+            CanonicalItemAlias.user_id == user_id,
+            CanonicalItemAlias.embedding.is_not(None),
+        )
+        if self.db.bind.dialect.name == "postgresql":
+            # Exact scan of this user's aliases; see migration 0015.
+            distance = CanonicalItemAlias.embedding.op("<=>", return_type=Float)(
+                cast(embedding, Vector(EMBEDDING_DIMENSIONS))
+            )
+            rows = await self.db.execute(
+                select(
+                    CanonicalItemAlias.normalized_name,
+                    CanonicalItemAlias.canonical_item_id,
+                    (1 - distance).label("similarity"),
+                )
+                .where(*has_embedding)
+                .order_by(distance)
+                .limit(_SEMANTIC_CANDIDATES)
+            )
+            return [(n, i, float(s)) for n, i, s in rows.all()]
+
+        # SQLite (the test suite) has no vector type: compare in Python.
+        rows = await self.db.execute(
+            select(
+                CanonicalItemAlias.normalized_name,
+                CanonicalItemAlias.canonical_item_id,
+                CanonicalItemAlias.embedding,
+            ).where(*has_embedding)
+        )
+        scored = [(n, i, _cosine(embedding, e)) for n, i, e in rows.all()]
+        scored.sort(key=lambda row: row[2], reverse=True)
+        return scored[:_SEMANTIC_CANDIDATES]
+
+    async def _embed(self, names: list[str]) -> dict[str, list[float]]:
+        """Embeddings by name; empty when there is no embedder or it fails.
+
+        Matching then falls back to aliases and fuzzy similarity, and the
+        nightly sweep fills in the missing alias embeddings.
+        """
+        if not names or self.embedder is None:
+            return {}
+        try:
+            vectors = await self.embedder.embed(names)
+        except EmbeddingUnavailableError:
+            logger.warning(
+                "Embedding model unavailable; matching %d name(s) without it",
+                len(names),
+                exc_info=True,
+            )
+            return {}
+        return dict(zip(names, vectors, strict=True))
+
+    async def _load_aliases(self, user_id: uuid.UUID) -> list[_Alias]:
+        rows = await self.db.execute(
+            select(
+                CanonicalItemAlias.canonical_item_id,
+                CanonicalItemAlias.normalized_name,
+            ).where(CanonicalItemAlias.user_id == user_id)
+        )
+        return [_Alias(item_id, name) for item_id, name in rows.all()]
+
+    async def _add_alias(
+        self,
+        user_id: uuid.UUID,
+        item_id: uuid.UUID,
+        raw_name: str,
+        normalized: str,
+        embedding: list[float] | None,
+    ) -> None:
+        self.db.add(
+            CanonicalItemAlias(
+                canonical_item_id=item_id,
+                user_id=user_id,
+                alias=raw_name.strip()[:500],
+                normalized_name=normalized[:500],
+                embedding=embedding,
+            )
+        )
+        await self.db.flush()
+
+    async def _link(self, line_item: LineItem, result: MatchResult) -> None:
+        line_item.canonical_item_id = result.item_id
+        line_item.match_confidence = result.confidence
+        line_item.match_method = result.method
+        if result.method != MATCH_NEW and line_item.unit_of_measure:
+            item = await self.db.get(CanonicalItem, result.item_id)
+            if item is not None and item.unit_of_measure is None:
+                item.unit_of_measure = line_item.unit_of_measure
+        dispatcher.dispatch(
+            ItemMatched(
+                line_item_id=line_item.id,
+                canonical_item_id=result.item_id,
+                match_confidence=result.confidence,
+                match_method=result.method,
+            )
+        )
+
+    async def match_unmatched(self, user_id: uuid.UUID) -> int:
+        """Match the user's confirmed lines that have no item yet.
+
+        Covers receipts confirmed before item matching existed, and any whose
+        matching failed. Returns the number of lines matched.
+        """
+        rows = await self.db.execute(
+            select(LineItem)
+            .join(Receipt, LineItem.receipt_id == Receipt.id)
+            .where(
+                Receipt.user_id == user_id,
+                Receipt.status == "confirmed",
+                LineItem.canonical_item_id.is_(None),
+            )
+            .order_by(Receipt.date, LineItem.position)
+        )
+        line_items = list(rows.scalars().all())
+        if line_items:
+            await self.match_line_items(user_id, line_items)
+        return len(line_items)
+
+    async def embed_missing_aliases(self, user_id: uuid.UUID) -> int:
+        """Fill in alias embeddings that matching could not compute."""
+        if self.embedder is None:
+            return 0
+        rows = await self.db.execute(
+            select(CanonicalItemAlias).where(
+                CanonicalItemAlias.user_id == user_id,
+                CanonicalItemAlias.embedding.is_(None),
+            )
+        )
+        aliases = list(rows.scalars().all())
+        vectors = await self._embed([a.normalized_name for a in aliases])
+        filled = 0
+        for alias in aliases:
+            vector = vectors.get(alias.normalized_name)
+            if vector is not None:
+                alias.embedding = vector
+                filled += 1
+        await self.db.flush()
+        return filled
+
+    # --- User actions -----------------------------------------------------
+
+    async def get_item(self, user_id: uuid.UUID, item_id: uuid.UUID) -> CanonicalItem:
+        item = await self.db.get(CanonicalItem, item_id)
+        if item is None or item.user_id != user_id:
+            raise ItemNotFoundError(item_id)
+        return item
+
+    async def rename(
+        self, user_id: uuid.UUID, item_id: uuid.UUID, name: str
+    ) -> CanonicalItem:
+        item = await self.get_item(user_id, item_id)
+        item.canonical_name = name.strip()[:255]
+        await self.db.flush()
+        return item
+
+    async def merge(
+        self, user_id: uuid.UUID, source_id: uuid.UUID, target_id: uuid.UUID
+    ) -> CanonicalItem:
+        """Fold ``source`` into ``target`` (PI-02 AC 3: link two items).
+
+        Its aliases, lines and prices move to the target, and the source is
+        deleted. Pending suggestions about the source move to the target; one
+        that would pair the target with itself is dropped.
+        """
+        if source_id == target_id:
+            raise ItemMatchConflictError("An item cannot be merged into itself")
+        source = await self.get_item(user_id, source_id)
+        target = await self.get_item(user_id, target_id)
+
+        await self.db.execute(
+            update(CanonicalItemAlias)
+            .where(CanonicalItemAlias.canonical_item_id == source.id)
+            .values(canonical_item_id=target.id)
+        )
+        await self.db.execute(
+            update(LineItem)
+            .where(LineItem.canonical_item_id == source.id)
+            .values(
+                canonical_item_id=target.id,
+                match_method=MATCH_MANUAL,
+                match_confidence=1.0,
+            )
+        )
+        await self.db.execute(
+            update(PriceObservation)
+            .where(PriceObservation.canonical_item_id == source.id)
+            .values(canonical_item_id=target.id)
+        )
+        await self._move_suggestions(source.id, target.id)
+        if target.unit_of_measure is None:
+            target.unit_of_measure = source.unit_of_measure
+
+        # A statement, not session.delete(): the ORM cascade would delete the
+        # aliases still listed in source.aliases, which now belong to target.
+        # Bulk statements also update the objects already in the session.
+        await self.db.execute(
+            delete(CanonicalItem).where(CanonicalItem.id == source.id)
+        )
+        await self.db.flush()
+        await self.db.refresh(target, ["aliases"])
+        return target
+
+    async def _move_suggestions(
+        self, source_id: uuid.UUID, target_id: uuid.UUID
+    ) -> None:
+        rows = await self.db.execute(
+            select(ItemMatchSuggestion).where(
+                (ItemMatchSuggestion.item_id == source_id)
+                | (ItemMatchSuggestion.suggested_item_id == source_id)
+            )
+        )
+        existing_pairs = {
+            (s.item_id, s.suggested_item_id)
+            for s in (
+                await self.db.execute(
+                    select(ItemMatchSuggestion).where(
+                        (ItemMatchSuggestion.item_id == target_id)
+                        | (ItemMatchSuggestion.suggested_item_id == target_id)
+                    )
+                )
+            ).scalars()
+        }
+        for suggestion in rows.scalars().all():
+            item_id = (
+                target_id if suggestion.item_id == source_id else suggestion.item_id
+            )
+            suggested = (
+                target_id
+                if suggestion.suggested_item_id == source_id
+                else suggestion.suggested_item_id
+            )
+            if item_id == suggested or (item_id, suggested) in existing_pairs:
+                await self.db.delete(suggestion)
+                continue
+            suggestion.item_id = item_id
+            suggestion.suggested_item_id = suggested
+            existing_pairs.add((item_id, suggested))
+        await self.db.flush()
+
+    async def split_alias(
+        self, user_id: uuid.UUID, item_id: uuid.UUID, alias_id: uuid.UUID
+    ) -> CanonicalItem:
+        """Move one alias, with its lines and prices, to a new item (unlink)."""
+        item = await self.get_item(user_id, item_id)
+        await self.db.refresh(item, ["aliases"])
+        alias = next((a for a in item.aliases if a.id == alias_id), None)
+        if alias is None:
+            raise ItemNotFoundError(alias_id)
+        if len(item.aliases) < 2:
+            raise ItemMatchConflictError(
+                "This is the item's only name; there is nothing to split off"
+            )
+
+        new_item = CanonicalItem(
+            user_id=user_id,
+            household_id=item.household_id,
+            canonical_name=alias.alias[:255],
+            unit_of_measure=item.unit_of_measure,
+        )
+        self.db.add(new_item)
+        await self.db.flush()
+        alias.canonical_item_id = new_item.id
+
+        rows = await self.db.execute(
+            select(LineItem).where(LineItem.canonical_item_id == item.id)
+        )
+        moved = [
+            li
+            for li in rows.scalars().all()
+            if normalize_item_name(li.raw_name) == alias.normalized_name
+        ]
+        for line_item in moved:
+            line_item.canonical_item_id = new_item.id
+            line_item.match_method = MATCH_MANUAL
+            line_item.match_confidence = 1.0
+        if moved:
+            await self.db.execute(
+                update(PriceObservation)
+                .where(PriceObservation.line_item_id.in_([li.id for li in moved]))
+                .values(canonical_item_id=new_item.id)
+            )
+        await self.db.flush()
+        await self.db.refresh(item, ["aliases"])
+        return new_item
+
+    # --- Suggestions (PI-02 AC 2) -----------------------------------------
+
+    async def list_suggestions(
+        self, user_id: uuid.UUID, item_id: uuid.UUID | None = None
+    ) -> list[ItemMatchSuggestion]:
+        query = (
+            select(ItemMatchSuggestion)
+            .where(
+                ItemMatchSuggestion.user_id == user_id,
+                ItemMatchSuggestion.status == "pending",
+            )
+            .order_by(ItemMatchSuggestion.created_at.desc())
+        )
+        if item_id is not None:
+            query = query.where(ItemMatchSuggestion.item_id == item_id)
+        rows = await self.db.execute(query)
+        suggestions = list(rows.scalars().all())
+        for suggestion in suggestions:
+            await self.db.refresh(suggestion, ["item", "suggested_item"])
+        return suggestions
+
+    async def _get_pending(
+        self, user_id: uuid.UUID, suggestion_id: uuid.UUID
+    ) -> ItemMatchSuggestion:
+        suggestion = await self.db.get(ItemMatchSuggestion, suggestion_id)
+        if suggestion is None or suggestion.user_id != user_id:
+            raise ItemNotFoundError(suggestion_id)
+        if suggestion.status != "pending":
+            raise ItemMatchConflictError(f"Suggestion is already {suggestion.status}")
+        return suggestion
+
+    async def accept_suggestion(
+        self, user_id: uuid.UUID, suggestion_id: uuid.UUID
+    ) -> tuple[CanonicalItem, MatchResult]:
+        """Same product: merge the new item into the suggested one.
+
+        Returns the merged item and the match the user confirmed (for the
+        precision metric). merge() drops the suggestion itself: it would pair
+        the item with itself.
+        """
+        suggestion = await self._get_pending(user_id, suggestion_id)
+        confirmed = MatchResult(
+            suggestion.suggested_item_id, suggestion.confidence, suggestion.method
+        )
+        target = await self.merge(
+            user_id, suggestion.item_id, suggestion.suggested_item_id
+        )
+        return target, confirmed
+
+    async def reject_suggestion(
+        self, user_id: uuid.UUID, suggestion_id: uuid.UUID
+    ) -> ItemMatchSuggestion:
+        """Different products: keep both items."""
+        suggestion = await self._get_pending(user_id, suggestion_id)
+        suggestion.status = "rejected"
+        suggestion.resolved_at = datetime.now(UTC)
+        await self.db.flush()
+        return suggestion

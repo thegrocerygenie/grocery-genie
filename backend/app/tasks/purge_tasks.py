@@ -4,7 +4,9 @@ Beat runs this daily. A receipt or budget whose deleted_at is older than
 RESTORE_WINDOW can no longer be restored, so it is hard-deleted:
 
 - receipt: its line_items, the receipts row, and its image files (original,
-  converted JPEG, thumbnail); receipt_corrections go by ON DELETE CASCADE;
+  converted JPEG, thumbnail); receipt_corrections and price_observations go
+  by ON DELETE CASCADE (the canonical items stay: they are the user's
+  registry, not the receipt's);
 - budget: the budget_threshold notifications that name it and the budgets
   row; budget_alerts_sent goes by ON DELETE CASCADE.
 

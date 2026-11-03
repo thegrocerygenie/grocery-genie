@@ -201,11 +201,73 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
 
 ## Price Intelligence [V1.1]
 
-### GET /api/items/{canonical_id}/prices?store=...&from=...&to=...
-Price observations for a canonical item.
+Built: PI-01 (price history) and PI-02 (item matching). Every route is the signed-in user's own data; another user's item, alias or suggestion answers 404.
+
+Confirming a receipt (scan + `PATCH status=confirmed`, or a manual entry) links each line to a canonical item and records its price. `LineItemResponse` carries `canonical_item_id`. Matching: exact alias → fuzzy (mean of Jaro-Winkler and Levenshtein on word-sorted names, ≥0.85 links) → semantic (embedding cosine, ≥0.80 links) → new item, with a suggestion for the user when the best candidate scored ≥0.6. Names whose numbers differ ("milk 1%" / "milk 2%") never match by similarity.
+
+### GET /api/items?q=&page=&per_page=
+Items with at least one price, most recently bought first. `q` searches names and aliases.
+
+**Response:**
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "canonical_name": "Organic Bananas",
+      "unit_of_measure": "lb",
+      "observation_count": 12,
+      "store_count": 2,
+      "latest_price": { "unit_price": 0.79, "unit_of_measure": "lb", "currency": "USD", "date": "2026-03-12", "store_name": "Loblaws" }
+    }
+  ],
+  "total": 1, "page": 1, "per_page": 20,
+  "pending_suggestions": 2
+}
+```
+
+### GET /api/items/{canonical_id}
+The list fields plus `aliases: [{id, alias}]` and `suggestions` (pending questions about this item).
+
+### GET /api/items/{canonical_id}/prices?store={store_id}&from=YYYY-MM-DD&to=YYYY-MM-DD
+Price observations for a canonical item, oldest first.
+
+**Response:**
+```json
+{
+  "item": { "id": "uuid", "canonical_name": "Organic Bananas" },
+  "unit_of_measure": "lb",
+  "currency": "USD",
+  "has_timeline": true,
+  "min_points": 2,
+  "store_count": 2,
+  "observations": [
+    { "receipt_id": "uuid", "date": "2026-03-01", "store_id": "uuid", "store_name": "FreshCo", "unit_price": 0.69, "quantity": 2.0, "unit_of_measure": "lb", "currency": "USD", "in_timeline": true }
+  ]
+}
+```
+`unit_of_measure` and `currency` are those of most of the item's prices; a price in another unit or currency has `in_timeline: false` (listed, not plotted). `has_timeline` is false until the timeline has `min_points` prices (PI-01 AC 4).
+
+### PATCH /api/items/{canonical_id}
+**Request:** `{ "canonical_name": "Organic Bananas" }` → item detail.
+
+### POST /api/items/{canonical_id}/merge
+**Request:** `{ "into_item_id": "uuid" }`. The item's aliases, lines and prices move to `into_item_id`, which is returned; the item is deleted. 409 when merging an item into itself.
+
+### POST /api/items/{canonical_id}/aliases/{alias_id}/split
+201 with the new item: the alias, its lines and their prices. 409 when it is the item's only alias.
+
+### GET /api/items/suggestions
+Pending suggestions: `[{ "id", "item": {id, canonical_name}, "suggested_item": {id, canonical_name}, "confidence", "method" }]`.
+
+### POST /api/items/suggestions/{id}/accept
+Same product: merges `item` into `suggested_item` and returns it. 409 when already resolved.
+
+### POST /api/items/suggestions/{id}/reject
+204. Different products: both items stay.
 
 ### GET /api/items/{canonical_id}/compare
-Cross-store comparison.
+Cross-store comparison (PI-04, not built yet).
 
 **Response:**
 ```json

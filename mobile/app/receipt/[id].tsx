@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 
 import { resolveCategoryMeta } from '@/constants/categories';
 import { colors, radii, spacing, type } from '@/constants/theme';
@@ -133,14 +134,41 @@ export default function ReceiptDetailScreen() {
 
         <Text style={styles.sectionLabel}>Items · {receipt.items.length}</Text>
         <View style={styles.listCard}>
-          {receipt.items.map((item, i) => (
-            <View key={item.id} style={[styles.row, i > 0 && styles.rowDivider]}>
-              <Text style={[type.body, styles.itemName]} numberOfLines={1}>
-                {item.quantity === 1 ? item.raw_name : `${item.raw_name} × ${item.quantity}`}
-              </Text>
-              <Text style={styles.itemPrice}>{money(item.total_price)}</Text>
-            </View>
-          ))}
+          {receipt.items.map((item, i) => {
+            const label =
+              item.quantity === 1 ? item.raw_name : `${item.raw_name} × ${item.quantity}`;
+            const itemId = item.canonical_item_id;
+            const content = (
+              <>
+                <Text style={[type.body, styles.itemName]} numberOfLines={1}>
+                  {label}
+                </Text>
+                <Text style={styles.itemPrice}>{money(item.total_price)}</Text>
+              </>
+            );
+            // PI-01: a confirmed line opens the price history of its item.
+            return itemId ? (
+              <Pressable
+                key={item.id}
+                onPress={() => router.push({ pathname: '/items/[id]', params: { id: itemId } })}
+                style={({ pressed }) => [
+                  styles.row,
+                  i > 0 && styles.rowDivider,
+                  pressed && styles.rowPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`${label}, ${money(item.total_price)}`}
+                accessibilityHint="Shows the price history of this item"
+              >
+                {content}
+                <SymbolView name="chevron.right" size={13} tintColor={colors.iosLabel3} />
+              </Pressable>
+            ) : (
+              <View key={item.id} style={[styles.row, i > 0 && styles.rowDivider]}>
+                {content}
+              </View>
+            );
+          })}
         </View>
 
         <Pressable
@@ -212,4 +240,5 @@ const styles = StyleSheet.create({
   },
   deleteLabel: { ...type.body, color: colors.red },
   pressed: { opacity: 0.6 },
+  rowPressed: { backgroundColor: colors.iosFill3 },
 });

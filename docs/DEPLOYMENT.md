@@ -80,6 +80,17 @@ default command starts Uvicorn with 4 workers. Uvicorn trusts Caddy's
 `X-Forwarded-For` header, so the per-IP auth rate limit sees the caller's
 address.
 
+V1.1 item matching (PI-02) embeds item names with a local
+sentence-transformers model (`GG_EMBEDDING_MODEL`, all-MiniLM-L6-v2 by
+default). Item names are not sent to any third party for this. The image
+installs the CPU-only build of PyTorch (`requirements.lock.txt` names the
+PyTorch CPU index) and downloads the model at build time, so no container
+fetches it at runtime. Each process that matches items (every Uvicorn worker,
+and the Celery worker for the nightly sweep) loads the model on first use:
+plan for roughly 400–500 MB more memory per process. With 4 Uvicorn workers,
+the 4 GB VPS above is the minimum. Set `GG_EMBEDDINGS_ENABLED=false` to match
+on aliases and fuzzy similarity only.
+
 ### 1.3 Docker Compose
 
 [`docker/docker-compose.yml`](../docker/docker-compose.yml) runs these services:
@@ -124,6 +135,15 @@ GG_LLM_API_KEY=sk-ant-...
 # A starting value until extraction latency is measured on the receipt test set.
 GG_LLM_TIMEOUT_SECONDS=60
 GG_LLM_NUM_RETRIES=1
+
+# Item matching (V1.1, PI-02). Defaults shown; the image bakes in the default
+# model, so another one is downloaded on first use (and needs a migration of
+# canonical_item_aliases.embedding if its size is not 384).
+# GG_EMBEDDINGS_ENABLED=true
+# GG_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+# GG_ITEM_MATCH_FUZZY_THRESHOLD=0.85
+# GG_ITEM_MATCH_SEMANTIC_THRESHOLD=0.80
+# GG_ITEM_MATCH_SUGGEST_THRESHOLD=0.60
 
 # App
 # Signs access and refresh tokens. Startup fails if it is the dev default or
@@ -175,7 +195,8 @@ this block; a test checks that the two match. `.gitignore` excludes
 
 1. **Create a new Supabase project** (or use an existing one with a dedicated schema).
 
-2. **Enable pgvector extension:**
+2. **Enable pgvector extension** (V1.1 item matching stores name embeddings in it;
+   migration `20261103_0015` also runs `CREATE EXTENSION IF NOT EXISTS vector`):
    - Dashboard → Database → Extensions → search "vector" → Enable
    - Or run: `CREATE EXTENSION IF NOT EXISTS vector;`
 
@@ -232,6 +253,15 @@ docker compose -f docker/docker-compose.yml exec api alembic upgrade head
 ```
 
 For automated deploys, set up a GitHub Actions workflow that SSHs into the VPS and runs these commands on push to `main`.
+
+**After the V1.1 deploy (migration `20261103_0015`):** receipts confirmed
+before it have no price history yet. Beat's nightly `match-unmatched-items`
+(04:15 UTC) backfills them; to backfill now instead:
+
+```bash
+docker compose -f docker/docker-compose.yml exec worker \
+  celery -A app.tasks call app.tasks.item_matching_tasks.match_unmatched_items
+```
 
 ### 1.9 Monitoring & Logs
 

@@ -34,6 +34,14 @@ dependencies = [
     "prometheus-fastapi-instrumentator>=7.0.0",
     "cryptography>=43.0.0",
     "jinja2>=3.1.0",
+    # PI-02 item matching: fuzzy string similarity (Jaro-Winkler).
+    "rapidfuzz>=3.10.0",
+    # PI-02 semantic matching: item-name embeddings stored in pgvector.
+    "pgvector>=0.3.6",
+    "sentence-transformers>=3.3.0",
+    # sentence-transformers' backend; listed so uv takes the CPU-only build
+    # below (the default Linux wheel pulls ~2 GB of CUDA libraries).
+    "torch>=2.5.0",
 ]
 
 [project.optional-dependencies]
@@ -43,6 +51,14 @@ dev = [
     "aiosqlite>=0.20.0",
     "ruff>=0.7.0",
 ]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["setuptools>=75.0"]

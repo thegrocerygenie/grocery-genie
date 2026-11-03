@@ -28,9 +28,13 @@ from app.models.database import (
     AuthEvent,
     Budget,
     BudgetAlertSent,
+    CanonicalItem,
+    CanonicalItemAlias,
     Category,
+    ItemMatchSuggestion,
     LineItem,
     Notification,
+    PriceObservation,
     PushToken,
     Receipt,
     ReceiptCorrection,
@@ -112,8 +116,17 @@ async def delete_account(
                 ReceiptCorrection.receipt_id.in_(owned_receipts),
             )
         ),
+        delete(ItemMatchSuggestion).where(ItemMatchSuggestion.user_id == user_id),
+        delete(PriceObservation).where(
+            or_(
+                PriceObservation.user_id == user_id,
+                PriceObservation.receipt_id.in_(owned_receipts),
+            )
+        ),
         delete(LineItem).where(LineItem.receipt_id.in_(owned_receipts)),
         delete(Receipt).where(Receipt.user_id == user_id),
+        delete(CanonicalItemAlias).where(CanonicalItemAlias.user_id == user_id),
+        delete(CanonicalItem).where(CanonicalItem.user_id == user_id),
         delete(Budget).where(Budget.user_id == user_id),
         delete(UserItemMapping).where(UserItemMapping.user_id == user_id),
         delete(Notification).where(Notification.user_id == user_id),

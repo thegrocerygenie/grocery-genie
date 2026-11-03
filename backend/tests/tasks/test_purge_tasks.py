@@ -14,8 +14,10 @@ from app.models.database import (
     Base,
     Budget,
     BudgetAlertSent,
+    CanonicalItem,
     LineItem,
     Notification,
+    PriceObservation,
     Receipt,
     ReceiptCorrection,
     User,
@@ -71,6 +73,22 @@ def _receipt(db, storage: Path, deleted_days_ago: float | None) -> Receipt:
             field="name",
             original_value="MLK",
             corrected_value="MILK",
+        )
+    )
+    product = CanonicalItem(user_id=USER_ID, canonical_name="Milk")
+    db.add(product)
+    db.flush()
+    item.canonical_item_id = product.id
+    db.add(
+        PriceObservation(
+            user_id=USER_ID,
+            canonical_item_id=product.id,
+            receipt_id=receipt.id,
+            line_item_id=item.id,
+            date=receipt.date,
+            unit_price=2.5,
+            quantity=1,
+            currency="USD",
         )
     )
     db.commit()
@@ -133,6 +151,9 @@ def test_receipt_deleted_31_days_ago_is_erased_with_items_and_images(db, storage
     assert _count(db, Receipt, id=receipt.id) == 0
     assert _count(db, LineItem, receipt_id=receipt.id) == 0
     assert _count(db, ReceiptCorrection, receipt_id=receipt.id) == 0
+    # Its prices leave the item's history; the item itself stays.
+    assert _count(db, PriceObservation, receipt_id=receipt.id) == 0
+    assert _count(db, CanonicalItem, user_id=USER_ID) == 1
     assert _files(storage, receipt.id) == []
 
 

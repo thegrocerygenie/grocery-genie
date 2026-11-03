@@ -206,6 +206,31 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-06 | 3 | Chosen day, 9 AM local time | Integration | `backend/tests/tasks/test_summary_tasks.py::test_recipients_only_on_users_chosen_day` | Pass |
 | BC-06 | 4 | Links to full dashboard | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "falls back to the dashboard when the route is missing" | Pass |
 
+V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02. PI-03 (price change alerts) and PI-04 (cross-store comparison) are not built yet.
+
+| Story | AC | Criterion | Type | Test | Status |
+|---|---|---|---|---|---|
+| PI-01 | 1 | Every recorded price with date and store | Integration | `backend/tests/api/test_items.py::test_every_price_is_recorded_with_date_and_store` | Pass |
+| PI-01 | 1 | Every recorded price with date and store | Component | `mobile/src/__tests__/priceHistory.test.tsx` "shows every price with its date and store, newest first (AC 1)" | Pass |
+| PI-01 | 2 | Line chart, a point per purchase | Component | `mobile/src/__tests__/priceHistory.test.tsx` "plots a line chart once there are two prices (AC 2)" | Pass |
+| PI-01 | 2 | Line chart, a point per purchase | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "places one dot per purchase: x by date, y by price" | Pass |
+| PI-01 | 3 | Unit price (per item, kg, lb) | Integration | `backend/tests/api/test_items.py::test_prices_are_unit_prices` | Pass |
+| PI-01 | 3 | Unit price (per item, kg, lb) | Component | `mobile/src/__tests__/priceHistory.test.tsx` "shows unit prices and the change since the first price (AC 3)" | Pass |
+| PI-01 | 4 | Timeline needs 2 data points | Integration | `backend/tests/api/test_items.py::test_one_price_is_not_yet_a_timeline` | Pass |
+| PI-01 | 4 | Timeline needs 2 data points | Component | `mobile/src/__tests__/priceHistory.test.tsx` "waits for a second price before showing a trend (AC 4)" | Pass |
+| PI-02 | 1 | Hybrid: embedding similarity + fuzzy strings | Integration | `backend/tests/services/test_item_matching.py::test_high_semantic_similarity_auto_links` | Pass |
+| PI-02 | 1 | Hybrid: embedding similarity + fuzzy strings | Integration | `backend/tests/services/test_item_matching.py::test_high_fuzzy_score_auto_links_and_learns_the_alias` | Pass |
+| PI-02 | 2 | >= 0.85 auto-link | Integration | `backend/tests/services/test_item_matching.py::test_high_fuzzy_score_auto_links_and_learns_the_alias` | Pass |
+| PI-02 | 2 | 0.6-0.85 asks the user | Integration | `backend/tests/services/test_item_matching.py::test_medium_score_asks_the_user_and_keeps_the_line_separate` | Pass |
+| PI-02 | 2 | 0.6-0.85 asks the user | Component | `mobile/src/__tests__/priceHistory.test.tsx` "asks on the item and merges when the user says Same Item" | Pass |
+| PI-02 | 2 | < 0.6 distinct | Integration | `backend/tests/services/test_item_matching.py::test_low_score_is_a_distinct_item_with_no_question` | Pass |
+| PI-02 | 3 | Manually link items | Integration | `backend/tests/api/test_items.py::test_merge_and_split_through_the_api` | Pass |
+| PI-02 | 3 | Manually link items | Component | `mobile/src/__tests__/priceHistory.test.tsx` "combines the item into another one and opens the result" | Pass |
+| PI-02 | 3 | Manually unlink items | Integration | `backend/tests/services/test_item_matching.py::test_split_moves_one_alias_with_its_lines_and_prices` | Pass |
+| PI-02 | 3 | Manually unlink items | Component | `mobile/src/__tests__/priceHistory.test.tsx` "splits a name off into its own item after confirming" | Pass |
+| PI-02 | 4 | Confirmed matches give a canonical name with aliases | Integration | `backend/tests/api/test_items.py::test_accepting_a_suggestion_merges_the_history` | Pass |
+| PI-02 | 4 | Confirmed matches give a canonical name with aliases | Integration | `backend/tests/api/test_items.py::test_rename_item` | Pass |
+
 This matrix is the source of truth for completeness. A phase is not done until every row has a passing test.
 
 ## Phase Definition of Done

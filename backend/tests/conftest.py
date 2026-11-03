@@ -20,8 +20,11 @@ from app.core import clock
 from app.core.config import get_settings
 from app.llm.provider import (
     MockCategoryAssigner,
+    MockEmbedder,
     MockReceiptExtractor,
+    SentenceTransformerEmbedder,
     get_category_assigner,
+    get_embedder,
 )
 from app.models.database import Base
 from app.services.ai_consent import AI_CONSENT_POLICY_VERSION
@@ -125,6 +128,32 @@ def mock_category_assigner() -> Iterator[None]:
     app.dependency_overrides.pop(get_category_assigner, None)
 
 
+class RealEmbeddingModelError(RuntimeError):
+    """A test tried to load the real sentence-transformers model."""
+
+
+@pytest.fixture(autouse=True)
+def mock_embedder(monkeypatch) -> Iterator[MockEmbedder]:
+    """Item-name embeddings come from MockEmbedder in every test app.
+
+    Loading the real model takes seconds (and a download on a fresh host),
+    so it raises here; a test that wants set similarities fills
+    ``mock_embedder.vectors``.
+    """
+    from main import app
+
+    def blocked_load(self):
+        raise RealEmbeddingModelError(
+            "Test loaded the real embedding model; use the mock_embedder fixture."
+        )
+
+    monkeypatch.setattr(SentenceTransformerEmbedder, "_load_model", blocked_load)
+    embedder = MockEmbedder()
+    app.dependency_overrides[get_embedder] = lambda: embedder
+    yield embedder
+    app.dependency_overrides.pop(get_embedder, None)
+
+
 @pytest.fixture
 def mock_extractor() -> MockReceiptExtractor:
     return MockReceiptExtractor()
@@ -153,6 +182,9 @@ async def db_engine():
     """A fresh schema per test, on TEST_DATABASE_URL."""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async with engine.begin() as conn:
+        if conn.dialect.name == "postgresql":
+            # canonical_item_aliases.embedding is a pgvector column.
+            await conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS vector")
         await conn.run_sync(Base.metadata.create_all)
     yield engine
     async with engine.begin() as conn:

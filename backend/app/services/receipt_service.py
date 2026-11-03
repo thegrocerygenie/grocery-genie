@@ -18,6 +18,7 @@ from app.events.dispatcher import dispatcher
 from app.events.types import ItemCorrected, ReceiptConfirmed
 from app.llm.provider import (
     CategoryAssigner,
+    Embedder,
     ReceiptExtractor,
     RuleBasedCategoryAssigner,
 )
@@ -37,7 +38,9 @@ from app.models.schemas import (
     ReceiptUpdateRequest,
 )
 from app.services.budget_service import BudgetService
+from app.services.item_matching_service import ItemMatchingService
 from app.services.notification_service import NotificationService
+from app.services.price_service import PriceService
 from app.services.store_service import StoreService
 
 if TYPE_CHECKING:
@@ -69,11 +72,15 @@ class ReceiptService:
         extractor: ReceiptExtractor | None = None,
         category_assigner: CategoryAssigner | None = None,
         analytics: AnalyticsService | None = None,
+        embedder: Embedder | None = None,
     ) -> None:
         self.db = db
         self.extractor = extractor
         self.category_assigner = category_assigner
         self.analytics = analytics
+        # PI-02 semantic matching; without it matching uses aliases and
+        # fuzzy similarity only.
+        self.embedder = embedder
         self.store_service = StoreService(db)
 
     async def count_receipts_in_month(
@@ -351,6 +358,7 @@ class ReceiptService:
         Every receipt that becomes confirmed runs this: a scan the user confirms
         and a manual entry, which is saved as confirmed.
         """
+        await self._record_prices(receipt)
         dispatcher.dispatch(
             ReceiptConfirmed(
                 receipt_id=receipt.id,
@@ -373,6 +381,27 @@ class ReceiptService:
         )
 
         await self._alert_on_thresholds(receipt.user_id, {receipt.date, *also_changed})
+
+    async def _record_prices(self, receipt: Receipt) -> None:
+        """Link the receipt's unlinked lines to canonical items (PI-02) and
+        rebuild its price observations (PI-01).
+
+        Runs in a savepoint: a failure here (the embedding model, say) is
+        logged and undone, and never fails the confirm or the edit. The
+        nightly sweep (app/tasks/item_matching_tasks.py) matches what it left.
+        """
+        try:
+            async with self.db.begin_nested():
+                unmatched = [
+                    li for li in receipt.line_items if li.canonical_item_id is None
+                ]
+                if unmatched:
+                    await ItemMatchingService(self.db, self.embedder).match_line_items(
+                        receipt.user_id, unmatched
+                    )
+                await PriceService(self.db).sync_receipt(receipt)
+        except Exception:
+            logger.exception("Item matching failed for receipt %s", receipt.id)
 
     async def _alert_on_thresholds(self, user_id: uuid.UUID, dates: set[date]) -> None:
         """Notify for each budget threshold crossed in the periods holding ``dates``.
@@ -495,6 +524,8 @@ class ReceiptService:
                     )
                     line_item.raw_name = correction.name
                     line_item.corrected = True
+                    # Another name may be another product: match it again.
+                    line_item.canonical_item_id = None
 
                 # Quantity and price columns are Numeric; compare and divide
                 # as Decimal. The line total is what was paid, so a quantity
@@ -592,6 +623,9 @@ class ReceiptService:
             if already_confirmed and (updates.items or updates.date):
                 changed.add(receipt.date)
             await self.db.flush()
+            if already_confirmed:
+                # Names, prices, the date or the store moved: so did its prices.
+                await self._record_prices(receipt)
             await self._alert_on_thresholds(user_id, changed)
 
         await self.db.flush()

@@ -30,7 +30,9 @@ from app.models.database import (
     Base,
     Budget,
     BudgetAlertSent,
+    CanonicalItem,
     Category,
+    ItemMatchSuggestion,
     LineItem,
     Notification,
     Receipt,
@@ -144,8 +146,29 @@ async def _give_user_everything(
         .scalars()
         .first()
     )
+    # Saving the manual receipt matched its line to a canonical item and
+    # recorded its price; a possible match waiting for the user is left.
+    matched_item_id = (
+        (
+            await db.execute(
+                select(CanonicalItem.id).where(CanonicalItem.user_id == user_id)
+            )
+        )
+        .scalars()
+        .first()
+    )
+    other_item = CanonicalItem(user_id=user_id, canonical_name="Gala Apples")
+    db.add(other_item)
+    await db.flush()
     db.add_all(
         [
+            ItemMatchSuggestion(
+                user_id=user_id,
+                item_id=other_item.id,
+                suggested_item_id=matched_item_id,
+                confidence=0.7,
+                method="fuzzy",
+            ),
             BudgetAlertSent(
                 budget_id=budget_id,
                 period_start=date(2026, 10, 1),

@@ -74,6 +74,18 @@ class Settings(BaseSettings):
     # Free-tier quota (overview: 20 receipts/month). Set to 0 to disable.
     free_tier_receipts_per_month: int = 20
 
+    # Item matching (PI-02). The embedding model runs in this process
+    # (sentence-transformers), so item names go to no third party. Off:
+    # matching uses exact aliases and fuzzy similarity only.
+    embeddings_enabled: bool = True
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    # Fuzzy (Jaro-Winkler + Levenshtein) at or above this links on its own.
+    item_match_fuzzy_threshold: float = Field(default=0.85, ge=0, le=1)
+    # Cosine similarity of name embeddings at or above this links on its own.
+    item_match_semantic_threshold: float = Field(default=0.80, ge=0, le=1)
+    # Below the thresholds above but at least this: ask the user to confirm.
+    item_match_suggest_threshold: float = Field(default=0.60, ge=0, le=1)
+
     # Budget alert thresholds (BC-03: configurable at 50%, 80%, 100%).
     budget_alert_thresholds: list[int] = [50, 80, 100]
 

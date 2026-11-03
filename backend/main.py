@@ -11,6 +11,7 @@ from app.api.routes import (
     categories,
     dashboard,
     health,
+    items,
     notifications,
     receipts,
 )
@@ -90,5 +91,6 @@ app.include_router(receipts.router)
 app.include_router(budgets.router)
 app.include_router(dashboard.router)
 app.include_router(categories.router)
+app.include_router(items.router)
 app.include_router(notifications.router)
 app.include_router(analytics.router)

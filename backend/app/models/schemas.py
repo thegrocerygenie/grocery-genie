@@ -64,6 +64,9 @@ class LineItemResponse(BaseModel):
     category_confidence: float | None = None
     extraction_confidence: float | None = None
     corrected: bool = False
+    # PI-02: the product this line was matched to once the receipt was
+    # confirmed; the app opens its price history from here.
+    canonical_item_id: uuid.UUID | None = None
 
 
 class ReceiptResponse(BaseModel):
@@ -514,3 +517,102 @@ class PushTokenPayload(BaseModel):
     token: str = Field(
         min_length=1, max_length=255, pattern=r"^Expo(nent)?PushToken\[.+\]$"
     )
+
+
+# --- Price Intelligence (V1.1: PI-01 price history, PI-02 item matching) ---
+
+
+class ItemRef(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    canonical_name: str
+
+
+class ItemAliasResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    alias: str
+
+
+class LatestPrice(BaseModel):
+    unit_price: float
+    unit_of_measure: str | None = None
+    currency: str
+    date: date
+    store_name: str | None = None
+
+
+class ItemSummaryResponse(BaseModel):
+    id: uuid.UUID
+    canonical_name: str
+    unit_of_measure: str | None = None
+    observation_count: int
+    store_count: int
+    latest_price: LatestPrice | None = None
+
+
+class ItemListResponse(BaseModel):
+    items: list[ItemSummaryResponse]
+    total: int
+    page: int
+    per_page: int
+    # Medium-confidence matches waiting for the user (PI-02 AC 2).
+    pending_suggestions: int
+
+
+class ItemSuggestionResponse(BaseModel):
+    id: uuid.UUID
+    item: ItemRef
+    suggested_item: ItemRef
+    confidence: float
+    method: str
+
+
+class ItemDetailResponse(ItemSummaryResponse):
+    aliases: list[ItemAliasResponse]
+    # "Is this the same as …?" questions about this item.
+    suggestions: list[ItemSuggestionResponse]
+
+
+class PricePointResponse(BaseModel):
+    receipt_id: uuid.UUID
+    date: date
+    store_id: uuid.UUID | None = None
+    store_name: str | None = None
+    unit_price: float
+    quantity: float
+    unit_of_measure: str | None = None
+    currency: str
+    # False for a price in another unit or currency than the timeline's: it
+    # is listed but not plotted (only like-for-like prices compare).
+    in_timeline: bool
+
+
+class PriceHistoryResponse(BaseModel):
+    item: ItemRef
+    unit_of_measure: str | None = None
+    currency: str | None = None
+    # PI-01 AC 4: false until the timeline has min_points prices.
+    has_timeline: bool
+    min_points: int
+    store_count: int
+    observations: list[PricePointResponse]
+
+
+class ItemRenameRequest(BaseModel):
+    canonical_name: str = Field(min_length=1, max_length=255)
+
+    @field_validator("canonical_name")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Name cannot be blank")
+        return value
+
+
+class ItemMergeRequest(BaseModel):
+    # The item this one is the same product as; it keeps its name.
+    into_item_id: uuid.UUID

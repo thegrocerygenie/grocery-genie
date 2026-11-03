@@ -1,8 +1,12 @@
+import asyncio
 import base64
+import hashlib
 import json
 import logging
+import math
+import threading
 import time
-from typing import Protocol
+from typing import Any, Protocol
 
 import litellm
 import openai
@@ -368,3 +372,108 @@ def get_category_assigner(
     if settings.debug:
         return MockCategoryAssigner()
     return LiteLLMCategoryAssigner(settings)
+
+
+# --- Embeddings (PI-02 semantic item matching) ---------------------------
+
+
+class EmbeddingUnavailableError(Exception):
+    """The embedding model could not be loaded or failed to encode."""
+
+
+class Embedder(Protocol):
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        """One unit-length vector per text, in order."""
+        ...
+
+
+class SentenceTransformerEmbedder:
+    """Embeds item names with a local sentence-transformers model.
+
+    The model runs in this process: item names are not sent anywhere. It
+    loads on first use (a few seconds, and a download the first time on a
+    new host) and stays loaded for the life of the process.
+    """
+
+    _models: dict[str, Any] = {}
+    _lock = threading.Lock()
+
+    def __init__(self, model_name: str) -> None:
+        self.model_name = model_name
+
+    def _load_model(self) -> Any:
+        with self._lock:
+            model = self._models.get(self.model_name)
+            if model is None:
+                from sentence_transformers import SentenceTransformer
+
+                started = time.monotonic()
+                model = SentenceTransformer(self.model_name, device="cpu")
+                self._models[self.model_name] = model
+                logger.info(
+                    "Loaded embedding model %s in %.1fs",
+                    self.model_name,
+                    time.monotonic() - started,
+                )
+            return model
+
+    def _encode(self, texts: list[str]) -> list[list[float]]:
+        vectors = self._load_model().encode(
+            texts, normalize_embeddings=True, convert_to_numpy=True
+        )
+        return [[float(v) for v in row] for row in vectors]
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        try:
+            # CPU-bound: keep it off the event loop.
+            return await asyncio.to_thread(self._encode, texts)
+        except Exception as exc:
+            raise EmbeddingUnavailableError(str(exc)) from exc
+
+
+class MockEmbedder:
+    """Deterministic embeddings for tests and offline development.
+
+    A name with an entry in ``vectors`` gets that vector (normalized), so a
+    test can set the exact similarity of two names. Any other name gets a
+    hashed bag of character trigrams: similar spellings come out close.
+    """
+
+    def __init__(
+        self, vectors: dict[str, list[float]] | None = None, dimensions: int = 384
+    ) -> None:
+        self.vectors = vectors or {}
+        self.dimensions = dimensions
+        self.calls: list[list[str]] = []
+
+    def _vector(self, text: str) -> list[float]:
+        if text in self.vectors:
+            raw = list(self.vectors[text])
+            raw += [0.0] * (self.dimensions - len(raw))
+        else:
+            raw = [0.0] * self.dimensions
+            padded = f"  {text} "
+            for i in range(len(padded) - 2):
+                digest = hashlib.blake2b(
+                    padded[i : i + 3].encode(), digest_size=4
+                ).digest()
+                raw[int.from_bytes(digest, "big") % self.dimensions] += 1.0
+        norm = math.sqrt(sum(v * v for v in raw)) or 1.0
+        return [v / norm for v in raw]
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        self.calls.append(list(texts))
+        return [self._vector(text) for text in texts]
+
+
+def get_embedder() -> Embedder | None:
+    """FastAPI dependency: the item-name embedder, or None when turned off.
+
+    No parameters: FastAPI would read a ``settings`` parameter as request body.
+    """
+    settings = get_settings()
+    if not settings.embeddings_enabled:
+        return None
+    return SentenceTransformerEmbedder(settings.embedding_model)
