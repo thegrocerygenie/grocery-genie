@@ -42,9 +42,7 @@ async def unmute_store(
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> Response:
-    """Price change alerts for this store again. Idempotent."""
-    try:
-        await PriceAlertService(db).unmute_store(user.id, store_id)
-    except StoreNotFoundError:
-        raise HTTPException(status_code=404, detail=STORE_NOT_FOUND) from None
+    """Price change alerts for this store again. Idempotent, and never 404:
+    it removes only the user's own mute, which can outlive their receipts."""
+    await PriceAlertService(db).unmute_store(user.id, store_id)
     return Response(status_code=204)

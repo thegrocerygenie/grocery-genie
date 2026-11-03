@@ -9,9 +9,9 @@ Confirming a receipt compares each price with the item's 30-day rolling average 
 - `pa.cooldown`: a further change for the same item within 7 days sends nothing.
 - `pa.threshold`: with the threshold at 25, a 20% change sends nothing and a 40% change alerts.
 - `pa.mute-item`: `POST /api/items/{id}/mute` (204, idempotent) sets `alerts_muted` on the item and lists it in `muted_items`; a muted item's change sends nothing; `DELETE` unmutes.
-- `pa.mute-store`: `POST /api/stores/{id}/mute` lists the store in `muted_stores`; a change at that store sends nothing; `DELETE` unmutes.
+- `pa.mute-store`: `POST /api/stores/{id}/mute` lists the store in `muted_stores`; a change at that store sends nothing; `DELETE` unmutes, and never 404s (it deletes only the caller's own mute, so a mute outliving its purged receipts can still be undone).
 - `pa.concurrent`: two receipts confirmed at the same moment with the same big change alert once (the ledger's unique key, on Postgres).
-- `pa.isolation`: another user muting the item, or a store they never shopped at, gets 404.
+- `pa.isolation`: another user muting the item, or a store they never shopped at, gets 404; unmuting their item is 404 too.
 
 ## How to get to it (user POV)
 
@@ -54,6 +54,8 @@ $G sql "SELECT title FROM notifications WHERE type='price_change' ORDER BY creat
 $G sql "SELECT count(*) FROM price_alerts_sent"                              # 3
 $G signup other
 $G api POST /api/items/$bread/mute; $G api POST /api/stores/$store/mute      # pa.isolation: 404, 404
+$G api DELETE /api/items/$bread/mute                                         # pa.isolation: 404
+$G api DELETE /api/stores/$store/mute                                        # 204: removes only their own mute (none)
 ```
 
 ## Gotchas
@@ -63,4 +65,4 @@ $G api POST /api/items/$bread/mute; $G api POST /api/stores/$store/mute      # p
 - Muting checks happen before the cooldown is claimed, so a muted change does not use up the cooldown.
 - The mock scan's items carry `unit_of_measure`; manual entries carry none. The average compares like with like, so a scanned per-lb price and a manual unitless price of the same item are separate series.
 - Pushes go through the existing pipeline (`deliver_pending_pushes`), which needs a Celery worker and an Expo token; the journey checks the notification rows. `backend/tests/tasks/test_push_tasks.py::test_a_price_change_push_opens_its_item` covers the push payload.
-- Verified 2026-11-03 against Postgres 16 (run `20261103-152228`).
+- Verified 2026-11-03 against Postgres 16 (run `20261103-181419`, after the unmute fix).

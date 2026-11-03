@@ -166,7 +166,9 @@ class PriceAlertService:
         )
 
     async def unmute_store(self, user_id: uuid.UUID, store_id: uuid.UUID) -> None:
-        await self._check_store(user_id, store_id)
+        """Delete the user's own mute row, if any. No store check: the mute
+        outlives the user's receipts from the store (deleted, then purged), and
+        settings still lists it, so it must stay removable."""
         await self.db.execute(
             delete(PriceAlertStoreMute).where(
                 PriceAlertStoreMute.user_id == user_id,

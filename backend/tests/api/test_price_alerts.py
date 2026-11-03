@@ -473,3 +473,150 @@ async def test_the_alert_is_pushed_with_a_link_to_the_item(
     assert data["type"] == "price_change"
     assert data["url"] == f"/items/{item_id}"
     assert data["canonical_item_id"] == item_id
+
+
+async def _purge_receipts(db_session, user_id) -> None:
+    """What the purge leaves once the user's receipts are past restore."""
+    from sqlalchemy import delete
+
+    from app.models.database import LineItem, PriceObservation, Receipt
+
+    receipts = select(Receipt.id).where(Receipt.user_id == user_id)
+    await db_session.execute(
+        delete(PriceObservation).where(PriceObservation.receipt_id.in_(receipts))
+    )
+    await db_session.execute(delete(LineItem).where(LineItem.receipt_id.in_(receipts)))
+    await db_session.execute(delete(Receipt).where(Receipt.user_id == user_id))
+    await db_session.flush()
+
+
+async def test_a_store_can_be_unmuted_after_its_receipts_are_purged(
+    client, mock_extractor, test_image_bytes, db_session
+):
+    """The mute still shows in settings, so the user must be able to undo it."""
+    from tests.conftest import DEV_USER_ID
+
+    await _history(client, mock_extractor, test_image_bytes, 1.00)
+    store_id = await _store_id(client)
+    assert (await client.post(f"/api/stores/{store_id}/mute")).status_code == 204
+    await _purge_receipts(db_session, DEV_USER_ID)
+    settings = (await client.get("/api/items/price-alert-settings")).json()
+    assert [s["id"] for s in settings["muted_stores"]] == [store_id]
+
+    resp = await client.delete(f"/api/stores/{store_id}/mute")
+
+    assert resp.status_code == 204, resp.text
+    assert (await client.get("/api/items/price-alert-settings")).json()[
+        "muted_stores"
+    ] == []
+    # Still idempotent.
+    assert (await client.delete(f"/api/stores/{store_id}/mute")).status_code == 204
+
+
+async def test_unmuting_a_store_never_touches_another_users_mute(client, db_session):
+    from app.models.database import PriceAlertStoreMute, Store
+    from tests.conftest import ensure_user
+
+    other = await ensure_user(db_session, uuid.uuid4())
+    store = Store(name="Elsewhere", normalized_name="elsewhere")
+    db_session.add(store)
+    await db_session.flush()
+    db_session.add(PriceAlertStoreMute(user_id=other, store_id=store.id))
+    await db_session.flush()
+
+    assert (await client.delete(f"/api/stores/{store.id}/mute")).status_code == 204
+
+    remaining = (
+        await db_session.execute(
+            select(PriceAlertStoreMute.user_id).where(
+                PriceAlertStoreMute.store_id == store.id
+            )
+        )
+    ).scalars()
+    assert list(remaining) == [other]
+
+
+async def test_another_users_item_cannot_be_muted_or_unmuted(client_user_b, db_session):
+    """User B gets 404 muting or unmuting user A's item; A's mute stays."""
+    from app.models.database import PriceAlertItemMute
+    from app.services.item_matching_service import ItemMatchingService
+    from tests.conftest import DEV_USER_ID
+    from tests.services.test_item_matching import _receipt
+
+    _, lines = await _receipt(db_session, "Limes", user_id=DEV_USER_ID)
+    await ItemMatchingService(db_session).match_line_items(DEV_USER_ID, lines)
+    item_id = lines[0].canonical_item_id
+    db_session.add(PriceAlertItemMute(user_id=DEV_USER_ID, canonical_item_id=item_id))
+    await db_session.flush()
+
+    for method in ("POST", "DELETE"):
+        resp = await client_user_b.request(method, f"/api/items/{item_id}/mute")
+        assert resp.status_code == 404, (method, resp.text)
+
+    mutes = (
+        await db_session.execute(
+            select(PriceAlertItemMute.user_id).where(
+                PriceAlertItemMute.canonical_item_id == item_id
+            )
+        )
+    ).scalars()
+    assert list(mutes) == [DEV_USER_ID]
+
+
+# --- Only a confirm alerts, and a failure never fails it --------------------
+
+
+async def test_editing_a_confirmed_receipt_never_sends_a_price_alert(
+    client, mock_extractor, test_image_bytes
+):
+    await _history(client, mock_extractor, test_image_bytes, 1.00, 1.00)
+    receipt = await _buy(client, mock_extractor, test_image_bytes, "2026-03-15", 1.00)
+    assert await _price_alerts(client) == []
+    [line] = receipt["items"]
+
+    # 2 lb at $1.00 becomes 2 lb at $1.50: a 50% rise, but an edit.
+    resp = await client.patch(
+        f"/api/receipts/{receipt['id']}",
+        json={"items": [{"id": line["id"], "total_price": 3.00}]},
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["items"][0]["total_price"] == 3.00
+    assert await _price_alerts(client) == []
+
+
+async def test_a_price_alert_failure_never_fails_the_confirm(
+    client, mock_extractor, test_image_bytes, db_session, monkeypatch
+):
+    """The alert breaks after its cooldown claim: confirm still answers 200,
+    the budget alert still goes out, and the claim is undone."""
+    from datetime import date
+
+    from app.services.notification_service import NotificationService
+
+    monkeypatch.setattr(clock, "today", lambda: date(2026, 3, 20))
+    await _history(client, mock_extractor, test_image_bytes, 1.00, 1.00)
+    budget = await client.post(
+        "/api/budgets", json={"amount": 4.0, "period_start": "2026-03-01"}
+    )
+    assert budget.status_code in (200, 201), budget.text
+
+    real = NotificationService.create_notification
+
+    async def broken(self, user_id, type, title, body, data=None):
+        if type == "price_change":
+            raise RuntimeError("forced price alert failure")
+        return await real(self, user_id, type, title, body, data)
+
+    monkeypatch.setattr(NotificationService, "create_notification", broken)
+
+    # 2 lb at $1.50 is 50% over the average, and its $3.00 takes the month's
+    # spend ($4.00 so far) past the $4 budget.
+    await _buy(client, mock_extractor, test_image_bytes, "2026-03-15", 1.50)
+
+    resp = await client.get("/api/notifications", params={"per_page": 100})
+    types = [n["type"] for n in resp.json()["items"]]
+    assert "budget_threshold" in types
+    assert "price_change" not in types
+    sent = (await db_session.execute(select(PriceAlertSent))).scalars().all()
+    assert sent == []

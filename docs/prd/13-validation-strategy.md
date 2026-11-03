@@ -244,6 +244,11 @@ V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02; PI-03
 | PI-03 | 3 | Cooldown, default 7 days per item | Integration | `backend/tests/services/test_price_alert_service.py::test_two_concurrent_claims_for_one_item_alert_once` | Pass (Postgres only) |
 | PI-03 | 4 | Mutable per item | Integration | `backend/tests/api/test_price_alerts.py::test_a_muted_item_does_not_alert` | Pass |
 | PI-03 | 4 | Mutable per store | Integration | `backend/tests/api/test_price_alerts.py::test_a_muted_store_does_not_alert` | Pass |
+| PI-03 | 4 | Mutable per store: unmute works after the store's receipts are purged | Integration | `backend/tests/api/test_price_alerts.py::test_a_store_can_be_unmuted_after_its_receipts_are_purged` | Pass |
+| PI-03 | 4 | Mutable per store: unmute removes only the user's own mute | Integration | `backend/tests/api/test_price_alerts.py::test_unmuting_a_store_never_touches_another_users_mute` | Pass |
+| PI-03 | 4 | Mutable per item: another user's item is 404 to mute and unmute | Integration | `backend/tests/api/test_price_alerts.py::test_another_users_item_cannot_be_muted_or_unmuted` | Pass |
+| PI-03 | FR | Only a confirm alerts; editing a confirmed receipt sends none | Integration | `backend/tests/api/test_price_alerts.py::test_editing_a_confirmed_receipt_never_sends_a_price_alert` | Pass |
+| PI-03 | FR | A price alert failure never fails the confirm or the budget alert | Integration | `backend/tests/api/test_price_alerts.py::test_a_price_alert_failure_never_fails_the_confirm` | Pass |
 | PI-04 | 1 | Side-by-side pricing across all stores with prices | Integration | `backend/tests/api/test_price_comparison.py::test_side_by_side_latest_and_average_per_store` | Pass |
 | PI-04 | 1 | Side-by-side pricing across all stores with prices | Integration | `backend/tests/api/test_price_comparison.py::test_stores_are_cheapest_first_by_average` | Pass |
 | PI-04 | 2 | Most recent and average price per store | Integration | `backend/tests/api/test_price_comparison.py::test_side_by_side_latest_and_average_per_store` | Pass |

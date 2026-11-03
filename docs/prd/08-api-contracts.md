@@ -318,7 +318,7 @@ Only a confirm alerts: editing a confirmed receipt later sends none. A failure i
 204. No price alerts for the item, or alerts again. Both are idempotent; another user's item is 404. Item detail (`GET /api/items/{canonical_id}`) carries `alerts_muted: bool`. Merging a muted item into another mutes the other.
 
 ### POST /api/stores/{store_id}/mute · DELETE /api/stores/{store_id}/mute
-204. No price alerts for prices paid at the store, or alerts again. Idempotent. A store the user has no receipt from is 404 (stores are shared across users). Store ids come from `GET /api/items/{canonical_id}/prices` (`observations[].store_id`).
+204. No price alerts for prices paid at the store, or alerts again. Idempotent. Muting a store the user has no receipt from is 404 (stores are shared across users); unmuting removes only the user's own mute and is never 404, so a mute whose receipts were since deleted and purged can still be undone. Store ids come from `GET /api/items/{canonical_id}/prices` (`observations[].store_id`).
 
 ### GET /api/items/{canonical_id}/compare
 Cross-store comparison (PI-04): the item's latest and average unit price at each store the user has bought it from, cheapest first.
