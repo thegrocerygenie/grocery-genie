@@ -126,8 +126,11 @@ export const spacing = {
  */
 const text = (style: TextStyle): TextStyle => ({ color: colors.iosLabel, ...style });
 
+// 'ui-rounded' is React Native's name for the iOS system rounded design (SF Pro
+// Rounded). iOS does not resolve 'SF Pro Rounded' as a family name, so that
+// spelling fell back to plain SF.
 const money: TextStyle = text({
-  fontFamily: Platform.select({ ios: 'SF Pro Rounded', default: 'System' }),
+  fontFamily: Platform.select({ ios: 'ui-rounded', default: 'System' }),
   fontVariant: ['tabular-nums'],
   fontWeight: '700',
 });
@@ -148,7 +151,9 @@ export const type = {
 } as const;
 
 export const springs = {
-  ring: { damping: 18, stiffness: 90 },
+  // The design's ring spring (response 0.6 s, damping ratio 0.7, the Activity
+  // ring) at mass 1: stiffness (2π/0.6)² ≈ 110, damping 2·0.7·√110 ≈ 14.7.
+  ring: { damping: 14.7, stiffness: 110 },
   ui: { damping: 22, stiffness: 220 },
   interactive: { damping: 26, stiffness: 300 },
 } as const;

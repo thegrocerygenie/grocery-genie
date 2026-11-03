@@ -80,6 +80,7 @@ backend/                 # Python FastAPI backend
   main.py                # FastAPI app entrypoint
 
 docs/prd/                # Product requirements — see directory for full listing
+docs/marketing/          # Marketing site briefs per roadmap stage, and decisions.md
 
 .agents/skills/           # Agent skills, shared by Claude Code and Codex
 .claude/skills/           # Symlinks into .agents/skills for Claude Code
@@ -154,6 +155,8 @@ With the full suite green, ask the user before each commit, and again before eac
 Skills live in `.agents/skills/<name>/` and load in both Claude Code and Codex. Before you add, rename, or remove one, read `docs/agents/harnesses.md`; after, run `scripts/check-agent-skills.py`.
 
 Four skills build and keep verification skills: `gg-create-verification-skill` and `gg-maintain-verification-skill` drive the app the way a user does, and `gg-create-formal-verification-skill` and `gg-maintain-formal-verification-skill` check risky code formally.
+
+`marketing-site-brief` writes the Claude Design brief for the marketing site at a roadmap stage. The brief covers the whole app as built up to that stage, and every claim is checked against the code. Its output goes in `docs/marketing/<stage>/`.
 
 ## Key Conventions
 

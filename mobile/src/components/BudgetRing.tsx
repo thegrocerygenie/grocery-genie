@@ -101,14 +101,16 @@ export function BudgetRing({
       <View style={styles.center} pointerEvents="none">
         <Text
           maxFontSizeMultiplier={CENTER_MAX_FONT_SCALE}
-          style={[type.money, { fontSize: 18, color: ringColor }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          style={[styles.amount, over && styles.amountOver]}
         >
           {label}
         </Text>
         {sub ? (
           <Text
             maxFontSizeMultiplier={CENTER_MAX_FONT_SCALE}
-            style={[type.caption1, { color: colors.iosLabel2 }]}
+            style={[styles.sub, over && styles.subOver]}
           >
             {sub}
           </Text>
@@ -128,5 +130,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
+    // Keeps a long amount inside the ring's hole, where it shrinks to fit.
+    paddingHorizontal: 16,
   },
+  // Design patterns.jsx and mvp-screens.jsx BudgetRingOver: on track, the amount
+  // left in the label color; over, the percent in red, smaller.
+  amount: { ...type.money, fontSize: 22, letterSpacing: -0.4, color: colors.iosLabel },
+  amountOver: { fontSize: 18, letterSpacing: 0, color: colors.red },
+  sub: { ...type.footnote, color: colors.iosLabel2 },
+  subOver: { ...type.caption2, color: colors.iosLabel2 },
 });

@@ -3,11 +3,12 @@
  * state over the captured photo, and a specific hint when the photo is rejected.
  */
 import React from 'react';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, StyleSheet, type ViewStyle } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import ScanScreen from '../../app/(tabs)/scan';
+import { colors } from '@/constants/theme';
 import { ApiError } from '@/services/api';
 import { aiConsentMock } from '@/testing/aiConsentHooksMock';
 
@@ -25,10 +26,11 @@ jest.mock('expo-router', () => ({
   Tabs: { Screen: () => null },
   useRouter: () => ({ push: mockPush, back: jest.fn() }),
 }));
+const mockPermission = { granted: true, canAskAgain: true };
 jest.mock('expo-camera', () => {
   const { forwardRef, useImperativeHandle } = jest.requireActual('react');
   return {
-    useCameraPermissions: () => [{ granted: true, canAskAgain: true }, jest.fn()],
+    useCameraPermissions: () => [mockPermission, jest.fn()],
     CameraView: forwardRef((_props: unknown, ref: unknown) => {
       useImperativeHandle(ref, () => ({
         takePictureAsync: () => Promise.resolve({ uri: 'file:///cache/Camera/shot.jpg' }),
@@ -64,6 +66,8 @@ jest.mock('@/features/receipt-capture/hooks/useReceiptScan', () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   aiConsentMock.granted = true;
+  mockPermission.granted = true;
+  mockPermission.canAskAgain = true;
   mockHandlers = null;
   mockFrame = null;
   (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
@@ -202,5 +206,45 @@ describe('Scan without AI consent', () => {
 
     expect(aiConsentMock.markRequired).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Reading receipt…')).toBeNull();
+  });
+});
+
+// Design "Scan · capture", "Scan · low quality" and "Permission denied".
+describe('Scan visual fidelity', () => {
+  const style = (node: { props: { style?: unknown } }): ViewStyle =>
+    StyleSheet.flatten(node.props.style as ViewStyle) ?? {};
+
+  it('draws a 64pt shutter', () => {
+    render(<ScanScreen />);
+    expect(style(screen.getByLabelText('Capture receipt'))).toMatchObject({
+      width: 64,
+      height: 64,
+    });
+  });
+
+  it('shows the error as a rounded rectangle, not a capsule', async () => {
+    await capture();
+    act(() =>
+      mockHandlers!.onError(
+        new ApiError(422, { detail: 'Image quality insufficient: Image appears blurry' }),
+      ),
+    );
+    expect(style(screen.getByTestId('scan-error-pill'))).toMatchObject({
+      borderRadius: 12,
+      paddingVertical: 8,
+    });
+  });
+
+  it('tints the icon tile red when camera access is off', () => {
+    mockPermission.granted = false;
+    mockPermission.canAskAgain = false;
+    render(<ScanScreen />);
+    expect(screen.getByText('Camera access is off')).toBeTruthy();
+    expect(style(screen.getByTestId('scan-permission-icon'))).toMatchObject({
+      width: 60,
+      height: 60,
+      borderRadius: 14,
+      backgroundColor: colors.redBg,
+    });
   });
 });

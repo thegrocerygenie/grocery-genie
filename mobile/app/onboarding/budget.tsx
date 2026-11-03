@@ -14,6 +14,8 @@ import { Stack, useRouter } from 'expo-router';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useBudgetCreate } from '@/features/budget/hooks/useBudget';
+import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
+import { currencySymbol } from '@/utils/money';
 
 // The amount is one line in a fixed-width card, and Skip sits in the
 // fixed-height nav bar. Neither can wrap, so both stop growing here.
@@ -24,6 +26,8 @@ export default function OnboardingBudget() {
   const router = useRouter();
   const budgetCreate = useBudgetCreate();
   const [amount, setAmount] = useState('400');
+  // Set from the iPhone at sign-up, just before this screen.
+  const symbol = currencySymbol(useBudgetCurrency());
   const [saving, setSaving] = useState(false);
 
   const onContinue = async (skipPersist = false) => {
@@ -89,8 +93,8 @@ export default function OnboardingBudget() {
                 justifyContent: 'center',
               }}
             >
-              <Text style={styles.amountCurrency} maxFontSizeMultiplier={AMOUNT_MAX_FONT_SCALE}>
-                $
+              <Text style={styles.amountText} maxFontSizeMultiplier={AMOUNT_MAX_FONT_SCALE}>
+                {symbol}
               </Text>
               <TextInput
                 keyboardType="decimal-pad"
@@ -101,6 +105,17 @@ export default function OnboardingBudget() {
                 maxFontSizeMultiplier={AMOUNT_MAX_FONT_SCALE}
                 accessibilityLabel="Monthly budget amount"
               />
+              {/* Design: "$400.00", the cents dimmed, until the user types their own. */}
+              {amount.includes('.') ? null : (
+                <Text
+                  style={[styles.amountText, styles.amountCents]}
+                  maxFontSizeMultiplier={AMOUNT_MAX_FONT_SCALE}
+                  importantForAccessibility="no"
+                  accessibilityElementsHidden
+                >
+                  .00
+                </Text>
+              )}
             </View>
             <Text style={styles.amountHint}>You can change this anytime.</Text>
           </View>
@@ -143,16 +158,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,
   },
-  amountCurrency: {
+  // Design mvp-screens.jsx OnbBudget: 48pt rounded bold, letter spacing -0.02em.
+  amountText: {
     ...type.money,
-    fontSize: 32,
-    color: colors.iosLabel3,
+    fontSize: 48,
+    letterSpacing: -1,
+    color: colors.iosLabel,
   },
+  amountCents: { color: colors.iosLabel3 },
   amountInput: {
     ...type.money,
-    fontSize: 56,
+    fontSize: 48,
+    letterSpacing: -1,
     color: colors.iosLabel,
-    minWidth: 120,
+    minWidth: 32,
     textAlign: 'center',
     padding: 0,
   },

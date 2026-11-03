@@ -293,7 +293,7 @@ function ScannerPill({ state, errorHint, busy, hints }: ScannerPillProps) {
   if (warning) {
     return (
       <View
-        style={[styles.pill, styles.pillWarning]}
+        style={[styles.pill, styles.pillAlert, styles.pillWarning]}
         testID="scan-error-pill"
         accessibilityLiveRegion="polite"
         accessibilityRole="alert"
@@ -413,7 +413,10 @@ interface PermissionScreenProps {
 function PermissionScreen({ denied, onRequest, onChooseFromLibrary }: PermissionScreenProps) {
   return (
     <View style={styles.permissionRoot}>
-      <View style={styles.permissionIcon}>
+      <View
+        style={[styles.permissionIcon, denied && styles.permissionIconDenied]}
+        testID="scan-permission-icon"
+      >
         <SymbolView name="camera.fill" size={28} tintColor={denied ? colors.red : colors.tint} />
       </View>
       <Text style={[type.title2, { textAlign: 'center' }]}>
@@ -559,7 +562,7 @@ function HintPill({ state, errorHint, frame }: HintPillProps) {
   if (state === 'ready' && frame && frame !== 'ok') {
     return (
       <View
-        style={[styles.pill, { backgroundColor: colors.orange }]}
+        style={[styles.pill, styles.pillAlert, styles.pillWarning]}
         accessibilityLiveRegion="polite"
         accessibilityRole="alert"
       >
@@ -573,7 +576,7 @@ function HintPill({ state, errorHint, frame }: HintPillProps) {
   if (state === 'low-quality') {
     return (
       <View
-        style={[styles.pill, { backgroundColor: colors.orange }]}
+        style={[styles.pill, styles.pillAlert, styles.pillWarning]}
         testID="scan-error-pill"
         accessibilityLiveRegion="polite"
         accessibilityRole="alert"
@@ -634,6 +637,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
   },
   pillText: { color: '#fff' },
+  // Design "Scan · low quality": a warning is a rounded rectangle, not a capsule.
+  pillAlert: { borderRadius: 12, paddingVertical: 8 },
   pillWarning: { backgroundColor: colors.orange, maxWidth: 340 },
   pillWarningText: { color: '#fff', fontWeight: '600', flexShrink: 1 },
 
@@ -697,9 +702,9 @@ const styles = StyleSheet.create({
   modeLabel: { ...type.callout, color: '#fff', fontWeight: '600' },
 
   shutter: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     borderWidth: 3,
     borderColor: '#fff',
     padding: 4,
@@ -720,14 +725,16 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   permissionIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
+    width: 60,
+    height: 60,
+    borderRadius: 14,
     backgroundColor: colors.iosFill3,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
   },
+  // Design "Permission denied": the camera tile turns red-tinted.
+  permissionIconDenied: { backgroundColor: colors.redBg },
   primaryBtn: {
     marginTop: spacing.md,
     minHeight: 50,
