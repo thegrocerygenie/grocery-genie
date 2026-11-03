@@ -10,8 +10,8 @@ interface PremiumUpgradePromptProps {
   /** Label for the upgrade button; shown only with `onUpgrade`. */
   upgradeLabel?: string;
   /**
-   * Opens the upgrade flow. Premium (V11-P0) routes this to its paywall; until
-   * then callers pass nothing and the prompt shows no button that goes nowhere.
+   * Opens the upgrade flow: callers route it to the paywall (`/paywall`,
+   * V11-P0). Without it the prompt shows no button that goes nowhere.
    */
   onUpgrade?: () => void;
 }

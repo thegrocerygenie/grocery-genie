@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.routes.users import user_profile
 from app.core.dependencies import get_db
 from app.core.security import get_current_user
 from app.models.database import User
@@ -19,11 +20,9 @@ from app.models.schemas import (
     SignInRequest,
     SignUpRequest,
     TokenPairResponse,
-    UserPreferencesPublic,
     UserProfileResponse,
     VerifyEmailRequest,
 )
-from app.services import ai_consent
 from app.services import auth as auth_service
 from app.services.apple_auth import verify_apple_sign_in
 from app.services.google_auth import verify_google_id_token
@@ -43,29 +42,8 @@ def _ua(request: Request) -> str | None:
 def _user_to_profile(
     user: User, *, needs_onboarding: bool = False
 ) -> UserProfileResponse:
-    prefs = dict(user.preferences or {})
-    return UserProfileResponse(
-        id=user.id,
-        email=user.email,
-        name=user.name,
-        locale=user.locale,
-        currency_preference=user.currency_preference,
-        email_verified_at=user.email_verified_at,
-        preferences=UserPreferencesPublic(
-            notification_thresholds={
-                "fifty": user.notif_threshold_50,
-                "eighty": user.notif_threshold_80,
-                "hundred": user.notif_threshold_100,
-            },
-            weekly_summary={
-                "enabled": user.weekly_summary_enabled,
-                "day": user.weekly_summary_day,
-            },
-            ocr_languages=prefs.get("ocr_languages", []),
-        ),
-        needs_onboarding=needs_onboarding,
-        ai_consent=ai_consent.public(user),
-    )
+    # One profile shape for /api/auth/me and /api/users/me.
+    return user_profile(user, needs_onboarding=needs_onboarding)
 
 
 def _to_pair(

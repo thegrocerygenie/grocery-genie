@@ -15,6 +15,7 @@ from app.api.routes import (
     notifications,
     receipts,
     stores,
+    webhooks,
 )
 from app.api.routes import (
     auth as auth_routes,
@@ -96,3 +97,4 @@ app.include_router(items.router)
 app.include_router(stores.router)
 app.include_router(notifications.router)
 app.include_router(analytics.router)
+app.include_router(webhooks.router)

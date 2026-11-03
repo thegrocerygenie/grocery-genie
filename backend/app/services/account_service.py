@@ -41,6 +41,7 @@ from app.models.database import (
     PushToken,
     Receipt,
     ReceiptCorrection,
+    RevenueCatEvent,
     User,
     UserItemMapping,
 )
@@ -140,6 +141,7 @@ async def delete_account(
         delete(Category).where(Category.user_id == user_id),
         delete(AuthEvent).where(AuthEvent.user_id == user_id),
         delete(AnalyticsEvent).where(AnalyticsEvent.user_id == user_id),
+        delete(RevenueCatEvent).where(RevenueCatEvent.user_id == user_id),
     ]
     if email is not None:
         # Failed sign-ins for an unknown email log it with no user_id.

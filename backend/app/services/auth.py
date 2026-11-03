@@ -10,6 +10,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import NoReturn
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -88,6 +89,18 @@ class InvalidTokenError(AuthError):
 class WeakPasswordError(AuthError):
     code = "weak_password"
     status = 422
+
+
+async def _commit_and_raise(db: AsyncSession, error: AuthError) -> NoReturn:
+    """Commit this failure's writes, then raise.
+
+    get_db rolls the request back on any exception, and the route turns
+    `error` into an HTTPException. Without this commit, the lockout counter
+    and the audit row for a failed sign-in or a token replay would vanish.
+    Call it only where the request has no other pending writes.
+    """
+    await db.commit()
+    raise error
 
 
 # ── Token helpers ─────────────────────────────────────────────────
@@ -200,7 +213,7 @@ async def sign_in(
             user_agent=user_agent,
             metadata={"reason": "no_user", "email": email},
         )
-        raise InvalidCredentialsError("invalid credentials")
+        await _commit_and_raise(db, InvalidCredentialsError("invalid credentials"))
 
     locked_until_aware = _aware(user.locked_until)
     if locked_until_aware and locked_until_aware > now:
@@ -216,7 +229,7 @@ async def sign_in(
                 else None
             },
         )
-        raise AccountLockedError("account locked")
+        await _commit_and_raise(db, AccountLockedError("account locked"))
 
     if not verify_password(password, user.password_hash):
         # Sliding window: only count failures within
@@ -246,7 +259,7 @@ async def sign_in(
             user_agent=user_agent,
             metadata={"reason": "bad_password"},
         )
-        raise InvalidCredentialsError("invalid credentials")
+        await _commit_and_raise(db, InvalidCredentialsError("invalid credentials"))
 
     user.failed_signin_count = 0
     user.last_failed_signin_at = None
@@ -282,18 +295,18 @@ async def refresh(
         await invalidate_family_async(
             payload.fam, ttl_seconds=payload.exp - int(payload.iat)
         )
-        # The account may be deleted (its other sessions stay live until they
-        # refresh), and an event cannot point at a user row that is gone.
-        user_id = await db.scalar(select(User.id).where(User.id == _uuid(payload.sub)))
+        # auth_events.user_id references users.id: a deleted user's replay
+        # is recorded without a user.
+        sub = _uuid(payload.sub)
         await auth_audit.record(
             db,
             event_type=auth_audit.EVENT_TOKEN_REUSE_DETECTED,
-            user_id=user_id,
+            user_id=sub if await db.get(User, sub) is not None else None,
             ip=ip,
             user_agent=user_agent,
             metadata={"family": payload.fam},
         )
-        raise InvalidTokenError("token reuse detected")
+        await _commit_and_raise(db, InvalidTokenError("token reuse detected"))
 
     if not await acquire_refresh_lock_async(payload.jti):
         # Another caller is mid-rotation; ask the client to retry.

@@ -40,6 +40,7 @@ from app.models.database import (
     PriceAlertStoreMute,
     Receipt,
     ReceiptCorrection,
+    RevenueCatEvent,
     User,
     UserItemMapping,
 )
@@ -189,6 +190,13 @@ async def _give_user_everything(
             ),
             PriceAlertItemMute(user_id=user_id, canonical_item_id=matched_item_id),
             PriceAlertStoreMute(user_id=user_id, store_id=store_id),
+            # Premium (V11-P0): the RevenueCat webhook ledger.
+            RevenueCatEvent(
+                event_id=f"evt-{user_id}",
+                event_type="INITIAL_PURCHASE",
+                user_id=user_id,
+                outcome="applied",
+            ),
             AnalyticsEvent(
                 user_id=user_id,
                 event_name="receipt_scan_started",
