@@ -95,7 +95,7 @@ Events are pushed to `window.dataLayer` (GTM / GA4) and forwarded to `window.pla
 | `headline_view` | page load | |
 | `cta_click` | any "Get early access" / "Download" click | `loc`: `nav`, `hero`, `mid`, `final` |
 | `waitlist_signup` | successful waitlist join | `loc` |
-| `appstore_click` | App Store badge or nav Download click (State B) | `loc` |
+| `appstore_click` | App Store badge click (State B; the nav Download link sends `cta_click`) | `loc`: `hero`, `mid`, `final` |
 | `faq_open` | an FAQ item is opened | `id` |
 | `next_vote` | a "What's next" vote (State A) | `feature` |
 

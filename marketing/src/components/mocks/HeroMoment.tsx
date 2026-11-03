@@ -35,8 +35,7 @@ export default function HeroMoment() {
   const fill = p >= 2 ? 168.2 / BUDGET : 120 / BUDGET;
 
   return (
-    <div className="hero-moment">
-      <Mock label="">
+    <Mock label="">
         <div style={{ position: 'absolute', inset: '28px 0 0', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 24, height: 32, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transform: 'rotate(-4deg)', flex: 'none' }} />
@@ -97,7 +96,6 @@ export default function HeroMoment() {
             <div style={{ width: 42, height: 42, borderRadius: 21, background: '#fff' }} />
           </div>
         </div>
-      </Mock>
-    </div>
+    </Mock>
   );
 }
