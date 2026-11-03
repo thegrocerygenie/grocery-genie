@@ -282,10 +282,13 @@ async def refresh(
         await invalidate_family_async(
             payload.fam, ttl_seconds=payload.exp - int(payload.iat)
         )
+        # The account may be deleted (its other sessions stay live until they
+        # refresh), and an event cannot point at a user row that is gone.
+        user_id = await db.scalar(select(User.id).where(User.id == _uuid(payload.sub)))
         await auth_audit.record(
             db,
             event_type=auth_audit.EVENT_TOKEN_REUSE_DETECTED,
-            user_id=_uuid(payload.sub),
+            user_id=user_id,
             ip=ip,
             user_agent=user_agent,
             metadata={"family": payload.fam},

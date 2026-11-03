@@ -331,6 +331,50 @@ async def test_delete_account_revokes_tokens(api_client, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_replayed_refresh_from_another_device_after_delete_is_rejected(
+    api_client, db_session, monkeypatch
+):
+    # Deletion revokes only the session that asked. Another device's refresh
+    # token that was already rotated reaches the replay check, which logs an
+    # auth event for a user who is gone. Postgres rejects that row (FK).
+    from app.services import auth as auth_service
+
+    denied: set[str] = set()
+
+    async def _add_jti(jti, _ttl):
+        denied.add(jti)
+
+    async def _is_denylisted(jti):
+        return jti in denied
+
+    monkeypatch.setattr(auth_service, "add_jti_async", _add_jti)
+    monkeypatch.setattr(auth_service, "is_jti_denylisted_async", _is_denylisted)
+    _, headers = await _sign_up(api_client, "gone@test.com")
+    other_device = await api_client.post(
+        "/api/auth/sign-in", json={"email": "gone@test.com", "password": PASSWORD}
+    )
+    rotated_refresh = other_device.json()["refresh_token"]
+    rotation = await api_client.post(
+        "/api/auth/refresh", json={"refresh_token": rotated_refresh}
+    )
+    assert rotation.status_code == 200, rotation.text
+    user_id = await _user_id(db_session, "gone@test.com")
+    deleted = await api_client.delete("/api/users/me", headers=headers)
+    assert deleted.status_code == 204, deleted.text
+
+    replay = await api_client.post(
+        "/api/auth/refresh", json={"refresh_token": rotated_refresh}
+    )
+
+    assert replay.status_code == 400, replay.text
+    assert replay.json()["detail"]["code"] == "invalid_token"
+    orphans = await db_session.execute(
+        select(AuthEvent.event_type).where(AuthEvent.user_id == user_id)
+    )
+    assert orphans.scalars().all() == []
+
+
+@pytest.mark.asyncio
 async def test_second_delete_call_is_rejected_and_changes_nothing(
     api_client, db_session
 ):
