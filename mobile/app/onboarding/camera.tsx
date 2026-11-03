@@ -93,10 +93,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.iosFill3,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xs,
   },
   tagline: {
-    ...type.callout,
+    ...type.subheadline,
     color: colors.iosLabel2,
     textAlign: 'center',
     lineHeight: 22,
@@ -119,7 +118,6 @@ const styles = StyleSheet.create({
   tertiaryBtn: {
     ...type.subheadline,
     color: colors.tint,
-    fontWeight: '500',
     textAlign: 'center',
     paddingVertical: spacing.sm,
   },

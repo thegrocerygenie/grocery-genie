@@ -1,6 +1,6 @@
 # Handoff: MVP design alignment, round 2 (2026-10-28)
 
-**Status: open.** Steps 1 and 2 are done: accessibility merged as #50 (plus #51, onboarding at AX5), and behavior and copy is PR 2. Step 3 (visual fidelity) is open. The document scanner is built in code (`.planning/PLAN-2026-11-01-document-scanner.md`) and waits on a device check. The MVP Definition of Done audit of 2026-10-29 (`.planning/DOD-AUDIT-2026-10-29.md`) ranks what's left.
+**Status: done.** Steps 1 and 2 are done: accessibility merged as #50 (plus #51, onboarding at AX5), and behavior and copy is PR 2. Step 3 (visual fidelity) is done on `feat/visual-fidelity`. The document scanner is built in code (`.planning/PLAN-2026-11-01-document-scanner.md`) and waits on a device check. The MVP Definition of Done audit of 2026-10-29 (`.planning/DOD-AUDIT-2026-10-29.md`) ranks what's left.
 
 Goal: close the gaps between the MVP design and the app, so the MVP screens match the design's look, behavior and accessibility rules. Every item has a test where a test can see it, and a Simulator check where only a screen can.
 
@@ -69,15 +69,15 @@ All items are **checked** and size S unless marked otherwise.
 
 ### 3. Visual fidelity (PR 3)
 
-All items are **from the design** unless marked. Compare each on the Simulator first.
-- [ ] **Money font.** `fontFamily: 'SF Pro Rounded'` (`theme.ts:124`) may not resolve on iOS, which would leave money text in plain SF. Try `'ui-rounded'`, and compare on the Simulator. **checked** that the name is used; not checked how it renders.
-- [ ] **Welcome icon glyph** is hard-coded white (`mobile/app/onboarding/index.tsx:17`). In dark mode the tint is bright `#34D17A`, and on-tint content is black elsewhere (`theme.ts:60`). Use `colors.onTint`. **checked**, S
-- [ ] **Ring spring** has almost no overshoot. Damping 18 and stiffness 90 work out to ζ ≈ 0.95; the reference spring (response 0.6, damping 0.7) overshoots slightly. Try about damping 14.7 and stiffness 110. `theme.ts:145`; design `motion.jsx:17`.
-- [ ] **Ring center label.** When on track, the reference uses label color at 22pt with a 13pt sub; the app uses tint at 18pt with a 12pt sub. When over, the reference sub is 11pt. `BudgetRing.tsx:57-58`; design `patterns.jsx:16-17`. PR 1 capped this text at 1.2× (`CENTER_MAX_FONT_SCALE`) so it fits the 108pt ring at AX5. Recheck that fit at AX5 after any size change.
-- [ ] **Welcome and Camera type and spacing.** The tagline is 15pt, 6pt under the wordmark, with a 20pt gap below the icon. "Not now" is weight 400. The icon shadow opacity is 0.25. `onboarding/index.tsx`, `camera.tsx`; design `mvp-screens.jsx:10-16,48-55`.
-- [ ] **Onboarding budget amount:** 48pt "$400" with ".00" in label-3 and letterSpacing −1. The app shows 56pt with no cents. `onboarding/budget.tsx:124-136`; design `mvp-screens.jsx:34`.
-- [ ] **Scan sizes.** The shutter is 70pt; the reference uses 64. The error pill is a full capsule; the reference uses radius 12 with 8pt padding. `scan.tsx:472-478,526-533`; design `mvp-screens.jsx:143,172`.
-- [ ] **Scan, permission denied:** the icon tile should be red-tinted (`rgba(255,59,48,0.12)`, 60pt, radius 14), not grey. `scan.tsx:548-556`; design `mvp-screens.jsx:320`.
+Done on `feat/visual-fidelity` (2026-11-02), each checked on the Simulator. Tests: `visualFidelity.test.tsx` and the "Scan visual fidelity" block in `scanStates.test.tsx`. Also fixed: the onboarding budget showed "$" for every user; it now shows the budget currency symbol.
+- [x] **Money font.** `fontFamily: 'SF Pro Rounded'` (`theme.ts:124`) may not resolve on iOS, which would leave money text in plain SF. Try `'ui-rounded'`, and compare on the Simulator. **checked** that the name is used; not checked how it renders.
+- [x] **Welcome icon glyph** is hard-coded white (`mobile/app/onboarding/index.tsx:17`). In dark mode the tint is bright `#34D17A`, and on-tint content is black elsewhere (`theme.ts:60`). Use `colors.onTint`. **checked**, S
+- [x] **Ring spring** has almost no overshoot. Damping 18 and stiffness 90 work out to ζ ≈ 0.95; the reference spring (response 0.6, damping 0.7) overshoots slightly. Try about damping 14.7 and stiffness 110. `theme.ts:145`; design `motion.jsx:17`.
+- [x] **Ring center label.** When on track, the reference uses label color at 22pt with a 13pt sub; the app uses tint at 18pt with a 12pt sub. When over, the reference sub is 11pt. `BudgetRing.tsx:57-58`; design `patterns.jsx:16-17`. PR 1 capped this text at 1.2× (`CENTER_MAX_FONT_SCALE`) so it fits the 108pt ring at AX5. Recheck that fit at AX5 after any size change.
+- [x] **Welcome and Camera type and spacing.** The tagline is 15pt, 6pt under the wordmark, with a 20pt gap below the icon. "Not now" is weight 400. The icon shadow opacity is 0.25. `onboarding/index.tsx`, `camera.tsx`; design `mvp-screens.jsx:10-16,48-55`.
+- [x] **Onboarding budget amount:** 48pt "$400" with ".00" in label-3 and letterSpacing −1. The app shows 56pt with no cents. `onboarding/budget.tsx:124-136`; design `mvp-screens.jsx:34`.
+- [x] **Scan sizes.** The shutter is 70pt; the reference uses 64. The error pill is a full capsule; the reference uses radius 12 with 8pt padding. `scan.tsx:472-478,526-533`; design `mvp-screens.jsx:143,172`.
+- [x] **Scan, permission denied:** the icon tile should be red-tinted (`rgba(255,59,48,0.12)`, 60pt, radius 14), not grey. `scan.tsx:548-556`; design `mvp-screens.jsx:320`.
 
 ## Deliberate divergences: leave these alone
 

@@ -26,12 +26,14 @@ export default function OnboardingWelcome() {
       >
         <View style={[styles.heroWrap, heroPad]}>
           <View style={styles.appIcon}>
-            <SymbolView name="cart.fill" size={44} tintColor="#fff" />
+            <SymbolView name="cart.fill" size={44} tintColor={colors.onTint} />
           </View>
-          <Text style={styles.wordmark} maxFontSizeMultiplier={WORDMARK_MAX_FONT_SCALE}>
-            Grocery Genie
-          </Text>
-          <Text style={styles.tagline}>Snap a receipt, watch your grocery budget take shape.</Text>
+          <View>
+            <Text style={styles.wordmark} maxFontSizeMultiplier={WORDMARK_MAX_FONT_SCALE}>
+              Grocery Genie
+            </Text>
+            <Text style={styles.tagline}>Snap a receipt, watch your grocery budget take shape.</Text>
+          </View>
         </View>
         <View style={styles.ctaStack}>
           <Pressable
@@ -65,7 +67,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.lg,
+    // Design: 20pt between the icon and the wordmark; the tagline sits 6pt under it.
+    gap: 20,
     paddingHorizontal: spacing.xl,
   },
   appIcon: {
@@ -76,7 +79,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: colors.tint,
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 12 },
     elevation: 8,
@@ -89,11 +92,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tagline: {
-    ...type.callout,
+    ...type.subheadline,
     color: colors.iosLabel2,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 21,
     maxWidth: 280,
+    marginTop: 6,
   },
   ctaStack: {
     paddingHorizontal: spacing.lg,
