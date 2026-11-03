@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from collections import Counter
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import delete, func, or_, select
@@ -29,6 +29,17 @@ from app.models.database import (
 MIN_TIMELINE_POINTS = 2
 # PI-04 FR: a store needs at least this many prices of an item to be compared.
 MIN_COMPARISON_OBSERVATIONS = 2
+
+# Rolling average windows (PI functional requirements). Price change alerts
+# compare with the 30-day average; the 7-day one goes along for context.
+SHORT_WINDOW_DAYS = 7
+LONG_WINDOW_DAYS = 30
+
+
+@dataclass(frozen=True)
+class RollingAverage:
+    average: Decimal | None
+    count: int
 
 
 @dataclass(frozen=True)
@@ -135,6 +146,49 @@ class PriceService:
                 )
             )
         await self.db.flush()
+
+    async def rolling_average(
+        self,
+        user_id: uuid.UUID,
+        item_id: uuid.UUID,
+        *,
+        unit_of_measure: str | None,
+        currency: str,
+        as_of: date,
+        days: int,
+        exclude_receipt_id: uuid.UUID | None = None,
+    ) -> RollingAverage:
+        """Mean unit price of the item over the ``days`` up to ``as_of``.
+
+        Only prices in the same unit and currency count (edge case: unit
+        price ambiguity). ``exclude_receipt_id`` leaves a receipt out, so a
+        new price is compared with the ones before it.
+        """
+        conditions = [
+            *self._visible(user_id),
+            PriceObservation.canonical_item_id == item_id,
+            PriceObservation.unit_of_measure.is_not_distinct_from(unit_of_measure),
+            PriceObservation.currency == currency,
+            PriceObservation.date > as_of - timedelta(days=days),
+            PriceObservation.date <= as_of,
+        ]
+        if exclude_receipt_id is not None:
+            conditions.append(PriceObservation.receipt_id != exclude_receipt_id)
+        prices = (
+            (
+                await self.db.execute(
+                    select(PriceObservation.unit_price)
+                    .join(Receipt, PriceObservation.receipt_id == Receipt.id)
+                    .where(*conditions)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if not prices:
+            return RollingAverage(average=None, count=0)
+        total = sum((Decimal(str(p)) for p in prices), Decimal(0))
+        return RollingAverage(average=total / len(prices), count=len(prices))
 
     def _visible(self, user_id: uuid.UUID) -> tuple:
         """Observations of this user's receipts that are not deleted."""

@@ -12,6 +12,7 @@ response, a dead worker, a failed commit), they end as `failed`: an alert may
 be lost, but never shown twice.
 """
 
+import json
 import logging
 from datetime import UTC, datetime, timedelta
 
@@ -34,6 +35,26 @@ logger = logging.getLogger(__name__)
 BATCH_SIZE = 100
 # Tapping a push opens the dashboard (BC-06: link to the full dashboard).
 DASHBOARD_URL = "/"
+# ...except a price change alert, which opens its item (PI-03).
+PRICE_CHANGE_TYPE = "price_change"
+
+
+def push_data(n: Notification) -> dict:
+    """The data a push carries for the app: notification_id, type and the
+    in-app url to open on tap. A price change alert also carries its
+    canonical_item_id and store_id, and opens /items/{canonical_item_id}."""
+    data = {"notification_id": str(n.id), "type": n.type, "url": DASHBOARD_URL}
+    if n.type == PRICE_CHANGE_TYPE and n.data:
+        try:
+            stored = json.loads(n.data)
+        except ValueError:
+            stored = {}
+        item_id = stored.get("canonical_item_id") if isinstance(stored, dict) else None
+        if item_id:
+            data["canonical_item_id"] = item_id
+            data["store_id"] = stored.get("store_id")
+            data["url"] = f"/items/{item_id}"
+    return data
 
 
 @celery_app.task(name="app.tasks.push_tasks.deliver_pending_pushes")
@@ -115,11 +136,7 @@ def deliver_pending_pushes(
                 to=token,
                 title=n.title,
                 body=n.body,
-                data={
-                    "notification_id": str(n.id),
-                    "type": n.type,
-                    "url": DASHBOARD_URL,
-                },
+                data=push_data(n),
             )
             targets.append((n, token, message))
     # The claim: commit `sending` before the first POST.

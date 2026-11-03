@@ -574,6 +574,8 @@ class ItemDetailResponse(ItemSummaryResponse):
     aliases: list[ItemAliasResponse]
     # "Is this the same as …?" questions about this item.
     suggestions: list[ItemSuggestionResponse]
+    # PI-03 AC 4: the user muted price change alerts for this item.
+    alerts_muted: bool = False
 
 
 class PricePointResponse(BaseModel):
@@ -638,3 +640,31 @@ class ItemRenameRequest(BaseModel):
 class ItemMergeRequest(BaseModel):
     # The item this one is the same product as; it keeps its name.
     into_item_id: uuid.UUID
+
+
+# --- Price change alerts (PI-03) ---
+
+
+class StoreRef(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+
+
+class PriceAlertSettingsResponse(BaseModel):
+    enabled: bool
+    # The user's threshold, or the default when they have not set one.
+    threshold_percent: int
+    default_threshold_percent: int
+    cooldown_days: int
+    muted_items: list[ItemRef]
+    muted_stores: list[StoreRef]
+
+
+class PriceAlertSettingsUpdate(BaseModel):
+    """Fields left out stay as they are; a null threshold goes back to the
+    default."""
+
+    enabled: bool | None = None
+    threshold_percent: int | None = Field(default=None, ge=1, le=100)

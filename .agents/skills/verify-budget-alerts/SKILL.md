@@ -1,6 +1,6 @@
 ---
 name: verify-budget-alerts
-description: "Model-check Grocery Genie's budget alert and push delivery pipeline with TLA+: one alert per threshold, no missed alert, each push sent at most once, every push settles. Use when a change touches confirm_receipt, create_manual_receipt, check_thresholds, claim_alert, budget_alerts_sent, create_notification, deliver_pending_pushes, ExpoPushClient.send, expo_rejected, or the request transaction in get_db."
+description: "Model-check Grocery Genie's budget alert and push delivery pipeline with TLA+: one alert per threshold, no missed alert, each push sent at most once, every push settles. Use when a change touches confirm_receipt, create_manual_receipt, check_thresholds, claim_alert, budget_alerts_sent, create_notification, _alert_on_price_changes, price_alerts_sent, deliver_pending_pushes, ExpoPushClient.send, expo_rejected, or the request transaction in get_db."
 ---
 
 # Verify budget alerts
@@ -137,6 +137,10 @@ Left out:
 - Expo push receipts (the second-phase delivery report);
 - creating the notification in the same transaction as the alert. The model merges `claim_alert` and `create_notification` into one step, which is sound because nothing sees either write before commit;
 - weekly summaries;
+- the steps `_after_confirm` runs besides the budget check, each in a savepoint that is logged and undone on failure, so neither can abort the confirm's transaction or write `budget_alerts_sent`; to the model they are steps that change none of its state:
+  - before it, `_record_prices` (PI-01/02: item matching and price observations). It writes `line_items`, `canonical_items`, aliases and `price_observations`, never spend: `Read` sums `line_items.total_price`, which it leaves alone. It can wait on another confirm's alias insert, which delays the `Read` step and cannot reorder it;
+  - after it, `_alert_on_price_changes` (PI-03), a second writer of `notifications` (`type = 'price_change'`). It runs after `check_thresholds` has locked the budgets, and claims `price_alerts_sent` rows in item id order, so locks are always budgets first, then ledger rows in one order: no deadlock with a concurrent confirm. Its notifications enter the push pipeline like any other, which `PushDelivery` covers whatever the type. Its own promise, one price alert per item per cooldown, is not in these models: the claim is one upsert on the ledger's unique key (`PriceAlertService.claim`), checked by `backend/tests/services/test_price_alert_service.py::test_two_concurrent_claims_for_one_item_alert_once` on Postgres;
+- receipts in a currency other than the user's (`in_budget_currency`): they add no spend, and spend in the model only grows;
 - the daily purge (`purge_tasks.py`), which erases a budget soft-deleted longer than the restore window, its `budget_alerts_sent` rows (ON DELETE CASCADE), and the `budget_threshold` notifications that name it. `check_thresholds` neither locks nor reads a deleted budget, so a confirm never claims on it. The purge holds the budget row lock and rechecks `deleted_at` in its delete, so a revive in `create_budget` cannot keep the row and lose its ledger. Those notifications are far older than `push_max_age`, so the push beat has already settled them;
 - anything outside these files.
 
@@ -146,18 +150,19 @@ A pass covers the model within its bounds, not the whole system.
 
 ## Coverage record
 
-Sync commit: `fe018b7`
+Sync commit: `dcc0b0c`
 
 The verification was last confirmed to describe these files and functions at the sync commit. `run.sh` reads this table and the sync commit.
 
 | File | Functions | Model steps |
 | --- | --- | --- |
 | `backend/app/core/dependencies.py` | `get_db`, `engine` (no isolation level) | `ConfirmAlerts`: `Commit`, `Abort` |
-| `backend/app/services/receipt_service.py` | `confirm_receipt`, `update_receipt` (date and status branches: the date is set before the status branch, in the same transaction; an already confirmed receipt is not confirmed again and cannot leave `confirmed` (422), an edit to one flushes, then runs `_alert_on_thresholds`, and every edit alerts in the periods `_retroactive_category_update` changed), `create_manual_receipt`, `_after_confirm` and `_alert_on_thresholds` (every alert path shares them) | `ConfirmAlerts`: `Flush` |
+| `backend/app/services/receipt_service.py` | `confirm_receipt`, `update_receipt` (date and status branches: the date is set before the status branch, in the same transaction; an already confirmed receipt is not confirmed again and cannot leave `confirmed` (422), an edit to one flushes, then runs `_alert_on_thresholds`, and every edit alerts in the periods `_retroactive_category_update` changed), `create_manual_receipt`, `_after_confirm` and `_alert_on_thresholds` (every alert path shares them); watched, not modeled: `_record_prices` (before the budget check) and `_alert_on_price_changes` (after it; see Scope) | `ConfirmAlerts`: `Flush` |
 | `backend/app/services/budget_service.py` | `check_thresholds` (budget row lock, taken once for every period it checks), `get_spending_by_category`, `_active_thresholds`, `claim_alert`; watched, not modeled: `get_period_containing` (picks the period whose spend `Read` sums; the model holds one period), `save_budget`, `update_budget`, `restore_budget` (they write budget rows the `Read` step locks) | `ConfirmAlerts`: `Read`, `Claim` |
 | `backend/app/services/notification_service.py` | `create_notification` | `ConfirmAlerts`: `Claim` |
-| `backend/app/models/database.py` | `BudgetAlertSent` unique key, `Notification.push_status`, `ix_notifications_push_pending`, `ix_notifications_push_sending` | `UniqueLedger`, `PushDelivery` statuses |
-| `backend/app/tasks/push_tasks.py` | `deliver_pending_pushes`, `BATCH_SIZE` | `PushDelivery`: `Expire`, `Select`, `Claim`, `Record`, `Finish`, `Crash` |
+| `backend/app/services/price_alert_service.py` | watched, not modeled: `detect`, `claim` (the second `notifications` writer and its ledger lock order; see Scope) | none |
+| `backend/app/models/database.py` | `BudgetAlertSent` unique key, `Notification.push_status`, `ix_notifications_push_pending`, `ix_notifications_push_sending`; watched: `PriceAlertSent` unique key | `UniqueLedger`, `PushDelivery` statuses |
+| `backend/app/tasks/push_tasks.py` | `deliver_pending_pushes`, `BATCH_SIZE`; `push_data` builds each message's payload (a price alert carries its item's url), not modeled: the model is the same for any payload | `PushDelivery`: `Expire`, `Select`, `Claim`, `Record`, `Finish`, `Crash` |
 | `backend/app/services/push_service.py` | `ExpoPushClient.send`, `expo_rejected`, `EXPO_MAX_BATCH` | `PushDelivery`: `SendChunk` |
 | `backend/app/tasks/celery_app.py` | `deliver-pending-pushes` beat schedule | `PushDelivery`: workers and fairness |
 

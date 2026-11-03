@@ -1,4 +1,4 @@
-"""Canonical items, their price history and comparison (V1.1: PI-01, PI-02, PI-04)."""
+"""Canonical items, price history, comparison and alerts (V1.1: PI-01..04)."""
 
 import uuid
 from datetime import date
@@ -24,10 +24,13 @@ from app.models.schemas import (
     ItemSuggestionResponse,
     ItemSummaryResponse,
     LatestPrice,
+    PriceAlertSettingsResponse,
+    PriceAlertSettingsUpdate,
     PriceComparisonResponse,
     PriceHistoryResponse,
     PricePointResponse,
     StorePriceResponse,
+    StoreRef,
 )
 from app.services.analytics_service import AnalyticsService, get_analytics_service
 from app.services.item_matching_service import (
@@ -35,6 +38,7 @@ from app.services.item_matching_service import (
     ItemMatchingService,
     ItemNotFoundError,
 )
+from app.services.price_alert_service import PriceAlertService, PriceAlertSettings
 from app.services.price_service import (
     MIN_COMPARISON_OBSERVATIONS,
     MIN_TIMELINE_POINTS,
@@ -85,6 +89,18 @@ async def _detail(
         latest_price=_latest(latest),
         aliases=[ItemAliasResponse.model_validate(a) for a in item.aliases],
         suggestions=[_suggestion(s) for s in suggestions],
+        alerts_muted=await PriceAlertService(db).is_item_muted(user_id, item.id),
+    )
+
+
+def _settings(settings: PriceAlertSettings) -> PriceAlertSettingsResponse:
+    return PriceAlertSettingsResponse(
+        enabled=settings.enabled,
+        threshold_percent=settings.threshold_percent,
+        default_threshold_percent=settings.default_threshold_percent,
+        cooldown_days=settings.cooldown_days,
+        muted_items=[ItemRef.model_validate(i) for i in settings.muted_items],
+        muted_stores=[StoreRef.model_validate(s) for s in settings.muted_stores],
     )
 
 
@@ -194,6 +210,26 @@ async def reject_suggestion(
         user.id,
     )
     return Response(status_code=204)
+
+
+@router.get("/price-alert-settings", response_model=PriceAlertSettingsResponse)
+async def get_price_alert_settings(
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User = Depends(get_current_user),
+) -> PriceAlertSettingsResponse:
+    """Price change alerts (PI-03): on or off, threshold, muted items and stores."""
+    return _settings(await PriceAlertService(db).get_settings(user))
+
+
+@router.put("/price-alert-settings", response_model=PriceAlertSettingsResponse)
+async def update_price_alert_settings(
+    body: PriceAlertSettingsUpdate,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User = Depends(get_current_user),
+) -> PriceAlertSettingsResponse:
+    """Fields left out stay as they are; ``threshold_percent: null`` resets it."""
+    changes = body.model_dump(exclude_unset=True)
+    return _settings(await PriceAlertService(db).update_settings(user, changes))
 
 
 @router.get("/{item_id}", response_model=ItemDetailResponse)
@@ -341,3 +377,29 @@ async def split_alias(
     except ItemMatchConflictError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return await _detail(db, user.id, item)
+
+
+@router.post("/{item_id}/mute", status_code=204)
+async def mute_item(
+    item_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User = Depends(get_current_user),
+    analytics: AnalyticsService = Depends(get_analytics_service),
+) -> Response:
+    """No price change alerts for this item (PI-03 AC 4). Idempotent."""
+    item = await _get_item(ItemMatchingService(db), user.id, item_id)
+    await PriceAlertService(db).mute_item(user.id, item.id)
+    analytics.emit("price_alert_muted", {"scope": "item"}, user.id)
+    return Response(status_code=204)
+
+
+@router.delete("/{item_id}/mute", status_code=204)
+async def unmute_item(
+    item_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User = Depends(get_current_user),
+) -> Response:
+    """Price change alerts for this item again. Idempotent."""
+    item = await _get_item(ItemMatchingService(db), user.id, item_id)
+    await PriceAlertService(db).unmute_item(user.id, item.id)
+    return Response(status_code=204)

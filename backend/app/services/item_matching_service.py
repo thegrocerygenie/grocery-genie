@@ -45,6 +45,8 @@ from app.models.database import (
     CanonicalItemAlias,
     ItemMatchSuggestion,
     LineItem,
+    PriceAlertItemMute,
+    PriceAlertSent,
     PriceObservation,
     Receipt,
 )
@@ -460,6 +462,7 @@ class ItemMatchingService:
             .values(canonical_item_id=target.id)
         )
         await self._move_suggestions(source.id, target.id)
+        await self._move_price_alert_state(user_id, source.id, target.id)
         if target.unit_of_measure is None:
             target.unit_of_measure = source.unit_of_measure
 
@@ -472,6 +475,36 @@ class ItemMatchingService:
         await self.db.flush()
         await self.db.refresh(target, ["aliases"])
         return target
+
+    async def _move_price_alert_state(
+        self, user_id: uuid.UUID, source_id: uuid.UUID, target_id: uuid.UUID
+    ) -> None:
+        """A muted item stays muted once merged (PI-03 AC 4). The source's
+        cooldown row goes with it; the target keeps its own."""
+        source_muted = await self.db.scalar(
+            select(PriceAlertItemMute.id).where(
+                PriceAlertItemMute.user_id == user_id,
+                PriceAlertItemMute.canonical_item_id == source_id,
+            )
+        )
+        target_muted = await self.db.scalar(
+            select(PriceAlertItemMute.id).where(
+                PriceAlertItemMute.user_id == user_id,
+                PriceAlertItemMute.canonical_item_id == target_id,
+            )
+        )
+        if source_muted is not None and target_muted is None:
+            self.db.add(
+                PriceAlertItemMute(user_id=user_id, canonical_item_id=target_id)
+            )
+        await self.db.execute(
+            delete(PriceAlertItemMute).where(
+                PriceAlertItemMute.canonical_item_id == source_id
+            )
+        )
+        await self.db.execute(
+            delete(PriceAlertSent).where(PriceAlertSent.canonical_item_id == source_id)
+        )
 
     async def _move_suggestions(
         self, source_id: uuid.UUID, target_id: uuid.UUID

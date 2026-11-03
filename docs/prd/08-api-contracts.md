@@ -200,7 +200,7 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
 { "apple_authorization_code": "fresh code from Sign in with Apple" }
 ```
 
-- **Deleted:** the user row (profile, preferences, password hash, Apple and Google subject IDs), all receipts (soft-deleted ones too), their line items and corrections, budgets and the alerts sent for them, notifications, push tokens, item mappings, the user's own categories, sign-in activity (`auth_events`, including failed sign-ins logged under the account's email), analytics events (`analytics_events`), and each receipt's image, converted JPEG, and thumbnail files.
+- **Deleted:** the user row (profile, preferences, password hash, Apple and Google subject IDs), all receipts (soft-deleted ones too), their line items and corrections, budgets and the alerts sent for them, notifications, push tokens, price alert cooldowns and mutes (`price_alerts_sent`, `price_alert_item_mutes`, `price_alert_store_mutes`), item mappings, the user's own categories, sign-in activity (`auth_events`, including failed sign-ins logged under the account's email), analytics events (`analytics_events`), and each receipt's image, converted JPEG, and thumbnail files.
 - **Kept:** stores (shared by all users, with no user link) and the default categories.
 - **Sessions:** the calling token's family is revoked. Every other token of the account fails too, because its user no longer exists (`/me` returns 401, `/api/auth/refresh` returns 400 `invalid_token`).
 - **Idempotent:** image files go first (a missing file is fine), then all rows in one transaction. A run cut off before the commit leaves the account in place, so the user can call again. A second call after success returns 401: its token no longer resolves to a user.
@@ -211,7 +211,7 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
 
 ## Price Intelligence [V1.1]
 
-Built: PI-01 (price history), PI-02 (item matching) and PI-04 (cross-store comparison, backend). Every route is the signed-in user's own data; another user's item, alias or suggestion answers 404.
+Built: PI-01 (price history), PI-02 (item matching), PI-03 (price change alerts, below) and PI-04 (cross-store comparison, backend). Every route is the signed-in user's own data; another user's item, alias or suggestion answers 404.
 
 Confirming a receipt (scan + `PATCH status=confirmed`, or a manual entry) links each line to a canonical item and records its price. `LineItemResponse` carries `canonical_item_id`. Matching: exact alias → fuzzy (mean of Jaro-Winkler and Levenshtein on word-sorted names, ≥0.85 links) → semantic (embedding cosine, ≥0.80 links) → new item, with a suggestion for the user when the best candidate scored ≥0.6. Names whose numbers differ ("milk 1%" / "milk 2%") never match by similarity.
 
@@ -275,6 +275,50 @@ Same product: merges `item` into `suggested_item` and returns it. 409 when alrea
 
 ### POST /api/items/suggestions/{id}/reject
 204. Different products: both items stay.
+
+### Price change alerts (PI-03) [V1.1]
+
+Contract frozen 2026-11-03 (V11-01); the app (V11-02) builds on it.
+
+**When one is sent.** Confirming a receipt (scan + `PATCH status=confirmed`, or a manual entry) compares each of its prices with the item's 30-day rolling average: the item's earlier prices in the same unit and currency, dated in the 30 days up to the receipt's date, this receipt left out. Two lines of one item on one receipt count as one price, their mean. A change of at least the user's threshold (`GG_PRICE_ALERT_THRESHOLD_PERCENT`, default 10), up or down, sends an alert, when:
+- the average has at least `GG_PRICE_ALERT_MIN_OBSERVATIONS` earlier prices (default 2);
+- alerts are on, and neither the item nor the receipt's store is muted;
+- the item has not alerted in the last `GG_PRICE_ALERT_COOLDOWN_DAYS` (default 7, on the server clock). A muted item or store, or a change under the threshold, does not use up the cooldown.
+
+Only a confirm alerts: editing a confirmed receipt later sends none. A failure in the price alert check is logged and never fails the confirm.
+
+**The notification** (`GET /api/notifications`, and the push the existing pipeline sends):
+```json
+{
+  "type": "price_change",
+  "title": "Organic Bananas price up 20%",
+  "body": "Organic Bananas: $0.78/lb at Loblaws, up 20% from your 30-day average of $0.65/lb.",
+  "data": "{\"canonical_item_id\": \"uuid\", \"store_id\": \"uuid\"}"
+}
+```
+`data` is a JSON string, as for every notification; `store_id` is null for a receipt with no store. The body names the item, the store, the 30-day average, the new price and the percent (rounded); "/lb" follows the price for a measured unit. The push's `data` is `{notification_id, type: "price_change", url: "/items/{canonical_item_id}", canonical_item_id, store_id}`, so a tap opens the item.
+
+### GET /api/items/price-alert-settings
+```json
+{
+  "enabled": true,
+  "threshold_percent": 10,
+  "default_threshold_percent": 10,
+  "cooldown_days": 7,
+  "muted_items": [{ "id": "uuid", "canonical_name": "Organic Bananas" }],
+  "muted_stores": [{ "id": "uuid", "name": "Loblaws" }]
+}
+```
+`threshold_percent` is the user's own, or the default when they have not set one.
+
+### PUT /api/items/price-alert-settings
+**Request:** `{ "enabled": false }`, `{ "threshold_percent": 15 }`, or both. A field left out stays as it is; `"threshold_percent": null` goes back to the default. `threshold_percent` is 1–100 (422 otherwise). Returns the settings above.
+
+### POST /api/items/{canonical_id}/mute · DELETE /api/items/{canonical_id}/mute
+204. No price alerts for the item, or alerts again. Both are idempotent; another user's item is 404. Item detail (`GET /api/items/{canonical_id}`) carries `alerts_muted: bool`. Merging a muted item into another mutes the other.
+
+### POST /api/stores/{store_id}/mute · DELETE /api/stores/{store_id}/mute
+204. No price alerts for prices paid at the store, or alerts again. Idempotent. Muting a store the user has no receipt from is 404 (stores are shared across users); unmuting removes only the user's own mute and is never 404, so a mute whose receipts were since deleted and purged can still be undone. Store ids come from `GET /api/items/{canonical_id}/prices` (`observations[].store_id`).
 
 ### GET /api/items/{canonical_id}/compare
 Cross-store comparison (PI-04): the item's latest and average unit price at each store the user has bought it from, cheapest first.

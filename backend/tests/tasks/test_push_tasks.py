@@ -96,6 +96,34 @@ def test_sends_pending_notification_to_each_device(db):
     assert n.push_status == "sent"
 
 
+def test_a_price_change_push_opens_its_item(db):
+    # PI-03: the app opens /items/{id}; the push carries the item and store.
+    _devices(db, TOKEN_A)
+    item_id, store_id = str(uuid.uuid4()), str(uuid.uuid4())
+    n = Notification(
+        user_id=USER_ID,
+        type="price_change",
+        title="Organic Bananas price up 20%",
+        body="Organic Bananas: $0.78/lb at Loblaws, up 20% from your 30-day "
+        "average of $0.65/lb.",
+        data=json.dumps({"canonical_item_id": item_id, "store_id": store_id}),
+    )
+    db.add(n)
+    db.commit()
+    client = FakePushClient()
+
+    deliver_pending_pushes(db, client, now=_now())
+
+    [msg] = client.sent
+    assert msg.data == {
+        "notification_id": str(n.id),
+        "type": "price_change",
+        "url": f"/items/{item_id}",
+        "canonical_item_id": item_id,
+        "store_id": store_id,
+    }
+
+
 def test_does_not_resend_on_next_run(db):
     _devices(db, TOKEN_A)
     _notify(db)

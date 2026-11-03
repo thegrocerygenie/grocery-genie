@@ -17,9 +17,13 @@ from app.models.database import (
     CanonicalItem,
     LineItem,
     Notification,
+    PriceAlertItemMute,
+    PriceAlertSent,
+    PriceAlertStoreMute,
     PriceObservation,
     Receipt,
     ReceiptCorrection,
+    Store,
     User,
 )
 from app.tasks.purge_tasks import purge_expired_deletions
@@ -155,6 +159,36 @@ def test_receipt_deleted_31_days_ago_is_erased_with_items_and_images(db, storage
     assert _count(db, PriceObservation, receipt_id=receipt.id) == 0
     assert _count(db, CanonicalItem, user_id=USER_ID) == 1
     assert _files(storage, receipt.id) == []
+
+
+def test_purging_a_receipt_keeps_the_users_price_alert_state(db, storage):
+    # PI-03: the cooldown ledger and mutes belong to the item, the store and
+    # the user, not to a receipt, so a purge erases none of them.
+    receipt = _receipt(db, storage, deleted_days_ago=31)
+    store = Store(name="Loblaws", normalized_name="loblaws")
+    db.add(store)
+    db.flush()
+    receipt.store_id = store.id
+    item_id = db.execute(
+        select(PriceObservation.canonical_item_id).where(
+            PriceObservation.receipt_id == receipt.id
+        )
+    ).scalar_one()
+    db.add_all(
+        [
+            PriceAlertSent(user_id=USER_ID, canonical_item_id=item_id, alerted_at=NOW),
+            PriceAlertItemMute(user_id=USER_ID, canonical_item_id=item_id),
+            PriceAlertStoreMute(user_id=USER_ID, store_id=store.id),
+        ]
+    )
+    db.commit()
+
+    result = _purge(db, storage)
+
+    assert result.receipts == 1
+    assert _count(db, PriceAlertSent, canonical_item_id=item_id) == 1
+    assert _count(db, PriceAlertItemMute, canonical_item_id=item_id) == 1
+    assert _count(db, PriceAlertStoreMute, store_id=store.id) == 1
 
 
 def test_receipt_deleted_29_days_ago_is_kept(db, storage):

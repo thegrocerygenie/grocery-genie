@@ -12,10 +12,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core import clock
 from app.core.money import format_money, normalize_currency
 from app.core.retention import restore_cutoff
 from app.events.dispatcher import dispatcher
-from app.events.types import ItemCorrected, ReceiptConfirmed
+from app.events.types import ItemCorrected, PriceChangeDetected, ReceiptConfirmed
 from app.llm.provider import (
     CategoryAssigner,
     Embedder,
@@ -40,6 +41,7 @@ from app.models.schemas import (
 from app.services.budget_service import BudgetService
 from app.services.item_matching_service import ItemMatchingService
 from app.services.notification_service import NotificationService
+from app.services.price_alert_service import NOTIFICATION_TYPE, PriceAlertService
 from app.services.price_service import PriceService
 from app.services.store_service import StoreService
 
@@ -353,10 +355,13 @@ class ReceiptService:
     async def _after_confirm(
         self, receipt: Receipt, also_changed: Iterable[date] = ()
     ) -> None:
-        """Dispatch ReceiptConfirmed and alert on budget thresholds now crossed.
+        """Dispatch ReceiptConfirmed, alert on budget thresholds now crossed,
+        then on price changes.
 
         Every receipt that becomes confirmed runs this: a scan the user confirms
-        and a manual entry, which is saved as confirmed.
+        and a manual entry, which is saved as confirmed. Price alerts come after
+        the budget check, which locks the user's budgets, so locks are always
+        taken budgets first, then price alert ledger rows in item id order.
         """
         await self._record_prices(receipt)
         dispatcher.dispatch(
@@ -381,6 +386,51 @@ class ReceiptService:
         )
 
         await self._alert_on_thresholds(receipt.user_id, {receipt.date, *also_changed})
+        await self._alert_on_price_changes(receipt)
+
+    async def _alert_on_price_changes(self, receipt: Receipt) -> None:
+        """Notify for each price at least the threshold from its item's 30-day
+        average (PI-03), at most once per item per cooldown.
+
+        Runs in a savepoint: a failure is logged and undone with its claims,
+        and never fails the confirm. Only a confirm alerts; editing a
+        confirmed receipt later does not.
+        """
+        sent: list[PriceChangeDetected] = []
+        try:
+            async with self.db.begin_nested():
+                service = PriceAlertService(self.db)
+                alerts = await service.detect(receipt)
+                notification_service = NotificationService(self.db)
+                now = clock.now()
+                for alert in alerts:
+                    event = alert.event
+                    if not await service.claim(
+                        event.user_id, event.canonical_item_id, now
+                    ):
+                        continue  # alerted for this item within the cooldown
+                    await notification_service.create_notification(
+                        user_id=event.user_id,
+                        type=NOTIFICATION_TYPE,
+                        title=alert.title,
+                        body=alert.body,
+                        data=alert.data,
+                    )
+                    sent.append(event)
+        except Exception:
+            logger.exception("Price change alerts failed for receipt %s", receipt.id)
+            return
+        for event in sent:
+            if self.analytics:
+                self.analytics.emit(
+                    "price_alert_triggered",
+                    {
+                        "direction": "up" if event.percent_change > 0 else "down",
+                        "percent_change": round(event.percent_change, 1),
+                    },
+                    event.user_id,
+                )
+            dispatcher.dispatch(event)
 
     async def _record_prices(self, receipt: Receipt) -> None:
         """Link the receipt's unlinked lines to canonical items (PI-02) and

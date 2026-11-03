@@ -97,6 +97,12 @@ class User(Base):
     # Both null when the user has not allowed it or has withdrawn it.
     ai_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ai_consent_version: Mapped[str | None] = mapped_column(String(32))
+    # Price change alerts (PI-03). A null threshold means the server default
+    # (settings.price_alert_threshold_percent).
+    price_alerts_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
+    price_alert_threshold_percent: Mapped[int | None] = mapped_column(SmallInteger)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -376,6 +382,76 @@ class BudgetAlertSent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class PriceAlertSent(Base):
+    """The last price change alert for each item: the cooldown ledger (PI-03).
+
+    One row per item, so the cooldown claim is one upsert on the unique key:
+    it inserts, or moves alerted_at when the last alert is older than the
+    cooldown, and otherwise changes nothing. Two confirms at the same time
+    cannot both alert for the same item.
+    """
+
+    __tablename__ = "price_alerts_sent"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    canonical_item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("canonical_items.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    alerted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
+class PriceAlertItemMute(Base):
+    """An item the user muted price change alerts for (PI-03 AC 4)."""
+
+    __tablename__ = "price_alert_item_mutes"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "canonical_item_id", name="uq_price_alert_item_mute"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    canonical_item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("canonical_items.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    item: Mapped["CanonicalItem"] = relationship()
+
+
+class PriceAlertStoreMute(Base):
+    """A store the user muted price change alerts for (PI-03 AC 4).
+
+    Stores are shared across users; the mute is this user's alone.
+    """
+
+    __tablename__ = "price_alert_store_mutes"
+    __table_args__ = (
+        UniqueConstraint("user_id", "store_id", name="uq_price_alert_store_mute"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    store_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("stores.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    store: Mapped["Store"] = relationship()
 
 
 class PushToken(Base):

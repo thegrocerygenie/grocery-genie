@@ -43,3 +43,20 @@ class ItemMatched:
     canonical_item_id: uuid.UUID
     match_confidence: float
     match_method: str  # alias | fuzzy | semantic | new | manual
+
+
+@dataclass(frozen=True)
+class PriceChangeDetected:
+    """A confirmed price moved at least the user's threshold from the item's
+    30-day average (PI-03). Dispatched once its alert is claimed."""
+
+    user_id: uuid.UUID
+    canonical_item_id: uuid.UUID
+    store_id: uuid.UUID | None
+    receipt_id: uuid.UUID
+    old_avg: float  # the 30-day rolling average the price is compared with
+    new_price: float
+    percent_change: float  # signed: positive is a rise
+    currency: str
+    unit_of_measure: str | None
+    avg_7d: float | None = None  # the 7-day rolling average, when there is one
