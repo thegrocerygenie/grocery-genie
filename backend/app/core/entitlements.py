@@ -25,6 +25,7 @@ PREMIUM_REQUIRED = "premium_required"
 
 # Feature ids sent in a premium_required error, for the app's upgrade prompt.
 FEATURE_TREND_12_MONTHS = "trend_12_months"
+FEATURE_DATA_EXPORT = "data_export"
 
 
 def is_premium(user: User) -> bool:

@@ -3,13 +3,14 @@ from __future__ import annotations
 import contextlib
 from typing import NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.dependencies import get_db
-from app.core.entitlements import is_premium
+from app.core.entitlements import FEATURE_DATA_EXPORT, is_premium, require_premium
 from app.core.security import bearer_scheme, get_current_user
 from app.image.storage import LocalFileStorage
 from app.models.database import User
@@ -26,6 +27,7 @@ from app.models.schemas import (
 from app.services import account_service, ai_consent
 from app.services import auth as auth_service
 from app.services.analytics_service import AnalyticsService, get_analytics_service
+from app.services.export_service import ExportFormat, ExportService
 from app.services.premium_service import PremiumService
 from app.services.push_token_service import PushTokenService
 from app.services.revenuecat_client import (
@@ -284,3 +286,34 @@ async def delete_me(
         # The DEBUG-only legacy api_token is not a JWT; nothing to revoke.
         with contextlib.suppress(HTTPException):
             await auth_service.revoke_session(credentials.credentials)
+
+
+@router.get("/me/export")
+async def export_data(
+    fmt: ExportFormat = Query(
+        default=ExportFormat.JSON,
+        alias="format",
+        description="json: one document. csv: a zip of one CSV file per entity.",
+    ),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User = Depends(require_premium(FEATURE_DATA_EXPORT)),
+    analytics: AnalyticsService = Depends(get_analytics_service),
+) -> StreamingResponse:
+    """Download receipts, line items, budgets and prices (NFR Privacy 2).
+
+    Premium (D2). The file is built from batched reads into a spooled
+    temporary file, then streamed, so a large account stays bounded in memory.
+    """
+    export = await ExportService(db).build(user, fmt)
+    analytics.emit(
+        "data_exported", {"format": fmt.value, **export.counts.model_dump()}, user.id
+    )
+    return StreamingResponse(
+        export.chunks(),
+        media_type=export.media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{export.filename}"',
+            "Content-Length": str(export.size),
+            "Cache-Control": "no-store",
+        },
+    )

@@ -1,6 +1,6 @@
 # Premium through RevenueCat
 
-Premium ($5.99/month, V1.1 decision D1) is an App Store subscription sold through RevenueCat. The backend never believes the app about it: RevenueCat's webhook (`POST /api/webhooks/revenuecat`, authenticated by a shared secret) and its REST API set the entitlement on the user row, the profile shows it as `is_premium`, and every Premium gate reads it. Premium unlocks the 12-month trend and unlimited receipts today (D2); a free user asking for either gets `403 premium_required` or the monthly `429`.
+Premium ($5.99/month, V1.1 decision D1) is an App Store subscription sold through RevenueCat. The backend never believes the app about it: RevenueCat's webhook (`POST /api/webhooks/revenuecat`, authenticated by a shared secret) and its REST API set the entitlement on the user row, the profile shows it as `is_premium`, and every Premium gate reads it. Premium unlocks the 12-month trend, unlimited receipts and data export ([data-export.md](./data-export.md)) today (D2); a free user asking for either gets `403 premium_required` or the monthly `429`.
 
 ## Sub-features
 
