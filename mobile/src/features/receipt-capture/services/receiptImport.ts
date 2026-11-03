@@ -57,6 +57,8 @@ export type ImportResult =
   | { status: 'queued' }
   /** The server refused: the user has not allowed AI reading. */
   | { status: 'consent-required' }
+  /** A free user's monthly scan cap: answered with the upgrade prompt (D2). */
+  | { status: 'quota' }
   | { status: 'error'; message: string }
   | { status: 'ready'; response: ReceiptScanResponse; previewUri: string };
 
@@ -147,6 +149,7 @@ export async function importReceipt({ pick, upload, queue }: ImportDeps): Promis
     };
   } catch (error) {
     if (isAiConsentRequiredError(error)) return { status: 'consent-required' };
+    if (isQuotaExceededError(error)) return { status: 'quota' };
     // NFR reliability 3, as for camera scans: keep a file that failed for a
     // reason outside the file itself; a rejected file (422) is an error.
     if (queue && isRetryableScanError(error)) {

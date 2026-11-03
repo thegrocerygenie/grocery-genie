@@ -284,6 +284,148 @@ async def test_refund_before_its_purchase_keeps_the_user_free(client):
 
 
 @pytest.mark.asyncio
+async def test_cancellation_without_expiry_before_its_purchase_grants_no_open_premium(
+    client,
+):
+    """A CANCELLATION with no expiration_at_ms leaves no expiry to keep. The
+    late purchase must not then turn Premium on with no expiry at all."""
+    now = datetime.now(UTC)
+    await _post(
+        client,
+        _event("CANCELLATION", at=now + timedelta(seconds=5), expiration_at_ms=None),
+    )
+    resp = await _post(client, _event("INITIAL_PURCHASE", at=now))
+    assert resp.json() == {"status": "stale"}
+    me = await _me(client)
+    assert me["is_premium"] is False
+
+
+@pytest.mark.asyncio
+async def test_refunded_non_renewing_purchase_arriving_late_grants_nothing(client):
+    """A non-renewing purchase has no expiry; its refund CANCELLATION may carry
+    none either. Delivered refund first, the purchase must not grant Premium."""
+    now = datetime.now(UTC)
+    await _post(
+        client,
+        _event(
+            "CANCELLATION",
+            at=now + timedelta(seconds=5),
+            expiration_at_ms=None,
+            cancel_reason="CUSTOMER_SUPPORT",
+        ),
+    )
+    await _post(client, _event("NON_RENEWING_PURCHASE", at=now, expiration_at_ms=None))
+    assert (await _me(client))["is_premium"] is False
+
+
+@pytest.mark.asyncio
+async def test_refund_of_a_non_renewing_purchase_ends_premium(client):
+    """In order: a non-renewing purchase (no expiry), then its refund
+    CANCELLATION with no expiry. Nothing is left to run out, so access ends."""
+    now = datetime.now(UTC)
+    await _post(client, _event("NON_RENEWING_PURCHASE", at=now, expiration_at_ms=None))
+    assert (await _me(client))["is_premium"] is True
+    await _post(
+        client,
+        _event(
+            "CANCELLATION",
+            at=now + timedelta(seconds=5),
+            expiration_at_ms=None,
+            cancel_reason="CUSTOMER_SUPPORT",
+        ),
+    )
+    assert (await _me(client))["is_premium"] is False
+
+
+@pytest.mark.asyncio
+async def test_refund_without_expiry_ends_premium_despite_a_stored_future_expiry(
+    client,
+):
+    """A refund (cancel_reason CUSTOMER_SUPPORT) with no expiration_at_ms must
+    not keep the expiry stored from the purchase: the money went back, so
+    Premium ends now. A plain cancellation would keep it (test above)."""
+    now = datetime.now(UTC)
+    await _post(
+        client,
+        _event("INITIAL_PURCHASE", expires=now + timedelta(days=30), at=now),
+    )
+    assert (await _me(client))["is_premium"] is True
+    resp = await _post(
+        client,
+        _event(
+            "CANCELLATION",
+            at=now + timedelta(seconds=5),
+            expiration_at_ms=None,
+            cancel_reason="CUSTOMER_SUPPORT",
+        ),
+    )
+    assert resp.json() == {"status": "applied"}
+    me = await _me(client)
+    assert me["is_premium"] is False
+    assert me["premium_expires_at"] is None
+    # A newer grant (the user buys again) is honoured as usual.
+    late = await _post(
+        client,
+        _event("RENEWAL", expires=now + timedelta(days=30), at=now + timedelta(1)),
+    )
+    assert late.json() == {"status": "applied"}
+    assert (await _me(client))["is_premium"] is True
+
+
+@pytest.mark.asyncio
+async def test_plain_cancellation_without_expiry_keeps_the_stored_expiry(client):
+    """The same CANCELLATION with no expiry but cancel_reason UNSUBSCRIBE (auto
+    renew off) keeps Premium to the paid period's end."""
+    now = datetime.now(UTC)
+    ends = now + timedelta(days=30)
+    await _post(client, _event("INITIAL_PURCHASE", expires=ends, at=now))
+    await _post(
+        client,
+        _event(
+            "CANCELLATION",
+            at=now + timedelta(seconds=5),
+            expiration_at_ms=None,
+            cancel_reason="UNSUBSCRIBE",
+        ),
+    )
+    me = await _me(client)
+    assert me["is_premium"] is True
+    got = datetime.fromisoformat(me["premium_expires_at"])
+    assert abs((got - ends).total_seconds()) < 1
+
+
+@pytest.mark.asyncio
+async def test_purchase_arriving_after_its_refund_without_expiry_grants_nothing(
+    client,
+):
+    """Refund delivered first, with no expiry, for a user who had a stored
+    future expiry from an earlier period: the late purchase stays stale."""
+    now = datetime.now(UTC)
+    await _post(
+        client,
+        _event(
+            "INITIAL_PURCHASE",
+            expires=now + timedelta(days=30),
+            at=now - timedelta(minutes=1),
+        ),
+    )
+    await _post(
+        client,
+        _event(
+            "CANCELLATION",
+            at=now + timedelta(seconds=5),
+            expiration_at_ms=None,
+            cancel_reason="CUSTOMER_SUPPORT",
+        ),
+    )
+    resp = await _post(
+        client, _event("RENEWAL", expires=now + timedelta(days=30), at=now)
+    )
+    assert resp.json() == {"status": "stale"}
+    assert (await _me(client))["is_premium"] is False
+
+
+@pytest.mark.asyncio
 async def test_purchase_before_a_newer_refresh_stays_stale(client, fake_revenuecat):
     """A refresh reads RevenueCat's whole state, so an older event changes
     nothing after it, even when the last webhook was a cancellation."""
