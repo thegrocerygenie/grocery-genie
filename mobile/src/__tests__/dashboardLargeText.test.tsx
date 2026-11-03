@@ -133,3 +133,18 @@ it('trend button grows with its label, and the label wraps beside the icon', () 
   expect(styleOf(label).flexShrink).toBe(1);
   expect(styleOf(label).textAlign).toBe('center');
 });
+
+// The empty state's Scan Receipt button had a fixed 44pt height, so its label
+// clipped at AX5.
+it('empty-state Scan Receipt button grows with its label', () => {
+  mockWindow.fontScale = AX5_SCALE;
+  mockDashboard.data = undefined;
+  renderRouter({ index: DashboardScreen }, { initialUrl: '/' });
+
+  const button = screen.getByRole('button', { name: 'Scan receipt' });
+  const label = screen.getByText('Scan Receipt');
+  expect(styleOf(button).height).toBeUndefined();
+  expect(styleOf(button).minHeight).toBeGreaterThanOrEqual(44);
+  expect(styleOf(label).flexShrink).toBe(1);
+  expect(styleOf(label).textAlign).toBe('center');
+});

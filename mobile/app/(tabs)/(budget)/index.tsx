@@ -400,9 +400,7 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
         accessibilityLabel="See 3-month trend"
       >
         <SymbolView name="chart.bar.fill" size={16} tintColor={colors.tint} />
-        <Text style={styles.trendLabel}>
-          See 3-month trend
-        </Text>
+        <Text style={styles.trendLabel}>See 3-month trend</Text>
       </Pressable>
     </View>
   );
@@ -546,7 +544,8 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     marginTop: spacing.sm,
-    height: 44,
+    minHeight: touchTarget.minHeight,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.xl,
     backgroundColor: colors.tint,
     borderRadius: radii.button,
@@ -554,7 +553,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  primaryBtnLabel: { ...type.headline, color: colors.onTint },
+  primaryBtnLabel: { ...type.headline, color: colors.onTint, flexShrink: 1, textAlign: 'center' },
 
   heroCard: {
     backgroundColor: colors.iosBg2,
