@@ -1,5 +1,13 @@
 import { apiClient } from '@/services/api';
-import type { ItemDetail, ItemList, ItemSuggestion, PriceHistory } from '../types';
+import type {
+  ItemDetail,
+  ItemList,
+  ItemSuggestion,
+  PriceAlertSettings,
+  PriceAlertSettingsUpdate,
+  PriceComparison,
+  PriceHistory,
+} from '../types';
 
 export async function listItems(query?: string): Promise<ItemList> {
   const params = new URLSearchParams({ per_page: '100' });
@@ -47,4 +55,41 @@ export async function acceptSuggestion(id: string): Promise<ItemDetail> {
 
 export async function rejectSuggestion(id: string): Promise<void> {
   await apiClient<void>(`/api/items/suggestions/${id}/reject`, { method: 'POST' });
+}
+
+/** PI-04: the item's latest and average price at each store, cheapest first. */
+export async function getPriceComparison(id: string): Promise<PriceComparison> {
+  return apiClient<PriceComparison>(`/api/items/${id}/compare`);
+}
+
+/** PI-03 settings: on/off, threshold, and what is muted. */
+export async function getPriceAlertSettings(): Promise<PriceAlertSettings> {
+  return apiClient<PriceAlertSettings>('/api/items/price-alert-settings');
+}
+
+export async function updatePriceAlertSettings(
+  body: PriceAlertSettingsUpdate,
+): Promise<PriceAlertSettings> {
+  return apiClient<PriceAlertSettings>('/api/items/price-alert-settings', {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+/** PI-03 AC 4: no price alerts for the item. Idempotent. */
+export async function muteItem(id: string): Promise<void> {
+  await apiClient<void>(`/api/items/${id}/mute`, { method: 'POST' });
+}
+
+export async function unmuteItem(id: string): Promise<void> {
+  await apiClient<void>(`/api/items/${id}/mute`, { method: 'DELETE' });
+}
+
+/** PI-03 AC 4: no price alerts for prices paid at the store. Idempotent. */
+export async function muteStore(storeId: string): Promise<void> {
+  await apiClient<void>(`/api/stores/${storeId}/mute`, { method: 'POST' });
+}
+
+export async function unmuteStore(storeId: string): Promise<void> {
+  await apiClient<void>(`/api/stores/${storeId}/mute`, { method: 'DELETE' });
 }

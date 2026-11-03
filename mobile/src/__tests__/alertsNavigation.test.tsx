@@ -30,6 +30,12 @@ jest.mock('@/features/budget/hooks/useBudget', () => ({
 jest.mock('@/features/budget/hooks/useCategories', () => ({
   useCategories: () => ({ data: [] }),
 }));
+jest.mock('@/features/price-intelligence/hooks/useItems', () => ({
+  usePriceAlertSettings: () => ({ data: undefined }),
+  useUpdatePriceAlertSettings: () => ({ mutate: jest.fn(), isPending: false }),
+  useMuteItem: () => ({ mutate: jest.fn() }),
+  useMuteStore: () => ({ mutate: jest.fn() }),
+}));
 
 interface HostNode {
   type: string;

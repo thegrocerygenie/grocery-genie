@@ -7,17 +7,54 @@ import { colors, radii, spacing, type } from '@/constants/theme';
 import { useMe, useUpdatePreferences } from '@/features/auth/hooks/useAuth';
 import { useBudgets } from '@/features/budget/hooks/useBudget';
 import { useCategories } from '@/features/budget/hooks/useCategories';
+import {
+  PRICE_ALERT_SETTINGS_COPY as PRICE_COPY,
+  PRICE_ALERT_THRESHOLDS,
+} from '@/features/price-intelligence/constants';
+import {
+  useMuteItem,
+  useMuteStore,
+  usePriceAlertSettings,
+  useUpdatePriceAlertSettings,
+} from '@/features/price-intelligence/hooks/useItems';
+import type { PriceAlertSettings } from '@/features/price-intelligence/types';
 import { useNotificationStore } from '@/store/notificationStore';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** The threshold choices: the preset ones plus the default and the user's own. */
+function thresholdChoices(settings: PriceAlertSettings): number[] {
+  const all = new Set<number>([
+    ...PRICE_ALERT_THRESHOLDS,
+    settings.default_threshold_percent,
+    settings.threshold_percent,
+  ]);
+  return [...all].sort((a, b) => a - b);
+}
 
 export default function NotificationSettingsScreen() {
   const { data: profile } = useMe();
   const update = useUpdatePreferences();
   const localStore = useNotificationStore();
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
+  const [thresholdPickerOpen, setThresholdPickerOpen] = useState(false);
   const { data: budgets } = useBudgets();
   const { data: categories } = useCategories();
+
+  // PI-03 settings: price change alerts on or off, their threshold, and mutes.
+  const { data: priceAlerts } = usePriceAlertSettings();
+  const updatePriceAlerts = useUpdatePriceAlertSettings();
+  const unmuteItem = useMuteItem();
+  const unmuteStore = useMuteStore();
+  const priceAlertsOn = updatePriceAlerts.isPending
+    ? (updatePriceAlerts.variables.enabled ?? priceAlerts?.enabled)
+    : priceAlerts?.enabled;
+  const setThresholdPercent = (percent: number) => {
+    if (!priceAlerts) return;
+    // The default is sent as null, so a later change of the default applies.
+    const isDefault = percent === priceAlerts.default_threshold_percent;
+    updatePriceAlerts.mutate({ threshold_percent: isDefault ? null : percent });
+  };
 
   // Server is source of truth; local store stays as offline fallback.
   const prefs = profile?.preferences;
@@ -99,6 +136,44 @@ export default function NotificationSettingsScreen() {
           </Section>
         ) : null}
 
+        {priceAlerts ? (
+          <Section header={PRICE_COPY.header} footer={PRICE_COPY.footer(priceAlerts.cooldown_days)}>
+            <ToggleRow
+              label={PRICE_COPY.enabled}
+              on={priceAlertsOn ?? true}
+              onChange={(v) => updatePriceAlerts.mutate({ enabled: v })}
+            />
+            {priceAlertsOn ? (
+              <NavRow
+                label={PRICE_COPY.threshold}
+                value={`${priceAlerts.threshold_percent}%`}
+                onPress={() => setThresholdPickerOpen(true)}
+              />
+            ) : null}
+          </Section>
+        ) : null}
+
+        {priceAlerts && priceAlerts.muted_items.length + priceAlerts.muted_stores.length > 0 ? (
+          <Section header={PRICE_COPY.mutedHeader} footer={PRICE_COPY.mutedFooter}>
+            {priceAlerts.muted_items.map((item) => (
+              <UnmuteRow
+                key={`item-${item.id}`}
+                name={item.canonical_name}
+                kind={PRICE_COPY.item}
+                onPress={() => unmuteItem.mutate({ id: item.id, muted: false })}
+              />
+            ))}
+            {priceAlerts.muted_stores.map((store) => (
+              <UnmuteRow
+                key={`store-${store.id}`}
+                name={store.name}
+                kind={PRICE_COPY.store}
+                onPress={() => unmuteStore.mutate({ storeId: store.id, muted: false })}
+              />
+            ))}
+          </Section>
+        ) : null}
+
         <Section header="WEEKLY SUMMARY">
           <ToggleRow
             label="Send weekly summary"
@@ -124,6 +199,22 @@ export default function NotificationSettingsScreen() {
         }}
         onClose={() => setDayPickerOpen(false)}
       />
+
+      {priceAlerts ? (
+        <PickerSheet
+          visible={thresholdPickerOpen}
+          options={thresholdChoices(priceAlerts).map((p) => ({
+            key: p,
+            label: PRICE_COPY.thresholdOption(p, p === priceAlerts.default_threshold_percent),
+          }))}
+          selected={priceAlerts.threshold_percent}
+          onSelect={(p) => {
+            setThresholdPercent(p);
+            setThresholdPickerOpen(false);
+          }}
+          onClose={() => setThresholdPickerOpen(false)}
+        />
+      ) : null}
     </>
   );
 }
@@ -198,6 +289,35 @@ function NavRow({ label, value, onPress }: NavRowProps) {
   );
 }
 
+interface UnmuteRowProps {
+  name: string;
+  /** "Item" or "Store", shown under the name. */
+  kind: string;
+  onPress: () => void;
+}
+
+function UnmuteRow({ name, kind, onPress }: UnmuteRowProps) {
+  return (
+    <View style={styles.row}>
+      <View style={styles.rowText}>
+        <Text style={type.body} numberOfLines={1}>
+          {name}
+        </Text>
+        <Text style={styles.caption}>{kind}</Text>
+      </View>
+      <Pressable
+        onPress={onPress}
+        hitSlop={8}
+        style={styles.inlineButton}
+        accessibilityRole="button"
+        accessibilityLabel={PRICE_COPY.unmuteLabel(name)}
+      >
+        <Text style={styles.link}>{PRICE_COPY.unmute}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 interface DayPickerSheetProps {
   visible: boolean;
   selected: number;
@@ -206,6 +326,26 @@ interface DayPickerSheetProps {
 }
 
 function DayPickerSheet({ visible, selected, onSelect, onClose }: DayPickerSheetProps) {
+  return (
+    <PickerSheet
+      visible={visible}
+      options={DAYS.map((d, i) => ({ key: i, label: d }))}
+      selected={selected}
+      onSelect={onSelect}
+      onClose={onClose}
+    />
+  );
+}
+
+interface PickerSheetProps {
+  visible: boolean;
+  options: { key: number; label: string }[];
+  selected: number;
+  onSelect: (key: number) => void;
+  onClose: () => void;
+}
+
+function PickerSheet({ visible, options, selected, onSelect, onClose }: PickerSheetProps) {
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       {/* Taps only: accessible, these would hide the options from VoiceOver. */}
@@ -221,15 +361,17 @@ function DayPickerSheet({ visible, selected, onSelect, onClose }: DayPickerSheet
           accessible={false}
         >
           <View style={styles.listCard}>
-            {DAYS.map((d, i) => (
+            {options.map((o, i) => (
               <Pressable
-                key={d}
-                onPress={() => onSelect(i)}
+                key={o.key}
+                onPress={() => onSelect(o.key)}
                 style={[styles.row, i > 0 && styles.rowDivider]}
                 accessibilityRole="button"
+                accessibilityLabel={o.label}
+                accessibilityState={{ selected: selected === o.key }}
               >
-                <Text style={type.body}>{d}</Text>
-                {selected === i ? (
+                <Text style={type.body}>{o.label}</Text>
+                {selected === o.key ? (
                   <SymbolView name="checkmark" size={14} tintColor={colors.tint} />
                 ) : null}
               </Pressable>
@@ -289,6 +431,10 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.iosSeparator,
   },
+  rowText: { flex: 1, gap: 2 },
+  caption: { ...type.footnote, color: colors.iosLabel2 },
+  inlineButton: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'flex-end' },
+  link: { ...type.body, color: colors.tint },
   separator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.iosSeparator,
