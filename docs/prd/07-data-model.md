@@ -14,7 +14,7 @@ Technology-agnostic entity model. Describes entities, relationships, and access 
 | **ReceiptCorrection** | id, receipt_id, line_item_id (nullable for store/date), user_id, household_id (nullable), field (store_name/date/name/category_id/quantity/total_price), original_value, corrected_value, created_at | Belongs to Receipt; optionally to LineItem; belongs to User. Append-only: one row per changed field per save; the oldest row for a field holds the extracted value (RC-02 AC 3) | MVP |
 | **Category** | id, name, is_default (bool), user_id (nullable for defaults), sort_order | Has many LineItems | MVP |
 | **Store** | id, name, normalized_name, location (optional) | Has many Receipts | MVP |
-| **Budget** | id, user_id, household_id (nullable), category_id (nullable for overall), amount, period_start, period_type (monthly), rollover_enabled | Belongs to User or Household; optionally to Category | MVP |
+| **Budget** | id, user_id, household_id (nullable), category_id (nullable for overall), amount, period_start, period_type (monthly), rollover_enabled, rollover_start (V1.1, nullable), rollover_opening (V1.1) | Belongs to User or Household; optionally to Category. Rollover (V1.1, Premium): see below | MVP |
 | **CanonicalItem** | id, user_id, household_id (nullable), canonical_name, unit_of_measure, created_at | Each user's own registry (merges and splits are the user's call; names never cross accounts). Has many CanonicalItemAliases, LineItems, PriceObservations | V1.1 |
 | **CanonicalItemAlias** | id, canonical_item_id, user_id, alias, normalized_name (unique per user), embedding (pgvector, 384-d, nullable) | Belongs to CanonicalItem. The names receipts gave the item: exact-alias and semantic matching run on these | V1.1 |
 | **PriceObservation** | id, user_id, household_id, canonical_item_id, receipt_id, line_item_id (unique), store_id, date, unit_price, quantity, unit_of_measure, currency | One per confirmed, matched line item; rebuilt when its receipt changes. Reads exclude deleted receipts | V1.1 |
@@ -28,6 +28,21 @@ Technology-agnostic entity model. Describes entities, relationships, and access 
 | **PantryItem** | id, user_id, household_id, ingredient_id, quantity, unit, purchased_date, estimated_expiry, status (fresh/use_soon/expired/used/discarded) | Belongs to User/Household; belongs to Ingredient | V2.0 |
 | **Recipe** | id, name, description, prep_time_min, cuisine, servings, dietary_labels[], source | Has many RecipeIngredients | V2.0 |
 | **RecipeIngredient** | recipe_id, ingredient_id, quantity, unit, is_optional | Belongs to Recipe; belongs to Ingredient | V2.0 |
+
+
+### Budget rollover [V1.1, Premium]
+
+BC-FR Budget Management: "unspent budget does not roll over by default. Optional rollover toggle (premium)." `rollover_enabled` is the toggle; `rollover_start` (a day in the run's first period) and `rollover_opening` (what carries into that period) hold the current rollover run. No row stores a carry: each period's carry is derived from the budget row and the user's confirmed receipts (`BudgetService.rollover_carries`), so it is deterministic, a read writes nothing, and a late receipt for an earlier period moves it.
+
+- **The carry.** From the run's first period on, each period's unspent amount (its amount plus what carried into it, minus its spend) carries into the next. The period's limit is its amount plus its carry; progress, `remaining`, `percent` and threshold alerts use that limit.
+- **Overspend** carries nothing: the carry is never below 0 (the PRD rolls over "unspent budget").
+- **Turning it on** starts a run in the previous period when the budget existed then (the period holding its `period_start`), so last period's unspent amount joins this period; otherwise the run starts this period. Turning it on again keeps the run; turning it off clears it.
+- **Partial periods and budgets created mid-month.** The first period counts its whole-period spend against its whole amount, as its progress bar does. No proration.
+- **A new amount or start day** (EC Budget 1) restarts the run in the current period, carrying what it had reached, so past periods are not re-scored against the new amount.
+- **Currency** (EC Budget 4): amounts are not converted, so changing the currency restarts every run with nothing carried.
+- **Deleted and restored budgets.** Restoring a budget deleted in an earlier period restarts its run with nothing carried: nothing carries from periods it spent deleted. Restored within the same period, the run is unchanged.
+- **A $0 budget** never carries (EC Budget 2: it alerts on any spend).
+- **Premium lapse.** The carry applies only while the user is Premium. While Premium lapses, the limit is the amount, alerts use it, and the toggle and run are kept; if Premium returns, the carry applies again, computed the same way.
 
 ## Primary Access Patterns
 

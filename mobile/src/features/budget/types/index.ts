@@ -1,10 +1,13 @@
 export interface BudgetSummary {
   period: string;
   overall: {
+    /** The period's limit: the amount plus what rolled over into it. */
     budget: number;
     spent: number;
     remaining: number;
     percent: number;
+    /** What rolled over from earlier periods (Premium rollover); absent from older servers. */
+    rolled_over?: number;
   };
   categories: BudgetCategorySummary[];
 }
@@ -16,6 +19,8 @@ export interface BudgetCategorySummary {
   spent: number;
   remaining: number;
   percent: number;
+  /** What rolled over into this category's limit (Premium rollover). */
+  rolled_over?: number;
 }
 
 export interface DashboardTopItem {
@@ -53,10 +58,13 @@ export interface DashboardCategoryChange {
 export interface DashboardData {
   period: string;
   overall: {
+    /** The period's limit: the amount plus what rolled over into it. */
     budget: number;
     spent: number;
     remaining: number;
     percent: number;
+    /** What rolled over from earlier periods (Premium rollover); absent from older servers. */
+    rolled_over?: number;
   };
   categories: BudgetCategorySummary[];
   top_items: DashboardTopItem[];

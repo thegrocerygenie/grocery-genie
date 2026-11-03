@@ -26,6 +26,7 @@ from app.models.schemas import (
 from app.services import account_service, ai_consent
 from app.services import auth as auth_service
 from app.services.analytics_service import AnalyticsService, get_analytics_service
+from app.services.budget_service import BudgetService
 from app.services.premium_service import PremiumService
 from app.services.push_token_service import PushTokenService
 from app.services.revenuecat_client import (
@@ -125,7 +126,13 @@ async def update_me(
 ) -> UserProfileResponse:
     if body.locale is not None:
         user.locale = body.locale
-    if body.currency_preference is not None:
+    if (
+        body.currency_preference is not None
+        and body.currency_preference != user.currency_preference
+    ):
+        # Budget amounts are not converted, so no rollover carry crosses a
+        # currency change (EC Budget 4).
+        await BudgetService(db).restart_rollovers(user.id)
         user.currency_preference = body.currency_preference
     if body.timezone is not None:
         user.timezone = body.timezone

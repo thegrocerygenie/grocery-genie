@@ -3,7 +3,7 @@
  * Externalized for i18n.
  *
  * The benefit list names only what Premium unlocks today (D2). Custom
- * categories, data export and budget rollover join it as they ship.
+ * categories and data export join it as they ship.
  */
 export const PREMIUM_STRINGS = {
   /** The locale these strings are written in; dates on the paywall use it. */
@@ -18,6 +18,12 @@ export const PREMIUM_STRINGS = {
       symbol: 'chart.bar.xaxis',
       title: '12-month spending trend',
       detail: 'See how your grocery spending moves across the whole year.',
+    },
+    {
+      key: 'rollover',
+      symbol: 'arrow.uturn.forward',
+      title: 'Budget rollover',
+      detail: 'Carry what you didn’t spend this month into next month’s budget.',
     },
     {
       key: 'receipts',
