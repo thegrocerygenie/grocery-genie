@@ -56,5 +56,6 @@ ev() {  # ev ID TYPE EVENT_AT EXPIRES_AT [APP_USER_ID]
 - Check names (`cat-name`) before the user reaches 10: at the cap a create is refused as `category_limit_reached` before its name is looked at.
 - The mock extractor never assigns a custom category: a custom category reaches a scan only through the user's mapping (`cat-next-scan`). The LLM category prompt lists only the defaults.
 - Deleting a category sends no budget alert, though its items now count toward "Other" (and its budget, if any) from the next receipt on.
+- Concurrent requests (creates at the cap, a delete racing a budget, correction or scan) are not driven here: they need two transactions held open at once. `backend/tests/api/test_custom_categories_concurrency.py` covers them on Postgres (`make backend-test-pg`).
 - Each RevenueCat event id must be new per run; the ids above end in the user's id.
 - A free user renaming any category gets `403` before ownership is checked; renaming another user's category as a Premium user is `404` (pytest: `test_another_users_category_cannot_be_renamed_or_deleted`).

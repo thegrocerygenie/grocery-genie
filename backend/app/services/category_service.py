@@ -15,6 +15,15 @@ Deleting a custom category keeps the spending it held:
 - its budgets (active or in Recently Deleted) are removed with their sent
   alerts: a budget for a category that no longer exists measures nothing;
 - it leaves the user's muted alert categories.
+
+Concurrency: one lock on the user's row (``_lock_user``) serializes a user's
+create, rename and delete, and every write that attaches a custom category to
+a row (a correction, a budget, a manual receipt, a scan applying an item
+mapping) takes it first through ``ensure_usable`` or ``usable_custom``. So a
+create cannot pass the cap or the name check beside another, and a delete
+never removes a category under a row about to point at it: the attach either
+commits first and is moved by the delete, or waits and finds the category
+gone (a clean 400, or no category for a scan).
 """
 
 import uuid
@@ -81,16 +90,40 @@ class CategoryService:
     async def ensure_usable(
         self, user_id: uuid.UUID, category_ids: Iterable[uuid.UUID | None]
     ) -> None:
-        """Raise ``UnknownCategoryError`` unless every id is visible to the user."""
+        """Raise ``UnknownCategoryError`` unless every id is visible to the user.
+
+        Call it before writing the ids: a custom one stays until this
+        transaction commits (see ``usable_custom``).
+        """
         wanted = {c for c in category_ids if c is not None}
         if not wanted:
             return
-        result = await self.db.execute(
-            select(Category.id).where(Category.id.in_(wanted), visible_to(user_id))
-        )
-        missing = wanted - set(result.scalars().all())
+        custom = wanted - await self._defaults_among(wanted)
+        missing = custom - await self.usable_custom(user_id, custom)
         if missing:
             raise UnknownCategoryError(sorted(missing, key=str)[0])
+
+    async def usable_custom(
+        self, user_id: uuid.UUID, category_ids: Iterable[uuid.UUID]
+    ) -> set[uuid.UUID]:
+        """Those of ``category_ids`` that are the user's custom categories.
+
+        Takes the user lock first when there are any, so none of them can be
+        deleted before this transaction commits. Read after the lock, so one
+        a delete just removed is left out.
+        """
+        wanted = set(category_ids)
+        if not wanted:
+            return set()
+        await self._lock_user(user_id)
+        result = await self.db.execute(
+            select(Category.id).where(
+                Category.id.in_(wanted),
+                Category.user_id == user_id,
+                Category.is_default.is_(False),
+            )
+        )
+        return set(result.scalars().all())
 
     async def create(self, user_id: uuid.UUID, name: str) -> Category:
         await self._lock_user(user_id)
@@ -120,6 +153,9 @@ class CategoryService:
         return category
 
     async def delete(self, user_id: uuid.UUID, category_id: uuid.UUID) -> None:
+        # Waits for any request attaching this category to commit, so its
+        # rows are visible to (and moved by) the updates below.
+        await self._lock_user(user_id)
         category = await self._owned(user_id, category_id)
         fallback = (
             await self.db.execute(
@@ -164,11 +200,26 @@ class CategoryService:
         return len(await self._custom(user_id))
 
     async def _lock_user(self, user_id: uuid.UUID) -> None:
-        """Serialize a user's creates and renames, so two at once cannot pass
-        the cap or the name check together. (SQLite ignores FOR UPDATE.)"""
+        """Lock the user's row until this transaction ends (see the module
+        docstring). SQLite ignores the lock.
+
+        FOR NO KEY UPDATE, not FOR UPDATE: it does not block the key-share
+        lock that inserting any row which references the user takes. A
+        receipt confirm holds its budget locks and then inserts a
+        notification; with FOR UPDATE, a delete holding this lock and waiting
+        for those budgets would deadlock with it.
+        """
         await self.db.execute(
-            select(User.id).where(User.id == user_id).with_for_update()
+            select(User.id).where(User.id == user_id).with_for_update(key_share=True)
         )
+
+    async def _defaults_among(self, ids: set[uuid.UUID]) -> set[uuid.UUID]:
+        result = await self.db.execute(
+            select(Category.id).where(
+                Category.id.in_(ids), Category.is_default.is_(True)
+            )
+        )
+        return set(result.scalars().all())
 
     async def _custom(self, user_id: uuid.UUID) -> list[Category]:
         result = await self.db.execute(

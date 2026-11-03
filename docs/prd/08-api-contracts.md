@@ -167,7 +167,7 @@ An item's `category_id`, when given, must be a default category or one of the us
 
 ## Categories [V1.1]
 
-The eight default categories, plus up to 10 custom categories per user (BC-05 AC 3). A custom category belongs to one user (Category has no household in the data model). Custom categories work everywhere a default does: correcting an item (and the item mapping it teaches the next scan, BC-05 AC 4), budgets, the budget summary and the dashboard. The LLM assigns only the defaults; a custom category reaches a new scan through the user's corrections.
+The eight default categories, plus up to 10 custom categories per user (BC-05 AC 3). A custom category belongs to one user (Category has no household in the data model). Custom categories work everywhere a default does: correcting an item (and the item mapping it teaches the next scan, BC-05 AC 4), budgets, the budget summary and the dashboard. **Known limitation (decided in V11-P1):** the LLM category prompt lists only the eight defaults, so a scan never assigns a custom category by itself. A custom category reaches a new scan only through the user's corrections: correcting an item teaches its item mapping, and the next scan of that item lands there (BC-05 AC 4). Teaching the prompt the user's custom names would change extraction and need the `validate-extraction` harness, so it is left for later.
 
 Creating and renaming are Premium (decision D2): a free user gets `403 premium_required` with `feature: "custom_categories"`. **When Premium lapses** the user's categories stay: they list, keep their items, still take corrections and budgets, and can be deleted; only create and rename return 403 until Premium is back.
 
@@ -190,6 +190,8 @@ Returns `204`. Not Premium-gated, so a lapsed user can still remove what they ma
 - it leaves `muted_alert_categories`.
 
 A default category or another user's returns 404. Deleting sends no budget alert; spend that moved into "Other" counts toward its budget from the next receipt on.
+
+**Concurrent requests.** Creates, renames and deletes of one user's categories take turns, so two creates at once cannot pass the cap of 10 or the name check together (the loser gets the 409). A request that puts a custom category on a row (a correction, a budget, a manual receipt, a scan applying an item mapping) takes turns with its delete: if it is first, the delete then moves or removes what it wrote, as above; if the delete is first, a correction, budget or manual receipt gets `400` (unknown category) and a scan leaves that item to be assigned afresh. Neither side gets a 500.
 
 ## Onboarding
 
