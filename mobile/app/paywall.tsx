@@ -29,7 +29,7 @@ import { isPurchasesAvailable } from '@/features/premium/services/purchases';
 type Notice = { tone: 'info' | 'error'; text: string } | null;
 
 function longDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', {
+  return new Date(iso).toLocaleDateString(S.dateLocale, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -74,9 +74,10 @@ export default function PaywallScreen() {
   const onRestore = async () => {
     if (!me) return;
     setNotice(null);
-    const { outcome, premium } = await restore.mutateAsync(me.id);
+    const { outcome, premium, checked } = await restore.mutateAsync(me.id);
     if (outcome.kind === 'restored') {
       if (premium) celebrate();
+      else if (!checked) setNotice({ tone: 'error', text: S.restoreCheckFailed });
       else setNotice({ tone: 'info', text: S.nothingToRestore });
     } else {
       setNotice({ tone: 'error', text: S.restoreFailed });
@@ -176,7 +177,7 @@ export default function PaywallScreen() {
             <View
               style={styles.priceRow}
               accessible
-              accessibilityLabel={`${offer.data.priceString} a month`}
+              accessibilityLabel={S.pricePerMonthLabel(offer.data.priceString)}
             >
               <Text style={styles.price}>{offer.data.priceString}</Text>
               <Text style={[type.body, styles.secondary]}>{S.perMonth}</Text>

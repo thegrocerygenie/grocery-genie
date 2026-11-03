@@ -166,6 +166,25 @@ describe('Paywall', () => {
     ).toBeTruthy();
   });
 
+  it('restore when the backend cannot check (503) shows an error, not the no-subscription message', async () => {
+    mockRestore.mockResolvedValue({ kind: 'restored' });
+    mockRefreshPremium.mockRejectedValue(new Error('503'));
+    renderPaywall();
+    fireEvent.press(await screen.findByLabelText('Restore Purchases'));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.props.children).toBe(
+      'Couldn’t check your subscription right now. Try Restore Purchases again in a moment.',
+    );
+    expect(screen.queryByText('No Premium subscription was found for this Apple ID.')).toBeNull();
+    expect(screen.queryByText('You’re on Premium')).toBeNull();
+  });
+
+  it('the price reads as a monthly price to VoiceOver', async () => {
+    renderPaywall();
+    expect(await screen.findByLabelText('$5.99 a month')).toBeTruthy();
+  });
+
   it('a Premium user sees the plan and a way to manage it, not a purchase button', async () => {
     mockFetchMe.mockResolvedValue(premiumProfile);
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);

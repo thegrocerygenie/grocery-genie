@@ -297,6 +297,10 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PREM | D1 | Premium: webhook grant, renew, cancel, expire | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_transfer_refreshes_the_new_user_from_the_rest_api` | Pass |
 | PREM | D1 | Premium: webhook idempotent on event id; late events ignored | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_replayed_event_id_is_a_no_op` | Pass |
 | PREM | D1 | Premium: webhook idempotent on event id; late events ignored | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_an_older_event_arriving_late_changes_nothing` | Pass |
+| PREM | D1 | Premium: webhook idempotent on event id; late events ignored | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_cancellation_before_its_purchase_still_grants_premium` | Pass |
+| PREM | D1 | Premium: webhook idempotent on event id; late events ignored | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refund_before_its_purchase_keeps_the_user_free` | Pass |
+| PREM | D1 | Premium: webhook idempotent on event id; late events ignored | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_purchase_before_a_newer_refresh_stays_stale` | Pass |
+| PREM | D1 | Premium: webhook idempotent on event id; late events ignored | Integration (Postgres) | `backend/tests/services/test_premium_service.py::test_two_concurrent_deliveries_of_one_event_apply_once` | Pass |
 | PREM | D1 | Premium: webhook needs the shared secret; the app cannot grant itself Premium | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_bad_secret_is_rejected` | Pass |
 | PREM | D1 | Premium: webhook needs the shared secret; the app cannot grant itself Premium | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_missing_authorization_is_rejected` | Pass |
 | PREM | D1 | Premium: webhook needs the shared secret; the app cannot grant itself Premium | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_secret_without_bearer_prefix_is_accepted` | Pass |
@@ -313,11 +317,17 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PREM | D1 | Premium: refresh from the RevenueCat REST API, never the app | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refresh_revokes_when_revenuecat_says_inactive` | Pass |
 | PREM | D1 | Premium: refresh from the RevenueCat REST API, never the app | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refresh_when_revenuecat_is_down_keeps_the_stored_state` | Pass |
 | PREM | D1 | Premium: refresh from the RevenueCat REST API, never the app | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refresh_without_an_api_key_is_503` | Pass |
+| PREM | D1 | Premium: refresh from the RevenueCat REST API, never the app | Unit | `backend/tests/services/test_premium_service.py::test_refresh_does_not_overwrite_a_newer_webhook` | Pass |
+| PREM | D1 | Premium: refresh from the RevenueCat REST API, never the app | Unit | `backend/tests/services/test_premium_service.py::test_refresh_is_stamped_with_the_read_time` | Pass |
+| PREM | D1 | Premium: refresh from the RevenueCat REST API, never the app | Unit | `backend/tests/services/test_premium_service.py::test_refresh_without_a_read_time_uses_the_time_before_the_read` | Pass |
+| PREM | D1 | Premium: refresh is rate limited per user (10/minute) | Unit | `backend/tests/core/test_rate_limit_tiers.py::test_premium_refreshes_past_the_per_minute_limit_get_429` | Pass |
+| PREM | D1 | Premium: refresh is rate limited per user (10/minute) | Unit | `backend/tests/core/test_rate_limit_tiers.py::test_reads_do_not_use_the_refresh_allowance` | Pass |
 | PREM | D1 | Premium: RevenueCat REST client reads the subscriber | Unit | `backend/tests/services/test_revenuecat_client.py::test_active_entitlement_is_read_with_the_secret_key` | Pass |
 | PREM | D1 | Premium: RevenueCat REST client reads the subscriber | Unit | `backend/tests/services/test_revenuecat_client.py::test_expired_or_missing_entitlement_is_inactive` | Pass |
 | PREM | D1 | Premium: RevenueCat REST client reads the subscriber | Unit | `backend/tests/services/test_revenuecat_client.py::test_grace_period_keeps_the_entitlement` | Pass |
 | PREM | D1 | Premium: RevenueCat REST client reads the subscriber | Unit | `backend/tests/services/test_revenuecat_client.py::test_lifetime_entitlement_has_no_expiry` | Pass |
 | PREM | D1 | Premium: RevenueCat REST client reads the subscriber | Unit | `backend/tests/services/test_revenuecat_client.py::test_errors_raise_unavailable` | Pass |
+| PREM | D1 | Premium: RevenueCat REST client reads the subscriber | Unit | `backend/tests/services/test_revenuecat_client.py::test_read_time_is_revenuecats_request_date` | Pass |
 | PREM | D1 | Premium: RevenueCat REST client reads the subscriber | Unit | `backend/tests/services/test_revenuecat_client.py::test_no_api_key_means_no_client` | Pass |
 | PREM | D1 | Premium unlocks the 12-month trend (D2) | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_premium_unlocks_the_12_month_trend` | Pass |
 | PREM | D1 | Premium unlocks unlimited receipts (D2) | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_premium_user_scans_past_the_free_quota` | Pass |
@@ -330,6 +340,8 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "a failed purchase says so inline" | Pass |
 | PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "restore purchases asks the backend and shows Premium" | Pass |
 | PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "restore with no subscription on the Apple ID says so" | Pass |
+| PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "restore when the backend cannot check (503) shows an error, not the no-subscription message" | Pass |
+| PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "the price reads as a monthly price to VoiceOver" | Pass |
 | PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "a Premium user sees the plan and a way to manage it, not a purchase button" | Pass |
 | PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "in Expo Go it explains purchases need the App Store build" | Pass |
 | PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "when the offer cannot load it offers a retry" | Pass |

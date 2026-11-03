@@ -237,6 +237,76 @@ async def test_an_older_event_arriving_late_changes_nothing(client):
     assert (await _me(client))["is_premium"] is False
 
 
+@pytest.mark.asyncio
+async def test_cancellation_before_its_purchase_still_grants_premium(client):
+    """RevenueCat can deliver the CANCELLATION before the INITIAL_PURCHASE it
+    cancels. A cancellation does not end access before its expiry, so the late
+    purchase still makes the user Premium, until the cancellation's expiry."""
+    now = datetime.now(UTC)
+    ends = now + timedelta(days=10)
+    resp = await _post(
+        client,
+        _event(
+            "CANCELLATION",
+            expires=ends,
+            at=now + timedelta(seconds=5),
+            cancel_reason="UNSUBSCRIBE",
+        ),
+    )
+    assert resp.json() == {"status": "applied"}
+    resp = await _post(
+        client,
+        _event("INITIAL_PURCHASE", expires=now + timedelta(days=30), at=now),
+    )
+    assert resp.json() == {"status": "applied"}
+    me = await _me(client)
+    assert me["is_premium"] is True
+    got = datetime.fromisoformat(me["premium_expires_at"])
+    assert abs((got - ends).total_seconds()) < 1
+
+
+@pytest.mark.asyncio
+async def test_refund_before_its_purchase_keeps_the_user_free(client):
+    """A refund's cancellation carries an expiry already past: the late
+    purchase it refunded does not grant Premium."""
+    now = datetime.now(UTC)
+    await _post(
+        client,
+        _event(
+            "CANCELLATION",
+            expires=now - timedelta(seconds=1),
+            at=now + timedelta(seconds=5),
+            cancel_reason="CUSTOMER_SUPPORT",
+        ),
+    )
+    await _post(client, _event("INITIAL_PURCHASE", at=now))
+    assert (await _me(client))["is_premium"] is False
+
+
+@pytest.mark.asyncio
+async def test_purchase_before_a_newer_refresh_stays_stale(client, fake_revenuecat):
+    """A refresh reads RevenueCat's whole state, so an older event changes
+    nothing after it, even when the last webhook was a cancellation."""
+    now = datetime.now(UTC)
+    await _post(
+        client,
+        _event(
+            "CANCELLATION",
+            expires=now + timedelta(days=10),
+            at=now - timedelta(minutes=2),
+        ),
+    )
+    fake_revenuecat.states[str(DEV_USER_ID)] = PremiumState(
+        active=False, read_at=now - timedelta(minutes=1)
+    )
+    await client.post("/api/users/me/premium/refresh")
+    resp = await _post(
+        client, _event("INITIAL_PURCHASE", at=now - timedelta(minutes=3))
+    )
+    assert resp.json() == {"status": "stale"}
+    assert (await _me(client))["is_premium"] is False
+
+
 # -- auth --------------------------------------------------------------------
 
 

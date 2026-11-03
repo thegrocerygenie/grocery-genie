@@ -6,6 +6,8 @@
  * categories, data export and budget rollover join it as they ship.
  */
 export const PREMIUM_STRINGS = {
+  /** The locale these strings are written in; dates on the paywall use it. */
+  dateLocale: 'en-US',
   screenTitle: 'Premium',
   close: 'Close',
   title: 'Grocery Genie Premium',
@@ -26,6 +28,8 @@ export const PREMIUM_STRINGS = {
   ],
   staysFree: 'Price history, price alerts and store comparison stay free.',
   perMonth: '/month',
+  /** The price as VoiceOver reads it. */
+  pricePerMonthLabel: (price: string) => `${price} a month`,
   subscribe: (price: string) => `Subscribe for ${price}/month`,
   subscribing: 'Subscribing…',
   restore: 'Restore Purchases',
@@ -42,6 +46,8 @@ export const PREMIUM_STRINGS = {
   purchaseFailed: 'The purchase didn’t go through. You weren’t charged.',
   restoreFailed: 'Couldn’t restore purchases. Check your connection and try again.',
   nothingToRestore: 'No Premium subscription was found for this Apple ID.',
+  restoreCheckFailed:
+    'Couldn’t check your subscription right now. Try Restore Purchases again in a moment.',
   pending: 'Purchase complete. Premium turns on in a moment.',
   activeTitle: 'You’re on Premium',
   activeUntil: (date: string) => `Renews or ends on ${date}.`,
@@ -52,6 +58,8 @@ export const PREMIUM_STRINGS = {
   settingsPremium: 'Premium',
   planFree: 'Free plan',
   planPremium: 'Premium',
+  deleteAccountNote:
+    'Deleting your account doesn’t cancel a Premium subscription. Apple keeps billing it until you cancel it in iOS Settings → Apple ID → Subscriptions.',
 } as const;
 
 /** Apple's standard EULA, which App Store Connect uses when the app sets none. */

@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     # the per-minute cap.
     max_receipt_submissions_per_hour: int = 50
     max_reads_per_minute: int = 300
+    # Per user (V11-P0). Each Premium refresh is a call to RevenueCat's REST
+    # API, so it has a count of its own: the app calls it only after a
+    # purchase or a restore.
+    max_premium_refreshes_per_minute: int = 10
 
     # Per-IP cap on unauthenticated /api/auth/* POSTs (sign-up, sign-in, social,
     # forgot/reset password, verify, refresh). 30/min/IP is generous enough for

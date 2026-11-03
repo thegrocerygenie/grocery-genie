@@ -27,6 +27,9 @@ class PremiumState(BaseModel):
     active: bool
     expires_at: datetime | None = None
     product_id: str | None = None
+    # When RevenueCat answered (its own clock, like webhook event times). The
+    # refresh is stamped with it, so it never overwrites a newer webhook.
+    read_at: datetime | None = None
 
 
 class RevenueCatUnavailableError(Exception):
@@ -49,6 +52,7 @@ class _Subscriber(BaseModel):
 
 
 class _SubscriberResponse(BaseModel):
+    request_date_ms: int | None = None
     subscriber: _Subscriber
 
 
@@ -88,9 +92,14 @@ class HttpRevenueCatClient:
             logger.warning("revenuecat subscriber read failed: %s", type(e).__name__)
             raise RevenueCatUnavailableError(str(e)) from e
 
+        read_at = (
+            None
+            if body.request_date_ms is None
+            else datetime.fromtimestamp(body.request_date_ms / 1000, tz=UTC)
+        )
         entitlement = body.subscriber.entitlements.get(self.entitlement_id)
         if entitlement is None:
-            return PremiumState(active=False)
+            return PremiumState(active=False, read_at=read_at)
         # No expiry: a grant that does not lapse. A grace period (billing
         # retry) keeps the entitlement past the paid period.
         expires = _utc(entitlement.expires_date)
@@ -102,6 +111,7 @@ class HttpRevenueCatClient:
             active=active,
             expires_at=expires,
             product_id=entitlement.product_identifier,
+            read_at=read_at,
         )
 
 

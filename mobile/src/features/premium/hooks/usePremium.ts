@@ -54,6 +54,8 @@ export interface PremiumResult<T> {
   outcome: T;
   /** The backend says the user is Premium. */
   premium: boolean;
+  /** The backend answered (false: the refresh failed, e.g. a 503). */
+  checked: boolean;
 }
 
 export function usePurchasePremium() {
@@ -67,9 +69,9 @@ export function usePurchasePremium() {
       offer: PremiumOffer;
     }): Promise<PremiumResult<PurchaseOutcome>> => {
       const outcome = await purchasePremium(userId, offer);
-      if (outcome.kind !== 'purchased') return { outcome, premium: false };
+      if (outcome.kind !== 'purchased') return { outcome, premium: false, checked: false };
       const profile = await syncPremium(qc);
-      return { outcome, premium: profile?.is_premium === true };
+      return { outcome, premium: profile?.is_premium === true, checked: profile !== null };
     },
   });
 }
@@ -79,9 +81,9 @@ export function useRestorePremium() {
   return useMutation({
     mutationFn: async (userId: string): Promise<PremiumResult<RestoreOutcome>> => {
       const outcome = await restorePremium(userId);
-      if (outcome.kind !== 'restored') return { outcome, premium: false };
+      if (outcome.kind !== 'restored') return { outcome, premium: false, checked: false };
       const profile = await syncPremium(qc);
-      return { outcome, premium: profile?.is_premium === true };
+      return { outcome, premium: profile?.is_premium === true, checked: profile !== null };
     },
   });
 }

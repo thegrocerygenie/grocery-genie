@@ -238,7 +238,7 @@ Called by RevenueCat, not the app. Authenticated by the `Authorization` header, 
 |---|---|
 | `applied` | The user's entitlement was updated. |
 | `duplicate` | This event id was received before: nothing changes. Each id is claimed once in `revenuecat_events`. |
-| `stale` | Older (`event_timestamp_ms`) than the event or REST read that last set the user's entitlement: webhooks can arrive out of order. |
+| `stale` | Older (`event_timestamp_ms`) than the event or REST read that last set the user's entitlement: webhooks can arrive out of order. One exception is `applied`: a grant older than the `CANCELLATION` or `BILLING_ISSUE` that last set the entitlement (it arrived after its own cancellation) makes the user Premium, to that newer event's expiry. A cancellation does not end access early, and a refund's expiry is already past, so a refunded purchase still grants nothing. |
 | `ignored` | Not about the Premium entitlement (`GG_REVENUECAT_ENTITLEMENT_ID`, default `premium`), or a type that changes nothing (`TEST`, `SUBSCRIPTION_PAUSED`, ...). |
 | `unknown_user` | None of the event's app user ids (`app_user_id`, `original_app_user_id`, `aliases`) is a Grocery Genie user. The app logs in to RevenueCat with the user's id, so a purchase made before sign-in is found through `aliases`. |
 
@@ -254,6 +254,9 @@ Called by RevenueCat, not the app. Authenticated by the `Authorization` header, 
 Reads the signed-in user's entitlement from RevenueCat's REST API (`GET /v1/subscribers/{user id}` with `GG_REVENUECAT_API_KEY`) and stores it. The app calls it after a purchase or "Restore purchases", so Premium shows without waiting for the webhook. The request body, if any, is ignored. Returns the user profile.
 
 - `503 revenuecat_unavailable`: no API key is configured, or RevenueCat could not be read. The stored entitlement is unchanged; the webhook still delivers it.
+- `429`: more than 10 refreshes in a minute for this user (`GG_MAX_PREMIUM_REFRESHES_PER_MINUTE`). Each refresh reads RevenueCat, so it has its own count, apart from the 300 requests a minute.
+
+The stored state is stamped with the time of RevenueCat's answer (`request_date_ms`). A webhook applied after that read is newer and is kept; the refresh then returns the stored state unchanged.
 
 ## Price Intelligence [V1.1]
 

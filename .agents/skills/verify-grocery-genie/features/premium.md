@@ -14,6 +14,8 @@ Premium ($5.99/month, V1.1 decision D1) is an App Store subscription sold throug
 - `premium-expire` an `EXPIRATION` ends Premium: `is_premium` false, and `months=12` is `403` again.
 - `premium-ignored` a `TEST` event answers `ignored`, and an event for an app user id that is no Grocery Genie user answers `unknown_user`; both are `200`, so RevenueCat stops retrying.
 - `premium-refresh-unconfigured` `POST /api/users/me/premium/refresh` without a RevenueCat API key answers `503 revenuecat_unavailable` and leaves the entitlement alone.
+- `premium-refresh-limit` the refresh is limited per user: the 11th in a minute answers `429` (each one reads RevenueCat).
+- `premium-cancel-first` a `CANCELLATION` delivered before the `INITIAL_PURCHASE` it cancels: the late purchase still answers `applied` and makes the user Premium to the cancellation's expiry.
 - `premium-unlimited` a Premium user's 21st scan of the month succeeds (a free user's is `429`).
 - `premium-delete` deleting the account deletes its `revenuecat_events` rows.
 
@@ -49,12 +51,14 @@ ev() {  # ev ID TYPE EVENT_AT EXPIRES_AT [APP_USER_ID]
 - **Expire (`premium-expire`).** `$G revenuecat "$(ev "e-$uid" EXPIRATION $((now+3000)) $now)"` is `applied`; `is_premium` is `false`, and `months=12` prints `-> 403` again.
 - **Ignored (`premium-ignored`).** `$G revenuecat "$(ev "t-$uid" TEST $now $now)"` is `{"status":"ignored"}`. `$G revenuecat "$(ev "u-$uid" INITIAL_PURCHASE $now $((now+30*day)) 00000000-0000-0000-0000-00000000dead)"` is `{"status":"unknown_user"}`. Both exit 0.
 - **Refresh, no API key (`premium-refresh-unconfigured`).** `$G api POST /api/users/me/premium/refresh || true` prints `-> 503` with `.detail.code` `revenuecat_unavailable`; `is_premium` is unchanged.
+- **Refresh limit (`premium-refresh-limit`).** Right after the step above, `for i in $(seq 1 10); do $G api POST /api/users/me/premium/refresh || true; done` prints `-> 503` nine times, then `-> 429`: ten refreshes a minute (`GG_MAX_PREMIUM_REFRESHES_PER_MINUTE`), counted apart from the 300 requests a minute.
 - **Unlimited receipts (`premium-unlimited`).** `$G revenuecat "$(ev "g2-$uid" UNCANCELLATION $((now+4000)) $((now+30*day)))"` is `applied`. Then `for i in $(seq 1 21); do $G scan > /dev/null || echo "scan $i failed"; done` prints no failure: 21 scans this month, past the free plan's 20.
 - **Delete (`premium-delete`).** `$G api DELETE /api/users/me` prints `-> 204`. `$G sql "SELECT event_id FROM revenuecat_events WHERE user_id = '$uid' OR event_id IN ('g-$uid','r-$uid','s-$uid','c-$uid','e-$uid','g2-$uid')"` prints nothing. The `TEST` and unknown-user rows (`t-`, `u-`) stay: they were never linked to the user (`user_id` null).
+- **Cancellation first (`premium-cancel-first`).** After the delete, `$G signup premium-oo` and `uid=$($G api GET /api/users/me | jq -r .id)`. `$G revenuecat "$(ev "oc-$uid" CANCELLATION $((now+5000)) $((now+10*day)))"` is `applied` and `is_premium` stays `false` (nothing bought yet). Then the older purchase, `$G revenuecat "$(ev "op-$uid" INITIAL_PURCHASE $now $((now+30*day)))"`, is `applied`, not `stale`: `is_premium` is `true` and `premium_expires_at` is 10 days out, the cancellation's expiry.
 
 ## Gotchas
 
 - Each event id must be new per run: the ids above end in the user's id. Reusing an id from an earlier step is the replay check, not a new event.
 - Order matters: `event_timestamp_ms` older than the last applied event is `stale`, which is why each step's event time grows (`now+1000`, `+2000`, ...).
-- `premium-unlimited` makes 21 scans: run it last but one, and keep the hourly limit (50 receipt submissions) in mind if you rerun it on the same user.
-- The REST refresh with a real key, `TRANSFER` events and refund cancellations are covered by pytest (`backend/tests/api/test_revenuecat_webhook.py`, `backend/tests/services/test_revenuecat_client.py`) with RevenueCat's API mocked: this instance never calls RevenueCat.
+- `premium-unlimited` makes 21 scans: run it before the delete, and keep the hourly limit (50 receipt submissions) in mind if you rerun it on the same user.
+- The REST refresh with a real key (and a webhook landing during its read), `TRANSFER` events, refund cancellations and two concurrent deliveries of one event are covered by pytest (`backend/tests/services/test_premium_service.py` too) (`backend/tests/api/test_revenuecat_webhook.py`, `backend/tests/services/test_revenuecat_client.py`) with RevenueCat's API mocked: this instance never calls RevenueCat.

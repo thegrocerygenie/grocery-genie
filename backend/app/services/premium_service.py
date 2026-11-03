@@ -7,9 +7,13 @@ Two ways in, both from RevenueCat and never from the app:
   a no-op. Grants (purchase, renewal, ...) make the user Premium until the
   event's expiry; a cancellation keeps Premium to the end of the paid period;
   an expiration ends it. An event older than the one that last changed the
-  user (webhooks can arrive out of order) changes nothing.
+  user (webhooks can arrive out of order) changes nothing, with one
+  exception: a grant that arrives after its own cancellation still grants,
+  to the cancellation's expiry (a cancellation does not end access early).
 - ``refresh``: read the subscriber from RevenueCat's REST API, after a
   purchase or restore in the app, so the app need not wait for the webhook.
+  It is stamped with the time of the read, and a webhook applied since the
+  read wins over it.
 
 The app user id in RevenueCat is our user id (the app calls ``logIn`` with
 it); a purchase made before ``logIn`` reaches us with the user id in
@@ -128,7 +132,9 @@ class PremiumService:
         )
         return outcome
 
-    async def _claim(self, event: RevenueCatWebhookEvent, at: datetime) -> uuid.UUID:
+    async def _claim(
+        self, event: RevenueCatWebhookEvent, at: datetime
+    ) -> uuid.UUID | None:
         insert = (
             pg_insert if self.db.bind.dialect.name == "postgresql" else (sqlite_insert)
         )
@@ -185,6 +191,22 @@ class PremiumService:
             return IGNORED, user.id
         last = _utc(user.premium_updated_at)
         if last is not None and at < last:
+            if kind in GRANT_TYPES and await self._last_change_kept_access(user, last):
+                # The grant came after the cancellation that followed it. The
+                # newer event's expiry stands: a refund's is past, so a
+                # refunded purchase still grants nothing.
+                self._set(
+                    user,
+                    PremiumState(
+                        active=True,
+                        expires_at=_utc(user.premium_expires_at),
+                        product_id=user.premium_product_id or event.product_id,
+                    ),
+                    last,
+                    source="webhook",
+                    event_type=kind,
+                )
+                return APPLIED, user.id
             return STALE, user.id
 
         expires = _from_ms(event.expiration_at_ms)
@@ -206,6 +228,25 @@ class PremiumService:
             )
         self._set(user, state, at, source="webhook", event_type=kind)
         return APPLIED, user.id
+
+    async def _last_change_kept_access(self, user: User, last: datetime) -> bool:
+        """Whether the user's state was last set by a webhook that moves the
+        expiry without ending access (a cancellation or billing issue), not by
+        a revocation, a transfer, or a refresh (which reads the whole state)."""
+        newest = (
+            await self.db.execute(
+                select(RevenueCatEvent.event_type, RevenueCatEvent.event_at)
+                .where(
+                    RevenueCatEvent.user_id == user.id,
+                    RevenueCatEvent.outcome == APPLIED,
+                )
+                .order_by(RevenueCatEvent.event_at.desc())
+                .limit(1)
+            )
+        ).first()
+        if newest is None or _utc(newest.event_at) != last:
+            return False
+        return newest.event_type in EXPIRY_ONLY_TYPES
 
     async def _transfer(
         self, event: RevenueCatWebhookEvent, at: datetime
@@ -248,16 +289,30 @@ class PremiumService:
     async def refresh(self, user: User) -> User:
         """Read ``user``'s entitlement from RevenueCat and store it.
 
+        The read is not made under the user lock (it is a network call). So the
+        decision is: lock, then store the read only if nothing changed the user
+        after the read was taken. A webhook applied in between (a refund, an
+        expiration) is newer and stays. The stored state is stamped with the
+        read's time, so later webhooks compare against what the read saw.
+
         Raises RevenueCatUnavailableError when there is no API key or the read
         fails; the stored entitlement is then left as it was.
         """
         if self.revenuecat is None:
             raise RevenueCatUnavailableError("RevenueCat API key not configured")
+        started = clock.now()
         state = await self.revenuecat.get_premium(str(user.id))
+        read_at = _utc(state.read_at) or started
         locked = await self._locked_user([user.id])
         if locked is None:
             return user
-        self._set(locked, state, clock.now(), source="refresh", event_type=None)
+        last = _utc(locked.premium_updated_at)
+        if last is not None and read_at < last:
+            logger.info(
+                "premium refresh for %s is older than the stored state", user.id
+            )
+            return locked
+        self._set(locked, state, read_at, source="refresh", event_type=None)
         await self.db.flush()
         return locked
 

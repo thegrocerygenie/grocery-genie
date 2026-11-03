@@ -130,3 +130,25 @@ def test_no_api_key_means_no_client(monkeypatch):
         assert isinstance(get_revenuecat_client(), HttpRevenueCatClient)
     finally:
         get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_read_time_is_revenuecats_request_date():
+    """The refresh is stamped with this time, so a webhook applied after the
+    read is not overwritten by it."""
+    expires = datetime.now(UTC) + timedelta(days=30)
+    asked = datetime(2026, 11, 3, 12, 0, 1, tzinfo=UTC)
+
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "request_date_ms": int(asked.timestamp() * 1000),
+                "subscriber": {
+                    "entitlements": {"premium": {"expires_date": _iso(expires)}}
+                },
+            },
+        )
+
+    state = await _client(handler).get_premium("u1")
+    assert state.read_at == asked

@@ -4,6 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { AppleReauthCancelledError, useDeleteAccount } from '@/features/auth/hooks/useAuth';
+import { PREMIUM_STRINGS } from '@/features/premium/content/premium';
 import { apiErrorCode } from '@/services/api';
 
 const ERASED = [
@@ -85,10 +86,7 @@ export default function DeleteAccountScreen() {
           device are removed too. If you use Sign in with Apple, you’ll confirm with Apple, and
           Grocery Genie’s access to your Apple ID is removed.
         </Text>
-        <Text style={styles.note}>
-          Deleting your account doesn’t cancel a Premium subscription. Apple keeps billing it until
-          you cancel it in iOS Settings → Apple ID → Subscriptions.
-        </Text>
+        <Text style={styles.note}>{PREMIUM_STRINGS.deleteAccountNote}</Text>
 
         {failure ? (
           <Text style={styles.error} accessibilityRole="alert">

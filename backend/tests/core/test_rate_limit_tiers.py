@@ -1,4 +1,5 @@
-"""Rate limit tiers per user (NFR 7: 50 receipt submissions/hour, 300 reads/minute).
+"""Rate limit tiers per user (NFR 7: 50 receipt submissions/hour, 300 reads/minute;
+V11-P0: 10 Premium refreshes/minute).
 
 Each test runs a bare app behind RateLimitMiddleware with the memory store and
 small limits, so a 429 takes a few requests instead of hundreds.
@@ -17,6 +18,7 @@ from app.core.security import create_token
 
 SUBMISSIONS_PER_HOUR = 2
 REQUESTS_PER_MINUTE = 3
+REFRESHES_PER_MINUTE = 2
 
 
 @pytest.fixture(autouse=True)
@@ -26,6 +28,7 @@ def small_limits(monkeypatch):
         rate_limit_storage="memory",
         max_receipt_submissions_per_hour=SUBMISSIONS_PER_HOUR,
         max_reads_per_minute=REQUESTS_PER_MINUTE,
+        max_premium_refreshes_per_minute=REFRESHES_PER_MINUTE,
     )
     monkeypatch.setattr(rate_limit, "get_settings", lambda: settings)
     reset_ip_state()
@@ -56,6 +59,10 @@ async def client():
 
     @app.get("/api/receipts")
     async def list_receipts() -> dict:
+        return {"ok": True}
+
+    @app.post("/api/users/me/premium/refresh")
+    async def refresh_premium() -> dict:
         return {"ok": True}
 
     async with AsyncClient(
@@ -170,3 +177,52 @@ async def test_a_token_that_is_not_a_jwt_is_limited_on_its_own(client):
     statuses = await _statuses(client, "GET", "/api/receipts", headers, 4)
 
     assert statuses == [200, 200, 200, 429]
+
+
+# --- Premium refresh: 10/minute per user (each one reads RevenueCat) ---
+
+REFRESH = "/api/users/me/premium/refresh"
+
+
+async def test_premium_refreshes_past_the_per_minute_limit_get_429(client):
+    headers = _auth(uuid.uuid4())
+
+    statuses = await _statuses(client, "POST", REFRESH, headers, 3)
+
+    assert statuses == [200, 200, 429]
+
+
+async def test_the_refresh_429_says_when_to_retry(client):
+    headers = _auth(uuid.uuid4())
+    await _statuses(client, "POST", REFRESH, headers, 2)
+
+    response = await client.post(REFRESH, headers=headers)
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"]
+
+
+async def test_signing_in_again_does_not_reset_the_refresh_count(client):
+    user_id = uuid.uuid4()
+    await _statuses(client, "POST", REFRESH, _auth(user_id), 2)
+
+    response = await client.post(REFRESH, headers=_auth(user_id))
+
+    assert response.status_code == 429
+
+
+async def test_users_have_separate_refresh_counts(client):
+    await _statuses(client, "POST", REFRESH, _auth(uuid.uuid4()), 2)
+
+    response = await client.post(REFRESH, headers=_auth(uuid.uuid4()))
+
+    assert response.status_code == 200
+
+
+async def test_reads_do_not_use_the_refresh_allowance(client):
+    headers = _auth(uuid.uuid4())
+    await _statuses(client, "GET", "/api/receipts", headers, 2)
+
+    statuses = await _statuses(client, "POST", REFRESH, headers, 2)
+
+    assert statuses == [200, 200]
