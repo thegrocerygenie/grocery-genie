@@ -3,12 +3,10 @@
 
 import { handleWaitlistJoin } from '../api/_handler.js';
 
-const results = [];
+// Tests run one at a time: several of them swap globalThis.fetch.
+const tests = [];
 function test(name, fn) {
-  results.push(Promise.resolve()
-    .then(() => fn())
-    .then(() => ({ name, ok: true }))
-    .catch((err) => ({ name, ok: false, err })));
+  tests.push({ name, fn });
 }
 function assert(cond, msg) {
   if (!cond) throw new Error('Assertion failed: ' + msg);
@@ -108,9 +106,34 @@ test('network error returns 502', async () => {
   });
 });
 
+test('accepts v5 slot sources (mid, final) in welcome email tag', async () => {
+  for (const source of ['mid', 'final']) {
+    const calls = [];
+    await withFetch(async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({ id: 'x' }), { status: 201 });
+    }, async () => {
+      const r = await handleWaitlistJoin(
+        { email: `src-${source}@b.co`, source, ip: `10.0.0.${source.length}` },
+        { RESEND_API_KEY: 'x', RESEND_AUDIENCE_ID: 'y', WAITLIST_FROM: 'GG <hi@example.com>' },
+      );
+      assert(r.status === 200, `status ${r.status}, want 200`);
+    });
+    const email = calls.find((c) => c.url.endsWith('/emails'));
+    assert(email, 'welcome email sent');
+    const sent = JSON.parse(email.init.body);
+    assert(sent.tags.some((t) => t.name === 'source' && t.value === source), `source tag ${source}`);
+    assert(!/brooklyn/i.test(sent.text), 'welcome text must not name a location');
+  }
+});
+
 // --------------- run + report ---------------
 
-const out = await Promise.all(results);
+const out = [];
+for (const { name, fn } of tests) {
+  try { await fn(); out.push({ name, ok: true }); }
+  catch (err) { out.push({ name, ok: false, err }); }
+}
 let failed = 0;
 for (const r of out) {
   if (r.ok) {

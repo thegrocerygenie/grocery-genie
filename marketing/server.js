@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Standalone Node http server for local dev and self-hosted deploys.
-// Serves the static site from this directory and dispatches /api/waitlist to the handler.
+// Serves the built static site (dist/, from `npm run build`) and dispatches /api/waitlist to the handler.
 //
 // Usage:
-//   PORT=3000 RESEND_API_KEY=re_... RESEND_AUDIENCE_ID=... node server.js
-//   npm run dev   (with nodemon-style auto-reload via --watch)
+//   npm run build && PORT=3000 RESEND_API_KEY=re_... RESEND_AUDIENCE_ID=... node server.js
+//   (For page development use `npm run dev`, Astro's dev server.)
 
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { handleWaitlistJoin } from './api/_handler.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(__dirname);
+const ROOT = resolve(__dirname, 'dist');
 const PORT = Number(process.env.PORT || 3000);
 
 const MIME = {

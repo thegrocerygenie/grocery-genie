@@ -1,0 +1,16 @@
+---
+// Leaf Drop mark + "grocerygenie" in Bricolage Grotesque. Renders a link when href is given.
+interface Props {
+  href?: string;
+}
+const { href } = Astro.props;
+const Tag = href ? 'a' : 'div';
+---
+
+<Tag class="wordmark" href={href} aria-label="Grocery Genie">
+  <svg viewBox="9 9 82 82" aria-hidden="true">
+    <path d="M74.5 29.4 A32 32 0 1 0 82 50" fill="none" stroke="#1F7A4A" stroke-width="18"></path>
+    <path d="M91 50 C80 36 61 36 46 53 C60 65 80 64 91 50 Z" fill="#34D17A"></path>
+  </svg>
+  <span>grocery<em>genie</em></span>
+</Tag>

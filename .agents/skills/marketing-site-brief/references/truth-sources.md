@@ -51,6 +51,6 @@ Where to confirm each kind of claim. The paths are as of the MVP; later stages a
 
 | What | Source |
 |---|---|
-| Live copy and claims | `marketing/index.html` (search for `<h1`, `<h2`, `<h3`, `faq`, `stat`) |
-| Waitlist form and API | `marketing/app.js`, `marketing/api/_handler.js` |
-| Design tokens Claude Design should keep | `marketing/tokens.css` |
+| Live copy and claims | `marketing/src/pages/index.astro` (search for `<h1`, `<h2`, `<h3`, `faq`) and `marketing/src/config.ts` (headlines, "Also included", "What's next", privacy line); mock screens in `marketing/src/components/mocks/` |
+| Waitlist form and API | `marketing/src/components/CtaSlot.astro`, `marketing/src/scripts/site.ts`, `marketing/api/_handler.js` |
+| Design tokens Claude Design should keep | `marketing/src/styles/tokens-v2.css` (app tokens) and the `:root` block of `marketing/src/styles/site.css` (page palette) |

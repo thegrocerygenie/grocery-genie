@@ -1,18 +1,35 @@
 {
   "name": "grocery-genie-marketing",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Grocery Genie marketing landing page — vanilla HTML/CSS with a Resend-backed waitlist API.",
+  "description": "Grocery Genie marketing site — Astro (static output) with React islands and a Resend-backed waitlist API.",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "dev": "node --watch server.js",
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
     "start": "node server.js",
-    "build:icons": "convert -background none -density 600 favicon.svg -resize 32x32 favicon-32.png && convert -background none -density 600 favicon.svg -resize 180x180 apple-touch-icon.png && convert -background none -density 600 favicon.svg -resize 192x192 icon-192.png && convert -background none -density 800 favicon.svg -resize 512x512 icon-512.png && convert -background none -density 200 og-image.svg -resize 1200x630 og-image.png",
-    "test:smoke": "node tests/smoke.mjs"
+    "check": "astro check",
+    "build:icons": "node scripts/render-icons.mjs",
+    "test:smoke": "node tests/smoke.mjs",
+    "test": "npm run test:smoke && npm run build && node tests/page.mjs"
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "dependencies": {
+    "@astrojs/react": "^7.1.2",
+    "astro": "^7.4.5",
+    "lucide-static": "^0.460.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^5.9.3"
+  }
 }

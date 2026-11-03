@@ -1,0 +1,293 @@
+---
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import '../styles/tokens-v2.css';
+import '../styles/site.css';
+import CtaSlot from '../components/CtaSlot.astro';
+import Wordmark from '../components/Wordmark.astro';
+import HeroMoment from '../components/mocks/HeroMoment';
+import MockScan from '../components/mocks/MockScan';
+import MockLockAlert from '../components/mocks/MockLockAlert';
+import MockDashboard from '../components/mocks/MockDashboard';
+import { APP_ID, APP_STORE_URL, HEADLINES, INCLUDED, LAUNCH_STATE, NEXT, PRIVACY_COPY } from '../config';
+
+const A = LAUNCH_STATE === 'a';
+const SITE = 'https://grocerygenie.app';
+const TITLE = 'Grocery Genie — See what your grocery money actually buys';
+const DESCRIPTION =
+  'Scan a grocery receipt, and Grocery Genie sorts every item, updates your budget, and warns you before you overspend. Free on iPhone.';
+
+// Lucide icons are inlined at build time (no runtime fetch, unlike the prototype).
+const iconDir = join(process.cwd(), 'node_modules', 'lucide-static', 'icons');
+const icon = (name: string) => readFileSync(join(iconDir, `${name}.svg`), 'utf8').replace(/<!--.*?-->\s*/s, '');
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#F0EEE9" />
+    <title>{TITLE}</title>
+    <meta name="description" content={DESCRIPTION} />
+    <link rel="canonical" href={`${SITE}/`} />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Grocery Genie" />
+    <meta property="og:title" content={TITLE} />
+    <meta property="og:description" content={DESCRIPTION} />
+    <meta property="og:url" content={`${SITE}/`} />
+    <meta property="og:image" content={`${SITE}/og-image.png`} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Grocery Genie — a receipt turning into categorized items and an updated budget" />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={TITLE} />
+    <meta name="twitter:description" content={DESCRIPTION} />
+    <meta name="twitter:image" content={`${SITE}/og-image.png`} />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" type="image/png" href="/favicon-32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    {!A && <meta name="apple-itunes-app" content={`app-id=${APP_ID}`} />}
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Bricolage+Grotesque:opsz,wght@12..96,800&display=swap"
+      rel="stylesheet"
+    />
+
+    <script type="application/ld+json" set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareApplication',
+      name: 'Grocery Genie',
+      operatingSystem: 'iOS',
+      applicationCategory: 'FinanceApplication',
+      description: DESCRIPTION,
+      url: `${SITE}/`,
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    })} />
+  </head>
+  <body data-state={LAUNCH_STATE}>
+    <div class="nav-wrap" id="navwrap">
+      <div class="nav">
+        <Wordmark href="#top" />
+        <nav class="nav-links" aria-label="Sections">
+          <a href="#how">How it works</a><a href="#features">Features</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a>
+        </nav>
+        {
+          A ? (
+            <a class="nav-cta" id="nav-cta" href="#join" data-cta="nav">Get early access</a>
+          ) : (
+            <a class="nav-cta" id="nav-cta" href={APP_STORE_URL} data-cta="nav">Download</a>
+          )
+        }
+      </div>
+    </div>
+
+    <main class="page" id="top">
+      <section class="hero" data-screen-label="Hero">
+        <div>
+          <div class="pill"><span class="dot"></span><span id="pill-text">{A ? 'Early access · iPhone' : 'New · Now on the App Store'}</span></div>
+          <h1 id="headline" set:html={HEADLINES.a} />
+          {/* Pick the sticky A/B/C headline before first paint to avoid a visible swap. */}
+          <script is:inline define:vars={{ HL: HEADLINES }}>
+            (function () {
+              var v;
+              try {
+                var q = new URLSearchParams(location.search).get('hl');
+                v = localStorage.getItem('gg_hl_variant');
+                if (!HL[v]) { v = 'abc'[Math.floor(Math.random() * 3)]; localStorage.setItem('gg_hl_variant', v); }
+                if (HL[q]) v = q;
+              } catch (e) { v = v && HL[v] ? v : 'a'; }
+              window.__GG_HEADLINE = v;
+              document.getElementById('headline').innerHTML = HL[v];
+            })();
+          </script>
+          <p class="lede">{DESCRIPTION}</p>
+          <CtaSlot loc="hero" id="join" />
+        </div>
+        <div class="hero-visual" id="hero-moment" role="img" aria-label="A receipt scan turning into categorized items and an updated budget">
+          <HeroMoment client:load />
+        </div>
+      </section>
+
+      <section class="contrast" data-screen-label="Contrast">
+        <div class="contrast-grid">
+          <div class="cc cc-bank">
+            <div class="q-label">Your bank</div>
+            <div class="row"><span>Grocery store</span><span>$187.43</span></div>
+            <div class="muted">One line. No idea what's in it.</div>
+          </div>
+          <div class="cc">
+            <div class="q-label">Grocery Genie</div>
+            <div class="cats">
+              <div class="cat"><div class="cat-h"><span>Groceries</span><span>$121</span></div><div class="cat-i">Chicken thighs $11.48 · Strawberries $4.99 · Whole milk $3.79 · 24 more</div></div>
+              <div class="cat"><div class="cat-h"><span>Household</span><span>$38</span></div><div class="cat-i">Paper towels $8.99 · Laundry pods $17.99 · 3 more</div></div>
+              <div class="cat"><div class="cat-h"><span>Snacks &amp; Treats</span><span>$18</span></div><div class="cat-i">Tortilla chips $4.29 · Dark chocolate $3.49 · 3 more</div></div>
+              <div class="cat"><div class="cat-h"><span>Pet</span><span>$10</span></div><div class="cat-i">Cat food, 12 cans $9.99</div></div>
+            </div>
+            <div class="cc-total"><span>Total</span><span>$187.43</span></div>
+          </div>
+        </div>
+        <div class="contrast-cap">Item by item, <em>even when you pay cash.</em></div>
+      </section>
+
+      <section id="how" class="how" data-screen-label="How it works">
+        <div class="section-head"><div class="label">How it works</div><h2>Three steps. <em>No typing.</em></h2></div>
+        <div class="how-grid">
+          <div class="step"><div class="num">01</div><h3>Snap.</h3><p>Scan the receipt, or import a photo or PDF you already have.</p></div>
+          <div class="step"><div class="num">02</div><h3>Check.</h3><p>AI reads every line. You fix anything in a tap and confirm.</p></div>
+          <div class="step"><div class="num">03</div><h3>Stay on budget.</h3><p>Your budget updates right away, and alerts reach you before you overspend.</p></div>
+        </div>
+      </section>
+
+      <section id="features" data-screen-label="Features">
+        <div class="section-head"><div class="label">Features</div></div>
+        <div class="feature" style="border-top:none;padding-top:0">
+          <div class="copy">
+            <div class="meta">Scan any receipt</div>
+            <h3>One photo. <em>No typing.</em></h3>
+            <ul>
+              <li>Finds the receipt's edges, crops it, and checks it's sharp</li>
+              <li>Import from Photos or Files</li>
+              <li>No signal? Scan anyway. It uploads when you're back online.</li>
+            </ul>
+          </div>
+          <div class="feature-visual" id="feat-scan"><MockScan /></div>
+        </div>
+        <div class="feature flip">
+          <div class="copy">
+            <div class="meta">Alerts before you overspend</div>
+            <h3>A heads-up before the overspend, <em>not after.</em></h3>
+            <ul>
+              <li>Alerts at 50%, 80% and 100% of your budget, with what's left and how many days remain</li>
+              <li>A weekly summary on the day you choose</li>
+              <li>Mute any category you don't care about</li>
+            </ul>
+          </div>
+          <div class="feature-visual" id="feat-alert"><MockLockAlert /></div>
+        </div>
+        <div class="feature">
+          <div class="copy">
+            <div class="meta">See where it all went</div>
+            <h3>Your month <em>at a glance.</em></h3>
+            <ul>
+              <li>Your budget, category by category, with a pace line that tells you mid-month whether you're on track</li>
+              <li>This month vs. last month, a 3-month trend, and your top 10 items</li>
+              <li>Every receipt, searchable, with the original photo</li>
+            </ul>
+          </div>
+          <div class="feature-visual" id="feat-dash"><MockDashboard /></div>
+        </div>
+      </section>
+
+      <div class="cta-mid" data-screen-label="Mid CTA">
+        <h3>Try it on your next grocery run.</h3>
+        <CtaSlot loc="mid" />
+      </div>
+
+      <section class="trust" id="privacy" data-screen-label="Trust">
+        <h2>You stay <em>in control.</em></h2>
+        <div class="trust-body">
+          <div class="trust-grid">
+            <div><h4>You approve every receipt.</h4><p>Nothing counts until you confirm it.</p></div>
+            <div><h4>You choose before AI reads anything.</h4><p>The app asks before your first scan, and you can change your mind any time.</p></div>
+            <div><h4>Fix it once, it remembers.</h4><p>Your corrections carry over to future receipts.</p></div>
+            <div><h4>Delete anything.</h4><p>A deleted receipt can be restored for 30 days. You can delete your whole account from inside the app.</p></div>
+          </div>
+          <p class="privacy-copy">{PRIVACY_COPY}</p>
+        </div>
+      </section>
+
+      <section class="included" data-screen-label="Also included">
+        <div class="label">Also included</div>
+        <div class="inc-grid" id="inc-grid">
+          {INCLUDED.map(([i, t]) => (
+            <div class="inc"><i aria-hidden="true" set:html={icon(i)} /><span>{t}</span></div>
+          ))}
+        </div>
+      </section>
+
+      <section id="faq" class="faq" data-screen-label="FAQ">
+        <div class="section-head"><div class="label">FAQ</div><h2>Straight answers.</h2></div>
+        <details data-track="faq_free">
+          <summary>Is it free?<span class="plus" aria-hidden="true">+</span></summary>
+          {/* Same markup as the design (span around the State A sentence) so text renders identically. */}
+          <p>Yes. Grocery Genie is free on iPhone. You can scan up to 20 receipts a month (about five a week) and add as many as you like by hand.{A && <span class="only-a">{' Join the waitlist and get a free year of Premium, our upcoming paid plan, when it launches.'}</span>}</p>
+        </details>
+        <details data-track="faq_wrong">
+          <summary>What if it reads my receipt wrong?<span class="plus" aria-hidden="true">+</span></summary>
+          <p>You check every receipt before it's saved. Anything the AI isn't sure about is flagged, every field is editable, and it remembers your fixes.</p>
+        </details>
+        <details data-track="faq_privacy">
+          <summary>Is my data private?<span class="plus" aria-hidden="true">+</span></summary>
+          <p>{PRIVACY_COPY} You decide before AI reads your first receipt, and you can delete your account and all its data from inside the app.</p>
+        </details>
+        <details data-track="faq_receipts">
+          <summary>Which receipts work?<span class="plus" aria-hidden="true">+</span></summary>
+          <p>Printed grocery receipts from any store, plus photos and PDFs you already have.</p>
+        </details>
+        <details data-track="faq_android">
+          <summary>Android?<span class="plus" aria-hidden="true">+</span></summary>
+          <p>iPhone first. We'll share Android plans later.</p>
+        </details>
+        <details data-track="faq_launch">
+          <summary>When does it launch?<span class="plus" aria-hidden="true">+</span></summary>
+          <p id="faq-launch">{
+            A ? (
+              <span class="only-a">Grocery Genie launches on iPhone in Q4 2026. Early sign-ups get TestFlight access first, ahead of the public launch on the App Store. We'll email you once, at launch.</span>
+            ) : (
+              <span class="only-b">It's out now. Grocery Genie is free on the App Store.</span>
+            )
+          }</p>
+        </details>
+      </section>
+
+      <div class="cta-block" data-screen-label="Final CTA">
+        <h2>Start seeing where your grocery money goes.</h2>
+        <CtaSlot loc="final" />
+      </div>
+
+      <section class="next" data-screen-label="Coming later">
+        <div class="next-head"><h3>What's next.</h3><span class="tag">Coming later</span></div>
+        <div class="next-list" id="next-list">
+          {
+            NEXT.map((n) =>
+              A ? (
+                <button type="button" class="vote" aria-pressed="false" data-vote={n}>
+                  <span>{n}</span>
+                  <span class="pick">Want this</span>
+                </button>
+              ) : (
+                <div class="vote"><span>{n}</span></div>
+              ),
+            )
+          }
+        </div>
+        {A && <div class="vote-hint">Tap the one you want most. It helps us decide what to build first.</div>}
+      </section>
+
+      <footer>
+        <div>
+          <Wordmark />
+          <p>Grocery budgets that start with a receipt. Built by a small team.</p>
+        </div>
+        <nav aria-label="Footer"><a href="#features">Features</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a></nav>
+      </footer>
+      <div class="legal">© 2026 Grocery Genie</div>
+    </main>
+
+    <template id="joined-tpl"><div class="joined" role="status"><strong>You're in.</strong> We'll email you once, at launch.</div></template>
+
+    <script>
+      import { initSite } from '../scripts/site';
+      initSite();
+    </script>
+  </body>
+</html>

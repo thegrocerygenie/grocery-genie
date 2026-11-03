@@ -65,7 +65,7 @@ Some claims need more than a code read. Run each check, and write down what you 
 
 ## 3. Audit the current site
 
-Read `marketing/index.html` and list every claim: features, privacy, prices, stats, testimonials, dates and platforms. Mark each one **keep**, **rewrite** or **remove**, with the reason ("later stage: V2.0", "false: receipts are uploaded", "date has passed", "stat with no source"). This table goes in section 5 of `feature-scope.md`.
+Read `marketing/src/pages/index.astro` and `marketing/src/config.ts` and list every claim: features, privacy, prices, stats, testimonials, dates and platforms. Mark each one **keep**, **rewrite** or **remove**, with the reason ("later stage: V2.0", "false: receipts are uploaded", "date has passed", "stat with no source"). This table goes in section 5 of `feature-scope.md`.
 
 ## 4. Settle the decisions only the user can make
 
