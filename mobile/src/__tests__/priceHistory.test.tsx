@@ -48,8 +48,12 @@ const mockApi = {
   listSuggestions: jest.fn(),
   acceptSuggestion: jest.fn(),
   rejectSuggestion: jest.fn(),
+  getPriceComparison: jest.fn(),
+  getPriceAlertSettings: jest.fn(),
 };
 jest.mock('@/features/price-intelligence/services/itemsApi', () => ({
+  getPriceComparison: (...a: unknown[]) => mockApi.getPriceComparison(...a),
+  getPriceAlertSettings: (...a: unknown[]) => mockApi.getPriceAlertSettings(...a),
   listItems: (...a: unknown[]) => mockApi.listItems(...a),
   getItem: (...a: unknown[]) => mockApi.getItem(...a),
   getPriceHistory: (...a: unknown[]) => mockApi.getPriceHistory(...a),
@@ -96,6 +100,7 @@ function detail(overrides: Partial<ItemDetail> = {}): ItemDetail {
       { id: 'a-2', alias: 'ORG BNNA' },
     ],
     suggestions: [],
+    alerts_muted: false,
     ...overrides,
   };
 }
@@ -148,6 +153,22 @@ beforeEach(() => {
     history([point('2026-03-01', 0.7, 'FreshCo'), point('2026-03-20', 0.77, 'Loblaws')]),
   );
   mockApi.listSuggestions.mockResolvedValue([]);
+  mockApi.getPriceComparison.mockResolvedValue({
+    item: { id: 'i-1', canonical_name: 'Organic Bananas' },
+    unit_of_measure: 'lb',
+    currency: 'USD',
+    min_observations: 2,
+    stores: [],
+    stores_below_minimum: 2,
+  });
+  mockApi.getPriceAlertSettings.mockResolvedValue({
+    enabled: true,
+    threshold_percent: 10,
+    default_threshold_percent: 10,
+    cooldown_days: 7,
+    muted_items: [],
+    muted_stores: [],
+  });
   jest.restoreAllMocks();
 });
 

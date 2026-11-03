@@ -12,10 +12,12 @@ Confirming a receipt compares each price with the item's 30-day rolling average 
 - `pa.mute-store`: `POST /api/stores/{id}/mute` lists the store in `muted_stores`; a change at that store sends nothing; `DELETE` unmutes, and never 404s (it deletes only the caller's own mute, so a mute outliving its purged receipts can still be undone).
 - `pa.concurrent`: two receipts confirmed at the same moment with the same big change alert once (the ledger's unique key, on Postgres).
 - `pa.isolation`: another user muting the item, or a store they never shopped at, gets 404; unmuting their item is 404 too.
+- `pa.app-tap`: the alert's `data.canonical_item_id` is what the app routes to (`/items/{id}`); item detail then loads with it: `GET /api/items/{id}` (with `alerts_muted`), `/prices` (whose `observations[].store_id` feed the store switches) and `/compare`, all 200.
+- `pa.app-settings`: Settings → Alerts unmutes by the ids `muted_items[].id` and `muted_stores[].id` it lists, and the on/off switch is `PUT {"enabled": ...}` leaving the threshold as it was.
 
 ## How to get to it (user POV)
 
-A push or the notification list (tapping opens the item, V11-02). Settings → Notifications → Price alerts for the switch and threshold; item detail for Mute item and Mute store (V11-02). The API is complete before the screens.
+A push: tapping a `price_change` alert opens the item (`mobile/src/features/notifications/notificationTap.ts`). Item detail (Budget tab → Price history → an item) → Price alerts: a switch for the item and one per store it was bought at. Settings → Alerts → Price alerts: the on/off switch and "Alert when a price changes by" (a picker; the default is sent as `null`), and a Muted price alerts list with Unmute. The screens are UI-only: check them on a simulator.
 
 ## Driving it with gg-verify
 
@@ -32,6 +34,9 @@ $G api GET /api/notifications | jq '[.items[] | select(.type=="price_change") | 
 $G sql "SELECT count(*) FROM price_alerts_sent"                              # 1
 milk 2026-11-03 5.00 Milk                                                    # pa.cooldown: still 1 alert
 $G api GET /api/notifications | jq '[.items[] | select(.type=="price_change")] | length'
+milk_id=$($G api GET /api/notifications | jq -r '[.items[] | select(.type=="price_change")][0].data' | jq -r .canonical_item_id)
+$G api GET /api/items/$milk_id | jq -c '{canonical_name, alerts_muted}'       # pa.app-tap: Milk, false
+$G api GET /api/items/$milk_id/prices > /dev/null; $G api GET /api/items/$milk_id/compare > /dev/null   # 200, 200
 $G api PUT /api/items/price-alert-settings '{"threshold_percent":25}'        # pa.threshold
 milk 2026-11-01 3.00 Eggs; milk 2026-11-02 3.00 Eggs
 milk 2026-11-03 3.60 Eggs                                                    # +20%: none
@@ -47,7 +52,12 @@ store=$($G api GET /api/items/$bread/prices | jq -r '.observations[0].store_id')
 $G api POST /api/stores/$store/mute                                          # pa.mute-store
 $G api GET /api/items/price-alert-settings | jq '{muted_items, muted_stores}'
 milk 2026-11-03 3.10 Bread                                                   # store muted: none (still 2)
-$G api DELETE /api/stores/$store/mute
+$G api POST /api/items/$bread/mute                                           # pa.app-settings: unmute both by the listed ids
+s=$($G api GET /api/items/price-alert-settings)
+$G api DELETE /api/stores/$(echo "$s" | jq -r '.muted_stores[0].id')/mute; $G api DELETE /api/items/$(echo "$s" | jq -r '.muted_items[0].id')/mute
+$G api GET /api/items/price-alert-settings | jq -c '{muted_items, muted_stores}'   # both []
+$G api PUT /api/items/price-alert-settings '{"enabled":false}' | jq -c '{enabled, threshold_percent}'   # false, 10
+$G api PUT /api/items/price-alert-settings '{"enabled":true}' > /dev/null
 milk 2026-11-01 5.00 Butter; milk 2026-11-02 5.00 Butter
 milk 2026-11-03 8.00 Butter & milk 2026-11-03 8.00 Butter & wait            # pa.concurrent
 $G sql "SELECT title FROM notifications WHERE type='price_change' ORDER BY created_at"  # Milk, Eggs, Butter once
@@ -65,4 +75,4 @@ $G api DELETE /api/stores/$store/mute                                        # 2
 - Muting checks happen before the cooldown is claimed, so a muted change does not use up the cooldown.
 - The mock scan's items carry `unit_of_measure`; manual entries carry none. The average compares like with like, so a scanned per-lb price and a manual unitless price of the same item are separate series.
 - Pushes go through the existing pipeline (`deliver_pending_pushes`), which needs a Celery worker and an Expo token; the journey checks the notification rows. `backend/tests/tasks/test_push_tasks.py::test_a_price_change_push_opens_its_item` covers the push payload.
-- Verified 2026-11-03 against Postgres 16 (run `20261103-181419`, after the unmute fix).
+- Verified 2026-11-03 against Postgres 16 (run `20261103-181419`, after the unmute fix); `pa.app-tap` and `pa.app-settings` with the app's calls in run `20261103-183706`.

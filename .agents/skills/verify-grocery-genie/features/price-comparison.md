@@ -12,7 +12,7 @@ An item's price at each store the user has bought it from, side by side (PI-04):
 
 ## How to get to it (user POV)
 
-Budget tab → Price history (Prices list) → an item → the store comparison. The screen is the mobile task (PI-04 AC 4); until it ships, the API is the only way in.
+Budget tab → Price history (Prices list) → an item → Compare stores (PI-04 AC 4, `mobile/src/features/price-intelligence/components/StoreComparison.tsx`): each store's average and latest price, the cheapest named, and a line counting `stores_below_minimum`. The section is UI-only: check it on a simulator.
 
 ## Driving it with gg-verify
 
@@ -45,4 +45,4 @@ $G signup compare-third && $G api GET /api/items/$iid/compare                   
 - `signup` switches every later call to the new user, so the other user's Costco prices go in first.
 - Stores are shared rows matched by name; the `sql` check groups every user's observations, Costco included, which is the point: it is in the database but not in this user's comparison.
 - The last call answers 404, so `$G api` exits non-zero there: that is the pass.
-- Verified 2026-11-03 against Postgres 16 in debug mode (run `20261103-151240`).
+- Verified 2026-11-03 against Postgres 16 in debug mode (run `20261103-151240`; again with the app's screen built, run `20261103-183706`).
