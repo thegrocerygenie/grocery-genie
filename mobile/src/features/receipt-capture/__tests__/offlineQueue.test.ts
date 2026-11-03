@@ -98,6 +98,17 @@ describe('isQuotaExceededError', () => {
     expect(isQuotaExceededError(new ApiError(429, { detail: QUOTA_DETAIL }))).toBe(true);
   });
 
+  it('spots the quota by its code, whatever the detail says', () => {
+    const error = new ApiError(429, {
+      detail: 'Limit reached.',
+      code: 'receipt_quota_exceeded',
+      feature: 'unlimited_receipts',
+      limit: 20,
+    });
+    expect(isQuotaExceededError(error)).toBe(true);
+    expect(isRetryableScanError(error)).toBe(false);
+  });
+
   it.each([
     ['the rate limit', new ApiError(429, { detail: RATE_LIMIT_DETAIL })],
     ['a 429 with no detail', new ApiError(429, null)],

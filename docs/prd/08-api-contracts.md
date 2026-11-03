@@ -221,7 +221,13 @@ The profile (`/api/auth/me`, `/api/users/me`, and every route that returns it) c
 ```
 `premium_expires_at` is the end of the paid period (null for a free user, or a grant with no end). A user is Premium while the entitlement is active and before that time, so a missed expiration webhook cannot keep anyone Premium. `PATCH /api/users/me` cannot set either field.
 
-**Unlimited receipts.** `POST /api/receipts/scan` refuses a free user's scan past `GG_FREE_TIER_RECEIPTS_PER_MONTH` (20) receipts in the month with `429`; a Premium user has no monthly cap (the hourly rate limit still applies).
+**Unlimited receipts.** `POST /api/receipts/scan` refuses a free user's scan past `GG_FREE_TIER_RECEIPTS_PER_MONTH` (20) receipts in the month with `429`; a Premium user has no monthly cap (the hourly rate limit still applies). Manual entries count toward the 20, but `POST /api/receipts` is never refused by the cap. The body:
+```json
+{ "detail": "Monthly receipt quota exceeded (20 receipts/month on Free tier).", "code": "receipt_quota_exceeded", "feature": "unlimited_receipts", "limit": 20 }
+```
+`code` is the stable test; the hourly rate limit's `429` has none. It is not `403 premium_required`, because the scan itself is a free feature: the month's allowance is spent. `detail` stays a string because app builds from before V1.1 match it ("quota") and must keep treating the cap as final, not retrying it. The app answers it with the upgrade prompt (See Premium opens the paywall, or Enter manually), never an error (D2).
+
+Everything else in price intelligence stays free (D2): price history, item matching, price alerts and cross-store comparison answer a free user `200`.
 
 ### POST /api/webhooks/revenuecat
 

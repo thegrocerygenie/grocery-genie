@@ -12,7 +12,11 @@ import { useAuthStore } from '@/store/authStore';
 import { useOfflineStore } from '@/store/offlineStore';
 import { fakeAccessToken } from '@/testing/jwt';
 import type { ReceiptResponse } from '@/features/receipt-capture/types';
-import { QUOTA_MESSAGE } from '@/features/receipt-capture/utils/scanQuota';
+import {
+  QUOTA_ACTIONS,
+  QUOTA_MESSAGE,
+  QUOTA_TITLE,
+} from '@/features/receipt-capture/utils/scanQuota';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('@/features/ai-consent/hooks/useAiConsent', () =>
@@ -90,6 +94,7 @@ function renderHistory() {
       index: () => null,
       history: HistoryScreen,
       'manual-entry': () => null,
+      paywall: () => null,
     },
     { initialUrl: '/' },
   );
@@ -213,8 +218,29 @@ describe('History offline queue', () => {
 
     expect(screen.queryByText('Couldn’t read this photo')).toBeNull();
     fireEvent.press(screen.getByText('Monthly scan limit reached'));
-    expect(alert.mock.calls[0][0]).toBe('Monthly scan limit reached');
+    expect(alert.mock.calls[0][0]).toBe(QUOTA_TITLE);
     expect(alert.mock.calls[0][1]).toBe(QUOTA_MESSAGE);
+  });
+
+  it('offers Premium for a photo over the monthly quota, and keeps the photo (D2)', () => {
+    queue();
+    const id = useOfflineStore.getState().pendingReceipts[0].id;
+    useOfflineStore.getState().markFailed(id, 'quota');
+    const alert = jest.spyOn(Alert, 'alert');
+    const routerScreen = renderHistory();
+
+    fireEvent.press(screen.getByText('Monthly scan limit reached'));
+    const buttons = alert.mock.calls[0][2]!;
+    expect(buttons.map((b) => b.text)).toEqual([
+      QUOTA_ACTIONS.upgrade,
+      QUOTA_ACTIONS.manual,
+      'Discard',
+      QUOTA_ACTIONS.dismiss,
+    ]);
+    act(() => buttons.find((b) => b.text === QUOTA_ACTIONS.upgrade)!.onPress!());
+
+    expect(routerScreen.getPathname()).toBe('/paywall');
+    expect(useOfflineStore.getState().pendingReceipts).toHaveLength(1);
   });
 
   it('lets the user enter a failed photo by hand', () => {

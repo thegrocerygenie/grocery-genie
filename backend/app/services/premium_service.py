@@ -191,7 +191,16 @@ class PremiumService:
             return IGNORED, user.id
         last = _utc(user.premium_updated_at)
         if last is not None and at < last:
-            if kind in GRANT_TYPES and await self._last_change_kept_access(user, last):
+            newer_expiry = _utc(user.premium_expires_at)
+            # A newer event that left no expiry (a cancellation without
+            # expiration_at_ms) gives the late grant no end: a refund of a
+            # non-renewing purchase looks just like that. Grant nothing rather
+            # than Premium with no expiry; the next webhook or refresh settles it.
+            if (
+                kind in GRANT_TYPES
+                and newer_expiry is not None
+                and await self._last_change_kept_access(user, last)
+            ):
                 # The grant came after the cancellation that followed it. The
                 # newer event's expiry stands: a refund's is past, so a
                 # refunded purchase still grants nothing.
@@ -199,7 +208,7 @@ class PremiumService:
                     user,
                     PremiumState(
                         active=True,
-                        expires_at=_utc(user.premium_expires_at),
+                        expires_at=newer_expiry,
                         product_id=user.premium_product_id or event.product_id,
                     ),
                     last,
@@ -215,9 +224,14 @@ class PremiumService:
                 active=True, expires_at=expires, product_id=event.product_id
             )
         elif kind in EXPIRY_ONLY_TYPES:
+            kept = expires if expires is not None else _utc(user.premium_expires_at)
             state = PremiumState(
-                active=user.premium_active,
-                expires_at=expires if expires is not None else user.premium_expires_at,
+                # A cancellation of a grant with no expiry (a non-renewing
+                # purchase, which only a refund cancels) leaves nothing to run
+                # out, so it ends access now rather than never.
+                active=user.premium_active
+                and not (kind == "CANCELLATION" and kept is None),
+                expires_at=kept,
                 product_id=event.product_id or user.premium_product_id,
             )
         else:

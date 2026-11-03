@@ -284,6 +284,60 @@ async def test_refund_before_its_purchase_keeps_the_user_free(client):
 
 
 @pytest.mark.asyncio
+async def test_cancellation_without_expiry_before_its_purchase_grants_no_open_premium(
+    client,
+):
+    """A CANCELLATION with no expiration_at_ms leaves no expiry to keep. The
+    late purchase must not then turn Premium on with no expiry at all."""
+    now = datetime.now(UTC)
+    await _post(
+        client,
+        _event("CANCELLATION", at=now + timedelta(seconds=5), expiration_at_ms=None),
+    )
+    resp = await _post(client, _event("INITIAL_PURCHASE", at=now))
+    assert resp.json() == {"status": "stale"}
+    me = await _me(client)
+    assert me["is_premium"] is False
+
+
+@pytest.mark.asyncio
+async def test_refunded_non_renewing_purchase_arriving_late_grants_nothing(client):
+    """A non-renewing purchase has no expiry; its refund CANCELLATION may carry
+    none either. Delivered refund first, the purchase must not grant Premium."""
+    now = datetime.now(UTC)
+    await _post(
+        client,
+        _event(
+            "CANCELLATION",
+            at=now + timedelta(seconds=5),
+            expiration_at_ms=None,
+            cancel_reason="CUSTOMER_SUPPORT",
+        ),
+    )
+    await _post(client, _event("NON_RENEWING_PURCHASE", at=now, expiration_at_ms=None))
+    assert (await _me(client))["is_premium"] is False
+
+
+@pytest.mark.asyncio
+async def test_refund_of_a_non_renewing_purchase_ends_premium(client):
+    """In order: a non-renewing purchase (no expiry), then its refund
+    CANCELLATION with no expiry. Nothing is left to run out, so access ends."""
+    now = datetime.now(UTC)
+    await _post(client, _event("NON_RENEWING_PURCHASE", at=now, expiration_at_ms=None))
+    assert (await _me(client))["is_premium"] is True
+    await _post(
+        client,
+        _event(
+            "CANCELLATION",
+            at=now + timedelta(seconds=5),
+            expiration_at_ms=None,
+            cancel_reason="CUSTOMER_SUPPORT",
+        ),
+    )
+    assert (await _me(client))["is_premium"] is False
+
+
+@pytest.mark.asyncio
 async def test_purchase_before_a_newer_refresh_stays_stale(client, fake_revenuecat):
     """A refresh reads RevenueCat's whole state, so an older event changes
     nothing after it, even when the last webhook was a cancellation."""

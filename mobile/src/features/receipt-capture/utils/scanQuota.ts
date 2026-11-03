@@ -1,19 +1,66 @@
+import { Alert, type AlertButton } from 'react-native';
+
 import { ApiError } from '@/services/api';
 
-/** Short form for the camera's hint pill. */
+/** Short form for the camera's hint pill and a queued row. */
 export const QUOTA_HINT = 'Monthly scan limit reached';
 
-/** Full form for an alert or a queued row. */
+/** Title of the upgrade prompt: an invitation, never an error (D2). */
+export const QUOTA_TITLE = 'You’ve used this month’s free scans';
+
+/** Full form for the upgrade prompt or a queued row. */
 export const QUOTA_MESSAGE =
-  'You’ve reached this month’s receipt scan limit. You can still add this receipt with manual entry.';
+  'Premium has unlimited receipts. You can still add this receipt with manual entry.';
+
+export const QUOTA_ACTIONS = {
+  upgrade: 'See Premium',
+  manual: 'Enter manually',
+  discard: 'Discard',
+  dismiss: 'Cancel',
+} as const;
+
+/** The backend's stable code for the cap (app/core/entitlements.py). */
+const QUOTA_CODE = 'receipt_quota_exceeded';
 
 /**
  * True for the backend's monthly receipt quota (app/api/routes/receipts.py).
  * The hourly rate limit (app/core/rate_limit.py) is also a 429, but it clears
- * within the hour, so it stays retryable; only the detail tells them apart.
+ * within the hour, so it stays retryable. The quota carries
+ * `code: "receipt_quota_exceeded"`; its `detail` string, which servers before
+ * that code also sent, says "quota".
  */
 export function isQuotaExceededError(error: unknown): boolean {
   if (!(error instanceof ApiError) || error.status !== 429) return false;
-  const detail = (error.data as { detail?: unknown } | null)?.detail;
-  return typeof detail === 'string' && /quota/i.test(detail);
+  const body = error.data as { detail?: unknown; code?: unknown } | null;
+  if (body?.code === QUOTA_CODE) return true;
+  return typeof body?.detail === 'string' && /quota/i.test(body.detail);
+}
+
+interface QuotaPromptActions {
+  /** Opens the paywall (`/paywall`). */
+  onUpgrade: () => void;
+  /** Opens manual entry (`/manual-entry`), which the cap does not block. */
+  onManualEntry: () => void;
+  /** Drops the photo; offered only for a queued one. */
+  onDiscard?: () => void;
+}
+
+/**
+ * D2: a free user at the monthly cap is invited to Premium, which lifts it,
+ * with manual entry as the way to add this receipt now.
+ */
+export function showQuotaUpgradePrompt({
+  onUpgrade,
+  onManualEntry,
+  onDiscard,
+}: QuotaPromptActions): void {
+  const buttons: AlertButton[] = [
+    { text: QUOTA_ACTIONS.upgrade, onPress: onUpgrade, isPreferred: true },
+    { text: QUOTA_ACTIONS.manual, onPress: onManualEntry },
+  ];
+  if (onDiscard) {
+    buttons.push({ text: QUOTA_ACTIONS.discard, style: 'destructive', onPress: onDiscard });
+  }
+  buttons.push({ text: QUOTA_ACTIONS.dismiss, style: 'cancel' });
+  Alert.alert(QUOTA_TITLE, QUOTA_MESSAGE, buttons);
 }

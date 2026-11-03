@@ -34,7 +34,7 @@ import { useReceipts } from '@/features/receipt-capture/hooks/useReceipts';
 import { useCategories } from '@/features/budget/hooks/useCategories';
 import { useDeleteReceipt } from '@/features/lifecycle/hooks/useLifecycle';
 import type { ReceiptResponse } from '@/features/receipt-capture/types';
-import { QUOTA_HINT, QUOTA_MESSAGE } from '@/features/receipt-capture/utils/scanQuota';
+import { showQuotaUpgradePrompt } from '@/features/receipt-capture/utils/scanQuota';
 import type { CategoryResponse } from '@/features/budget/types';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useSyncNow } from '@/hooks/useSyncQueue';
@@ -300,24 +300,33 @@ export default function HistoryScreen() {
   };
 
   const onPressFailed = (receipt: PendingReceipt) => {
-    const [title, message] =
-      receipt.failure === 'quota'
-        ? [QUOTA_HINT, QUOTA_MESSAGE]
-        : [
-            'Couldn’t read this receipt',
-            'The photo may be blurry or not a receipt. Enter it by hand or discard the photo.',
-          ];
-    Alert.alert(title, message, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Enter manually',
-        onPress: () => {
+    if (receipt.failure === 'quota') {
+      // D2: invite the upgrade; the photo stays until the user drops it.
+      showQuotaUpgradePrompt({
+        onUpgrade: () => router.push('/paywall'),
+        onManualEntry: () => {
           dropPending(receipt);
           router.push('/manual-entry');
         },
-      },
-      { text: 'Discard', style: 'destructive', onPress: () => dropPending(receipt) },
-    ]);
+        onDiscard: () => dropPending(receipt),
+      });
+      return;
+    }
+    Alert.alert(
+      'Couldn’t read this receipt',
+      'The photo may be blurry or not a receipt. Enter it by hand or discard the photo.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Enter manually',
+          onPress: () => {
+            dropPending(receipt);
+            router.push('/manual-entry');
+          },
+        },
+        { text: 'Discard', style: 'destructive', onPress: () => dropPending(receipt) },
+      ],
+    );
   };
 
   const onDelete = (id: string, label: string) =>
