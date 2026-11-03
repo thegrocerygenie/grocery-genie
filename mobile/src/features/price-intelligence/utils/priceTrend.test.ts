@@ -87,6 +87,18 @@ describe('chartGeometry (PI-01 AC 2)', () => {
     ]);
   });
 
+  it('spaces dates by calendar day across a DST change', () => {
+    // jest.globalSetup.js runs the suite in America/New_York, where clocks
+    // spring forward on 2026-03-08 and that local day is 23 hours long.
+    const geo = chartGeometry(
+      [point('2026-03-06', 1), point('2026-03-08', 3), point('2026-03-10', 2)],
+      220,
+      120,
+      10,
+    );
+    expect(geo.points.map((p) => p.x)).toEqual([10, 110, 210]);
+  });
+
   it('centres a flat price and spreads same-day prices evenly', () => {
     const geo = chartGeometry([point('2026-03-01', 2), point('2026-03-01', 2)], 220, 120, 10);
     expect(geo.points.map((p) => [p.x, p.y])).toEqual([
