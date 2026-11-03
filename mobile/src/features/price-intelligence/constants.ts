@@ -58,4 +58,50 @@ export const PRICES_COPY = {
 
   chartLabel: (count: number, low: string, high: string, latest: string) =>
     `Price chart, ${count} prices from ${low} to ${high}, latest ${latest}`,
+
+  // PI-04 AC 4: store comparison on item detail.
+  compareHeader: 'Compare stores',
+  cheapest: 'Cheapest',
+  average: 'average',
+  compareLatest: (price: string, date: string) => `Latest ${price} · ${date}`,
+  compareRowLabel: (
+    store: string,
+    cheapest: boolean,
+    average: string,
+    latest: string,
+    date: string,
+  ) => `${store}${cheapest ? ', cheapest' : ''}, average ${average}, latest ${latest} on ${date}`,
+  compareEmpty: (min: number) => `Buy it ${min} times at a store to compare that store’s price.`,
+  compareBelowMinimum: (count: number, min: number) =>
+    `${count} more ${count === 1 ? 'store needs' : 'stores need'} ${min} prices of this item to compare.`,
+
+  // PI-03 AC 4: mute price alerts for the item, or at a store.
+  alertsHeader: 'Price alerts',
+  alertsItem: 'This item',
+  alertsItemLabel: (name: string) => `Price alerts for ${name}`,
+  alertsStore: (store: string) => `At ${store}`,
+  alertsStoreLabel: (store: string) => `Price alerts at ${store}`,
+  alertsFooter: (threshold: number, days: number) =>
+    `You get an alert when a price moves ${threshold}% or more from your 30-day average, at most once every ${days} days.`,
+  alertsOff: 'Price alerts are off. Turn them on in Settings → Alerts.',
 } as const;
+
+/** Settings → Alerts: price change alerts (PI-03 settings). */
+export const PRICE_ALERT_SETTINGS_COPY = {
+  header: 'PRICE ALERTS',
+  enabled: 'Price change alerts',
+  threshold: 'Alert when a price changes by',
+  thresholdOption: (percent: number, isDefault: boolean) =>
+    isDefault ? `${percent}% (default)` : `${percent}%`,
+  footer: (days: number) =>
+    `Compared with your 30-day average for the item, up or down. At most one alert per item every ${days} days.`,
+  mutedHeader: 'MUTED PRICE ALERTS',
+  mutedFooter: 'Mute an item or a store from the item’s price history.',
+  unmute: 'Unmute',
+  unmuteLabel: (name: string) => `Unmute ${name}`,
+  store: 'Store',
+  item: 'Item',
+} as const;
+
+/** The threshold choices; the default and the user's own are always added. */
+export const PRICE_ALERT_THRESHOLDS = [5, 10, 15, 20, 25, 30, 50] as const;

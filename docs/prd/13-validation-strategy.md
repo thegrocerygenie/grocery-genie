@@ -206,7 +206,7 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-06 | 3 | Chosen day, 9 AM local time | Integration | `backend/tests/tasks/test_summary_tasks.py::test_recipients_only_on_users_chosen_day` | Pass |
 | BC-06 | 4 | Links to full dashboard | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "falls back to the dashboard when the route is missing" | Pass |
 
-V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, its app screens (alert tap, mute buttons, threshold setting) come with V11-02. PI-04 (cross-store comparison) has its backend; its screen (AC 4) is the mobile task.
+V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04. `PREM` rows are the Premium tier (V11-P0, decisions D1 and D2: `PHASE_SCOPE.md`), which has no user story ID.
 
 | Story | AC | Criterion | Type | Test | Status |
 |---|---|---|---|---|---|
@@ -249,6 +249,18 @@ V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02; PI-03
 | PI-03 | 4 | Mutable per item: another user's item is 404 to mute and unmute | Integration | `backend/tests/api/test_price_alerts.py::test_another_users_item_cannot_be_muted_or_unmuted` | Pass |
 | PI-03 | FR | Only a confirm alerts; editing a confirmed receipt sends none | Integration | `backend/tests/api/test_price_alerts.py::test_editing_a_confirmed_receipt_never_sends_a_price_alert` | Pass |
 | PI-03 | FR | A price alert failure never fails the confirm or the budget alert | Integration | `backend/tests/api/test_price_alerts.py::test_a_price_alert_failure_never_fails_the_confirm` | Pass |
+| PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "opens the item named in a price change alert (PI-03)" | Pass |
+| PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "opens a price change item from its id even when the url says otherwise" | Pass |
+| PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "never builds a route from a malformed price change item id" | Pass |
+| PI-03 | 4 | Mutable per item (app) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "mutes price alerts for the item" | Pass |
+| PI-03 | 4 | Mutable per item (app) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "unmutes an item whose price alerts are muted" | Pass |
+| PI-03 | 4 | Mutable per item (app): a failed save puts the switch back | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "puts the switch back and says so when a mute fails" | Pass |
+| PI-03 | 4 | Mutable per store (app) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "mutes and unmutes price alerts at each store the item was bought from" | Pass |
+| PI-03 | 4 | Mutable per item or per store (app, from Settings) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "unmutes a muted item and a muted store" | Pass |
+| PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "sets the price change threshold" | Pass |
+| PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "goes back to the default threshold" | Pass |
+| PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "turns price change alerts off" | Pass |
+| PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "says what size of change sends an alert, and when alerts are off" | Pass |
 | PI-04 | 1 | Side-by-side pricing across all stores with prices | Integration | `backend/tests/api/test_price_comparison.py::test_side_by_side_latest_and_average_per_store` | Pass |
 | PI-04 | 1 | Side-by-side pricing across all stores with prices | Integration | `backend/tests/api/test_price_comparison.py::test_stores_are_cheapest_first_by_average` | Pass |
 | PI-04 | 2 | Most recent and average price per store | Integration | `backend/tests/api/test_price_comparison.py::test_side_by_side_latest_and_average_per_store` | Pass |
@@ -259,13 +271,91 @@ V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02; PI-03
 | PI-04 | 3 | Only stores the user has scanned from | Integration | `backend/tests/api/test_price_comparison.py::test_comparison_is_private_and_unknown_items_are_404` | Pass |
 | PI-04 | FR | Minimum 2 observations per store per item | Integration | `backend/tests/api/test_price_comparison.py::test_a_store_needs_two_prices_to_be_compared` | Pass |
 | PI-04 | FR | Minimum 2 observations per store per item | Integration | `backend/tests/api/test_price_comparison.py::test_one_price_anywhere_compares_nothing` | Pass |
-| PI-04 | 4 | From item detail or a comparison screen | Component | Mobile task, not built yet (it reads `GET /api/items/{id}/compare`) | Pending |
+| PI-04 | 4 | From item detail or a comparison screen | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "shows the latest and average price at each store, cheapest first (AC 4)" | Pass |
+| PI-04 | 4 | From item detail or a comparison screen | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "says how many stores need more prices before they compare" | Pass |
+| PI-04 | 4 | From item detail or a comparison screen | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "explains an empty comparison when no store has enough prices yet" | Pass |
 | BC-FR | Trends | 12-month trend (V1.1), Premium per D2 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_for_premium` | Pass |
 | BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_premium_user_still_gets_3_months_by_default` | Pass |
 | BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_trend_is_3_months_with_months_3` | Pass |
 | BC-FR | Trends | `months` other than 3 or 12 is a 422 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_rejects_months_other_than_3_or_12` | Pass |
 | BC-FR | Trends | Free user asking for 12 months gets `403 premium_required` | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_needs_premium` | Pass |
-| BC-FR | Trends | Nobody is Premium until V11-P0 | Unit | `backend/tests/core/test_entitlements.py::test_nobody_is_premium_until_the_premium_tier_ships` | Pass |
+| PREM | D1 | Premium: entitlement from RevenueCat only, checked with its expiry | Unit | `backend/tests/core/test_entitlements.py::test_a_user_with_no_entitlement_is_free` | Pass |
+| PREM | D1 | Premium: entitlement from RevenueCat only, checked with its expiry | Unit | `backend/tests/core/test_entitlements.py::test_an_active_entitlement_before_its_expiry_is_premium` | Pass |
+| PREM | D1 | Premium: entitlement from RevenueCat only, checked with its expiry | Unit | `backend/tests/core/test_entitlements.py::test_an_entitlement_past_its_expiry_is_free` | Pass |
+| PREM | D1 | Premium: entitlement from RevenueCat only, checked with its expiry | Unit | `backend/tests/core/test_entitlements.py::test_an_inactive_entitlement_is_free_even_before_expiry` | Pass |
+| PREM | D1 | Premium: entitlement from RevenueCat only, checked with its expiry | Unit | `backend/tests/core/test_entitlements.py::test_an_active_entitlement_without_expiry_is_premium` | Pass |
+| PREM | D1 | Premium: `require_premium` gives `403 premium_required` to a free user | Unit | `backend/tests/core/test_entitlements.py::test_require_premium_refuses_a_free_user_with_premium_required` | Pass |
+| PREM | D1 | Premium: `require_premium` gives `403 premium_required` to a free user | Unit | `backend/tests/core/test_entitlements.py::test_require_premium_lets_a_premium_user_through` | Pass |
+| PREM | D1 | Premium: webhook grant, renew, cancel, expire | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_initial_purchase_makes_the_user_premium` | Pass |
+| PREM | D1 | Premium: webhook grant, renew, cancel, expire | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_renewal_moves_the_expiry` | Pass |
+| PREM | D1 | Premium: webhook grant, renew, cancel, expire | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_cancellation_keeps_premium_until_the_period_ends` | Pass |
+| PREM | D1 | Premium: webhook grant, renew, cancel, expire | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refund_cancellation_ends_premium_now` | Pass |
+| PREM | D1 | Premium: webhook grant, renew, cancel, expire | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_expiration_ends_premium` | Pass |
+| PREM | D1 | Premium: webhook grant, renew, cancel, expire | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_premium_lapses_at_expiry_without_an_expiration_event` | Pass |
+| PREM | D1 | Premium: webhook grant, renew, cancel, expire | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_uncancellation_restores_premium` | Pass |
+| PREM | D1 | Premium: webhook grant, renew, cancel, expire | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_transfer_revokes_premium_from_the_old_user` | Pass |
+| PREM | D1 | Premium: webhook grant, renew, cancel, expire | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_transfer_refreshes_the_new_user_from_the_rest_api` | Pass |
+| PREM | D1 | Premium: webhook idempotent on event id; late events ignored | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_replayed_event_id_is_a_no_op` | Pass |
+| PREM | D1 | Premium: webhook idempotent on event id; late events ignored | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_an_older_event_arriving_late_changes_nothing` | Pass |
+| PREM | D1 | Premium: webhook idempotent on event id; late events ignored | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_cancellation_before_its_purchase_still_grants_premium` | Pass |
+| PREM | D1 | Premium: webhook idempotent on event id; late events ignored | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refund_before_its_purchase_keeps_the_user_free` | Pass |
+| PREM | D1 | Premium: webhook idempotent on event id; late events ignored | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_purchase_before_a_newer_refresh_stays_stale` | Pass |
+| PREM | D1 | Premium: webhook idempotent on event id; late events ignored | Integration (Postgres) | `backend/tests/services/test_premium_service.py::test_two_concurrent_deliveries_of_one_event_apply_once` | Pass |
+| PREM | D1 | Premium: webhook needs the shared secret; the app cannot grant itself Premium | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_bad_secret_is_rejected` | Pass |
+| PREM | D1 | Premium: webhook needs the shared secret; the app cannot grant itself Premium | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_missing_authorization_is_rejected` | Pass |
+| PREM | D1 | Premium: webhook needs the shared secret; the app cannot grant itself Premium | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_secret_without_bearer_prefix_is_accepted` | Pass |
+| PREM | D1 | Premium: webhook needs the shared secret; the app cannot grant itself Premium | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_webhook_is_closed_when_no_secret_is_configured` | Pass |
+| PREM | D1 | Premium: webhook needs the shared secret; the app cannot grant itself Premium | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_app_cannot_make_itself_premium` | Pass |
+| PREM | D1 | Premium: events for other users, entitlements or types change nothing | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_unknown_app_user_is_acknowledged_and_ignored` | Pass |
+| PREM | D1 | Premium: events for other users, entitlements or types change nothing | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_anonymous_app_user_id_resolves_through_aliases` | Pass |
+| PREM | D1 | Premium: events for other users, entitlements or types change nothing | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_other_entitlement_is_ignored` | Pass |
+| PREM | D1 | Premium: events for other users, entitlements or types change nothing | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_test_event_is_acknowledged` | Pass |
+| PREM | D1 | Premium: events for other users, entitlements or types change nothing | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_malformed_body_is_422` | Pass |
+| PREM | D1 | Premium: `is_premium` on the profile | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_free_user_is_not_premium` | Pass |
+| PREM | D1 | Premium: `is_premium` on the profile | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_auth_me_carries_premium_too` | Pass |
+| PREM | D1 | Premium: refresh from the RevenueCat REST API, never the app | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refresh_reads_revenuecat_not_the_app` | Pass |
+| PREM | D1 | Premium: refresh from the RevenueCat REST API, never the app | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refresh_revokes_when_revenuecat_says_inactive` | Pass |
+| PREM | D1 | Premium: refresh from the RevenueCat REST API, never the app | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refresh_when_revenuecat_is_down_keeps_the_stored_state` | Pass |
+| PREM | D1 | Premium: refresh from the RevenueCat REST API, never the app | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refresh_without_an_api_key_is_503` | Pass |
+| PREM | D1 | Premium: refresh from the RevenueCat REST API, never the app | Unit | `backend/tests/services/test_premium_service.py::test_refresh_does_not_overwrite_a_newer_webhook` | Pass |
+| PREM | D1 | Premium: refresh from the RevenueCat REST API, never the app | Unit | `backend/tests/services/test_premium_service.py::test_refresh_is_stamped_with_the_read_time` | Pass |
+| PREM | D1 | Premium: refresh from the RevenueCat REST API, never the app | Unit | `backend/tests/services/test_premium_service.py::test_refresh_without_a_read_time_uses_the_time_before_the_read` | Pass |
+| PREM | D1 | Premium: refresh is rate limited per user (10/minute) | Unit | `backend/tests/core/test_rate_limit_tiers.py::test_premium_refreshes_past_the_per_minute_limit_get_429` | Pass |
+| PREM | D1 | Premium: refresh is rate limited per user (10/minute) | Unit | `backend/tests/core/test_rate_limit_tiers.py::test_reads_do_not_use_the_refresh_allowance` | Pass |
+| PREM | D1 | Premium: RevenueCat REST client reads the subscriber | Unit | `backend/tests/services/test_revenuecat_client.py::test_active_entitlement_is_read_with_the_secret_key` | Pass |
+| PREM | D1 | Premium: RevenueCat REST client reads the subscriber | Unit | `backend/tests/services/test_revenuecat_client.py::test_expired_or_missing_entitlement_is_inactive` | Pass |
+| PREM | D1 | Premium: RevenueCat REST client reads the subscriber | Unit | `backend/tests/services/test_revenuecat_client.py::test_grace_period_keeps_the_entitlement` | Pass |
+| PREM | D1 | Premium: RevenueCat REST client reads the subscriber | Unit | `backend/tests/services/test_revenuecat_client.py::test_lifetime_entitlement_has_no_expiry` | Pass |
+| PREM | D1 | Premium: RevenueCat REST client reads the subscriber | Unit | `backend/tests/services/test_revenuecat_client.py::test_errors_raise_unavailable` | Pass |
+| PREM | D1 | Premium: RevenueCat REST client reads the subscriber | Unit | `backend/tests/services/test_revenuecat_client.py::test_read_time_is_revenuecats_request_date` | Pass |
+| PREM | D1 | Premium: RevenueCat REST client reads the subscriber | Unit | `backend/tests/services/test_revenuecat_client.py::test_no_api_key_means_no_client` | Pass |
+| PREM | D1 | Premium unlocks the 12-month trend (D2) | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_premium_unlocks_the_12_month_trend` | Pass |
+| PREM | D1 | Premium unlocks unlimited receipts (D2) | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_premium_user_scans_past_the_free_quota` | Pass |
+| PREM | D1 | Premium status changes are tracked (`premium_status_changed`) | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_status_change_emits_analytics` | Pass |
+| PREM | D1 | Account deletion erases the RevenueCat ledger rows | Integration | `backend/tests/api/test_account_deletion.py::test_delete_account_erases_every_row_and_image` | Pass |
+| PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "shows what Premium unlocks and the App Store price" | Pass |
+| PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "subscribing asks the backend and shows Premium once it says so" | Pass |
+| PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "a purchase the backend has not seen yet says Premium is on its way, not active" | Pass |
+| PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "a cancelled purchase shows nothing alarming" | Pass |
+| PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "a failed purchase says so inline" | Pass |
+| PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "restore purchases asks the backend and shows Premium" | Pass |
+| PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "restore with no subscription on the Apple ID says so" | Pass |
+| PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "restore when the backend cannot check (503) shows an error, not the no-subscription message" | Pass |
+| PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "the price reads as a monthly price to VoiceOver" | Pass |
+| PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "a Premium user sees the plan and a way to manage it, not a purchase button" | Pass |
+| PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "in Expo Go it explains purchases need the App Store build" | Pass |
+| PREM | D1 | Paywall: price and benefits; subscribe and restore | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "when the offer cannot load it offers a retry" | Pass |
+| PREM | D1 | RevenueCat SDK guarded outside the dev build; logs in as the user | Component | `mobile/src/features/premium/__tests__/purchases.test.ts` "is unavailable in Expo Go, which has no native module" | Pass |
+| PREM | D1 | RevenueCat SDK guarded outside the dev build; logs in as the user | Component | `mobile/src/features/premium/__tests__/purchases.test.ts` "is unavailable without the RevenueCat SDK key" | Pass |
+| PREM | D1 | RevenueCat SDK guarded outside the dev build; logs in as the user | Component | `mobile/src/features/premium/__tests__/purchases.test.ts` "configures RevenueCat with the Grocery Genie user id and reads the monthly price" | Pass |
+| PREM | D1 | RevenueCat SDK guarded outside the dev build; logs in as the user | Component | `mobile/src/features/premium/__tests__/purchases.test.ts` "logs in again when another user opens the paywall" | Pass |
+| PREM | D1 | RevenueCat SDK guarded outside the dev build; logs in as the user | Component | `mobile/src/features/premium/__tests__/purchases.test.ts` "reports a cancelled purchase as cancelled, not failed" | Pass |
+| PREM | D1 | RevenueCat SDK guarded outside the dev build; logs in as the user | Component | `mobile/src/features/premium/__tests__/purchases.test.ts` "restores purchases for the signed-in user" | Pass |
+| PREM | D1 | Settings → Premium row, from the backend `is_premium` | Component | `mobile/src/__tests__/settingsHub.test.tsx` "a free user sees the free plan and a Premium row that opens the paywall (V11-P0)" | Pass |
+| PREM | D1 | Settings → Premium row, from the backend `is_premium` | Component | `mobile/src/__tests__/settingsHub.test.tsx` "a Premium user sees Premium, from the backend profile" | Pass |
+| PREM | D1 | Upgrade prompt opens the paywall (D2) | Component | `mobile/src/__tests__/trendMonths.test.tsx` "the upgrade prompt opens the Premium paywall (V11-P0)" | Pass |
+| PREM | D1 | Deleting the account says the subscription is not cancelled | Component | `mobile/src/__tests__/deleteAccountScreen.test.tsx` "says a Premium subscription is not cancelled by deleting (V11-P0)" | Pass |
+| PREM | D1 | Sandbox purchase and restore on a device | Manual | `docs/DEPLOYMENT.md` 2.9 step 6 (needs the RevenueCat keys and App Store product) | Pending |
 | BC-04 | 5 | 12-month dashboard loads within 2 seconds | Integration | `backend/tests/api/test_p95_postgres.py::test_dashboard_12_month_trend_p95_under_2s` (Postgres) | Pass |
 | BC-FR | Trends | 3/12-month toggle on Trend; 3 stays the default | Component | `mobile/src/__tests__/trendMonths.test.tsx` "shows 3 months by default and asks the server for 3" | Pass |
 | BC-FR | Trends | 3/12-month toggle on Trend; 12 months charts every month | Component | `mobile/src/__tests__/trendMonths.test.tsx` "switching to 12 months asks the server for 12 and charts every month" | Pass |

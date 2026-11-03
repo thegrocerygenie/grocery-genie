@@ -114,6 +114,10 @@ export default function RootLayout() {
                 name="recently-deleted"
                 options={{ title: 'Recently Deleted', presentation: 'modal' }}
               />
+              <Stack.Screen
+                name="paywall"
+                options={{ title: 'Premium', presentation: 'modal' }}
+              />
             </Stack>
           </OnboardingGate>
         </QueryClientProvider>

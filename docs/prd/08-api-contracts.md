@@ -144,7 +144,7 @@ The 12-month trend is Premium (decision D2). A free user asking for `months=12` 
 { "detail": { "code": "premium_required", "feature": "trend_12_months", "message": "This feature is part of Grocery Genie Premium." } }
 ```
 
-`code: "premium_required"` is the stable error for every Premium-only feature; `feature` names which one. The check lives in `backend/app/core/entitlements.py` (`is_premium`), which returns false for everyone until the Premium tier (V11-P0) ships.
+`code: "premium_required"` is the stable error for every Premium-only feature; `feature` names which one. The check lives in `backend/app/core/entitlements.py` (`is_premium`, and the `require_premium(feature)` dependency for a route that is Premium as a whole); see [Premium](#premium-v11).
 
 ## User currency
 
@@ -200,8 +200,9 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
 { "apple_authorization_code": "fresh code from Sign in with Apple" }
 ```
 
-- **Deleted:** the user row (profile, preferences, password hash, Apple and Google subject IDs), all receipts (soft-deleted ones too), their line items and corrections, budgets and the alerts sent for them, notifications, push tokens, price alert cooldowns and mutes (`price_alerts_sent`, `price_alert_item_mutes`, `price_alert_store_mutes`), item mappings, the user's own categories, sign-in activity (`auth_events`, including failed sign-ins logged under the account's email), analytics events (`analytics_events`), and each receipt's image, converted JPEG, and thumbnail files.
+- **Deleted:** the user row (profile, preferences, password hash, Apple and Google subject IDs), all receipts (soft-deleted ones too), their line items and corrections, budgets and the alerts sent for them, notifications, push tokens, price alert cooldowns and mutes (`price_alerts_sent`, `price_alert_item_mutes`, `price_alert_store_mutes`), the RevenueCat webhook events matched to the account (`revenuecat_events`), item mappings, the user's own categories, sign-in activity (`auth_events`, including failed sign-ins logged under the account's email), analytics events (`analytics_events`), and each receipt's image, converted JPEG, and thumbnail files.
 - **Kept:** stores (shared by all users, with no user link) and the default categories.
+- **Not cancelled:** an App Store Premium subscription. Apple bills it until the user cancels it in iOS Settings; the delete screen says so.
 - **Sessions:** the calling token's family is revoked. Every other token of the account fails too, because its user no longer exists (`/me` returns 401, `/api/auth/refresh` returns 400 `invalid_token`).
 - **Idempotent:** image files go first (a missing file is fine), then all rows in one transaction. A run cut off before the commit leaves the account in place, so the user can call again. A second call after success returns 401: its token no longer resolves to a user.
 - **Sign in with Apple** (TN3194): the server keeps no Apple token, so an account with an Apple ID signs in with Apple again, and the app sends the new authorization code. The server exchanges the code, checks that it is the account's Apple ID, and calls `https://appleid.apple.com/auth/revoke` with the refresh token (or the access token when Apple returns none). Only then does it delete. Each failure stops the deletion, and nothing is deleted:
@@ -209,9 +210,57 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
   - `403 apple_account_mismatch`: the code is for a different Apple ID.
   - `502 apple_revoke_failed`: the exchange or the revoke call failed, or Apple could not be reached.
 
+## Premium [V1.1]
+
+Premium ($5.99/month, decision D1) is an App Store subscription sold through RevenueCat. The backend trusts only RevenueCat for it: the webhook below and RevenueCat's REST API, never the app. Premium gates only the V1.1 extras (D2): the 12-month trend, custom categories, data export, budget rollover, and unlimited receipts. A free user asking for one gets `403 premium_required` (above).
+
+The profile (`/api/auth/me`, `/api/users/me`, and every route that returns it) carries the entitlement:
+```json
+"is_premium": true,
+"premium_expires_at": "2026-12-04T10:00:00Z"
+```
+`premium_expires_at` is the end of the paid period (null for a free user, or a grant with no end). A user is Premium while the entitlement is active and before that time, so a missed expiration webhook cannot keep anyone Premium. `PATCH /api/users/me` cannot set either field.
+
+**Unlimited receipts.** `POST /api/receipts/scan` refuses a free user's scan past `GG_FREE_TIER_RECEIPTS_PER_MONTH` (20) receipts in the month with `429`; a Premium user has no monthly cap (the hourly rate limit still applies).
+
+### POST /api/webhooks/revenuecat
+
+Called by RevenueCat, not the app. Authenticated by the `Authorization` header, which must equal `GG_REVENUECAT_WEBHOOK_SECRET` (alone or after `Bearer `); a missing or wrong value, or no secret configured, returns `401 invalid_webhook_secret` and changes nothing.
+
+**Request:** RevenueCat's webhook body. The backend reads `event.id`, `type`, `app_user_id`, `original_app_user_id`, `aliases`, `entitlement_ids` (or the older `entitlement_id`), `product_id`, `expiration_at_ms`, `event_timestamp_ms`, `transferred_from` and `transferred_to`; it ignores the rest. A body without `event.id` and `event.type` is `422`.
+
+**Response** `200`, also for an event that changes nothing, so RevenueCat stops retrying it:
+```json
+{ "status": "applied" }
+```
+
+| `status` | Meaning |
+|---|---|
+| `applied` | The user's entitlement was updated. |
+| `duplicate` | This event id was received before: nothing changes. Each id is claimed once in `revenuecat_events`. |
+| `stale` | Older (`event_timestamp_ms`) than the event or REST read that last set the user's entitlement: webhooks can arrive out of order. One exception is `applied`: a grant older than the `CANCELLATION` or `BILLING_ISSUE` that last set the entitlement (it arrived after its own cancellation) makes the user Premium, to that newer event's expiry. A cancellation does not end access early, and a refund's expiry is already past, so a refunded purchase still grants nothing. |
+| `ignored` | Not about the Premium entitlement (`GG_REVENUECAT_ENTITLEMENT_ID`, default `premium`), or a type that changes nothing (`TEST`, `SUBSCRIPTION_PAUSED`, ...). |
+| `unknown_user` | None of the event's app user ids (`app_user_id`, `original_app_user_id`, `aliases`) is a Grocery Genie user. The app logs in to RevenueCat with the user's id, so a purchase made before sign-in is found through `aliases`. |
+
+| Event `type` | Effect |
+|---|---|
+| `INITIAL_PURCHASE`, `RENEWAL`, `UNCANCELLATION`, `PRODUCT_CHANGE`, `NON_RENEWING_PURCHASE`, `SUBSCRIPTION_EXTENDED`, `TEMPORARY_ENTITLEMENT_GRANT`, `REFUND_REVERSED` | Premium until `expiration_at_ms` (none: no end). |
+| `CANCELLATION`, `BILLING_ISSUE` | Stays as it is; the expiry moves to `expiration_at_ms`. Auto-renew is off, so Premium lasts to the end of the paid period; a refund's expiry is already past, so it ends now. |
+| `EXPIRATION` | Premium ends. |
+| `TRANSFER` | The purchase moved to another app user id (a restore on another account). Each user in `transferred_from` and `transferred_to` is read back from the REST API; without an API key, the old owners lose Premium and the new owner gets it with its next event or refresh. |
+
+### POST /api/users/me/premium/refresh
+
+Reads the signed-in user's entitlement from RevenueCat's REST API (`GET /v1/subscribers/{user id}` with `GG_REVENUECAT_API_KEY`) and stores it. The app calls it after a purchase or "Restore purchases", so Premium shows without waiting for the webhook. The request body, if any, is ignored. Returns the user profile.
+
+- `503 revenuecat_unavailable`: no API key is configured, or RevenueCat could not be read. The stored entitlement is unchanged; the webhook still delivers it.
+- `429`: more than 10 refreshes in a minute for this user (`GG_MAX_PREMIUM_REFRESHES_PER_MINUTE`). Each refresh reads RevenueCat, so it has its own count, apart from the 300 requests a minute.
+
+The stored state is stamped with the time of RevenueCat's answer (`request_date_ms`). A webhook applied after that read is newer and is kept; the refresh then returns the stored state unchanged.
+
 ## Price Intelligence [V1.1]
 
-Built: PI-01 (price history), PI-02 (item matching), PI-03 (price change alerts, below) and PI-04 (cross-store comparison, backend). Every route is the signed-in user's own data; another user's item, alias or suggestion answers 404.
+Built: PI-01 (price history), PI-02 (item matching), PI-03 (price change alerts, below) and PI-04 (cross-store comparison), backend and app. Every route is the signed-in user's own data; another user's item, alias or suggestion answers 404.
 
 Confirming a receipt (scan + `PATCH status=confirmed`, or a manual entry) links each line to a canonical item and records its price. `LineItemResponse` carries `canonical_item_id`. Matching: exact alias → fuzzy (mean of Jaro-Winkler and Levenshtein on word-sorted names, ≥0.85 links) → semantic (embedding cosine, ≥0.80 links) → new item, with a suggestion for the user when the best candidate scored ≥0.6. Names whose numbers differ ("milk 1%" / "milk 2%") never match by similarity.
 
@@ -278,7 +327,7 @@ Same product: merges `item` into `suggested_item` and returns it. 409 when alrea
 
 ### Price change alerts (PI-03) [V1.1]
 
-Contract frozen 2026-11-03 (V11-01); the app (V11-02) builds on it.
+Contract frozen 2026-11-03 (V11-01); the app (V11-02) uses it: an alert tap opens `/items/{canonical_item_id}`, item detail has the item and store mute switches, and Settings → Alerts the on/off switch, the threshold and the muted list.
 
 **When one is sent.** Confirming a receipt (scan + `PATCH status=confirmed`, or a manual entry) compares each of its prices with the item's 30-day rolling average: the item's earlier prices in the same unit and currency, dated in the 30 days up to the receipt's date, this receipt left out. Two lines of one item on one receipt count as one price, their mean. A change of at least the user's threshold (`GG_PRICE_ALERT_THRESHOLD_PERCENT`, default 10), up or down, sends an alert, when:
 - the average has at least `GG_PRICE_ALERT_MIN_OBSERVATIONS` earlier prices (default 2);

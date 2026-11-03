@@ -41,4 +41,8 @@ export interface UserProfile {
   preferences: UserPreferences;
   needs_onboarding?: boolean;
   ai_consent?: AiConsent;
+  /** Premium (V11-P0), from RevenueCat through the backend only. */
+  is_premium?: boolean;
+  /** End of the paid period; null for a free user. */
+  premium_expires_at?: string | null;
 }

@@ -13,16 +13,19 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
+import { PriceAlertControls } from '@/features/price-intelligence/components/PriceAlertControls';
 import { PriceChart } from '@/features/price-intelligence/components/PriceChart';
+import { StoreComparison } from '@/features/price-intelligence/components/StoreComparison';
 import { SuggestionCard } from '@/features/price-intelligence/components/SuggestionCard';
 import { PRICES_COPY } from '@/features/price-intelligence/constants';
 import {
   useItem,
+  usePriceComparison,
   usePriceHistory,
   useRenameItem,
   useSplitAlias,
 } from '@/features/price-intelligence/hooks/useItems';
-import type { ItemAlias, PriceHistory } from '@/features/price-intelligence/types';
+import type { ItemAlias, PriceHistory, StoreRef } from '@/features/price-intelligence/types';
 import {
   formatPercent,
   formatUnitPrice,
@@ -35,13 +38,17 @@ import { formatLongDate } from '@/features/receipt-capture/utils/receiptDate';
  * PI-01: one item's price history — the latest unit price and its change, a
  * line chart once there are enough prices (AC 2, AC 4), and every price with
  * its date and store (AC 1). PI-02 AC 3: the names receipts gave it, which
- * the user can split off, and combining it with another item.
+ * the user can split off, and combining it with another item. PI-04 AC 4:
+ * its price at each store. PI-03 AC 4: muting its price alerts, or a store's.
+ * A price change alert opens this screen.
  */
 export default function ItemDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const item = useItem(id);
   const history = usePriceHistory(id);
+  // Not awaited: the rest of the screen shows while the comparison loads.
+  const comparison = usePriceComparison(id);
   const rename = useRenameItem();
   const split = useSplitAlias();
 
@@ -127,6 +134,7 @@ export default function ItemDetailScreen() {
   const detail = item.data;
   const prices = history.data;
   const newestFirst = [...prices.observations].reverse();
+  const stores = storesOf(newestFirst);
 
   return (
     <>
@@ -148,6 +156,8 @@ export default function ItemDetailScreen() {
             }
           />
         ))}
+
+        {comparison.data ? <StoreComparison comparison={comparison.data} /> : null}
 
         <Text style={styles.sectionLabel} accessibilityRole="header">
           {PRICES_COPY.timelineHeader}
@@ -193,6 +203,13 @@ export default function ItemDetailScreen() {
           })}
         </View>
 
+        <PriceAlertControls
+          itemId={id}
+          itemName={detail.canonical_name}
+          alertsMuted={detail.alerts_muted}
+          stores={stores}
+        />
+
         <Text style={styles.sectionLabel} accessibilityRole="header">
           {PRICES_COPY.namesHeader}
         </Text>
@@ -231,6 +248,17 @@ export default function ItemDetailScreen() {
       </ScrollView>
     </>
   );
+}
+
+/** Each store with a price of the item, once, in the order given. */
+function storesOf(points: PriceHistory['observations']): StoreRef[] {
+  const seen = new Map<string, string>();
+  for (const p of points) {
+    if (p.store_id && !seen.has(p.store_id)) {
+      seen.set(p.store_id, p.store_name ?? PRICES_COPY.unknownStore);
+    }
+  }
+  return [...seen].map(([storeId, name]) => ({ id: storeId, name }));
 }
 
 function LatestCard({ history }: { history: PriceHistory }) {

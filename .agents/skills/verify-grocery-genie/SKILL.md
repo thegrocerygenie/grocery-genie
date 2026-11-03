@@ -47,6 +47,9 @@ $G signup [label] [--no-consent]  # new user (example.com); later calls use its 
 $G api METHOD PATH [JSON]         # body on stdout, "METHOD PATH -> status" on stderr; exits non-zero on >= 400
 $G scan [PHOTO]                   # POST /api/receipts/scan (default: a generated photo); prints the scan response
 $G sql "SELECT ..."               # read gg_verify (observe only; never write through it)
+$G revenuecat JSON [--secret V]   # POST a RevenueCat webhook body as RevenueCat does, with the
+                                  # launch's random GG_REVENUECAT_WEBHOOK_SECRET (or V, to prove a
+                                  # wrong one is refused); see features/premium.md
 ```
 
 All routes sit under `/api/` except `/health`. Pipe bodies through `jq`, for example `rid=$($G scan | jq -r .receipt_id)`. Use a fresh `signup` per journey so the users never share state.

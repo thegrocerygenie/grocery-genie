@@ -21,6 +21,8 @@ REDIS_KEY_PREFIX = "gg:ratelimit:"
 
 # NFR 7 counts receipt submissions on their own: the scan and manual entry.
 RECEIPT_SUBMISSIONS = {("POST", "/api/receipts/scan"), ("POST", "/api/receipts")}
+# Each refresh reads RevenueCat's REST API (V11-P0): counted on its own.
+PREMIUM_REFRESH = ("POST", "/api/users/me/premium/refresh")
 
 
 class RateLimitStore(Protocol):
@@ -150,9 +152,11 @@ def _too_many(detail: str, retry_after: str) -> JSONResponse:
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Sliding window rate limiter.
 
-    Three tiers:
+    Four tiers:
     - Receipt submissions (RECEIPT_SUBMISSIONS): keyed by user,
       cap = max_receipt_submissions_per_hour
+    - Premium refreshes (PREMIUM_REFRESH), each a RevenueCat REST read:
+      keyed by user, cap = max_premium_refreshes_per_minute
     - Every other authenticated request, reads and writes alike: keyed by
       user, cap = max_reads_per_minute. Analytics and push-token calls count
       here, so they never use up the scan allowance.
@@ -200,6 +204,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     f"submit:{caller}",
                     window=3600.0,
                     limit=settings.max_receipt_submissions_per_hour,
+                )
+                if not allowed:
+                    return _too_many("Rate limit exceeded. Try again later.", "60")
+            elif (request.method, path) == PREMIUM_REFRESH:
+                allowed = await store.hit(
+                    f"premium-refresh:{caller}",
+                    window=60.0,
+                    limit=settings.max_premium_refreshes_per_minute,
                 )
                 if not allowed:
                     return _too_many("Rate limit exceeded. Try again later.", "60")

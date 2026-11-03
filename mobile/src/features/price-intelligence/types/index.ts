@@ -1,4 +1,7 @@
-/** Price intelligence (V1.1): PI-01 price history, PI-02 item matching. */
+/**
+ * Price intelligence (V1.1): PI-01 price history, PI-02 item matching, PI-03
+ * price change alerts, PI-04 cross-store comparison.
+ */
 
 export interface ItemRef {
   id: string;
@@ -47,6 +50,8 @@ export interface ItemAlias {
 export interface ItemDetail extends ItemSummary {
   aliases: ItemAlias[];
   suggestions: ItemSuggestion[];
+  /** PI-03 AC 4: the user muted price alerts for this item. */
+  alerts_muted: boolean;
 }
 
 export interface PricePoint {
@@ -71,4 +76,46 @@ export interface PriceHistory {
   min_points: number;
   store_count: number;
   observations: PricePoint[];
+}
+
+export interface StoreRef {
+  id: string;
+  name: string;
+}
+
+/** PI-03 settings: `GET/PUT /api/items/price-alert-settings`. */
+export interface PriceAlertSettings {
+  enabled: boolean;
+  /** The user's own threshold, or the default when they set none. */
+  threshold_percent: number;
+  default_threshold_percent: number;
+  cooldown_days: number;
+  muted_items: ItemRef[];
+  muted_stores: StoreRef[];
+}
+
+/** A field left out stays; `threshold_percent: null` goes back to the default. */
+export interface PriceAlertSettingsUpdate {
+  enabled?: boolean;
+  threshold_percent?: number | null;
+}
+
+export interface StorePrice {
+  store_id: string;
+  store_name: string;
+  latest_price: number;
+  latest_date: string;
+  avg_price: number;
+  observation_count: number;
+}
+
+/** PI-04: `GET /api/items/{id}/compare`, cheapest store first. */
+export interface PriceComparison {
+  item: ItemRef;
+  unit_of_measure: string | null;
+  currency: string | null;
+  min_observations: number;
+  stores: StorePrice[];
+  /** Stores with a price of the item but too few to compare. */
+  stores_below_minimum: number;
 }

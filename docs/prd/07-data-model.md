@@ -6,7 +6,7 @@ Technology-agnostic entity model. Describes entities, relationships, and access 
 
 | Entity | Key Attributes | Relationships | Phase |
 |--------|---------------|---------------|-------|
-| **User** | id, email, name, locale, currency_preference, price_alerts_enabled (V1.1), price_alert_threshold_percent (V1.1; null: the server default), created_at | Has many Receipts; belongs to 0–1 Household; has many UserItemMappings | MVP |
+| **User** | id, email, name, locale, currency_preference, price_alerts_enabled (V1.1), price_alert_threshold_percent (V1.1; null: the server default), premium_active, premium_expires_at, premium_product_id, premium_updated_at (V1.1; written only from RevenueCat: Premium while active and before the expiry), created_at | Has many Receipts; belongs to 0–1 Household; has many UserItemMappings | MVP |
 | **Household** | id, name, created_by, created_at | Has many HouseholdMembers; has many Receipts (via members) | V1.5 |
 | **HouseholdMember** | household_id, user_id, role (admin/contributor/viewer), joined_at | Belongs to Household and User | V1.5 |
 | **Receipt** | id, user_id, household_id (nullable), store_id, date, subtotal, tax, total, currency, image_url, extraction_confidence, status (pending/confirmed), created_at | Belongs to User; has many LineItems; belongs to Store | MVP |
@@ -22,6 +22,7 @@ Technology-agnostic entity model. Describes entities, relationships, and access 
 | **PriceAlertSent** | id, user_id, canonical_item_id (unique), alerted_at | The price change alert cooldown ledger (PI-03 AC 3): one row per item. Claiming is one upsert on the unique key that moves alerted_at only when it is a cooldown old, so two concurrent confirms cannot both alert | V1.1 |
 | **PriceAlertItemMute** | id, user_id, canonical_item_id, created_at; unique (user_id, canonical_item_id) | The user muted price alerts for this item (PI-03 AC 4). Merging a muted item mutes the target | V1.1 |
 | **PriceAlertStoreMute** | id, user_id, store_id, created_at; unique (user_id, store_id) | The user muted price alerts for prices paid at this store (PI-03 AC 4). Stores are shared; the mute is the user's | V1.1 |
+| **RevenueCatEvent** | id, event_id (unique), event_type, user_id (nullable: no user matched), outcome (applied/stale/ignored/unknown_user), event_at, created_at | The RevenueCat webhook's idempotency ledger: inserting the event id is the claim, so a retried delivery changes nothing. Deleted with the account | V1.1 |
 | **UserItemMapping** | user_id, raw_text_pattern, canonical_item_id, category_id, confidence_override | Belongs to User; references CanonicalItem and Category | MVP |
 | **Ingredient** | id, canonical_item_id, ingredient_name, category (produce/dairy/meat/pantry/etc.), default_shelf_life_days | Extends CanonicalItem | V2.0 |
 | **PantryItem** | id, user_id, household_id, ingredient_id, quantity, unit, purchased_date, estimated_expiry, status (fresh/use_soon/expired/used/discarded) | Belongs to User/Household; belongs to Ingredient | V2.0 |
@@ -40,6 +41,7 @@ Technology-agnostic entity model. Describes entities, relationships, and access 
 | Semantic item match | The user's CanonicalItemAliases ordered by embedding cosine distance (exact scan by user_id, no ANN index: a global index filtered to one user can return no neighbours) | High (every confirm) | V1.1 |
 | Rolling average for a price alert | Mean unit_price of PriceObservations by canonical_item_id with the same unit_of_measure and currency, date in the 7 or 30 days up to the receipt date, the confirming receipt left out | Medium (every confirm, per item) | V1.1 |
 | Cross-store price comparison | The user's PriceObservations for a canonical_item_id (receipts not deleted) grouped by store_id: latest and mean unit price, like-for-like unit and currency, stores with at least 2 prices | Medium | V1.1 |
+| Premium check | The signed-in user's premium_active and premium_expires_at (on the user row, already loaded: no extra query) | High (every Premium gate, every scan) | V1.1 |
 | Household receipts | Receipts by household_id, ordered by date DESC | Medium | V1.5 |
 | Pantry contents | PantryItems by user_id/household_id where status != used/discarded, ordered by estimated_expiry ASC | High (meal planner) | V2.0 |
 | Recipe matching | Recipes where required ingredient_ids overlap with active PantryItem ingredient_ids | Medium | V2.0 |
