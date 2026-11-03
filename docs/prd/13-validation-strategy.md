@@ -206,7 +206,7 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-06 | 3 | Chosen day, 9 AM local time | Integration | `backend/tests/tasks/test_summary_tasks.py::test_recipients_only_on_users_chosen_day` | Pass |
 | BC-06 | 4 | Links to full dashboard | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "falls back to the dashboard when the route is missing" | Pass |
 
-V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, its app screens (alert tap, mute buttons, threshold setting) come with V11-02. PI-04 (cross-store comparison) has its backend; its screen (AC 4) is the mobile task.
+V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04.
 
 | Story | AC | Criterion | Type | Test | Status |
 |---|---|---|---|---|---|
@@ -249,6 +249,18 @@ V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02; PI-03
 | PI-03 | 4 | Mutable per item: another user's item is 404 to mute and unmute | Integration | `backend/tests/api/test_price_alerts.py::test_another_users_item_cannot_be_muted_or_unmuted` | Pass |
 | PI-03 | FR | Only a confirm alerts; editing a confirmed receipt sends none | Integration | `backend/tests/api/test_price_alerts.py::test_editing_a_confirmed_receipt_never_sends_a_price_alert` | Pass |
 | PI-03 | FR | A price alert failure never fails the confirm or the budget alert | Integration | `backend/tests/api/test_price_alerts.py::test_a_price_alert_failure_never_fails_the_confirm` | Pass |
+| PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "opens the item named in a price change alert (PI-03)" | Pass |
+| PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "opens a price change item from its id even when the url says otherwise" | Pass |
+| PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "never builds a route from a malformed price change item id" | Pass |
+| PI-03 | 4 | Mutable per item (app) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "mutes price alerts for the item" | Pass |
+| PI-03 | 4 | Mutable per item (app) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "unmutes an item whose price alerts are muted" | Pass |
+| PI-03 | 4 | Mutable per item (app): a failed save puts the switch back | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "puts the switch back and says so when a mute fails" | Pass |
+| PI-03 | 4 | Mutable per store (app) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "mutes and unmutes price alerts at each store the item was bought from" | Pass |
+| PI-03 | 4 | Mutable per item or per store (app, from Settings) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "unmutes a muted item and a muted store" | Pass |
+| PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "sets the price change threshold" | Pass |
+| PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "goes back to the default threshold" | Pass |
+| PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "turns price change alerts off" | Pass |
+| PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "says what size of change sends an alert, and when alerts are off" | Pass |
 | PI-04 | 1 | Side-by-side pricing across all stores with prices | Integration | `backend/tests/api/test_price_comparison.py::test_side_by_side_latest_and_average_per_store` | Pass |
 | PI-04 | 1 | Side-by-side pricing across all stores with prices | Integration | `backend/tests/api/test_price_comparison.py::test_stores_are_cheapest_first_by_average` | Pass |
 | PI-04 | 2 | Most recent and average price per store | Integration | `backend/tests/api/test_price_comparison.py::test_side_by_side_latest_and_average_per_store` | Pass |
@@ -259,7 +271,9 @@ V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02; PI-03
 | PI-04 | 3 | Only stores the user has scanned from | Integration | `backend/tests/api/test_price_comparison.py::test_comparison_is_private_and_unknown_items_are_404` | Pass |
 | PI-04 | FR | Minimum 2 observations per store per item | Integration | `backend/tests/api/test_price_comparison.py::test_a_store_needs_two_prices_to_be_compared` | Pass |
 | PI-04 | FR | Minimum 2 observations per store per item | Integration | `backend/tests/api/test_price_comparison.py::test_one_price_anywhere_compares_nothing` | Pass |
-| PI-04 | 4 | From item detail or a comparison screen | Component | Mobile task, not built yet (it reads `GET /api/items/{id}/compare`) | Pending |
+| PI-04 | 4 | From item detail or a comparison screen | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "shows the latest and average price at each store, cheapest first (AC 4)" | Pass |
+| PI-04 | 4 | From item detail or a comparison screen | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "says how many stores need more prices before they compare" | Pass |
+| PI-04 | 4 | From item detail or a comparison screen | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "explains an empty comparison when no store has enough prices yet" | Pass |
 | BC-FR | Trends | 12-month trend (V1.1), Premium per D2 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_for_premium` | Pass |
 | BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_premium_user_still_gets_3_months_by_default` | Pass |
 | BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_trend_is_3_months_with_months_3` | Pass |

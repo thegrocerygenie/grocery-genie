@@ -211,7 +211,7 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
 
 ## Price Intelligence [V1.1]
 
-Built: PI-01 (price history), PI-02 (item matching), PI-03 (price change alerts, below) and PI-04 (cross-store comparison, backend). Every route is the signed-in user's own data; another user's item, alias or suggestion answers 404.
+Built: PI-01 (price history), PI-02 (item matching), PI-03 (price change alerts, below) and PI-04 (cross-store comparison), backend and app. Every route is the signed-in user's own data; another user's item, alias or suggestion answers 404.
 
 Confirming a receipt (scan + `PATCH status=confirmed`, or a manual entry) links each line to a canonical item and records its price. `LineItemResponse` carries `canonical_item_id`. Matching: exact alias → fuzzy (mean of Jaro-Winkler and Levenshtein on word-sorted names, ≥0.85 links) → semantic (embedding cosine, ≥0.80 links) → new item, with a suggestion for the user when the best candidate scored ≥0.6. Names whose numbers differ ("milk 1%" / "milk 2%") never match by similarity.
 
@@ -278,7 +278,7 @@ Same product: merges `item` into `suggested_item` and returns it. 409 when alrea
 
 ### Price change alerts (PI-03) [V1.1]
 
-Contract frozen 2026-11-03 (V11-01); the app (V11-02) builds on it.
+Contract frozen 2026-11-03 (V11-01); the app (V11-02) uses it: an alert tap opens `/items/{canonical_item_id}`, item detail has the item and store mute switches, and Settings → Alerts the on/off switch, the threshold and the muted list.
 
 **When one is sent.** Confirming a receipt (scan + `PATCH status=confirmed`, or a manual entry) compares each of its prices with the item's 30-day rolling average: the item's earlier prices in the same unit and currency, dated in the 30 days up to the receipt's date, this receipt left out. Two lines of one item on one receipt count as one price, their mean. A change of at least the user's threshold (`GG_PRICE_ALERT_THRESHOLD_PERCENT`, default 10), up or down, sends an alert, when:
 - the average has at least `GG_PRICE_ALERT_MIN_OBSERVATIONS` earlier prices (default 2);
