@@ -1,4 +1,3 @@
-import { fromIsoDate } from '@/features/receipt-capture/utils/receiptDate';
 import { formatMoney } from '@/utils/money';
 import type { PriceHistory, PricePoint } from '../types';
 
@@ -43,6 +42,12 @@ export function formatPercent(percent: number): string {
   return '0%';
 }
 
+/** Whole days since 1970-01-01 for a "YYYY-MM-DD" date, the same in every time zone. */
+function dayNumber(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number);
+  return Date.UTC(y, m - 1, d) / 86_400_000;
+}
+
 export interface ChartPoint {
   x: number;
   y: number;
@@ -73,7 +78,7 @@ export function chartGeometry(
   const high = Math.max(...prices);
   // The range labels and VoiceOver need low and high before the first layout.
   if (width <= 0 || height <= 0) return { points: [], low, high };
-  const times = points.map((p) => fromIsoDate(p.date).getTime());
+  const times = points.map((p) => dayNumber(p.date));
   const start = Math.min(...times);
   const span = Math.max(...times) - start;
   const innerW = Math.max(width - inset * 2, 0);
