@@ -320,7 +320,54 @@ async def test_csv_export_of_an_empty_account_has_headers(premium_client):
         assert len(header) == 1 and header[0].startswith("id,")
 
 
+async def test_export_leaves_out_a_deleted_budget(premium_client):
+    """A budget in Recently deleted is not in either format."""
+    [category, *_] = (await premium_client.get("/api/categories")).json()
+    month = {"period_type": "monthly", "period_start": "2026-03-01"}
+    kept = await premium_client.post("/api/budgets", json={"amount": 450.0, **month})
+    gone = await premium_client.post(
+        "/api/budgets",
+        json={"amount": 321.09, "category_id": category["id"], **month},
+    )
+    assert kept.status_code == gone.status_code == 201, gone.text
+    resp = await premium_client.delete(f"/api/budgets/{gone.json()['id']}")
+    assert resp.status_code == 204, resp.text
+
+    body = (await premium_client.get("/api/users/me/export")).json()
+    csv_resp = await premium_client.get("/api/users/me/export?format=csv")
+    budgets = _csv_rows(zipfile.ZipFile(io.BytesIO(csv_resp.content)), "budgets.csv")
+
+    assert [b["id"] for b in body["budgets"]] == [kept.json()["id"]]
+    assert [b["id"] for b in budgets] == [kept.json()["id"]]
+
+
 # --- CSV formula injection ---------------------------------------------------
+
+
+async def test_csv_escapes_store_names_too(
+    premium_client, mock_extractor, test_image_bytes
+):
+    """Every text cell is escaped, not only item names: the store name on
+    receipts.csv and price_observations.csv."""
+    await _scan_and_confirm(
+        premium_client,
+        mock_extractor,
+        test_image_bytes,
+        "@SUM(1+1)",
+        "2026-03-01",
+        ("-MILK", 1.0, 2.5),
+    )
+
+    resp = await premium_client.get("/api/users/me/export", params={"format": "csv"})
+    archive = zipfile.ZipFile(io.BytesIO(resp.content))
+
+    [receipt] = _csv_rows(archive, "receipts.csv")
+    assert receipt["store_name"] == "'@SUM(1+1)"
+    [price] = _csv_rows(archive, "price_observations.csv")
+    assert price["store_name"] == "'@SUM(1+1)"
+    assert price["item_name"] == "'-MILK"
+    [line] = _csv_rows(archive, "line_items.csv")
+    assert line["name"] == "'-MILK"
 
 
 @pytest.mark.parametrize(
