@@ -1,10 +1,10 @@
 import json
 import logging
 from datetime import UTC, date, datetime, time, timedelta
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import func, select
 
+from app.core import clock
 from app.core.dependencies import get_sync_session_factory
 from app.core.money import format_money
 from app.models.database import (
@@ -52,14 +52,6 @@ def generate_weekly_summaries_at(db, now: datetime) -> None:
     db.commit()
 
 
-def _user_zone(name: str | None) -> ZoneInfo:
-    """The user's time zone; UTC for a missing or unknown name."""
-    try:
-        return ZoneInfo(name or "UTC")
-    except (ZoneInfoNotFoundError, ValueError):
-        return ZoneInfo("UTC")
-
-
 def _summary_recipients(db, now: datetime) -> list[tuple]:
     """(user id, their local date) for each user whose summary is due at
     ``now``: opted in, it is 9 AM on their chosen day where they are, and they
@@ -71,7 +63,7 @@ def _summary_recipients(db, now: datetime) -> list[tuple]:
         )
     ).all()
     for user_id, zone_name, summary_day in users:
-        local = now.astimezone(_user_zone(zone_name))
+        local = now.astimezone(clock.user_zone(zone_name))
         # weekly_summary_day uses 0 = Sunday; date.weekday() uses 0 = Monday.
         if local.hour != SUMMARY_LOCAL_HOUR or (local.weekday() + 1) % 7 != summary_day:
             continue
@@ -104,7 +96,7 @@ def _generate_summary_for_user(
         select(User.currency_preference, User.timezone).where(User.id == user_id)
     ).first()
     currency = (user.currency_preference if user else None) or "USD"
-    zone = _user_zone(user.timezone if user else None)
+    zone = clock.user_zone(user.timezone if user else None)
     day_start = datetime.combine(today, time.min, tzinfo=zone)
     already_sent = db.execute(
         select(Notification.id).where(
