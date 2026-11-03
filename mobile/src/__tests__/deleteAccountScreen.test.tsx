@@ -61,6 +61,12 @@ describe('Delete account screen', () => {
     expect(screen.getByText(/can’t be undone/i)).toBeTruthy();
   });
 
+  it('says a Premium subscription is not cancelled by deleting (V11-P0)', () => {
+    renderScreen();
+
+    expect(screen.getByText(/cancel it in iOS Settings/)).toBeTruthy();
+  });
+
   it('asks to confirm and deletes nothing until confirmed', () => {
     renderScreen();
 

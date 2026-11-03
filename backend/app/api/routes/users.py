@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.dependencies import get_db
+from app.core.entitlements import is_premium
 from app.core.security import bearer_scheme, get_current_user
 from app.image.storage import LocalFileStorage
 from app.models.database import User
@@ -24,7 +25,14 @@ from app.models.schemas import (
 )
 from app.services import account_service, ai_consent
 from app.services import auth as auth_service
+from app.services.analytics_service import AnalyticsService, get_analytics_service
+from app.services.premium_service import PremiumService
 from app.services.push_token_service import PushTokenService
+from app.services.revenuecat_client import (
+    RevenueCatClient,
+    RevenueCatUnavailableError,
+    get_revenuecat_client,
+)
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -43,7 +51,7 @@ def _raise_auth(e: auth_service.AuthError) -> NoReturn:
     )
 
 
-def _to_profile(user: User, *, needs_onboarding: bool = False) -> UserProfileResponse:
+def user_profile(user: User, *, needs_onboarding: bool = False) -> UserProfileResponse:
     prefs = dict(user.preferences or {})
     return UserProfileResponse(
         id=user.id,
@@ -68,6 +76,8 @@ def _to_profile(user: User, *, needs_onboarding: bool = False) -> UserProfileRes
         ),
         needs_onboarding=needs_onboarding,
         ai_consent=ai_consent.public(user),
+        is_premium=is_premium(user),
+        premium_expires_at=user.premium_expires_at if user.premium_active else None,
     )
 
 
@@ -77,7 +87,34 @@ async def get_me(
     db: AsyncSession = Depends(get_db, scope="function"),
 ) -> UserProfileResponse:
     needs = await auth_service.user_needs_onboarding(db, user.id)
-    return _to_profile(user, needs_onboarding=needs)
+    return user_profile(user, needs_onboarding=needs)
+
+
+@router.post("/me/premium/refresh", response_model=UserProfileResponse)
+async def refresh_premium(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    analytics: AnalyticsService = Depends(get_analytics_service),
+    revenuecat: RevenueCatClient | None = Depends(get_revenuecat_client),
+) -> UserProfileResponse:
+    """Read the user's Premium entitlement from RevenueCat's REST API.
+
+    The app calls this after a purchase or a restore, so Premium shows without
+    waiting for the webhook. The server asks RevenueCat; nothing the app sends
+    is trusted.
+    """
+    try:
+        user = await PremiumService(db, analytics, revenuecat).refresh(user)
+    except RevenueCatUnavailableError:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "revenuecat_unavailable",
+                "message": "Could not check your subscription. Try again soon.",
+            },
+        ) from None
+    needs = await auth_service.user_needs_onboarding(db, user.id)
+    return user_profile(user, needs_onboarding=needs)
 
 
 @router.patch("/me", response_model=UserProfileResponse)
@@ -122,7 +159,7 @@ async def update_me(
 
     await db.flush()
     needs = await auth_service.user_needs_onboarding(db, user.id)
-    return _to_profile(user, needs_onboarding=needs)
+    return user_profile(user, needs_onboarding=needs)
 
 
 @router.post("/me/onboarding-complete", response_model=UserProfileResponse)
@@ -132,7 +169,7 @@ async def complete_onboarding(
 ) -> UserProfileResponse:
     await auth_service.complete_onboarding(db, user)
     needs = await auth_service.user_needs_onboarding(db, user.id)
-    return _to_profile(user, needs_onboarding=needs)
+    return user_profile(user, needs_onboarding=needs)
 
 
 @router.put("/me/ai-consent", response_model=UserProfileResponse)
@@ -155,7 +192,7 @@ async def grant_ai_consent(
         ) from None
     await db.flush()
     needs = await auth_service.user_needs_onboarding(db, user.id)
-    return _to_profile(user, needs_onboarding=needs)
+    return user_profile(user, needs_onboarding=needs)
 
 
 @router.delete("/me/ai-consent", response_model=UserProfileResponse)
@@ -167,7 +204,7 @@ async def withdraw_ai_consent(
     ai_consent.withdraw(user)
     await db.flush()
     needs = await auth_service.user_needs_onboarding(db, user.id)
-    return _to_profile(user, needs_onboarding=needs)
+    return user_profile(user, needs_onboarding=needs)
 
 
 @router.post("/me/email-change/request", status_code=202)

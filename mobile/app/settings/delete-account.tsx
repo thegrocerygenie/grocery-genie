@@ -85,6 +85,10 @@ export default function DeleteAccountScreen() {
           device are removed too. If you use Sign in with Apple, you’ll confirm with Apple, and
           Grocery Genie’s access to your Apple ID is removed.
         </Text>
+        <Text style={styles.note}>
+          Deleting your account doesn’t cancel a Premium subscription. Apple keeps billing it until
+          you cancel it in iOS Settings → Apple ID → Subscriptions.
+        </Text>
 
         {failure ? (
           <Text style={styles.error} accessibilityRole="alert">

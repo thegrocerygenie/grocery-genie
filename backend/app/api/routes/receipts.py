@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.dependencies import get_db
+from app.core.entitlements import is_premium
 from app.core.money import format_money
 from app.core.retention import days_remaining
 from app.core.security import get_current_user
@@ -119,7 +120,8 @@ async def scan_receipt(
 
     # Free-tier quota: reject scans that would exceed the monthly limit
     settings = get_settings()
-    if settings.free_tier_receipts_per_month > 0:
+    # Premium (D2): unlimited receipts.
+    if settings.free_tier_receipts_per_month > 0 and not is_premium(user):
         quota_service = ReceiptService(db=db)
         scanned_this_month = await quota_service.count_receipts_in_month(
             user.id, datetime.now(UTC)

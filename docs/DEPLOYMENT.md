@@ -185,6 +185,17 @@ GG_GOOGLE_CLIENT_ID=<web client ID>.apps.googleusercontent.com
 # GG_EXPO_PUSH_ACCESS_TOKEN=
 # Pending pushes older than this are dropped instead of sent late (default 60):
 # GG_PUSH_MAX_AGE_MINUTES=60
+
+# Premium — RevenueCat (V1.1; set up as in 2.9). The webhook's Authorization
+# value, as typed in RevenueCat; while it is empty every delivery is refused
+# and nobody becomes Premium. Generate with:
+#   python -c "import secrets; print(secrets.token_hex(32))"
+GG_REVENUECAT_WEBHOOK_SECRET=<the webhook Authorization value>
+# The secret API key (sk_..., API v1). The app's purchase and "Restore
+# purchases" read it back through the API at once; empty waits for the webhook.
+GG_REVENUECAT_API_KEY=sk_...
+# The entitlement Premium unlocks (default premium):
+# GG_REVENUECAT_ENTITLEMENT_ID=premium
 ```
 
 [`docker/.env.production.example`](../docker/.env.production.example) holds
@@ -394,13 +405,14 @@ servers on the way to Apple.
 
 ### 2.3 Configure the build's environment
 
-The app reads three `EXPO_PUBLIC_` variables at build time; `mobile/.env.example` documents them. Metro bakes them into the JS bundle, so none may be a secret.
+The app reads four `EXPO_PUBLIC_` variables at build time; `mobile/.env.example` documents them. Metro bakes them into the JS bundle, so none may be a secret.
 
 | Variable | Value |
 |---|---|
 | `EXPO_PUBLIC_API_URL` | The API's public URL, for example `https://api.grocerygenie.app`. Without it the app uses `http://localhost:8001`. |
 | `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | The iOS OAuth client ID. `app.config.ts` adds Google's URL scheme from it; without it the app hides "Continue with Google". |
 | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | The web OAuth client ID, equal to the backend's `GG_GOOGLE_CLIENT_ID`. |
+| `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` | RevenueCat's public Apple App Store SDK key (`appl_...`, see 2.9). Without it Settings shows Premium as unavailable and no purchase can start. |
 
 For local builds, put them in `mobile/.env.local`. For EAS builds, create them per environment (`mobile/.env.local` isn't uploaded):
 
@@ -482,6 +494,44 @@ jobs:
 
 Set `EXPO_TOKEN` in GitHub repository secrets (generate at expo.dev → Account Settings → Access Tokens).
 
+### 2.9 Premium through RevenueCat (V1.1)
+
+Premium is $5.99/month (`docs/prd/00-overview.md`), sold as an App Store
+auto-renewing subscription through RevenueCat. The app buys and restores with
+`react-native-purchases`; the backend never believes the app about Premium.
+It stores the entitlement from RevenueCat's webhook, and reads RevenueCat's
+REST API after a purchase or restore (`POST /api/users/me/premium/refresh`).
+
+1. **App Store Connect:** create an auto-renewable subscription (for example
+   `gg_premium_monthly`, $5.99/month) in a subscription group, and an
+   In-App Purchase key (Users and Access → Integrations → In-App Purchase).
+2. **RevenueCat:** create a project with an Apple App Store app for the bundle
+   ID `com.grocerygenie.app`, upload the In-App Purchase key, import the
+   product, and attach it to an entitlement with the identifier `premium`
+   (`GG_REVENUECAT_ENTITLEMENT_ID` if you pick another). Put the product in the
+   current offering as its monthly package: the paywall shows that package
+   and its App Store price.
+3. **Webhook:** Project settings → Integrations → Webhooks → add
+   `https://api.grocerygenie.app/api/webhooks/revenuecat`. Set the
+   Authorization header value to the secret generated for
+   `GG_REVENUECAT_WEBHOOK_SECRET` (with or without `Bearer `), and send events
+   for both production and sandbox: App Review and TestFlight buy in the
+   sandbox. "Send test event" should answer 200 `{"status": "ignored"}`.
+4. **API keys:** the secret API key (v1, `sk_...`) goes in
+   `GG_REVENUECAT_API_KEY` (1.5). The public Apple SDK key (`appl_...`) goes in
+   the build's `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` (2.3).
+5. **Build:** `react-native-purchases` is a native module, so Premium works
+   only in a development or EAS build, never in Expo Go (there the paywall
+   says purchases need the App Store build).
+6. **Check on a device** with a sandbox Apple ID: buy Premium, see Settings say
+   Premium, open the 12-month trend; delete and reinstall the app, then
+   "Restore purchases". Cancel in the sandbox and wait for the expiry
+   (sandbox months last minutes): the app goes back to the free plan.
+
+The app logs in to RevenueCat with the user's Grocery Genie id, so webhook
+events name that id. A purchase made before sign-in arrives with the id among
+its `aliases`, and the backend finds the user from it.
+
 ---
 
 ## Part 3: Cost Estimate
@@ -510,6 +560,7 @@ Set `EXPO_TOKEN` in GitHub repository secrets (generate at expo.dev → Account 
 - [ ] Celery Beat fires on schedule (check with `docker logs`)
 - [ ] CORS configured to allow requests from the iOS app
 - [ ] Rate limiting active
+- [ ] RevenueCat "Send test event" reaches `/api/webhooks/revenuecat` and gets 200 (2.9)
 - [ ] Receipt image upload and retrieval working
 - [ ] Log cleanup cron job installed (1.9): `crontab -l` shows the `find /var/lib/docker/containers` line
 
@@ -524,6 +575,7 @@ Set `EXPO_TOKEN` in GitHub repository secrets (generate at expo.dev → Account 
 - [ ] Push notification permission requested after sign-in
 - [ ] `app.json` has `extra.eas.projectId` and EAS has an APNs push key
 - [ ] A budget alert arrives as a push on a physical device; tapping it opens the dashboard
+- [ ] A sandbox Premium purchase and "Restore purchases" work on a device (2.9, step 6)
 
 ### Supabase
 - [ ] pgvector extension enabled (for future V1.1 use)

@@ -94,6 +94,16 @@ class Settings(BaseSettings):
     # Earlier prices in the 30-day window needed before there is an average.
     price_alert_min_observations: int = Field(default=2, ge=1)
 
+    # Premium through RevenueCat (V11-P0, decision D1). The webhook secret is
+    # the Authorization header value set on the RevenueCat webhook; empty
+    # refuses every delivery. The API key is RevenueCat's secret (sk_) REST
+    # key, used to read a subscriber after a purchase or restore; empty turns
+    # that read off. The entitlement id is the one Premium unlocks.
+    revenuecat_webhook_secret: str = ""
+    revenuecat_api_key: str = ""
+    revenuecat_api_base: str = "https://api.revenuecat.com"
+    revenuecat_entitlement_id: str = "premium"
+
     # Budget alert thresholds (BC-03: configurable at 50%, 80%, 100%).
     budget_alert_thresholds: list[int] = [50, 80, 100]
 

@@ -8,6 +8,7 @@ import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { AiConsentSettingsSection } from '@/features/ai-consent/components/AiConsentSettingsSection';
 import { useMe, useSignOut } from '@/features/auth/hooks/useAuth';
 import { useBudgets } from '@/features/budget/hooks/useBudget';
+import { PREMIUM_STRINGS } from '@/features/premium/content/premium';
 import { alertsSummary, budgetsSummary } from '@/features/settings/utils/settingsSummary';
 import { useNotificationStore } from '@/store/notificationStore';
 
@@ -75,6 +76,16 @@ export default function SettingsScreen() {
       href: '/settings/currency-settings',
     },
   ];
+  // Premium as the backend says (is_premium), never the purchase SDK alone.
+  const isPremium = profile?.is_premium === true;
+  const premiumRow: RowDef = {
+    key: 'premium',
+    symbol: 'sparkles',
+    iconBg: colors.tint,
+    title: PREMIUM_STRINGS.settingsRow,
+    detail: isPremium ? PREMIUM_STRINGS.settingsPremium : PREMIUM_STRINGS.settingsFree,
+    href: '/paywall',
+  };
   const version = Constants.expoConfig?.version;
 
   const onSignOut = async () => {
@@ -114,11 +125,20 @@ export default function SettingsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={type.headline}>{profile?.name ?? 'Grocery Genie'}</Text>
             <Text style={[type.footnote, { color: colors.iosLabel2 }]}>
-              {profile?.email ?? 'Loading…'} · Free plan
+              {profile?.email ?? 'Loading…'} ·{' '}
+              {isPremium ? PREMIUM_STRINGS.planPremium : PREMIUM_STRINGS.planFree}
             </Text>
           </View>
           <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
         </Pressable>
+
+        <Section header="PREMIUM">
+          <SettingsRow
+            row={premiumRow}
+            showDivider={false}
+            onPress={() => router.push('/paywall')}
+          />
+        </Section>
 
         <Section header="SPENDING">
           {spendingRows.map((r, i) => (

@@ -9,6 +9,8 @@
 #   gg-verify api METHOD PATH [JSON]  call the API as that user (body on stdout)
 #   gg-verify scan [PHOTO]          upload a receipt photo (default: a generated one) to /api/receipts/scan
 #   gg-verify sql "SELECT ..."      read the instance's database
+#   gg-verify revenuecat JSON [--secret VALUE]  POST a RevenueCat webhook body with the
+#                                   launch's webhook secret (or VALUE, to prove a wrong one fails)
 #   gg-verify cleanup               stop what launch started, drop its database
 #   gg-verify last                  print the newest evidence directory
 set -euo pipefail
@@ -82,6 +84,11 @@ cmd_launch() {
   # No email: --live-llm runs with GG_DEBUG=false, where startup needs a
   # Resend key unless email is turned off on purpose.
   export GG_RESEND_API_KEY="" GG_EMAIL_DELIVERY=off GG_EXPO_PUSH_ACCESS_TOKEN=""
+  # Premium: a random webhook secret, kept in state (never in evidence), and
+  # no REST API key, so nothing reaches RevenueCat.
+  export GG_REVENUECAT_WEBHOOK_SECRET; GG_REVENUECAT_WEBHOOK_SECRET="$(openssl rand -hex 32)"
+  export GG_REVENUECAT_API_KEY=""
+  (umask 077; echo "$GG_REVENUECAT_WEBHOOK_SECRET" > "$STATE/revenuecat_secret")
 
   echo "== migrating $DB to head" >&2
   (cd "$BACKEND" && "$VENV/alembic" upgrade head) > "$run/migrate.log" 2>&1 || { cat "$run/migrate.log" >&2; die "migration failed"; }
@@ -188,6 +195,26 @@ cmd_api() {
   [ "$code" -lt 400 ]
 }
 
+cmd_revenuecat() {
+  [ $# -ge 1 ] || die "usage: gg-verify revenuecat JSON [--secret VALUE]"
+  local data="$1" secret run; shift; run="$(run_dir)"
+  secret="$(cat "$STATE/revenuecat_secret")"
+  local label="launch secret"
+  if [ "${1:-}" = "--secret" ]; then secret="${2:-}"; label="given secret"; fi
+  local path=/api/webhooks/revenuecat seq; seq="$(next_seq)"
+  local out="$run/$seq-POST-$(slug "$path").json"
+  local raw code body
+  raw="$(curl -s -w '\n%{http_code}' -X POST -H "Authorization: Bearer $secret" \
+    -H 'Content-Type: application/json' -d "$data" "$BASE$path")"
+  code="$(echo "$raw" | tail -1)"
+  body="$(echo "$raw" | sed '$d')"
+  jq -n --arg p "$path" --arg d "$data" --arg s "$code" --arg b "$body" --arg a "$label" \
+    '{request:{method:"POST",path:$p,authorization:$a,body:($d|fromjson? // $d)},status:($s|tonumber),response:($b|fromjson? // $b)}' > "$out"
+  echo "POST $path ($label) -> $code" >&2
+  [ -n "$body" ] && echo "$body"
+  [ "$code" -lt 400 ]
+}
+
 cmd_scan() {
   local run; run="$(run_dir)"
   [ -f "$STATE/token" ] || die "no user; run: gg-verify signup"
@@ -264,6 +291,6 @@ cmd_cleanup() {
 cmd_last() { ls -1d "$ROOT"/runs/* 2>/dev/null | tail -1; }
 
 case "${1:-}" in
-  launch|doctor|signup|api|scan|sql|cleanup|last) sub="$1"; shift; "cmd_$sub" "$@" ;;
-  *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  launch|doctor|signup|api|scan|sql|revenuecat|cleanup|last) sub="$1"; shift; "cmd_$sub" "$@" ;;
+  *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
