@@ -79,6 +79,16 @@ describe('Privacy policy', () => {
     expect(PRIVACY_POLICY.effective).toMatch(/2026/);
   });
 
+  // docs/marketing/decisions.md #2 and #7: waitlist sign-ups get a free year of
+  // Premium, matched by comparing the waitlist email with the account email.
+  // docs/launch-open-items.md §6 asks the policy to say so before the waitlist grows.
+  it('says the waitlist email is matched to the account to apply the offer', () => {
+    expect(text()).toMatch(/joined the waitlist on our website/i);
+    expect(text()).toMatch(/compare it with the email address on your account/i);
+    expect(text()).toMatch(/free year of Premium/);
+    expect(text()).toMatch(/Resend sends account emails[^.]*and keeps our waitlist/);
+  });
+
   // docker/docker-compose.yml rotates logs by size (5 × 10 MB per service), and
   // a host job deletes rotated files after 30 days (docs/DEPLOYMENT.md 1.9).
   // A quiet service's current file can hold older lines, so the text must not
