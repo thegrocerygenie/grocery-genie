@@ -3,7 +3,7 @@
 ## Receipt Capture
 
 1. **Damaged/faded receipts:** Extraction proceeds on visible content. Missing fields flagged. User prompted to fill gaps. No data fabricated.
-2. **Multi-page receipts:** MVP supports single-page only. Multi-page scanned as separate images, manually linked. V1.1 stretch: multi-image linking.
+2. **Multi-page receipts:** MVP supports single-page only. Each page is scanned as a separate receipt; nothing links the pages (Scan keeps the first page of a multi-page scan and says so, and a multi-page PDF is rejected). V1.1 stretch: multi-image linking.
 3. **Non-receipt images:** Zero items extracted or confidence < 0.3 → rejected with clear error ("This doesn't appear to be a receipt").
 4. **Duplicate submission:** Check for exact duplicate (same store, date, total, item count) within 24 hours. Warn before saving.
 5. **Extremely long receipts (50+ items):** Pagination in review UI. Progress indicator for extended processing.
