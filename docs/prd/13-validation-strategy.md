@@ -206,7 +206,7 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-06 | 3 | Chosen day, 9 AM local time | Integration | `backend/tests/tasks/test_summary_tasks.py::test_recipients_only_on_users_chosen_day` | Pass |
 | BC-06 | 4 | Links to full dashboard | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "falls back to the dashboard when the route is missing" | Pass |
 
-V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02. PI-03 (price change alerts) and PI-04 (cross-store comparison) are not built yet.
+V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02. PI-04 (cross-store comparison) has its backend; its screen (AC 4) is the mobile task. PI-03 (price change alerts) is not built yet.
 
 | Story | AC | Criterion | Type | Test | Status |
 |---|---|---|---|---|---|
@@ -230,6 +230,17 @@ V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02. PI-03
 | PI-02 | 3 | Manually unlink items | Component | `mobile/src/__tests__/priceHistory.test.tsx` "splits a name off into its own item after confirming" | Pass |
 | PI-02 | 4 | Confirmed matches give a canonical name with aliases | Integration | `backend/tests/api/test_items.py::test_accepting_a_suggestion_merges_the_history` | Pass |
 | PI-02 | 4 | Confirmed matches give a canonical name with aliases | Integration | `backend/tests/api/test_items.py::test_rename_item` | Pass |
+| PI-04 | 1 | Side-by-side pricing across all stores with prices | Integration | `backend/tests/api/test_price_comparison.py::test_side_by_side_latest_and_average_per_store` | Pass |
+| PI-04 | 1 | Side-by-side pricing across all stores with prices | Integration | `backend/tests/api/test_price_comparison.py::test_stores_are_cheapest_first_by_average` | Pass |
+| PI-04 | 2 | Most recent and average price per store | Integration | `backend/tests/api/test_price_comparison.py::test_side_by_side_latest_and_average_per_store` | Pass |
+| PI-04 | 2 | Most recent and average price per store | Integration | `backend/tests/api/test_price_comparison.py::test_only_like_for_like_prices_are_compared` | Pass |
+| PI-04 | 2 | Most recent and average price per store | Integration | `backend/tests/api/test_price_comparison.py::test_prices_in_another_currency_are_not_compared` | Pass |
+| PI-04 | 2 | Most recent and average price per store | Integration | `backend/tests/api/test_price_comparison.py::test_average_is_rounded_half_up_to_the_cent` | Pass |
+| PI-04 | 3 | Only stores the user has scanned from | Integration | `backend/tests/api/test_price_comparison.py::test_only_stores_the_user_bought_from_are_shown` | Pass |
+| PI-04 | 3 | Only stores the user has scanned from | Integration | `backend/tests/api/test_price_comparison.py::test_comparison_is_private_and_unknown_items_are_404` | Pass |
+| PI-04 | FR | Minimum 2 observations per store per item | Integration | `backend/tests/api/test_price_comparison.py::test_a_store_needs_two_prices_to_be_compared` | Pass |
+| PI-04 | FR | Minimum 2 observations per store per item | Integration | `backend/tests/api/test_price_comparison.py::test_one_price_anywhere_compares_nothing` | Pass |
+| PI-04 | 4 | From item detail or a comparison screen | Component | Mobile task, not built yet (it reads `GET /api/items/{id}/compare`) | Pending |
 | BC-FR | Trends | 12-month trend (V1.1), Premium per D2 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_for_premium` | Pass |
 | BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_premium_user_still_gets_3_months_by_default` | Pass |
 | BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_trend_is_3_months_with_months_3` | Pass |
