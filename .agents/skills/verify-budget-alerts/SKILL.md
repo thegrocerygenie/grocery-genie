@@ -32,11 +32,13 @@ Expected rows as of the sync commit:
 | `confirm` | pass | The code: 3 receipts, thresholds 50/80/100, any interleaving, 1 rollback |
 | `confirm-missed` | pass | **Finding H1**, fixed: the H1 trace's setup, with the budget row lock |
 | `confirm-fix-rowlock` | pass | The H1 fix with 3 receipts, both confirm properties |
+| `confirm-rollover` | pass | The code with a rollover run (V11-P3): 3 receipts this period, 1 dated last period that shrinks this period's limit |
 | `push` | pass | The code: 3 notifications, 2 workers, Expo may reject, no faults |
 | `push-crash` | pass | **Finding H2, fixed**: the code with one fault |
 | `push-chunks` | pass | **Finding H2b, fixed**: the code with two Expo requests per batch |
 | `break-confirm-no-rowlock` | violation NoMissedAlert | Broken variant: the code before the H1 fix |
 | `break-confirm-no-unique` | violation OneAlertPerThreshold | Broken variant: proves the property can fail |
+| `break-confirm-rollover-prior-unchecked` | violation NoMissedAlert | Broken variant: under a rollover run, a last-period receipt does not check this period |
 | `break-push-no-lock` | violation PushAtMostOnce | Broken variant: proves the property can fail |
 | `break-push-no-expiry` | violation EveryPushSettles | Broken variant: proves the property can fail |
 | `break-push-retry-unknown` | violation PushAtMostOnce | Broken variant: H2 comes back if an unknown outcome is retried |
@@ -124,13 +126,16 @@ Before the fix, `repro/h2_push_resend.py` pushed messages twice in every scenari
 
 Verified, within the bounds in each config:
 - **Confirm side:** one user, one overall budget, one period. Each receipt adds one unit of spend; up to 3 receipts, thresholds 50/80/100, 1 injected rollback. Postgres runs at READ COMMITTED, the default, since no isolation level is set.
+- **Rollover (V11-P3):** with a Premium rollover run, the period's limit is the budget plus last period's unspent amount (never less than the budget), derived from spend in `rollover_carries` under the same budget lock as the spend read. A receipt dated last period then lowers this period's limit, so `check_thresholds` checks the current period for it (its `earliest_past` branch). `confirm-rollover` adds one such receipt to three this-period ones; the model's carry spans one period, with a zero opening.
 - **Push side:** up to 3 notifications, 2 workers, `BATCH_SIZE` and the chunk size as set in each config. Expo may reject any request, any number of times. Up to 1 crash, failed commit, or lost response.
 
 Left out:
 - category budgets (same steps, another budget row). A category correction recategorizes same-named items on the user's other receipts (`_retroactive_category_update`), which moves category spend in their periods. `update_receipt` passes every such date, with the receipt's own, to one `check_thresholds` call: it locks the budgets once, then reads and claims per period. Per period that is the same `Flush`, `Read`, `Claim`. One call keeps one lock pass: a second pass in the same transaction could lock a budget created in between after a concurrent confirm took it, and deadlock;
 - an edit that lowers a confirmed receipt's spend, or moves its date to another period: spend in the model only grows. Neither can break a property: the old period reaches fewer thresholds, and an edit to a confirmed receipt runs the alert check for its new date (`update_receipt` → `_alert_on_thresholds`);
 - editing a budget during a period (`save_budget` updates the active budget in place, `update_budget` can move `period_start`). The model holds one budget at a fixed amount. An in-place save waits on the confirm's budget row lock (`check_thresholds` locks the user's active budgets), so it cannot interleave with `Read` and `Claim`. Creating or reviving a budget takes no such wait, and a confirm already in flight checks only the budgets it locked. Thresholds already in `budget_alerts_sent` for the period stay claimed after a raise, so they do not alert again at the new amount;
-- receipts outside the periods that hold yesterday, today, and tomorrow (`clock.today()`, UTC; a day either side covers the user's local date). `check_thresholds` drops their periods before the lock, so they never lock, read, or claim, and send no alert (M5). The model's one period is the current one. A receipt dated in a later period does not alert when that period begins;
+- receipts outside the periods that hold yesterday, today, and tomorrow (`clock.today()`, UTC; a day either side covers the user's local date). `check_thresholds` drops their periods before the lock, so they never lock, read, or claim, and send no alert in their own period (M5). The model's one period is the current one. A receipt dated in a later period does not alert when that period begins. The exception is an earlier-period receipt under a rollover run, modeled above: it checks the current period;
+- rollover carries longer than one period, openings from a restarted run, and category runs: the carry is a sum over earlier periods' spend, all read under the one lock, and only grows the limit's sensitivity to earlier spend in the same direction (more spend, lower limit), so a longer chain is the same `Read` with a different `Limit`;
+- changes to the limit that are not confirms: turning rollover on or off (`set_rollover`), restarting runs on an amount, start-day or currency change (`_restart_rollover`, `restart_rollovers` from `PATCH /api/users/me`), and Premium starting or lapsing (`is_premium`, written by RevenueCat). Like a budget edit, each changes the limit outside `Read`; one that lowers it (rollover off, a lapse) alerts at the next confirm, not at once. The pre-lock `_running_budgets` check can miss a run turned on concurrently, which only raises the limit, so it reaches no new threshold;
 - two requests confirming the same receipt;
 - the `no_device` path and `DeviceNotRegistered` token deletion;
 - a notification sent to several devices, whose messages can fall in different chunks. The model gives each user one device. `test_failed_chunk_keeps_earlier_chunks_and_retries_only_the_rest` covers two devices;
@@ -150,7 +155,7 @@ A pass covers the model within its bounds, not the whole system.
 
 ## Coverage record
 
-Sync commit: `dcc0b0c`
+Sync commit: `4486047`
 
 The verification was last confirmed to describe these files and functions at the sync commit. `run.sh` reads this table and the sync commit.
 
@@ -158,10 +163,11 @@ The verification was last confirmed to describe these files and functions at the
 | --- | --- | --- |
 | `backend/app/core/dependencies.py` | `get_db`, `engine` (no isolation level) | `ConfirmAlerts`: `Commit`, `Abort` |
 | `backend/app/services/receipt_service.py` | `confirm_receipt`, `update_receipt` (date and status branches: the date is set before the status branch, in the same transaction; an already confirmed receipt is not confirmed again and cannot leave `confirmed` (422), an edit to one flushes, then runs `_alert_on_thresholds`, and every edit alerts in the periods `_retroactive_category_update` changed), `create_manual_receipt`, `_after_confirm` and `_alert_on_thresholds` (every alert path shares them); watched, not modeled: `_record_prices` (before the budget check) and `_alert_on_price_changes` (after it; see Scope) | `ConfirmAlerts`: `Flush` |
-| `backend/app/services/budget_service.py` | `check_thresholds` (budget row lock, taken once for every period it checks), `get_spending_by_category`, `_active_thresholds`, `claim_alert`; watched, not modeled: `get_period_containing` (picks the period whose spend `Read` sums; the model holds one period), `save_budget`, `update_budget`, `restore_budget` (they write budget rows the `Read` step locks) | `ConfirmAlerts`: `Read`, `Claim` |
+| `backend/app/services/budget_service.py` | `check_thresholds` (budget row lock, taken once for every period it checks), `get_spending_by_category`, `_active_thresholds`, `claim_alert`; watched, not modeled: `get_period_containing` (picks the period whose spend `Read` sums; the model holds one period), `save_budget`, `update_budget`, `restore_budget` (they write budget rows the `Read` step locks); rollover (V11-P3): `rollover_carries`, `_carries`, `_spend_by_period` (the limit, read in `_period_breaches` under the lock) and the `earliest_past` branch of `check_thresholds` are modeled; `set_rollover`, `_restart_rollover`, `restart_rollovers`, `_running_budgets` are watched | `ConfirmAlerts`: `Read`, `Claim`, `Limit`, `Checks` |
 | `backend/app/services/notification_service.py` | `create_notification` | `ConfirmAlerts`: `Claim` |
 | `backend/app/services/price_alert_service.py` | watched, not modeled: `detect`, `claim` (the second `notifications` writer and its ledger lock order; see Scope) | none |
-| `backend/app/models/database.py` | `BudgetAlertSent` unique key, `Notification.push_status`, `ix_notifications_push_pending`, `ix_notifications_push_sending`; watched: `PriceAlertSent` unique key | `UniqueLedger`, `PushDelivery` statuses |
+| `backend/app/models/database.py` | `BudgetAlertSent` unique key, `Notification.push_status`, `ix_notifications_push_pending`, `ix_notifications_push_sending`; watched: `PriceAlertSent` unique key, `Budget.rollover_enabled`, `rollover_start`, `rollover_opening`, the `User.premium_*` columns | `UniqueLedger`, `PushDelivery` statuses, `Rollover` |
+| `backend/app/core/entitlements.py` | watched, not modeled: `is_premium` (whether a rollover carry applies to the limit) | `Rollover` |
 | `backend/app/tasks/push_tasks.py` | `deliver_pending_pushes`, `BATCH_SIZE`; `push_data` builds each message's payload (a price alert carries its item's url), not modeled: the model is the same for any payload | `PushDelivery`: `Expire`, `Select`, `Claim`, `Record`, `Finish`, `Crash` |
 | `backend/app/services/push_service.py` | `ExpoPushClient.send`, `expo_rejected`, `EXPO_MAX_BATCH` | `PushDelivery`: `SendChunk` |
 | `backend/app/tasks/celery_app.py` | `deliver-pending-pushes` beat schedule | `PushDelivery`: workers and fairness |
