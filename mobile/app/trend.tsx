@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,9 +10,14 @@ import {
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import SegmentedControl from '@react-native-segmented-control/segmented-control';
 
-import { colors, radii, spacing, type } from '@/constants/theme';
+import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
+import { PremiumUpgradePrompt } from '@/components/PremiumUpgradePrompt';
+import { TREND_STRINGS } from '@/features/budget/content/trend';
 import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
+import type { TrendMonths } from '@/features/budget/services/budgetApi';
+import { isPremiumRequired } from '@/utils/premium';
 import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
 import { useBudgetStore } from '@/store/budgetStore';
 import { formatMoney } from '@/utils/money';
@@ -85,27 +91,37 @@ export default function TrendScreen() {
   const { selectedPeriod } = useBudgetStore();
   const currency = useBudgetCurrency();
   const money = (amount: number) => formatMoney(amount, currency, { decimals: 0 });
+  // V1.1: 3 months by default; 12 is Premium (D2) and asked for only when picked.
+  const [trendMonths, setTrendMonths] = useState<TrendMonths>(3);
   const { data, isLoading } = useDashboardSpending(selectedPeriod);
+  const yearly = useDashboardSpending(selectedPeriod, 12, { enabled: trendMonths === 12 });
+  const chartData = trendMonths === 12 ? yearly.data : data;
+  const compact = trendMonths === 12;
 
-  const breakdown = useMemo(() => buildTrendBreakdown((data?.trend ?? []).slice(0, 3)), [data]);
+  const breakdown = useMemo(
+    () => buildTrendBreakdown((chartData?.trend ?? []).slice(-trendMonths)),
+    [chartData, trendMonths],
+  );
   const months = useMemo(
     () =>
       breakdown.months.map((m) => ({
         period: m.period,
-        label: periodLabel(m.period),
+        // Twelve bars leave room for one letter each; VoiceOver reads the full name.
+        label: compact ? periodLabel(m.period).charAt(0) : periodLabel(m.period),
         total: m.total,
         segments: m.segments,
       })),
-    [breakdown],
+    [breakdown, compact],
   );
 
   const max = months.length > 0 ? Math.max(...months.map((m) => m.total), 1) : 1;
   const exactAvg = months.length > 0 ? months.reduce((s, m) => s + m.total, 0) / months.length : 0;
   const avg = Math.round(exactAvg);
-  // Design "3-month trend": the average against the 3 months before. Only with
+  // Design "3-month trend": the average against the same span before. Only with
   // a full window and spending before it; a percentage of nothing means nothing.
   const priorChange =
-    months.length === 3 ? percentChange(exactAvg, data?.prior_average ?? 0) : null;
+    months.length === trendMonths ? percentChange(exactAvg, chartData?.prior_average ?? 0) : null;
+  const hasData = (data?.trend ?? []).length > 0;
 
   // BC-04 AC 2: this month vs last month, for the total and per category.
   const period = data?.period ?? selectedPeriod;
@@ -135,7 +151,7 @@ export default function TrendScreen() {
           <View style={styles.loading}>
             <ActivityIndicator color={colors.tint} />
           </View>
-        ) : months.length === 0 ? (
+        ) : !hasData ? (
           <View style={styles.empty}>
             <Text style={[type.headline, { textAlign: 'center' }]}>Not enough data yet</Text>
             <Text
@@ -149,6 +165,13 @@ export default function TrendScreen() {
           </View>
         ) : (
           <>
+            <SegmentedControl
+              values={[...TREND_STRINGS.monthsOptions]}
+              selectedIndex={trendMonths === 12 ? 1 : 0}
+              onChange={(e) => setTrendMonths(e.nativeEvent.selectedSegmentIndex === 1 ? 12 : 3)}
+              accessibilityLabel={TREND_STRINGS.monthsControlLabel}
+              style={styles.segmented}
+            />
             <View style={styles.summaryCard}>
               <Text style={styles.caption}>{monthName(period)} spending</Text>
               <View style={styles.totalRow}>
@@ -166,45 +189,81 @@ export default function TrendScreen() {
                   </Text>
                 ) : null}
               </View>
-              <View style={styles.averageRow}>
-                <Text style={styles.caption}>
-                  {months.length}-month average {money(avg)}
-                </Text>
-                {priorChange !== null ? (
-                  <Text
-                    style={[styles.priorChange, { color: changeColor(priorChange) }]}
-                    accessibilityLabel={
-                      priorChange === 0
-                        ? 'Same as the 3 months before'
-                        : `${changeWords(priorChange).replace(/^./, (c) => c.toUpperCase())} from the 3 months before`
-                    }
-                  >
-                    {changeText(priorChange)} vs prior 3 months
+              {compact && isPremiumRequired(yearly.error) ? (
+                // D2: a free user asking for 12 months is invited, never shown an error.
+                // V11-P0 passes onUpgrade (and upgradeLabel) to route to its paywall.
+                <PremiumUpgradePrompt
+                  title={TREND_STRINGS.upgradeTitle}
+                  message={TREND_STRINGS.upgradeMessage}
+                />
+              ) : compact && yearly.isError ? (
+                <View style={styles.chartStatus}>
+                  <Text style={[type.subheadline, styles.statusText]}>
+                    {TREND_STRINGS.loadErrorTwelve}
                   </Text>
-                ) : null}
-              </View>
-              <View style={styles.chart}>
-                {months.map((m) => {
-                  const h = (m.total / max) * 130;
-                  return (
-                    <View
-                      key={m.label}
-                      style={styles.chartCol}
-                      accessible
-                      accessibilityLabel={`${monthName(m.period)}: ${money(m.total)}`}
-                    >
-                      <Text style={[type.caption1, { fontWeight: '600', color: colors.iosLabel }]}>
-                        ${m.total.toFixed(0)}
+                  <Pressable
+                    style={styles.retry}
+                    onPress={() => void yearly.refetch()}
+                    accessibilityRole="button"
+                    accessibilityLabel={TREND_STRINGS.retryLabel}
+                  >
+                    <Text style={styles.retryLabel}>{TREND_STRINGS.retry}</Text>
+                  </Pressable>
+                </View>
+              ) : compact && !yearly.data ? (
+                <View style={styles.chartStatus}>
+                  <ActivityIndicator color={colors.tint} />
+                </View>
+              ) : (
+                <>
+                  <View style={styles.averageRow}>
+                    <Text style={styles.caption}>
+                      {`${TREND_STRINGS.average(months.length)} ${money(avg)}`}
+                    </Text>
+                    {priorChange !== null ? (
+                      <Text
+                        style={[styles.priorChange, { color: changeColor(priorChange) }]}
+                        accessibilityLabel={
+                          priorChange === 0
+                            ? TREND_STRINGS.samePrior(trendMonths)
+                            : `${changeWords(priorChange).replace(/^./, (c) => c.toUpperCase())} ${TREND_STRINGS.fromPrior(trendMonths)}`
+                        }
+                      >
+                        {`${changeText(priorChange)} ${TREND_STRINGS.versusPrior(trendMonths)}`}
                       </Text>
-                      <View style={[styles.bar, { height: Math.max(h, 6) }]}>
-                        <StackedFill period={m.period} total={m.total} segments={m.segments} />
-                      </View>
-                      <Text style={[type.caption1, { color: colors.iosLabel2 }]}>{m.label}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-              {breakdown.categories.length > 0 ? (
+                    ) : null}
+                  </View>
+                  <View style={[styles.chart, compact && styles.chartCompact]}>
+                    {months.map((m) => {
+                      const h = (m.total / max) * 130;
+                      return (
+                        <View
+                          key={m.period}
+                          style={styles.chartCol}
+                          accessible
+                          accessibilityLabel={`${monthName(m.period)}: ${money(m.total)}`}
+                        >
+                          {/* Twelve amounts do not fit above narrow bars; VoiceOver reads each. */}
+                          {compact ? null : (
+                            <Text style={styles.barValue}>${m.total.toFixed(0)}</Text>
+                          )}
+                          <View
+                            style={[
+                              styles.bar,
+                              compact && styles.barCompact,
+                              { height: Math.max(h, 6) },
+                            ]}
+                          >
+                            <StackedFill period={m.period} total={m.total} segments={m.segments} />
+                          </View>
+                          <Text style={styles.barLabel}>{m.label}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+              {(!compact || yearly.data) && breakdown.categories.length > 0 ? (
                 <View style={styles.legend}>
                   {breakdown.categories.map((c) => (
                     <View
@@ -386,11 +445,24 @@ const styles = StyleSheet.create({
     height: 170,
     paddingTop: spacing.lg,
   },
+  chartCompact: {
+    // Twelve bars across an iPhone SE card (about 290pt): ~20pt each.
+    gap: spacing.xs,
+  },
   chartCol: {
     flex: 1,
     alignItems: 'center',
     gap: 6,
     justifyContent: 'flex-end',
+  },
+  barValue: {
+    ...type.caption1,
+    fontWeight: '600',
+    color: colors.iosLabel,
+  },
+  barLabel: {
+    ...type.caption1,
+    color: colors.iosLabel2,
   },
   bar: {
     width: 36,
@@ -398,6 +470,34 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     overflow: 'hidden',
     justifyContent: 'flex-end',
+  },
+  barCompact: {
+    width: '100%',
+    maxWidth: 20,
+    borderRadius: 4,
+  },
+  segmented: {
+    height: touchTarget.minHeight,
+  },
+  chartStatus: {
+    minHeight: 170,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  statusText: {
+    color: colors.iosLabel2,
+    textAlign: 'center',
+  },
+  retry: {
+    ...touchTarget,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryLabel: {
+    ...type.headline,
+    color: colors.tint,
   },
   barFill: {
     width: '100%',

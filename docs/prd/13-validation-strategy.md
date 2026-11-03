@@ -248,7 +248,13 @@ V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02. PI-04
 | BC-FR | Trends | Free user asking for 12 months gets `403 premium_required` | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_needs_premium` | Pass |
 | BC-FR | Trends | Nobody is Premium until V11-P0 | Unit | `backend/tests/core/test_entitlements.py::test_nobody_is_premium_until_the_premium_tier_ships` | Pass |
 | BC-04 | 5 | 12-month dashboard loads within 2 seconds | Integration | `backend/tests/api/test_p95_postgres.py::test_dashboard_12_month_trend_p95_under_2s` (Postgres) | Pass |
-| BC-FR | Trends | 3/12-month toggle on Trend (V11-06b) | — | none | Gap: mobile is V11-06b |
+| BC-FR | Trends | 3/12-month toggle on Trend; 3 stays the default | Component | `mobile/src/__tests__/trendMonths.test.tsx` "shows 3 months by default and asks the server for 3" | Pass |
+| BC-FR | Trends | 3/12-month toggle on Trend; 12 months charts every month | Component | `mobile/src/__tests__/trendMonths.test.tsx` "switching to 12 months asks the server for 12 and charts every month" | Pass |
+| BC-FR | Trends | 3/12-month toggle on Trend; 12 months charts every month | Component | `mobile/src/__tests__/trendMonths.test.tsx` "compares the 12-month average with the 12 months before" | Pass |
+| BC-FR | Trends | Free user sees an upgrade prompt, not an error (D2) | Component | `mobile/src/__tests__/trendMonths.test.tsx` "a free user asking for 12 months sees an upgrade prompt, not an error" | Pass |
+| BC-FR | Trends | Free user sees an upgrade prompt, not an error (D2) | Component | `mobile/src/__tests__/trendMonths.test.tsx` "switching back to 3 months after the upgrade prompt shows the 3-month chart" | Pass |
+| BC-FR | Trends | Free user sees an upgrade prompt, not an error (D2) | Component | `mobile/src/components/__tests__/PremiumUpgradePrompt.test.tsx` "calls onUpgrade when the upgrade button is tapped (the V11-P0 paywall seam)" | Pass |
+| BC-FR | Trends | Another 12-month load failure offers a retry | Component | `mobile/src/__tests__/trendMonths.test.tsx` "another failure loading 12 months offers a retry" | Pass |
 
 This matrix is the source of truth for completeness. A phase is not done until every row has a passing test.
 
