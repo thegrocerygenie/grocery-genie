@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, type AlertButton } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import * as DocumentPicker from 'expo-document-picker';
@@ -14,6 +14,7 @@ import { useReceiptStore } from '@/store/receiptStore';
 import { useReceiptImport } from '../hooks/useReceiptImport';
 import { persistCapturedImage } from '../services/pendingImageFiles';
 import { scanReceipt } from '../services/receiptApi';
+import { QUOTA_ACTIONS, QUOTA_MESSAGE, QUOTA_TITLE } from '../utils/scanQuota';
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
@@ -135,6 +136,33 @@ it('shows the server reason and stays put when the upload is rejected', async ()
   );
   expect(mockPush).not.toHaveBeenCalled();
   expect(result.current.progress).toBeNull();
+});
+
+it('answers the monthly quota with the Premium upgrade prompt, not an error (D2)', async () => {
+  getDocument.mockResolvedValue({
+    canceled: false,
+    assets: [{ uri: 'file:///r.pdf', name: 'r.pdf', mimeType: 'application/pdf', size: 1000 }],
+  });
+  scan.mockRejectedValue(
+    new ApiError(429, {
+      detail: 'Monthly receipt quota exceeded (20 receipts/month on Free tier).',
+      code: 'receipt_quota_exceeded',
+    }),
+  );
+  const { result } = renderImportHook();
+
+  await act(() => result.current.importFrom('files'));
+
+  const alert = Alert.alert as jest.Mock;
+  expect(alert).toHaveBeenCalledTimes(1);
+  const [title, message, buttons] = alert.mock.calls[0];
+  expect(title).toBe(QUOTA_TITLE);
+  expect(message).toBe(QUOTA_MESSAGE);
+  expect(title).not.toBe('Couldn’t import receipt');
+  buttons.find((b: AlertButton) => b.text === QUOTA_ACTIONS.upgrade).onPress();
+  expect(mockPush).toHaveBeenCalledWith('/paywall');
+  buttons.find((b: AlertButton) => b.text === QUOTA_ACTIONS.manual).onPress();
+  expect(mockPush).toHaveBeenCalledWith('/manual-entry');
 });
 
 it('reports a picker that fails to open', async () => {

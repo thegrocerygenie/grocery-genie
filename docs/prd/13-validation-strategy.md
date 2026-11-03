@@ -355,6 +355,32 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PREM | D1 | Settings → Premium row, from the backend `is_premium` | Component | `mobile/src/__tests__/settingsHub.test.tsx` "a Premium user sees Premium, from the backend profile" | Pass |
 | PREM | D1 | Upgrade prompt opens the paywall (D2) | Component | `mobile/src/__tests__/trendMonths.test.tsx` "the upgrade prompt opens the Premium paywall (V11-P0)" | Pass |
 | PREM | D1 | Deleting the account says the subscription is not cancelled | Component | `mobile/src/__tests__/deleteAccountScreen.test.tsx` "says a Premium subscription is not cancelled by deleting (V11-P0)" | Pass |
+| PREM | D1 | Premium is never active with no expiry from a late grant or a refund | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_cancellation_without_expiry_before_its_purchase_grants_no_open_premium` | Pass |
+| PREM | D1 | Premium is never active with no expiry from a late grant or a refund | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refunded_non_renewing_purchase_arriving_late_grants_nothing` | Pass |
+| PREM | D1 | Premium is never active with no expiry from a late grant or a refund | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refund_of_a_non_renewing_purchase_ends_premium` | Pass |
+| PREM | D1 | A refund (`cancel_reason` `CUSTOMER_SUPPORT`) with no expiry ends Premium despite a stored future expiry | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refund_without_expiry_ends_premium_despite_a_stored_future_expiry` | Pass |
+| PREM | D1 | A refund (`cancel_reason` `CUSTOMER_SUPPORT`) with no expiry ends Premium despite a stored future expiry | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_purchase_arriving_after_its_refund_without_expiry_grants_nothing` | Pass |
+| PREM | D1 | A plain cancellation with no expiry keeps Premium to the stored expiry | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_plain_cancellation_without_expiry_keeps_the_stored_expiry` | Pass |
+| PREM | D2 | Free user over the monthly cap: `429` with `code` `receipt_quota_exceeded` | Integration | `backend/tests/api/test_free_tier_quota.py::test_scan_blocked_at_quota` | Pass |
+| PREM | D2 | Free user over the monthly cap: `429` with `code` `receipt_quota_exceeded` | Integration | `backend/tests/api/test_free_tier_quota.py::test_quota_429_carries_a_stable_code_for_the_upgrade_prompt` | Pass |
+| PREM | D2 | Manual entry stays open at the cap | Integration | `backend/tests/api/test_free_tier_quota.py::test_manual_entry_is_not_capped_at_quota` | Pass |
+| PREM | D2 | Premium user is not blocked by the cap | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_premium_user_scans_past_the_free_quota` | Pass |
+| PREM | D2 | Free features stay free: price history | Integration | `backend/tests/api/test_premium_gating.py::test_price_history_is_free` | Pass |
+| PREM | D2 | Free features stay free: cross-store comparison | Integration | `backend/tests/api/test_premium_gating.py::test_price_comparison_is_free` | Pass |
+| PREM | D2 | Free features stay free: item matching | Integration | `backend/tests/api/test_premium_gating.py::test_item_matching_is_free` | Pass |
+| PREM | D2 | Free features stay free: item merge and split | Integration | `backend/tests/api/test_premium_gating.py::test_merge_and_split_are_free` | Pass |
+| PREM | D2 | Free features stay free: accept a match suggestion | Integration | `backend/tests/api/test_premium_gating.py::test_accepting_a_suggestion_is_free` | Pass |
+| PREM | D2 | Free features stay free: reject a match suggestion | Integration | `backend/tests/api/test_premium_gating.py::test_rejecting_a_suggestion_is_free` | Pass |
+| PREM | D2 | Free features stay free: price alerts | Integration | `backend/tests/api/test_premium_gating.py::test_price_alerts_are_free` | Pass |
+| PREM | D2 | 12-month trend is Premium, one `403 premium_required` shape; 3 months stays free | Integration | `backend/tests/api/test_premium_gating.py::test_three_month_trend_is_free_and_twelve_is_premium` | Pass |
+| PREM | D2 | App knows the cap by its code | Unit | `mobile/src/features/receipt-capture/__tests__/offlineQueue.test.ts` "spots the quota by its code, whatever the detail says" | Pass |
+| PREM | D2 | A capped queued photo is retryable once the user is Premium (backend `is_premium`) | Component | `mobile/src/__tests__/historyOfflineQueue.test.tsx` "offers a retry, not Premium, once the user has upgraded (V11-P4)" | Pass |
+| PREM | D2 | A capped queued photo is retryable once the user is Premium (backend `is_premium`) | Component | `mobile/src/__tests__/historyOfflineQueue.test.tsx` "queues the retry for later when a Premium user is offline" | Pass |
+| PREM | D2 | Camera scan at the cap: upgrade prompt opens the paywall, no error | Component | `mobile/src/__tests__/scanOfflineQueue.test.tsx` "does not queue a photo over the monthly quota, and invites an upgrade (D2)" | Pass |
+| PREM | D2 | Import at the cap: upgrade prompt opens the paywall, no error | Component | `mobile/src/features/receipt-capture/__tests__/useReceiptImport.test.tsx` "answers the monthly quota with the Premium upgrade prompt, not an error (D2)" | Pass |
+| PREM | D2 | Import at the cap: upgrade prompt opens the paywall, no error | Unit | `mobile/src/features/receipt-capture/__tests__/receiptImport.test.ts` "does not queue a file over the monthly quota, and reports the quota" | Pass |
+| PREM | D2 | Queued photo that hit the cap: upgrade prompt opens the paywall | Component | `mobile/src/__tests__/historyOfflineQueue.test.tsx` "offers Premium for a photo over the monthly quota, and keeps the photo (D2)" | Pass |
+| PREM | D2 | Cap, Premium unblock and free endpoints through the API | E2E | `.agents/skills/verify-grocery-genie/features/premium.md` `premium-quota-free`, `premium-unlimited`, `premium-free-features` | Pass |
 | PREM | D1 | Sandbox purchase and restore on a device | Manual | `docs/DEPLOYMENT.md` 2.9 step 6 (needs the RevenueCat keys and App Store product) | Pending |
 | PREM | NFR-P2 | Export: JSON with receipts, line items, budgets and prices | Integration | `backend/tests/api/test_data_export.py::test_json_export_has_receipts_line_items_budgets_and_prices` | Pass |
 | PREM | NFR-P2 | Export: CSV, a zip with one file per entity | Integration | `backend/tests/api/test_data_export.py::test_csv_export_is_a_zip_of_one_file_per_entity` | Pass |
@@ -534,9 +560,10 @@ To stop the server, stop the backend process the phone points at (`EXPO_PUBLIC_A
 
 - [ ] Server down, relaunch as a user with receipts: Budget shows "Couldn't load your budget" and History shows "Couldn't load your receipts", each with **Try Again**. Neither shows "Scan your first receipt" or "No receipts yet".
 - [ ] **Try Again** with the server back loads the data.
-- [ ] At the quota, a camera scan shows "Monthly scan limit reached". The photo is not queued: nothing appears under Pending.
-- [ ] At the quota, an import from Photos or Files shows the monthly-limit alert, not "Saved to upload later". Nothing appears under Pending.
-- [ ] A receipt queued offline that hits the quota when it syncs: its Pending row says "Monthly scan limit reached", and tapping it offers Enter manually or Discard. It does not retry.
+- [ ] At the quota (free plan), a camera scan shows the upgrade prompt "You’ve used this month’s free scans" with See Premium (opens the paywall), Enter manually and Cancel; no error pill (D2). The photo is not queued: nothing appears under Pending.
+- [ ] At the quota, an import from Photos or Files shows the same upgrade prompt, not "Couldn’t import receipt" or "Saved to upload later". Nothing appears under Pending.
+- [ ] A receipt queued offline that hits the quota when it syncs: its Pending row says "Monthly scan limit reached", and tapping it shows the upgrade prompt with See Premium, Enter manually, Discard and Cancel. It does not retry.
+- [ ] A Premium account past 20 receipts this month scans without any prompt.
 
 Simulator run on 2026-10-27 (PR #21) passed the server-down, automatic-retry, and import-quota items. Not yet run anywhere: the Retry Now tap, the camera quota message, the airplane-mode reconnect, and the queued receipt that hits the quota.
 

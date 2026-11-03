@@ -212,7 +212,7 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
 
 ## Premium [V1.1]
 
-Premium ($5.99/month, decision D1) is an App Store subscription sold through RevenueCat. The backend trusts only RevenueCat for it: the webhook below and RevenueCat's REST API, never the app. Premium gates only the V1.1 extras (D2): the 12-month trend, custom categories, data export, budget rollover, and unlimited receipts. A free user asking for one gets `403 premium_required` (above).
+Premium ($5.99/month, decision D1) is an App Store subscription sold through RevenueCat. The backend trusts only RevenueCat for it: the webhook below and RevenueCat's REST API, never the app. Premium gates only the V1.1 extras (D2): the 12-month trend, custom categories, data export, budget rollover, and unlimited receipts. A free user asking for the trend, custom categories, export or rollover gets `403 premium_required` (above). The receipt cap is the one exception: a free user past it gets `429 receipt_quota_exceeded` (below), because the scan itself stays free.
 
 The profile (`/api/auth/me`, `/api/users/me`, and every route that returns it) carries the entitlement:
 ```json
@@ -221,7 +221,13 @@ The profile (`/api/auth/me`, `/api/users/me`, and every route that returns it) c
 ```
 `premium_expires_at` is the end of the paid period (null for a free user, or a grant with no end). A user is Premium while the entitlement is active and before that time, so a missed expiration webhook cannot keep anyone Premium. `PATCH /api/users/me` cannot set either field.
 
-**Unlimited receipts.** `POST /api/receipts/scan` refuses a free user's scan past `GG_FREE_TIER_RECEIPTS_PER_MONTH` (20) receipts in the month with `429`; a Premium user has no monthly cap (the hourly rate limit still applies).
+**Unlimited receipts.** `POST /api/receipts/scan` refuses a free user's scan past `GG_FREE_TIER_RECEIPTS_PER_MONTH` (20) receipts in the month with `429`; a Premium user has no monthly cap (the hourly rate limit still applies). Manual entries count toward the 20, but `POST /api/receipts` is never refused by the cap. The body:
+```json
+{ "detail": "Monthly receipt quota exceeded (20 receipts/month on Free tier).", "code": "receipt_quota_exceeded", "feature": "unlimited_receipts", "limit": 20 }
+```
+`code` is the stable test; the hourly rate limit's `429` has none. It is not `403 premium_required`, because the scan itself is a free feature: the month's allowance is spent. `detail` stays a string because app builds from before V1.1 match it ("quota") and must keep treating the cap as final, not retrying it. The app answers it with the upgrade prompt (See Premium opens the paywall, or Enter manually), never an error (D2).
+
+Everything else in price intelligence stays free (D2): price history, item matching, price alerts and cross-store comparison answer a free user `200`.
 
 ### POST /api/webhooks/revenuecat
 
@@ -245,7 +251,8 @@ Called by RevenueCat, not the app. Authenticated by the `Authorization` header, 
 | Event `type` | Effect |
 |---|---|
 | `INITIAL_PURCHASE`, `RENEWAL`, `UNCANCELLATION`, `PRODUCT_CHANGE`, `NON_RENEWING_PURCHASE`, `SUBSCRIPTION_EXTENDED`, `TEMPORARY_ENTITLEMENT_GRANT`, `REFUND_REVERSED` | Premium until `expiration_at_ms` (none: no end). |
-| `CANCELLATION`, `BILLING_ISSUE` | Stays as it is; the expiry moves to `expiration_at_ms`. Auto-renew is off, so Premium lasts to the end of the paid period; a refund's expiry is already past, so it ends now. |
+| `CANCELLATION`, `BILLING_ISSUE` | Stays as it is; the expiry moves to `expiration_at_ms` (none sent: the stored expiry stays). Auto-renew is off, so Premium lasts to the end of the paid period. |
+| `CANCELLATION` with `cancel_reason` `CUSTOMER_SUPPORT` (a refund) | Premium ends now and `premium_expires_at` is cleared, whatever expiry the event or the user row holds, so a late grant from before the refund is `stale`. |
 | `EXPIRATION` | Premium ends. |
 | `TRANSFER` | The purchase moved to another app user id (a restore on another account). Each user in `transferred_from` and `transferred_to` is read back from the REST API; without an API key, the old owners lose Premium and the new owner gets it with its next event or refresh. |
 

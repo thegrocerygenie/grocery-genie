@@ -36,6 +36,8 @@ interface OfflineState {
   holdForConsent: (id: string) => void;
   /** Stop uploading a receipt: the server will reject it the same way every time. */
   markFailed: (id: string, failure: NonNullable<PendingReceipt['failure']>) => void;
+  /** Put a `failed` receipt back in the queue, e.g. a capped one after the user upgraded. */
+  requeue: (id: string) => void;
   removePendingReceipt: (id: string) => void;
 }
 
@@ -79,6 +81,15 @@ export const useOfflineStore = create<OfflineState>()(
         set((state) => ({
           pendingReceipts: state.pendingReceipts.map((r) =>
             r.id === id ? { ...r, status: 'failed' as const, failure } : r,
+          ),
+        })),
+
+      requeue: (id) =>
+        set((state) => ({
+          pendingReceipts: state.pendingReceipts.map((r) =>
+            r.id === id
+              ? { ...r, status: 'pending' as const, failure: undefined, lastAttemptFailed: false }
+              : r,
           ),
         })),
 
