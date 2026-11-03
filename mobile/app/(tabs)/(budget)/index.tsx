@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type ColorValue,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
@@ -377,6 +378,7 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
             <Pressable
               onPress={onTopItems}
               hitSlop={6}
+              style={styles.sectionLinkButton}
               accessibilityRole="button"
               accessibilityLabel="Top items"
             >
@@ -398,7 +400,7 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend }: FilledStateProp
         accessibilityLabel="See 3-month trend"
       >
         <SymbolView name="chart.bar.fill" size={16} tintColor={colors.tint} />
-        <Text style={[type.subheadline, { color: colors.tint, fontWeight: '600' }]}>
+        <Text style={styles.trendLabel}>
           See 3-month trend
         </Text>
       </Pressable>
@@ -444,54 +446,80 @@ interface CategoryRowProps {
   showDivider: boolean;
 }
 
+// React Native's iOS font scale at AX1, the first accessibility text size.
+const ACCESSIBILITY_FONT_SCALE = 1.7;
+
 function CategoryRow({ cat, showDivider }: CategoryRowProps) {
   const currency = useBudgetCurrency();
+  const { fontScale } = useWindowDimensions();
   const hasCap = cat.cap > 0;
   const pct = hasCap ? (cat.spent / cat.cap) * 100 : 0;
   const over = pct > 100;
 
-  return (
-    <View
-      style={[styles.catRow, showDivider && { borderTopWidth: StyleSheet.hairlineWidth }]}
-      accessible
-      accessibilityLabel={categoryAccessibilityLabel(cat, currency)}
-    >
-      <View style={[styles.catCircle, { backgroundColor: cat.color }]}>
-        <SymbolView
-          name={cat.symbol as Parameters<typeof SymbolView>[0]['name']}
-          size={14}
-          tintColor="#fff"
-        />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={type.headline}>{cat.name}</Text>
-        <View style={styles.catBarTrack}>
-          <View
-            style={[
-              styles.catBarFill,
-              {
-                width: `${Math.min(hasCap ? pct : 0, 100)}%`,
-                backgroundColor: over ? colors.red : cat.color,
-              },
-            ]}
-          />
-        </View>
-      </View>
+  const circle = (
+    <View style={[styles.catCircle, { backgroundColor: cat.color }]}>
+      <SymbolView
+        name={cat.symbol as Parameters<typeof SymbolView>[0]['name']}
+        size={14}
+        tintColor="#fff"
+      />
+    </View>
+  );
+  const name = <Text style={type.headline}>{cat.name}</Text>;
+  const bar = (
+    <View style={styles.catBarTrack}>
+      <View
+        style={[
+          styles.catBarFill,
+          {
+            width: `${Math.min(hasCap ? pct : 0, 100)}%`,
+            backgroundColor: over ? colors.red : cat.color,
+          },
+        ]}
+      />
+    </View>
+  );
+  const amount = (
+    <>
       {over && (
         // Red is not the only sign of an over-cap category.
         <SymbolView name="exclamationmark.circle.fill" size={15} tintColor={colors.red} />
       )}
-      <Text
-        style={[
-          type.money,
-          {
-            fontSize: 15,
-            color: over ? colors.red : colors.iosLabel,
-          },
-        ]}
-      >
+      <Text style={[styles.catAmount, { color: over ? colors.red : colors.iosLabel }]}>
         {formatMoney(cat.spent, currency, { decimals: 0 })}
       </Text>
+    </>
+  );
+  const rowProps = {
+    accessible: true,
+    accessibilityLabel: categoryAccessibilityLabel(cat, currency),
+  };
+  const divider = showDivider && { borderTopWidth: StyleSheet.hairlineWidth };
+
+  // At accessibility sizes the name, icon and amount do not fit side by side:
+  // the name gets its own full-width line, where it can wrap.
+  if (fontScale >= ACCESSIBILITY_FONT_SCALE) {
+    return (
+      <View style={[styles.catRowStacked, divider]} {...rowProps}>
+        <View style={styles.catTopLine}>
+          {circle}
+          <View style={{ flex: 1 }} />
+          {amount}
+        </View>
+        {name}
+        {bar}
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.catRow, divider]} {...rowProps}>
+      {circle}
+      <View style={{ flex: 1 }}>
+        {name}
+        {bar}
+      </View>
+      {amount}
     </View>
   );
 }
@@ -560,14 +588,19 @@ const styles = StyleSheet.create({
     ...type.footnote,
     color: colors.iosLabel2,
     letterSpacing: 0.5,
+    flexShrink: 1,
   },
+  // Wraps at large text, where the label and the link do not fit on one line.
   sectionHeaderRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: spacing.md,
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xs,
   },
+  sectionLinkButton: { flexShrink: 1 },
   sectionLink: {
     ...type.footnote,
     color: colors.tint,
@@ -578,10 +611,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    height: 44,
+    minHeight: touchTarget.minHeight,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
     borderRadius: radii.list,
     backgroundColor: colors.iosBg2,
     marginTop: spacing.sm,
+  },
+
+  trendLabel: {
+    ...type.subheadline,
+    color: colors.tint,
+    fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'center',
   },
 
   listGroup: {
@@ -597,6 +640,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderTopColor: colors.iosSeparator,
   },
+  catRowStacked: {
+    gap: spacing.sm,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderTopColor: colors.iosSeparator,
+  },
+  catTopLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  catAmount: { ...type.money, fontSize: 15, flexShrink: 0 },
   catCircle: {
     width: 28,
     height: 28,
