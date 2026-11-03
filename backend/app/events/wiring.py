@@ -14,7 +14,12 @@ cross-cutting observability today and a seam for async/out-of-band handlers
 import logging
 
 from app.events.dispatcher import dispatcher
-from app.events.types import ItemCorrected, ItemMatched, ReceiptConfirmed
+from app.events.types import (
+    ItemCorrected,
+    ItemMatched,
+    PriceChangeDetected,
+    ReceiptConfirmed,
+)
 
 logger = logging.getLogger("app.events")
 
@@ -49,6 +54,16 @@ def on_item_matched(event: ItemMatched) -> None:
     )
 
 
+def on_price_change_detected(event: PriceChangeDetected) -> None:
+    logger.info(
+        "PriceChangeDetected item=%s store=%s change=%+.1f%% user=%s",
+        event.canonical_item_id,
+        event.store_id,
+        event.percent_change,
+        event.user_id,
+    )
+
+
 def register_handlers() -> None:
     """Register all event handlers. Idempotent — safe to call more than once."""
     global _registered
@@ -57,4 +72,5 @@ def register_handlers() -> None:
     dispatcher.register(ReceiptConfirmed, on_receipt_confirmed)
     dispatcher.register(ItemCorrected, on_item_corrected)
     dispatcher.register(ItemMatched, on_item_matched)
+    dispatcher.register(PriceChangeDetected, on_price_change_detected)
     _registered = True

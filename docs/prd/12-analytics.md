@@ -25,6 +25,8 @@ MVP notes on the table below:
 | `budget_alert_triggered` | threshold_percent, category | Alert frequency |
 | `budget_alert_opened` | threshold_percent, notification_source (push/in_app) | Alert engagement rate |
 | `price_history_viewed` | canonical_item_id, store_count | Price intelligence engagement |
+| `price_alert_triggered` | direction (up/down), percent_change | Price alert frequency (PI-03) |
+| `price_alert_muted` | scope (item/store) | Price alert fatigue: how often users mute |
 | `item_match_resolved` | decision (accepted/rejected), method (fuzzy/semantic), confidence | Item matching precision against user-confirmed matches |
 | `recipe_suggestion_viewed` | recipe_id, match_score, had_expiring_ingredient | Recipe relevance |
 | `recipe_suggestion_cooked` | recipe_id, ingredients_from_pantry, ingredients_purchased | End-to-end meal planner value |

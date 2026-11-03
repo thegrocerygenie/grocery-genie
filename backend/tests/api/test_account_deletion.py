@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -35,6 +35,9 @@ from app.models.database import (
     ItemMatchSuggestion,
     LineItem,
     Notification,
+    PriceAlertItemMute,
+    PriceAlertSent,
+    PriceAlertStoreMute,
     Receipt,
     ReceiptCorrection,
     User,
@@ -157,6 +160,9 @@ async def _give_user_everything(
         .scalars()
         .first()
     )
+    store_id = (
+        await db.execute(select(Receipt.store_id).where(Receipt.id == receipt_id))
+    ).scalar_one()
     other_item = CanonicalItem(user_id=user_id, canonical_name="Gala Apples")
     db.add(other_item)
     await db.flush()
@@ -175,6 +181,14 @@ async def _give_user_everything(
                 threshold_percent=80,
             ),
             Notification(user_id=user_id, type="budget_alert", title="t", body="b"),
+            # Price change alerts (PI-03): the cooldown ledger and both mutes.
+            PriceAlertSent(
+                user_id=user_id,
+                canonical_item_id=matched_item_id,
+                alerted_at=datetime.now(UTC),
+            ),
+            PriceAlertItemMute(user_id=user_id, canonical_item_id=matched_item_id),
+            PriceAlertStoreMute(user_id=user_id, store_id=store_id),
             AnalyticsEvent(
                 user_id=user_id,
                 event_name="receipt_scan_started",

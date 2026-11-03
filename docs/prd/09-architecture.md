@@ -29,7 +29,7 @@ Downstream features react to domain events asynchronously. This decouples servic
 | `ItemCorrected` | Receipt Ingestion | Category, Item Matching | line_item_id, field, old_value, new_value, user_id |
 | `BudgetThresholdBreached` | Budget | Notification | user_id, budget_id, threshold_percent, current_spend, budget_amount |
 | `ItemMatched` | Item Matching | Price Intelligence | line_item_id, canonical_item_id, match_confidence, match_method |
-| `PriceChangeDetected` | Price Intelligence | Notification | canonical_item_id, store_id, old_avg, new_price, percent_change |
+| `PriceChangeDetected` | Price Intelligence | Notification | user_id, canonical_item_id, store_id, receipt_id, old_avg (30-day), avg_7d, new_price, percent_change, currency, unit_of_measure |
 | `IngredientExpiring` | Pantry | Notification, Recipe | pantry_item_id, ingredient_name, estimated_expiry, days_remaining |
 | `RecipeCooked` | Recipe | Pantry | recipe_id, ingredients_used[] |
 

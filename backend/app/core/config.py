@@ -86,6 +86,14 @@ class Settings(BaseSettings):
     # Below the thresholds above but at least this: ask the user to confirm.
     item_match_suggest_threshold: float = Field(default=0.60, ge=0, le=1)
 
+    # Price change alerts (PI-03). A price at least this far, in percent,
+    # from the item's 30-day average alerts; each user can set their own.
+    price_alert_threshold_percent: int = Field(default=10, ge=1, le=100)
+    # An item alerts at most once in this many days.
+    price_alert_cooldown_days: int = Field(default=7, ge=0)
+    # Earlier prices in the 30-day window needed before there is an average.
+    price_alert_min_observations: int = Field(default=2, ge=1)
+
     # Budget alert thresholds (BC-03: configurable at 50%, 80%, 100%).
     budget_alert_thresholds: list[int] = [50, 80, 100]
 

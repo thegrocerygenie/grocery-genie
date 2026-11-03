@@ -206,7 +206,7 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-06 | 3 | Chosen day, 9 AM local time | Integration | `backend/tests/tasks/test_summary_tasks.py::test_recipients_only_on_users_chosen_day` | Pass |
 | BC-06 | 4 | Links to full dashboard | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "falls back to the dashboard when the route is missing" | Pass |
 
-V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02. PI-03 (price change alerts) and PI-04 (cross-store comparison) are not built yet.
+V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, its app screens (alert tap, mute buttons, threshold setting) come with V11-02. PI-04 (cross-store comparison) is not built yet.
 
 | Story | AC | Criterion | Type | Test | Status |
 |---|---|---|---|---|---|
@@ -230,6 +230,20 @@ V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02. PI-03
 | PI-02 | 3 | Manually unlink items | Component | `mobile/src/__tests__/priceHistory.test.tsx` "splits a name off into its own item after confirming" | Pass |
 | PI-02 | 4 | Confirmed matches give a canonical name with aliases | Integration | `backend/tests/api/test_items.py::test_accepting_a_suggestion_merges_the_history` | Pass |
 | PI-02 | 4 | Confirmed matches give a canonical name with aliases | Integration | `backend/tests/api/test_items.py::test_rename_item` | Pass |
+| PI-03 | 1 | Alert at >= 10% change from the rolling average | Integration | `backend/tests/api/test_price_alerts.py::test_a_ten_percent_rise_from_the_rolling_average_alerts` | Pass |
+| PI-03 | 1 | Alert at >= 10% change from the rolling average | Integration | `backend/tests/api/test_price_alerts.py::test_a_ten_percent_drop_alerts` | Pass |
+| PI-03 | 1 | Alert at >= 10% change from the rolling average | Integration | `backend/tests/api/test_price_alerts.py::test_a_change_under_the_threshold_does_not_alert` | Pass |
+| PI-03 | 1 | Rolling average (7-day and 30-day windows), like-for-like | Integration | `backend/tests/services/test_price_alert_service.py::test_7_and_30_day_rolling_averages` | Pass |
+| PI-03 | 1 | Rolling average (7-day and 30-day windows), like-for-like | Integration | `backend/tests/api/test_price_alerts.py::test_only_like_for_like_prices_make_the_average` | Pass |
+| PI-03 | 1 | Configurable threshold | Integration | `backend/tests/api/test_price_alerts.py::test_the_user_can_set_their_own_threshold` | Pass |
+| PI-03 | 1 | Configurable threshold | Integration | `backend/tests/api/test_price_alerts.py::test_the_default_threshold_is_a_setting` | Pass |
+| PI-03 | 2 | Item, store, old average, new price, percent | Integration | `backend/tests/api/test_price_alerts.py::test_the_alert_names_item_store_average_new_price_and_percent` | Pass |
+| PI-03 | 2 | Item, store, old average, new price, percent | Integration | `backend/tests/tasks/test_push_tasks.py::test_a_price_change_push_opens_its_item` | Pass |
+| PI-03 | 3 | Cooldown, default 7 days per item | Integration | `backend/tests/api/test_price_alerts.py::test_an_item_alerts_once_per_cooldown` | Pass |
+| PI-03 | 3 | Cooldown, default 7 days per item | Integration | `backend/tests/api/test_price_alerts.py::test_the_cooldown_is_per_item` | Pass |
+| PI-03 | 3 | Cooldown, default 7 days per item | Integration | `backend/tests/services/test_price_alert_service.py::test_two_concurrent_claims_for_one_item_alert_once` | Pass (Postgres only) |
+| PI-03 | 4 | Mutable per item | Integration | `backend/tests/api/test_price_alerts.py::test_a_muted_item_does_not_alert` | Pass |
+| PI-03 | 4 | Mutable per store | Integration | `backend/tests/api/test_price_alerts.py::test_a_muted_store_does_not_alert` | Pass |
 
 This matrix is the source of truth for completeness. A phase is not done until every row has a passing test.
 

@@ -14,6 +14,7 @@ from app.api.routes import (
     items,
     notifications,
     receipts,
+    stores,
 )
 from app.api.routes import (
     auth as auth_routes,
@@ -92,5 +93,6 @@ app.include_router(budgets.router)
 app.include_router(dashboard.router)
 app.include_router(categories.router)
 app.include_router(items.router)
+app.include_router(stores.router)
 app.include_router(notifications.router)
 app.include_router(analytics.router)
