@@ -7,6 +7,39 @@ The landing page for Grocery Genie, built from the Claude Design handoff **"Groc
 - A small client script (`src/scripts/site.ts`) handles the waitlist form, analytics events, "What's next" votes and the sticky-nav rule.
 - The **Resend-backed waitlist API** in `api/` is unchanged in shape and runs on Vercel, Netlify or the bundled Node server.
 
+## Go-live checklist: keys to set
+
+Set these in your host's environment settings (Vercel: Project → Settings → Environment Variables; Netlify: Site configuration → Environment variables). For local runs, copy `.env.example` to `.env`. Never commit real keys.
+
+### Before the page goes live (pre-launch, State A)
+
+| Key | Required | Value | Where to get it |
+|---|---|---|---|
+| `RESEND_API_KEY` | **Yes** | `re_…` | https://resend.com/api-keys |
+| `RESEND_AUDIENCE_ID` | **Yes** | The waitlist audience's ID | https://resend.com/audiences |
+| `PUBLIC_LAUNCH_STATE` | No (default `a`) | `a` | — |
+| `ALLOWED_ORIGIN` | Recommended | `https://grocerygenie.app` | Your production domain. Locks the waitlist API's CORS to it (default `*`). |
+| `WAITLIST_FROM` | No | `Grocery Genie <hello@grocerygenie.app>` | A sender on a domain verified at https://resend.com/domains. Set it only if you want a welcome email. |
+
+Without both Resend keys, sign-ups aren't saved and the form shows "Waitlist is temporarily unavailable."
+
+**Check:** after deploying, join the waitlist with a test email and confirm it appears in the Resend audience.
+
+### Before switching to the App Store (launch, State B)
+
+| Key / file | Required | Value |
+|---|---|---|
+| `PUBLIC_LAUNCH_STATE` | **Yes** | `b` |
+| `PUBLIC_APP_STORE_ID` | **Yes** | The live listing's numeric ID (the digits after `id` in its `apps.apple.com` URL) |
+| `public/badges/download-on-the-app-store-black.svg` | **Yes** | Apple's official badge, from https://tools.applemarketingtools.com |
+| `public/badges/download-on-the-app-store-white.svg` | **Yes** | Same, white version (used on the green final block) |
+
+`PUBLIC_*` values are baked in when the site is built, so **redeploy after changing them**. The Resend keys are read when the API runs, so a change takes effect on the next request; some hosts still need a redeploy to pick it up.
+
+**Check:** on the live page, the badges show (not the dashed placeholder), and both the QR code and the iPhone smart banner open the listing.
+
+The full list, including optional keys, is under [Environment variables](#environment-variables).
+
 ## What's here
 
 ```
