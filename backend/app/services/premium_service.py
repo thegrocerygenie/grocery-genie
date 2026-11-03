@@ -63,6 +63,9 @@ GRANT_TYPES = frozenset(
 # is already past), a billing issue to the end of the grace period.
 EXPIRY_ONLY_TYPES = frozenset({"CANCELLATION", "BILLING_ISSUE"})
 REVOKE_TYPES = frozenset({"EXPIRATION"})
+# The CANCELLATION cancel_reason RevenueCat sends for a refund (Apple or
+# Google gave the money back): access ends now, whatever expiry is stored.
+REFUND_CANCEL_REASONS = frozenset({"CUSTOMER_SUPPORT"})
 TRANSFER = "TRANSFER"
 
 APPLIED = "applied"
@@ -74,6 +77,10 @@ UNKNOWN_USER = "unknown_user"
 
 def _from_ms(ms: int | None) -> datetime | None:
     return None if ms is None else datetime.fromtimestamp(ms / 1000, tz=UTC)
+
+
+def _is_refund(event: RevenueCatWebhookEvent) -> bool:
+    return (event.cancel_reason or "").upper() in REFUND_CANCEL_REASONS
 
 
 def _utc(value: datetime | None) -> datetime | None:
@@ -222,6 +229,16 @@ class PremiumService:
         if kind in GRANT_TYPES:
             state = PremiumState(
                 active=True, expires_at=expires, product_id=event.product_id
+            )
+        elif kind == "CANCELLATION" and _is_refund(event):
+            # A refund ends Premium now. Its expiry, when sent, is already
+            # past; when it is missing, the stored expiry of the refunded
+            # period must not keep access. No expiry is kept either, so a late
+            # grant from before the refund stays stale.
+            state = PremiumState(
+                active=False,
+                expires_at=None,
+                product_id=event.product_id or user.premium_product_id,
             )
         elif kind in EXPIRY_ONLY_TYPES:
             kept = expires if expires is not None else _utc(user.premium_expires_at)

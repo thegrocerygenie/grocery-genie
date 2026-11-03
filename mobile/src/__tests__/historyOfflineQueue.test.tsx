@@ -15,6 +15,7 @@ import type { ReceiptResponse } from '@/features/receipt-capture/types';
 import {
   QUOTA_ACTIONS,
   QUOTA_MESSAGE,
+  QUOTA_RETRY_TITLE,
   QUOTA_TITLE,
 } from '@/features/receipt-capture/utils/scanQuota';
 
@@ -44,6 +45,12 @@ jest.mock('@/hooks/useSyncQueue', () => ({
 let mockConnected = false;
 jest.mock('@/hooks/useNetworkStatus', () => ({
   useNetworkStatus: () => ({ isConnected: mockConnected }),
+}));
+
+// Premium as the backend profile says (`is_premium`).
+let mockPremium = false;
+jest.mock('@/features/premium/hooks/usePremium', () => ({
+  useIsPremium: () => mockPremium,
 }));
 
 const synced: ReceiptResponse = {
@@ -105,6 +112,7 @@ function renderHistory() {
 beforeEach(() => {
   mockSyncNow.mockClear();
   mockConnected = false;
+  mockPremium = false;
   useOfflineStore.setState({ pendingReceipts: [] });
   useAuthStore.setState({ accessToken: fakeAccessToken('user-a') });
 });
@@ -241,6 +249,48 @@ describe('History offline queue', () => {
 
     expect(routerScreen.getPathname()).toBe('/paywall');
     expect(useOfflineStore.getState().pendingReceipts).toHaveLength(1);
+  });
+
+  it('offers a retry, not Premium, once the user has upgraded (V11-P4)', () => {
+    mockConnected = true;
+    mockPremium = true;
+    queue();
+    const id = useOfflineStore.getState().pendingReceipts[0].id;
+    useOfflineStore.getState().markFailed(id, 'quota');
+    const alert = jest.spyOn(Alert, 'alert');
+    const routerScreen = renderHistory();
+
+    fireEvent.press(screen.getByText('Monthly scan limit reached'));
+    expect(alert.mock.calls[0][0]).toBe(QUOTA_RETRY_TITLE);
+    const buttons = alert.mock.calls[0][2]!;
+    expect(buttons.map((b) => b.text)).toEqual([
+      QUOTA_ACTIONS.retry,
+      'Discard',
+      QUOTA_ACTIONS.dismiss,
+    ]);
+    act(() => buttons.find((b) => b.text === QUOTA_ACTIONS.retry)!.onPress!());
+
+    expect(routerScreen.getPathname()).toBe('/history');
+    const [retried] = useOfflineStore.getState().pendingReceipts;
+    expect(retried.status).toBe('pending');
+    expect(retried.failure).toBeUndefined();
+    expect(mockSyncNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('queues the retry for later when a Premium user is offline', () => {
+    mockPremium = true;
+    queue();
+    const id = useOfflineStore.getState().pendingReceipts[0].id;
+    useOfflineStore.getState().markFailed(id, 'quota');
+    const alert = jest.spyOn(Alert, 'alert');
+    renderHistory();
+
+    fireEvent.press(screen.getByText('Monthly scan limit reached'));
+    const buttons = alert.mock.calls[0][2]!;
+    act(() => buttons.find((b) => b.text === QUOTA_ACTIONS.retry)!.onPress!());
+
+    expect(useOfflineStore.getState().pendingReceipts[0].status).toBe('pending');
+    expect(mockSyncNow).not.toHaveBeenCalled();
   });
 
   it('lets the user enter a failed photo by hand', () => {

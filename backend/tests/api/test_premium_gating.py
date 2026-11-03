@@ -9,7 +9,7 @@ themselves in their own tests.
 
 from httpx import AsyncClient
 
-from tests.api.test_items import _item_id
+from tests.api.test_items import _item_id, _suggestion
 from tests.api.test_price_comparison import _manual
 
 
@@ -51,6 +51,43 @@ async def test_item_matching_is_free(client):
         await client.patch(f"/api/items/{item_id}", json={"canonical_name": "Lime"}),
     ):
         _assert_free(resp)
+
+
+async def _assert_free_user(client: AsyncClient) -> None:
+    assert (await client.get("/api/users/me")).json()["is_premium"] is False
+
+
+async def test_merge_and_split_are_free(client):
+    """PI-02 AC 3 (link and unlink names) is item matching: free under D2."""
+    await _assert_free_user(client)
+    await _manual(client, "FreshCo", "2026-03-01", "Seltzer", 1.00)
+    await _manual(client, "FreshCo", "2026-03-02", "Club Soda", 1.10)
+    seltzer = await _item_id(client, "seltzer")
+    club_soda = await _item_id(client, "club")
+
+    merged = await client.post(
+        f"/api/items/{club_soda}/merge", json={"into_item_id": seltzer}
+    )
+    _assert_free(merged)
+    alias_id = next(
+        a["id"] for a in merged.json()["aliases"] if a["alias"] == "Club Soda"
+    )
+    split = await client.post(f"/api/items/{seltzer}/aliases/{alias_id}/split")
+    assert split.status_code == 201, split.text
+
+
+async def test_accepting_a_suggestion_is_free(client, mock_extractor, test_image_bytes):
+    """PI-02 AC 2: confirming a medium-confidence match is free under D2."""
+    await _assert_free_user(client)
+    suggestion = await _suggestion(client, mock_extractor, test_image_bytes)
+    _assert_free(await client.post(f"/api/items/suggestions/{suggestion['id']}/accept"))
+
+
+async def test_rejecting_a_suggestion_is_free(client, mock_extractor, test_image_bytes):
+    """PI-02 AC 2: turning a suggested match down is free under D2."""
+    await _assert_free_user(client)
+    suggestion = await _suggestion(client, mock_extractor, test_image_bytes)
+    _assert_free(await client.post(f"/api/items/suggestions/{suggestion['id']}/reject"))
 
 
 async def test_price_alerts_are_free(client):

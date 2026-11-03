@@ -57,12 +57,17 @@ async def test_scan_allowed_under_quota(
 async def test_scan_blocked_at_quota(
     client: AsyncClient, test_image_bytes: bytes, db_session: AsyncSession
 ):
-    """At 20 scanned receipts this month, the 21st scan is rejected with 429."""
+    """At 20 scanned receipts this month, the 21st scan is rejected with 429,
+    named by its stable code and the Premium feature that lifts it."""
     await _seed_receipts_this_month(db_session, 20)
 
     resp = await _scan(client, test_image_bytes)
     assert resp.status_code == 429
-    assert "quota" in resp.json()["detail"].lower()
+    body = resp.json()
+    assert body["code"] == "receipt_quota_exceeded"
+    assert body["feature"] == "unlimited_receipts"
+    assert body["limit"] == 20
+    assert "quota" in body["detail"].lower()
 
 
 @pytest.mark.asyncio

@@ -12,8 +12,14 @@ export const QUOTA_TITLE = 'You’ve used this month’s free scans';
 export const QUOTA_MESSAGE =
   'Premium has unlimited receipts. You can still add this receipt with manual entry.';
 
+/** A photo the cap stopped, once the user has Premium: it can upload now. */
+export const QUOTA_RETRY_TITLE = 'Upload this receipt now?';
+
+export const QUOTA_RETRY_MESSAGE = 'Premium has unlimited receipts, so this photo can upload now.';
+
 export const QUOTA_ACTIONS = {
   upgrade: 'See Premium',
+  retry: 'Upload now',
   manual: 'Enter manually',
   discard: 'Discard',
   dismiss: 'Cancel',
@@ -63,4 +69,23 @@ export function showQuotaUpgradePrompt({
   }
   buttons.push({ text: QUOTA_ACTIONS.dismiss, style: 'cancel' });
   Alert.alert(QUOTA_TITLE, QUOTA_MESSAGE, buttons);
+}
+
+interface QuotaRetryActions {
+  /** Puts the photo back in the upload queue. */
+  onRetry: () => void;
+  onDiscard: () => void;
+}
+
+/**
+ * A queued photo the cap stopped, for a user who is Premium now (the backend
+ * profile's `is_premium`): the cap no longer applies, so offer the upload
+ * again instead of the paywall.
+ */
+export function showQuotaRetryPrompt({ onRetry, onDiscard }: QuotaRetryActions): void {
+  Alert.alert(QUOTA_RETRY_TITLE, QUOTA_RETRY_MESSAGE, [
+    { text: QUOTA_ACTIONS.retry, onPress: onRetry, isPreferred: true },
+    { text: QUOTA_ACTIONS.discard, style: 'destructive', onPress: onDiscard },
+    { text: QUOTA_ACTIONS.dismiss, style: 'cancel' },
+  ]);
 }

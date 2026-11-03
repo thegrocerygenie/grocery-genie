@@ -358,6 +358,9 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PREM | D1 | Premium is never active with no expiry from a late grant or a refund | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_cancellation_without_expiry_before_its_purchase_grants_no_open_premium` | Pass |
 | PREM | D1 | Premium is never active with no expiry from a late grant or a refund | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refunded_non_renewing_purchase_arriving_late_grants_nothing` | Pass |
 | PREM | D1 | Premium is never active with no expiry from a late grant or a refund | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refund_of_a_non_renewing_purchase_ends_premium` | Pass |
+| PREM | D1 | A refund (`cancel_reason` `CUSTOMER_SUPPORT`) with no expiry ends Premium despite a stored future expiry | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refund_without_expiry_ends_premium_despite_a_stored_future_expiry` | Pass |
+| PREM | D1 | A refund (`cancel_reason` `CUSTOMER_SUPPORT`) with no expiry ends Premium despite a stored future expiry | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_purchase_arriving_after_its_refund_without_expiry_grants_nothing` | Pass |
+| PREM | D1 | A plain cancellation with no expiry keeps Premium to the stored expiry | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_plain_cancellation_without_expiry_keeps_the_stored_expiry` | Pass |
 | PREM | D2 | Free user over the monthly cap: `429` with `code` `receipt_quota_exceeded` | Integration | `backend/tests/api/test_free_tier_quota.py::test_scan_blocked_at_quota` | Pass |
 | PREM | D2 | Free user over the monthly cap: `429` with `code` `receipt_quota_exceeded` | Integration | `backend/tests/api/test_free_tier_quota.py::test_quota_429_carries_a_stable_code_for_the_upgrade_prompt` | Pass |
 | PREM | D2 | Manual entry stays open at the cap | Integration | `backend/tests/api/test_free_tier_quota.py::test_manual_entry_is_not_capped_at_quota` | Pass |
@@ -365,9 +368,14 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PREM | D2 | Free features stay free: price history | Integration | `backend/tests/api/test_premium_gating.py::test_price_history_is_free` | Pass |
 | PREM | D2 | Free features stay free: cross-store comparison | Integration | `backend/tests/api/test_premium_gating.py::test_price_comparison_is_free` | Pass |
 | PREM | D2 | Free features stay free: item matching | Integration | `backend/tests/api/test_premium_gating.py::test_item_matching_is_free` | Pass |
+| PREM | D2 | Free features stay free: item merge and split | Integration | `backend/tests/api/test_premium_gating.py::test_merge_and_split_are_free` | Pass |
+| PREM | D2 | Free features stay free: accept a match suggestion | Integration | `backend/tests/api/test_premium_gating.py::test_accepting_a_suggestion_is_free` | Pass |
+| PREM | D2 | Free features stay free: reject a match suggestion | Integration | `backend/tests/api/test_premium_gating.py::test_rejecting_a_suggestion_is_free` | Pass |
 | PREM | D2 | Free features stay free: price alerts | Integration | `backend/tests/api/test_premium_gating.py::test_price_alerts_are_free` | Pass |
 | PREM | D2 | 12-month trend is Premium, one `403 premium_required` shape; 3 months stays free | Integration | `backend/tests/api/test_premium_gating.py::test_three_month_trend_is_free_and_twelve_is_premium` | Pass |
 | PREM | D2 | App knows the cap by its code | Unit | `mobile/src/features/receipt-capture/__tests__/offlineQueue.test.ts` "spots the quota by its code, whatever the detail says" | Pass |
+| PREM | D2 | A capped queued photo is retryable once the user is Premium (backend `is_premium`) | Component | `mobile/src/__tests__/historyOfflineQueue.test.tsx` "offers a retry, not Premium, once the user has upgraded (V11-P4)" | Pass |
+| PREM | D2 | A capped queued photo is retryable once the user is Premium (backend `is_premium`) | Component | `mobile/src/__tests__/historyOfflineQueue.test.tsx` "queues the retry for later when a Premium user is offline" | Pass |
 | PREM | D2 | Camera scan at the cap: upgrade prompt opens the paywall, no error | Component | `mobile/src/__tests__/scanOfflineQueue.test.tsx` "does not queue a photo over the monthly quota, and invites an upgrade (D2)" | Pass |
 | PREM | D2 | Import at the cap: upgrade prompt opens the paywall, no error | Component | `mobile/src/features/receipt-capture/__tests__/useReceiptImport.test.tsx` "answers the monthly quota with the Premium upgrade prompt, not an error (D2)" | Pass |
 | PREM | D2 | Import at the cap: upgrade prompt opens the paywall, no error | Unit | `mobile/src/features/receipt-capture/__tests__/receiptImport.test.ts` "does not queue a file over the monthly quota, and reports the quota" | Pass |

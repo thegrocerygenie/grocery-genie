@@ -457,6 +457,9 @@ class RevenueCatWebhookEvent(BaseModel):
     product_id: str | None = None
     expiration_at_ms: int | None = None
     event_timestamp_ms: int | None = None
+    # Why a CANCELLATION happened. CUSTOMER_SUPPORT is a refund, which ends
+    # access now; UNSUBSCRIBE and the rest keep it to the period's end.
+    cancel_reason: str | None = Field(default=None, max_length=64)
     transferred_from: list[str] | None = None
     transferred_to: list[str] | None = None
     environment: str | None = None
