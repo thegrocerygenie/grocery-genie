@@ -102,6 +102,8 @@ A comparison of the design (removed in `041f38f`, still in git) with `main` on 2
 The site promises waitlist sign-ups "a free year of Premium" when Premium launches in V1.1 ([decisions](marketing/decisions.md) #2). The match is automatic: the waitlist email against the account's email (#7). Waitlist emails are contacts in the Resend audience (`RESEND_AUDIENCE_ID`), stored trimmed and lowercased by `marketing/api/_handler.js`.
 
 - [ ] **Now: say it in the privacy text.** Before the waitlist grows, the waitlist sign-up and `privacy.ts` must say the waitlist email will be used to find the person's account and apply the offer.
+  - [x] `privacy.ts` ("What we collect" → "Our waitlist", and Resend "keeps our waitlist"), updated November 3, 2026. Still a draft until legal sign-off.
+  - [ ] The waitlist sign-up on the marketing site: waits on the redesign.
 - [ ] **Now: decide the cut-off.** Which sign-ups count? For example, everyone who joined before the site switches to App Store downloads. Resend keeps each contact's `created_at`. Record it in `docs/marketing/decisions.md`.
 - [ ] **Now: decide on unsubscribes.** Does someone who unsubscribed from waitlist emails still get the year? Resend keeps an unsubscribed contact, with a flag.
 - [ ] **Matching rule.** An account qualifies when its email, trimmed and lowercased like the waitlist's, equals a waitlist contact's.

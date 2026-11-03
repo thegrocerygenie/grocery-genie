@@ -23,7 +23,7 @@ export const PRIVACY_POLICY: {
 } = {
   reviewed: false,
   effective: 'October 27, 2026',
-  updated: 'November 2, 2026',
+  updated: 'November 3, 2026',
   sections: [
     {
       heading: 'Who we are',
@@ -38,6 +38,7 @@ export const PRIVACY_POLICY: {
         'Your receipts: the photos and files you scan or import, and what we read from them: store, date, items, quantities, prices, tax, totals and currency. We keep the corrections you make and the categories you choose, so the app can learn your items.',
         'Your settings: budgets, category caps, alert and weekly summary choices, receipt languages, and your device’s notification token. Budget alerts and the weekly summary are on by default; you can turn them off in Settings → Alerts.',
         'Security and app activity: the time, IP address and device details of sign-ins and failed attempts, to protect your account; and basic events about how you use the app (for example, that a scan started or was confirmed), to fix and improve it. These stay with us and our hosting providers.',
+        'Our waitlist: if you joined the waitlist on our website, we keep that email address. When Premium launches, we compare it with the email address on your account to find you and give you the free year of Premium we offered waitlist members.',
       ],
     },
     {
@@ -53,7 +54,7 @@ export const PRIVACY_POLICY: {
         'Hetzner runs our servers, and Supabase hosts our database.',
         'Anthropic (Claude) reads receipt photos and item names to extract the details and suggest categories. We send them only after you allow it: the app asks before your first scan or import. You can turn this off at any time in Settings → Read receipts with AI; scans and imports then stop, and you can still enter receipts manually. Under its commercial terms, Anthropic does not use this data to train its models.',
         'Expo and Apple deliver push notifications: your device’s notification token and the alert text, which can include spending amounts.',
-        'Resend sends account emails, such as verification, password reset and email change.',
+        'Resend sends account emails, such as verification, password reset and email change, and keeps our waitlist.',
         'Apple and Google confirm your identity when you sign in with them.',
       ],
     },
