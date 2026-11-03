@@ -1,4 +1,4 @@
-import { budgetPace, monthShareElapsed } from '../pace';
+import { budgetPace } from '../pace';
 
 describe('budgetPace', () => {
   // Design 05 · Dashboard: April day 19, $242 of $400. The mockup says "5% under";
@@ -27,21 +27,5 @@ describe('budgetPace', () => {
   it('has no pace without a cap or before the month starts', () => {
     expect(budgetPace(50, 0, 0.5)).toBeNull();
     expect(budgetPace(50, 400, 0)).toBeNull();
-  });
-});
-
-describe('monthShareElapsed', () => {
-  const today = new Date(2026, 3, 19); // April 19, 2026
-
-  it('counts today as gone in the current month', () => {
-    expect(monthShareElapsed('2026-04', today)).toBeCloseTo(19 / 30);
-  });
-
-  it('is the whole month for a past period', () => {
-    expect(monthShareElapsed('2026-03', today)).toBe(1);
-  });
-
-  it('is none of it for a future period', () => {
-    expect(monthShareElapsed('2026-05', today)).toBe(0);
   });
 });

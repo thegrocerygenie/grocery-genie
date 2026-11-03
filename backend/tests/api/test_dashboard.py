@@ -1,10 +1,11 @@
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import clock
 from app.core.seed import seed_default_categories
 from app.models.database import Category, LineItem, Receipt
 from tests.conftest import DEV_USER_ID, USER_B_ID, ensure_user
@@ -117,14 +118,91 @@ async def test_dashboard_top_items_limit(client: AsyncClient, seeded_db, db_sess
     assert len(data["top_items"]) == 10
 
 
+def pin_now(monkeypatch, instant: str) -> None:
+    """Pin the server's clock to ``instant`` (ISO, UTC)."""
+    moment = datetime.fromisoformat(instant).replace(tzinfo=UTC)
+    monkeypatch.setattr(clock, "now", lambda: moment)
+
+
+async def set_reset_day(client: AsyncClient, period_start: str) -> None:
+    response = await client.post(
+        "/api/budgets",
+        json={
+            "category_id": None,
+            "amount": 500.0,
+            "period_type": "monthly",
+            "period_start": period_start,
+        },
+    )
+    assert response.status_code in (200, 201)
+
+
 @pytest.mark.asyncio
-async def test_dashboard_default_current_month(client: AsyncClient, seeded_db):
+async def test_dashboard_default_current_month(
+    client: AsyncClient, seeded_db, monkeypatch
+):
+    pin_now(monkeypatch, "2026-10-10T12:00:00")
     response = await client.get("/api/dashboard/spending")
     assert response.status_code == 200
     data = response.json()
-    today = date.today()
-    expected_period = f"{today.year:04d}-{today.month:02d}"
-    assert data["period"] == expected_period
+    assert data["period"] == "2026-10"
+    assert data["period_start"] == "2026-10-01"
+    assert data["period_end"] == "2026-10-31"
+
+
+@pytest.mark.asyncio
+async def test_dashboard_default_period_follows_the_reset_day(
+    client: AsyncClient, seeded_db, monkeypatch
+):
+    # Reset day 15: October 10 falls in the period that began September 15.
+    await set_reset_day(client, "2026-09-15")
+    pin_now(monkeypatch, "2026-10-10T12:00:00")
+    response = await client.get("/api/dashboard/spending")
+    data = response.json()
+    assert data["period"] == "2026-09"
+    assert data["period_start"] == "2026-09-15"
+    assert data["period_end"] == "2026-10-14"
+    assert data["previous_period"] == "2026-08"
+
+
+@pytest.mark.asyncio
+async def test_dashboard_default_period_is_new_on_the_reset_day(
+    client: AsyncClient, seeded_db, monkeypatch
+):
+    await set_reset_day(client, "2026-09-15")
+    pin_now(monkeypatch, "2026-10-15T12:00:00")
+    data = (await client.get("/api/dashboard/spending")).json()
+    assert data["period"] == "2026-10"
+    assert data["period_start"] == "2026-10-15"
+    assert data["period_end"] == "2026-11-14"
+
+
+@pytest.mark.asyncio
+async def test_dashboard_default_period_uses_the_users_local_date(
+    stored_client: AsyncClient, seeded_db, monkeypatch
+):
+    # 03:00 UTC on October 15 is still October 14 in New York, the last day
+    # of the period that began September 15.
+    patched = await stored_client.patch(
+        "/api/users/me", json={"timezone": "America/New_York"}
+    )
+    assert patched.status_code == 200
+    await set_reset_day(stored_client, "2026-09-15")
+    pin_now(monkeypatch, "2026-10-15T03:00:00")
+    data = (await stored_client.get("/api/dashboard/spending")).json()
+    assert data["period"] == "2026-09"
+    assert data["period_end"] == "2026-10-14"
+
+
+@pytest.mark.asyncio
+async def test_dashboard_named_period_returns_its_own_dates(
+    client: AsyncClient, seeded_db
+):
+    await set_reset_day(client, "2026-03-15")
+    data = (await client.get("/api/dashboard/spending?period=2026-03")).json()
+    assert data["period"] == "2026-03"
+    assert data["period_start"] == "2026-03-15"
+    assert data["period_end"] == "2026-04-14"
 
 
 @pytest.mark.asyncio

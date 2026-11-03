@@ -45,7 +45,7 @@ export default function TopItemsScreen() {
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: 120, gap: spacing.sm }}
       >
         <Text style={styles.intro}>
-          {monthName(data?.period ?? selectedPeriod)} · ranked by total spend
+          {data ? `${monthName(data.period)} · ranked by total spend` : 'Ranked by total spend'}
         </Text>
 
         {isLoading ? (
