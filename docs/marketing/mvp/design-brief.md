@@ -13,7 +13,7 @@ The page has a single goal and one call to action, repeated after the hero, afte
 | Main control | Email field + **Get early access** button | Apple's official "Download on the App Store" badge, used unaltered |
 | Line under the button | iPhone · Free · A free year of Premium for early sign-ups | Free on iPhone |
 | After sign-up | "You're in. We'll email you once, at launch." | (none) |
-| Pill at the top of the page | Early access · iPhone | New · Now on the App Store |
+| Pill at the top of the page | Coming Q4 2026 · iPhone | New · Now on the App Store |
 
 - The control sits in one slot, so State B swaps the form for the badge.
 - In State B, also add Apple's Smart App Banner on mobile, plus a QR code for desktop visitors.
@@ -84,7 +84,7 @@ Import photos and PDFs · Works offline · Manual entry · Duplicate-receipt war
 - **Is my data private?** Use the privacy line from section 6, then add: "You decide before AI reads your first receipt, and you can delete your account and all its data from inside the app."
 - **Which receipts work?** Printed grocery receipts from any store, plus photos and PDFs you already have.
 - **Android?** iPhone first. We'll share Android plans later.
-- **When does it launch?** [Team: fill in. The old "Q3 2026" date has passed, so don't reuse it.]
+- **When does it launch?** Q4 2026, on iPhone. *(State B: "It's out now on the App Store.")*
 
 ## 9. Final call to action
 Headline: **Start seeing where your grocery money goes.**
@@ -99,6 +99,13 @@ Price tracking across stores · Household sharing · Meal planning from what you
 ## 11. Optional referral module (State A only)
 "Move up the line: share your link, and get TestFlight access sooner."
 Design it only if the team builds referral tracking into the waitlist API.
+
+## 12. Social share card (`og-image.svg` → `og-image.png`, 1200×630)
+This image is what people see when the link is shared in Messages, Slack or social apps, so it does a lot of the sharing work.
+- Use the hero headline (the winning A/B variant) and the receipt-to-budget visual. The current card advertises price tracking and the pantry; replace it.
+- Keep the headline clear of the phone mock-up, so the text doesn't overflow at 1200×630.
+- State A: "Coming Q4 2026 · Join the waitlist". State B: "Now on the App Store".
+- Also update the page's `<meta name="description">` and `og:description` to the new subhead.
 
 ## Rules
 - **Never claim:**

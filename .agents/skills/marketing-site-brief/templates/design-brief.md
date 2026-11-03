@@ -92,6 +92,12 @@ Same control as section 0.
 
 {The loop that suits this stage, from the conversion playbook. Mark it optional if it needs code that doesn't exist yet, and say where that code lives.}
 
+## 12. Social share card (`og-image.svg` → `og-image.png`, 1200×630)
+
+- {hero headline and the stage's key moment, with the headline kept clear of any phone mock-up}
+- {the pill for each call-to-action state}
+- Update `<meta name="description">` and `og:description` to the subhead.
+
 ## Rules
 
 - **Never claim:** {from feature-scope.md section 5}
