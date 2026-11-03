@@ -1,131 +1,132 @@
 # Grocery Genie — Marketing Site
 
-The pre-launch landing page for Grocery Genie. Vanilla HTML, CSS, and a small JS file. Ships zero JS framework, renders in under 50KB on the wire (excluding fonts and the social card), and works without JavaScript except for the waitlist submit.
+The landing page for Grocery Genie, built from the Claude Design handoff **"Grocery Genie Marketing Site v5"** and the MVP brief (`docs/marketing/mvp/design-brief.md`, `docs/marketing/decisions.md`).
+
+- **Astro** with static output. Every section is plain HTML/CSS at build time.
+- **React** for the phone mockups. They render to static HTML; only the hero animation (`HeroMoment`) hydrates on the client.
+- A small client script (`src/scripts/site.ts`) handles the waitlist form, analytics events, "What's next" votes and the sticky-nav rule.
+- The **Resend-backed waitlist API** in `api/` is unchanged in shape and runs on Vercel, Netlify or the bundled Node server.
 
 ## What's here
 
 ```
 marketing/
-├── index.html              # the page
-├── styles.css              # all visual styles (extracted from the design handoff)
-├── tokens.css              # design system tokens (Apple-lens v2)
-├── app.js                  # waitlist form handler + smooth-scroll
-│
-├── api/
-│   ├── _handler.js         # framework-agnostic waitlist join logic
-│   └── waitlist.js         # Vercel / Cloudflare Pages Function entry
-│
-├── netlify/
-│   └── functions/
-│       └── waitlist.js     # Netlify Function entry
-│
-├── server.js               # standalone Node http server (dev + self-hosted)
-│
-├── favicon.svg             # source-of-truth icon
-├── favicon-32.png          # generated 32×32
-├── apple-touch-icon.png    # generated 180×180
-├── icon-192.png            # generated 192×192 (PWA)
-├── icon-512.png            # generated 512×512 (PWA)
-├── og-image.svg            # source-of-truth Open Graph card
-├── og-image.png            # generated 1200×630
-├── site.webmanifest        # PWA manifest
-├── robots.txt
-├── sitemap.xml
-│
-├── vercel.json             # Vercel headers + caching
-├── netlify.toml            # Netlify redirects + headers + caching
-├── package.json            # scripts (dev/start/build:icons)
-├── .env.example            # required + optional env vars
-└── .gitignore
+├── src/
+│   ├── pages/index.astro          # the page (all sections, in design order)
+│   ├── config.ts                  # launch state, App Store ID, headlines, lists, privacy line
+│   ├── components/
+│   │   ├── CtaSlot.astro          # hero / mid / final CTA: waitlist form (A) or App Store badge + QR (B)
+│   │   ├── Wordmark.astro         # Leaf Drop mark + "grocerygenie"
+│   │   └── mocks/                 # phone mockups (React); HeroMoment is the animated hero
+│   ├── scripts/site.ts            # waitlist submit, events, votes, nav
+│   └── styles/
+│       ├── tokens-v2.css          # app design tokens (Apple-lens v2)
+│       └── site.css               # page styles, ported 1:1 from the v5 design
+├── public/                        # favicon, app icons, OG card, manifest, robots, sitemap, badges/
+├── api/                           # waitlist handler (+ Vercel / Cloudflare entry)
+├── netlify/functions/             # Netlify entry for the waitlist handler
+├── server.js                      # Node server: serves dist/ and /api/waitlist
+├── scripts/render-icons.mjs       # renders PNG icons + OG card from their SVGs
+└── tests/
+    ├── smoke.mjs                  # waitlist handler tests (no network)
+    └── page.mjs                   # built-page checks against the brief's copy rules
 ```
 
 ## Run locally
 
 ```bash
-cp .env.example .env        # then fill in RESEND_API_KEY + RESEND_AUDIENCE_ID
-npm run dev                 # http://localhost:3000 (auto-reloads on file changes)
+npm install
+npm run dev            # Astro dev server, http://localhost:4321 (page only, no /api)
+
+# Full stack (page + waitlist API):
+cp .env.example .env   # fill RESEND_API_KEY + RESEND_AUDIENCE_ID
+npm run build && npm start   # http://localhost:3000
 ```
 
-You can preview the page without a Resend key — the form will just return a "temporarily unavailable" message.
+Without Resend keys, the form shows "Waitlist is temporarily unavailable."
 
-## Deploy targets
+## Configuration (replaces the design's Tweaks panel)
 
-The site is portable. Pick whichever fits.
+The design prototype had a Tweaks panel. In production these settings are fixed or come from build-time env:
 
-### Vercel
+| Prototype tweak | Production |
+|---|---|
+| Launch state A/B | `PUBLIC_LAUNCH_STATE=a` (pre-launch waitlist, default) or `b` (App Store). Rebuild to switch. |
+| Hero headline A/B/C | Each visitor gets a random variant that sticks (`localStorage gg_hl_variant`). `?hl=a`, `?hl=b` or `?hl=c` forces one. Copy lives in `src/config.ts`. |
+| Green use | Fixed at "CTAs + block": green buttons and a deep-green final CTA block. |
+| Accent | Fixed at `#1F7A4A` (`--accent` in `site.css`). |
 
-```bash
-vercel --prod
-```
+**State A (pre-launch):** waitlist form in the hero, mid-page and final blocks. A successful sign-up swaps all three to "You're in. We'll email you once, at launch." The FAQ shows the free-Premium-year line, and the "What's next" items are votable.
 
-`vercel.json` configures security headers and immutable caching on assets. The function at `api/waitlist.js` is auto-detected and routed to `/api/waitlist`. Add `RESEND_API_KEY` and `RESEND_AUDIENCE_ID` in the Vercel project's Environment Variables.
+**State B (launch):** Apple's App Store badge in each slot, a QR code (generated at build time) in the hero and final blocks for desktop visitors, the `apple-itunes-app` smart banner, "Download" in the nav, and the "It's out now" FAQ answer.
 
-### Netlify
+### Environment variables
 
-```bash
-netlify deploy --prod
-```
-
-`netlify.toml` redirects `/api/waitlist` to the function in `netlify/functions/`. Add the same env vars in the Netlify site config.
-
-### Cloudflare Pages
-
-The `api/waitlist.js` ESM signature works as a Pages Function out of the box. Set `public` directory to `.` and add the env vars in the Pages project. (The `vercel.json` headers won't apply on Cloudflare — set headers via `_headers` if you want them; the markup itself doesn't depend on them.)
-
-### Self-hosted (Docker, fly.io, Render, EC2, anywhere Node 20+ runs)
-
-```bash
-RESEND_API_KEY=re_... RESEND_AUDIENCE_ID=... PORT=3000 node server.js
-```
-
-`server.js` serves the static files and dispatches `/api/waitlist` itself — no Express, no extra deps.
-
-### GitHub Pages / static-only host
-
-The page itself works without the API (the form will fail open with an error). If you must use a static-only host, point the form at a third-party form service like Formspark or Buttondown by editing `app.js`'s `fetch('/api/waitlist', ...)` call.
-
-## Environment variables
-
-| Var | Required | Purpose |
+| Var | Where | Purpose |
 |---|---|---|
-| `RESEND_API_KEY` | yes | API key from https://resend.com/api-keys |
-| `RESEND_AUDIENCE_ID` | yes | Audience (waitlist) ID from https://resend.com/audiences |
-| `WAITLIST_FROM` | no | If set, fires a welcome email to each signup. Must be a verified sender (e.g. `Grocery Genie <hello@grocerygenie.app>`) |
-| `WAITLIST_WELCOME_SUBJECT` | no | Override default subject line |
-| `WAITLIST_WELCOME_TEXT` | no | Override default plain-text body |
-| `ALLOWED_ORIGIN` | no | Lock CORS to a specific origin. Defaults to `*` |
-| `PORT` | no | Local dev port. Defaults to `3000` |
+| `PUBLIC_LAUNCH_STATE` | build | `a` or `b` (default `a`) |
+| `PUBLIC_APP_STORE_ID` | build | Real App Store ID (default placeholder `0000000000`) |
+| `PUBLIC_WAITLIST_ENDPOINT` | build | Optional. Posts the form somewhere other than `/api/waitlist`. |
+| `RESEND_API_KEY` | runtime | https://resend.com/api-keys |
+| `RESEND_AUDIENCE_ID` | runtime | https://resend.com/audiences |
+| `WAITLIST_FROM` | runtime | Optional welcome email sender (verified Resend domain) |
+| `WAITLIST_WELCOME_SUBJECT` / `WAITLIST_WELCOME_TEXT` | runtime | Optional welcome email overrides |
+| `ALLOWED_ORIGIN` | runtime | Lock CORS (default `*`) |
+| `PORT` | runtime | Node server port (default `3000`) |
 
-## Resend setup (one-time)
+The default welcome email matches the page's promise ("We'll email you once, at launch"). If you set `WAITLIST_WELCOME_TEXT`, keep it consistent with that promise.
 
-1. Create an account at https://resend.com.
-2. Create an audience: https://resend.com/audiences → copy the audience ID into `RESEND_AUDIENCE_ID`.
-3. Create an API key: https://resend.com/api-keys → copy into `RESEND_API_KEY`.
-4. (Optional) Verify a sending domain at https://resend.com/domains and set `WAITLIST_FROM=Grocery Genie <hello@yourdomain.com>` to enable welcome emails.
+## Before switching to State B
 
-## Regenerating icons
+1. Set `PUBLIC_APP_STORE_ID` to the live listing's ID.
+2. Download Apple's official badges from Apple Marketing Tools (https://tools.applemarketingtools.com) and save them as:
+   - `public/badges/download-on-the-app-store-black.svg`
+   - `public/badges/download-on-the-app-store-white.svg`
 
-If you edit `favicon.svg` or `og-image.svg`, regenerate the PNGs:
-
-```bash
-npm run build:icons
-```
-
-Requires ImageMagick (`convert`). On macOS: `brew install imagemagick`. On Debian/Ubuntu: `apt install imagemagick`.
+   Until those files exist, State B shows a dashed "Official App Store badge" placeholder instead of a broken image.
+3. Build with `PUBLIC_LAUNCH_STATE=b` and check that the QR code and smart banner open the listing.
 
 ## Analytics
 
-`app.js` dispatches a `waitlist:join` `CustomEvent` after successful sign-up and forwards to common SDK globals if present (`window.plausible`, `window.gtag`). To add Plausible, GA4, or any tag:
+Events are pushed to `window.dataLayer` (GTM / GA4) and forwarded to `window.plausible` if it's on the page. Each event carries `state`, `headline` and any UTM tags (kept for the session).
 
-```html
-<!-- in <head> of index.html -->
-<script defer data-domain="grocerygenie.app" src="https://plausible.io/js/script.js"></script>
+| Event | When | Extra props |
+|---|---|---|
+| `headline_view` | page load | |
+| `cta_click` | any "Get early access" / "Download" click | `loc`: `nav`, `hero`, `mid`, `final` |
+| `waitlist_signup` | successful waitlist join | `loc` |
+| `appstore_click` | App Store badge or nav Download click (State B) | `loc` |
+| `faq_open` | an FAQ item is opened | `id` |
+| `next_vote` | a "What's next" vote (State A) | `feature` |
+
+The waitlist POST body also includes `headline`, `path`, `referrer` and UTM tags. The handler currently stores only the email in the Resend audience; extend `api/_handler.js` if you want attribution stored with the contact.
+
+## Deploy
+
+- **Vercel:** `vercel --prod`. `vercel.json` sets the Astro build (`dist/`), security headers and caching. `api/waitlist.js` is served at `/api/waitlist`.
+- **Netlify:** `netlify deploy --prod`. `netlify.toml` builds to `dist/` and routes `/api/waitlist` to the function.
+- **Self-hosted (Node 20+):** `npm run build && RESEND_API_KEY=… RESEND_AUDIENCE_ID=… node server.js`.
+
+## Tests
+
+```bash
+npm test             # handler smoke tests + build + built-page checks
+npm run check        # astro check (types)
 ```
 
-That's it — `app.js` calls `plausible('Waitlist Join', { props: { source } })` when the form succeeds.
+`tests/page.mjs` enforces the brief's copy rules on the built page: the privacy line word for word, no on-device or "never shared" claims, no "unlimited", no speed or accuracy figures, no paid-tier prices, and the right CTAs for the launch state. Run it for both states:
 
-## Notes
+```bash
+npm run build && node tests/page.mjs
+PUBLIC_LAUNCH_STATE=b npm run build && node tests/page.mjs
+```
 
-- The phone-mock illustrations in the hero/features are **inline static SVG/HTML**, captured from the design handoff's React mocks. Zero runtime React. They will look pixel-identical without any JS.
-- The page is iOS-first in messaging but the markup degrades gracefully on Android, desktop, and reduced-motion / dark-mode preferences (color-scheme is set to `light` because the visual design is paper-on-paper; flip if you need dark mode).
-- Form has both client and server-side validation, in-memory rate limiting (6 req/min/IP), and friendly error messages. For production scale beyond a single instance, replace the in-memory limiter in `api/_handler.js` with Upstash Ratelimit or similar.
+## Icons and social card
+
+`public/favicon.svg` (Leaf Drop) and `public/og-image.svg` are the sources. Regenerate the PNGs with:
+
+```bash
+npm run build:icons   # needs Playwright with Chromium
+```
+
+App and PWA icons are drawn on the paper tile (`#F8F6F1`) so they're opaque on the home screen. Leaf Drop is still a concept sketch; swap in final vector artwork when the identity designer delivers it.

@@ -9,6 +9,7 @@ node_modules/
 .cloudflare/
 .wrangler/
 dist/
+.astro/
 build/
 
 # Editor / OS

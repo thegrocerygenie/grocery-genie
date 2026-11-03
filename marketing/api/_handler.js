@@ -31,7 +31,8 @@ function rateLimit(ip) {
 
 function normalizeSource(s) {
   const v = String(s || '').toLowerCase();
-  return ['hero', 'cta', 'unknown'].includes(v) ? v : 'unknown';
+  // Slots on the page: hero, mid, final (v5). 'cta' kept for the previous page.
+  return ['hero', 'mid', 'final', 'cta', 'unknown'].includes(v) ? v : 'unknown';
 }
 
 async function callResend(path, init, apiKey) {
@@ -107,7 +108,7 @@ export async function handleWaitlistJoin(input, env) {
     const subject = env.WAITLIST_WELCOME_SUBJECT || "You're on the Grocery Genie list";
     const body =
       env.WAITLIST_WELCOME_TEXT ||
-      `Welcome to the Grocery Genie waitlist.\n\nWe'll only email when there's something to ship — TestFlight invites, launch dates, the occasional "we shipped X" note. No drip sequence, no nonsense.\n\nIf you ever change your mind, reply with "unsubscribe" and we'll remove you within 24 hours.\n\n— The Grocery Genie team\nBrooklyn, NY`;
+      `You're on the Grocery Genie waitlist.\n\nWe'll email you once, at launch, with your invite. That's it until then.\n\nIf you change your mind, reply with "unsubscribe" and we'll remove you within 24 hours.\n\n— The Grocery Genie team`;
 
     // fire-and-forget: don't block the user response
     callResend('/emails', {

@@ -105,4 +105,4 @@ Same control as section 0.
 - **Social proof:** only from a source you can name. No invented numbers, quotes or users.
 - **Measurement:** track the call-to-action click, the conversion event for each state, and FAQ expands. Add UTM handling. Split traffic evenly across the hero headlines.
 - **Consistency:** use the same headline and hero visual on the App Store screenshots and the app's first onboarding screen.
-- **Design tokens:** keep `marketing/tokens.css` unless the user asks for a new visual direction.
+- **Design tokens:** keep `marketing/src/styles/tokens-v2.css` and the page palette in `marketing/src/styles/site.css` unless the user asks for a new visual direction.

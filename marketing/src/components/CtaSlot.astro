@@ -1,0 +1,58 @@
+---
+// The call-to-action slot used in the hero, mid-page and final blocks.
+// State A (pre-launch): waitlist form. On success, client JS swaps every slot to the "joined" message.
+// State B (launch): official App Store badge, plus a QR code for desktop visitors (not in the mid slot).
+import QRCode from 'qrcode';
+import { APP_STORE_URL, BADGE, LAUNCH_STATE } from '../config';
+
+interface Props {
+  loc: 'hero' | 'mid' | 'final';
+  id?: string;
+}
+const { loc, id } = Astro.props;
+
+const dark = loc === 'final';
+const qrSvg =
+  LAUNCH_STATE === 'b' && loc !== 'mid'
+    ? await QRCode.toString(APP_STORE_URL, { type: 'svg', margin: 0, color: { dark: '#000000', light: '#ffffff' } })
+    : '';
+const qrSrc = qrSvg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(qrSvg)}` : '';
+
+// Fallbacks match the design: a labelled dashed box instead of a broken image.
+const badgeFallback =
+  "this.replaceWith(Object.assign(document.createElement('span'),{className:'badge-ph',textContent:'Official App Store badge'}))";
+---
+
+<div id={id} class="cta-slot" data-loc={loc}>
+  {
+    LAUNCH_STATE === 'b' ? (
+      <>
+        <div class="badge-row">
+          <a class="badge" href={APP_STORE_URL} data-appstore={loc}>
+            <img src={dark ? BADGE.white : BADGE.black} alt="Download on the App Store" height="54" onerror={badgeFallback} />
+          </a>
+          {qrSrc && (
+            <div class="qr">
+              <img src={qrSrc} alt="QR code to the App Store" width="72" height="72" />
+              <span>
+                Scan with your
+                <br />
+                iPhone camera
+              </span>
+            </div>
+          )}
+        </div>
+        <div class="cta-line">Free on iPhone</div>
+      </>
+    ) : (
+      <>
+        <form class="waitlist" action="/api/waitlist" method="post">
+          <label class="sr-only" for={`email-${loc}`}>Email address</label>
+          <input id={`email-${loc}`} type="email" name="email" placeholder="you@email.com" required autocomplete="email" />
+          <button type="submit" data-cta={loc}>Get early access</button>
+        </form>
+        <div class="cta-line">iPhone · Free · A free year of Premium when it launches</div>
+      </>
+    )
+  }
+</div>

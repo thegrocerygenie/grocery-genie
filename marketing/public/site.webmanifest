@@ -1,7 +1,7 @@
 {
   "name": "Grocery Genie",
   "short_name": "Genie",
-  "description": "A smart pantry that starts with a receipt. Track prices, plan meals, stop food waste.",
+  "description": "Scan a grocery receipt. Every item sorted, your budget updated, alerts before you overspend.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F0EEE9",
