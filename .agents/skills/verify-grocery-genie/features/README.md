@@ -35,3 +35,4 @@ Each feature file starts with an H1 title and one paragraph describing the user-
 - [Item category correction](./item-correction.md) covers correcting an item's category, retroactive update, and the mapping applied to the next scan.
 - [Delete and restore a receipt](./delete-restore.md) covers soft delete, the recently-deleted list, restore, and spend.
 - [Price history and item matching](./price-history.md) (V1.1) covers matching lines to items on confirm, auto-links, "same item?" suggestions accepted and rejected, the price history, split, merge, rename, and isolation between users.
+- [Cross-store price comparison](./price-comparison.md) (V1.1) covers latest and average price per store, cheapest first, the 2-price minimum, only the user's own stores, like-for-like currency, and isolation.

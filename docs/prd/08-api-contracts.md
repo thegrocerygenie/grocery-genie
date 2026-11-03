@@ -201,7 +201,7 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
 
 ## Price Intelligence [V1.1]
 
-Built: PI-01 (price history) and PI-02 (item matching). Every route is the signed-in user's own data; another user's item, alias or suggestion answers 404.
+Built: PI-01 (price history), PI-02 (item matching) and PI-04 (cross-store comparison, backend). Every route is the signed-in user's own data; another user's item, alias or suggestion answers 404.
 
 Confirming a receipt (scan + `PATCH status=confirmed`, or a manual entry) links each line to a canonical item and records its price. `LineItemResponse` carries `canonical_item_id`. Matching: exact alias → fuzzy (mean of Jaro-Winkler and Levenshtein on word-sorted names, ≥0.85 links) → semantic (embedding cosine, ≥0.80 links) → new item, with a suggestion for the user when the best candidate scored ≥0.6. Names whose numbers differ ("milk 1%" / "milk 2%") never match by similarity.
 
@@ -267,17 +267,26 @@ Same product: merges `item` into `suggested_item` and returns it. 409 when alrea
 204. Different products: both items stay.
 
 ### GET /api/items/{canonical_id}/compare
-Cross-store comparison (PI-04, not built yet).
+Cross-store comparison (PI-04): the item's latest and average unit price at each store the user has bought it from, cheapest first.
 
 **Response:**
 ```json
 {
-  "item": "Organic Bananas",
+  "item": { "id": "uuid", "canonical_name": "Organic Bananas" },
+  "unit_of_measure": "lb",
+  "currency": "USD",
+  "min_observations": 2,
   "stores": [
-    { "store_name": "Store A", "latest_price": 1.29, "avg_price": 1.35, "observation_count": 12 }
-  ]
+    { "store_id": "uuid", "store_name": "FreshCo", "latest_price": 0.71, "latest_date": "2026-03-05", "avg_price": 0.70, "observation_count": 2 },
+    { "store_id": "uuid", "store_name": "Loblaws", "latest_price": 0.81, "latest_date": "2026-03-06", "avg_price": 0.80, "observation_count": 2 }
+  ],
+  "stores_below_minimum": 1
 }
 ```
+- **Like for like:** `unit_of_measure` and `currency` are those of most of the item's prices, as in `/prices`. Only prices in that unit and currency count toward `latest_price`, `avg_price` and `observation_count` (edge case "unit price ambiguity"; no currency conversion).
+- **Stores:** only stores on the user's own receipts that are not deleted (AC 3). A price from a receipt with no store is left out. A store needs `min_observations` like-for-like prices to be listed; `stores_below_minimum` counts the stores with fewer, so the app can say why one is missing.
+- **Order:** cheapest first by `avg_price`, then by `latest_price`, then by name. `latest_price` is the price on the newest receipt date at that store; `avg_price` is the plain mean of its prices, rounded to the cent.
+- **Empty:** `stores` is `[]` when no store has enough prices; the item still answers 200. Another user's or an unknown item answers 404.
 
 ## Household [V1.5]
 
