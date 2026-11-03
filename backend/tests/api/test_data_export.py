@@ -404,9 +404,14 @@ async def test_export_reads_in_batches(
     monkeypatch.setattr(export_service, "SPOOL_MAX_BYTES", 256)
     me = (await premium_client.get("/api/users/me")).json()
     user_id = uuid.UUID(me["id"])
+    store = Store(name="Batch Mart", normalized_name="batch mart")
+    item = CanonicalItem(user_id=user_id, canonical_name="Batch Item")
+    db_session.add_all([store, item])
+    await db_session.flush()
     for day in range(1, 6):
         receipt = Receipt(
             user_id=user_id,
+            store_id=store.id,
             date=date(2026, 3, day),
             status="confirmed",
             currency="USD",
@@ -415,14 +420,28 @@ async def test_export_reads_in_batches(
         )
         db_session.add(receipt)
         await db_session.flush()
+        line = LineItem(
+            receipt_id=receipt.id,
+            raw_name=f"Item {day}",
+            quantity=1,
+            unit_price=day,
+            total_price=day,
+            position=0,
+            canonical_item_id=item.id,
+        )
+        db_session.add(line)
+        await db_session.flush()
         db_session.add(
-            LineItem(
+            PriceObservation(
+                user_id=user_id,
+                canonical_item_id=item.id,
                 receipt_id=receipt.id,
-                raw_name=f"Item {day}",
-                quantity=1,
+                line_item_id=line.id,
+                store_id=store.id,
+                date=receipt.date,
                 unit_price=day,
-                total_price=day,
-                position=0,
+                quantity=1,
+                currency="USD",
             )
         )
     await db_session.flush()
@@ -438,6 +457,14 @@ async def test_export_reads_in_batches(
         f"Item {d}" for d in range(1, 6)
     ]
     assert [li["name"] for li in lines] == [f"Item {d}" for d in range(1, 6)]
+    # Price observations page past one batch too: all five, once each, in order.
+    prices = _csv_rows(
+        zipfile.ZipFile(io.BytesIO(csv_resp.content)), "price_observations.csv"
+    )
+    assert [p["date"] for p in body["price_observations"]] == [
+        f"2026-03-0{d}" for d in range(1, 6)
+    ]
+    assert [p["date"] for p in prices] == [f"2026-03-0{d}" for d in range(1, 6)]
 
 
 async def test_export_records_data_exported_event(
@@ -476,3 +503,97 @@ async def test_free_user_refused_export_records_no_event(free_client):
     await free_client.get("/api/users/me/export")
 
     assert spy.calls == []
+
+
+# --- The spooled file is closed on every path --------------------------------
+
+
+def _tracked_export(payload: bytes = b'{"ok":true}'):
+    from app.models.export import ExportCounts
+    from app.services.export_service import ExportFile
+
+    counts = ExportCounts(
+        receipt_count=0, line_item_count=0, budget_count=0, price_observation_count=0
+    )
+    return ExportFile(
+        file=io.BytesIO(payload),
+        size=len(payload),
+        media_type="application/json",
+        filename="export.json",
+        counts=counts,
+    )
+
+
+@pytest.mark.parametrize("spec_version", ["2.0", "2.4"])
+async def test_export_file_closed_when_client_disconnects_before_streaming(
+    spec_version,
+):
+    """The client goes away before the first byte: the file is still closed."""
+    from starlette.requests import ClientDisconnect
+
+    from app.api.routes.users import _export_response
+
+    export = _tracked_export()
+    response = _export_response(export)
+
+    async def receive():
+        return {"type": "http.disconnect"}
+
+    async def send(message):
+        raise OSError("client gone")
+
+    scope = {"type": "http", "asgi": {"spec_version": spec_version}}
+    with pytest.raises((OSError, ClientDisconnect)):
+        await response(scope, receive, send)
+
+    assert export.file.closed
+
+
+async def test_export_file_closed_after_streaming():
+    from app.api.routes.users import _export_response
+
+    export = _tracked_export(b"abc")
+    response = _export_response(export)
+    sent: list[dict] = []
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message):
+        sent.append(message)
+
+    await response({"type": "http", "asgi": {"spec_version": "2.4"}}, receive, send)
+
+    assert b"".join(m.get("body", b"") for m in sent) == b"abc"
+    assert export.file.closed
+
+
+async def test_export_file_closed_when_analytics_fails(premium_client, monkeypatch):
+    """``analytics.emit`` raising after the file is built must not leak it."""
+    from app.services import export_service
+    from app.services.analytics_service import AnalyticsService, get_analytics_service
+    from main import app
+
+    built: list = []
+    real_build = export_service.ExportService.build
+
+    async def spy_build(self, user, fmt):
+        export = await real_build(self, user, fmt)
+        built.append(export)
+        return export
+
+    monkeypatch.setattr(export_service.ExportService, "build", spy_build)
+
+    class FailingAnalytics(AnalyticsService):
+        def emit(self, *args, **kwargs):
+            raise RuntimeError("analytics down")
+
+    app.dependency_overrides[get_analytics_service] = lambda: FailingAnalytics(
+        backend=SpyBackend()
+    )
+
+    with pytest.raises(RuntimeError, match="analytics down"):
+        await premium_client.get("/api/users/me/export")
+
+    [export] = built
+    assert export.file.closed

@@ -206,7 +206,7 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-06 | 3 | Chosen day, 9 AM local time | Integration | `backend/tests/tasks/test_summary_tasks.py::test_recipients_only_on_users_chosen_day` | Pass |
 | BC-06 | 4 | Links to full dashboard | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "falls back to the dashboard when the route is missing" | Pass |
 
-V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04. `PREM` rows are the Premium tier (V11-P0, decisions D1 and D2: `PHASE_SCOPE.md`), which has no user story ID; `NFR-P2` rows are data export (V11-P2, NFR Privacy 2).
+V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04. `PREM` rows are the Premium tier (V11-P0 and V11-P4, decisions D1 and D2: `PHASE_SCOPE.md`), which has no user story ID, so the AC column names the decision. Data export (V11-P2, NFR Privacy 2) is Premium too: its rows are Story `PREM`, AC `NFR-P2`.
 
 | Story | AC | Criterion | Type | Test | Status |
 |---|---|---|---|---|---|
@@ -393,7 +393,10 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PREM | NFR-P2 | Export: CSV formula injection escaped | Integration | `backend/tests/api/test_data_export.py::test_csv_escapes_store_names_too` | Pass |
 | PREM | NFR-P2 | Export: Premium only (D2), `403 premium_required` | Integration | `backend/tests/api/test_data_export.py::test_export_needs_premium` | Pass |
 | PREM | NFR-P2 | Export: Premium only (D2), `403 premium_required` | Integration | `backend/tests/api/test_data_export.py::test_free_user_refused_export_records_no_event` | Pass |
-| PREM | NFR-P2 | Export: large accounts read in batches | Integration | `backend/tests/api/test_data_export.py::test_export_reads_in_batches` | Pass |
+| PREM | NFR-P2 | Export: large accounts read in batches (receipts, line items and price observations past one page) | Integration | `backend/tests/api/test_data_export.py::test_export_reads_in_batches` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (streamed, client gone first, analytics error) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_after_streaming` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (streamed, client gone first, analytics error) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_when_client_disconnects_before_streaming` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (streamed, client gone first, analytics error) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_when_analytics_fails` | Pass |
 | PREM | NFR-P2 | Export: `data_exported` analytics event | Integration | `backend/tests/api/test_data_export.py::test_export_records_data_exported_event` | Pass |
 | PREM | NFR-P2 | Export: unknown format is a 422; signed out is a 401 | Integration | `backend/tests/api/test_data_export.py::test_export_rejects_unknown_format` | Pass |
 | PREM | NFR-P2 | Export: unknown format is a 422; signed out is a 401 | Integration | `backend/tests/api/test_data_export.py::test_export_needs_sign_in` | Pass |

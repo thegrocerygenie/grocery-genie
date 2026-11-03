@@ -137,7 +137,13 @@ class ExportFile:
             while chunk := self.file.read(CHUNK_BYTES):
                 yield chunk
         finally:
-            self.file.close()
+            self.close()
+
+    def close(self) -> None:
+        """Release the spooled file. Safe to call more than once; the caller
+        calls it on every path, streamed or not (a client that left before the
+        first byte never starts ``chunks``)."""
+        self.file.close()
 
 
 def _spool() -> IO[bytes]:

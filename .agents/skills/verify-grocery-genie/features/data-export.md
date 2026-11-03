@@ -31,4 +31,4 @@ Preconditions: a debug-mode instance; `$G doctor` shows no `FAIL`. `$G download 
 
 - Grep for ids, not amounts: a random UUID or timestamp can hold `999` by chance, which is why the other user's budget is `987.65`.
 - `$G download` exits non-zero on a status of 400 or more, like `$G api`; add `|| true` when the refusal is the expected result.
-- Batched reads for large accounts (more receipts than one 500-row page), the `'` prefix for `+`, `-`, `@`, tab and carriage return, and the 422 for an unknown `format` are covered by pytest (`backend/tests/api/test_data_export.py`).
+- Batched reads for large accounts (more receipts and price observations than one 500-row page), the spooled file closed however the response ends (streamed, client gone first, analytics error), the `'` prefix for `+`, `-`, `@`, tab and carriage return, and the 422 for an unknown `format` are covered by pytest (`backend/tests/api/test_data_export.py`).
