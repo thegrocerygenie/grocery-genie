@@ -132,12 +132,13 @@ Settled (recorded in [decisions.md](../decisions.md)):
 1. **Conversion goal:** waitlist sign-ups now, then App Store downloads at public launch. The brief designs both states.
 2. **Waitlist incentive:** keep "a free year of Premium". Premium arrives in V1.1, and the promise has to be kept then.
 3. **Free-tier wording:** "Free" in the hero, and the 20-scan monthly limit (`free_tier_receipts_per_month`) stated in the FAQ. Manual entry has no limit. Never say "unlimited". This is the recommended default; the user didn't choose explicitly.
+4. **Launch date:** Q4 2026 (decision #6). The live site was updated on 2026-11-03.
+5. **Free Premium year:** waitlist emails are matched to app accounts automatically (decision #7). The to-do list is in [launch-open-items.md](../../launch-open-items.md) §6.
+6. **Privacy line:** rests on Anthropic's standard Commercial Terms, which apply to the regular API (decision #8). No review with Anthropic is needed. Our own `privacy.ts` still needs legal sign-off.
 
 Still open:
-4. **Launch date.** The old site's "Q3 2026" has passed. The brief leaves a placeholder.
-5. **Privacy line.** Needs legal review against the actual agreement with Anthropic (see section 6).
-6. **Speed and accuracy.** Neither has been measured on real receipts. Use "in seconds" and no percentages.
-7. **Weekly summary by email.** Push only; email was deferred on 2026-11-02.
+7. **Speed and accuracy.** Neither has been measured on real receipts. Use "in seconds" and no percentages.
+8. **Weekly summary by email.** Push only; email was deferred on 2026-11-02.
 
 ## 5. Don't put these on the new page
 
@@ -176,6 +177,6 @@ The site's statistics (waitlist count, "6.2% average personal inflation our beta
   - [Commercial Terms](https://www.anthropic.com/legal/commercial-terms): "Anthropic may not train models on Customer Content from Services."
   - [Privacy Center, API retention](https://privacy.claude.com/en/articles/7996866): API inputs and outputs are deleted within 30 days, but may be kept longer to enforce the Usage Policy or when the law requires it.
 
-  So "used only to read your receipt" is too strong. Legal review is open in [launch-open-items.md](../../launch-open-items.md) §2.
+  We use the regular API, so these standard terms apply, and no separate agreement or review with Anthropic is needed (decision #8). "Anthropic doesn't use them to train its models" is supported. "Used only to read your receipt" is still too strong: retention exceptions exist, and we keep the photo for History.
 - The camera screens' privacy copy: fixed in PR 31. `mobile/src/__tests__/cameraPrivacyCopy.test.tsx` passed on 2026-11-02.
 - Device checks still open: the document scanner, push alerts and the weekly summary, account deletion, and a full VoiceOver pass ([device-checklist.md](../../device-checklist.md)).

@@ -11,7 +11,7 @@ Sources:
 
 - [x] **AI consent before the first scan** (Apple 5.1.2(i), review blocker 3). Shipped in PR 34: a one-time consent sheet, a Settings switch to withdraw it, server-side consent (a 403 without it), and the consent wording in `privacy.ts`.
 - [ ] **Public privacy policy URL** for App Store Connect (5.1.1(i)), for example on the `marketing/` site. It must match the in-app text.
-- [x] **Marketing FAQ makes a false privacy claim.** `marketing/index.html` (the "Will my receipts be private?" answer) says receipts are "processed on-device for OCR" and that "we never sell or share your data". Receipts are uploaded to our servers, and Anthropic reads them. The same answer promises an opt-in community-pricing feature, which is a later-phase feature. Rewrite it to match `privacy.ts` before the site goes public. Done 2026-11-02: the answer now says only what `privacy.ts` says (Anthropic reads receipts after consent, no selling or ad sharing, encrypted in transit, account deletion). It goes to legal review with the privacy text. The rest of the page still describes roadmap features (price tracking, household sharing, recipes, a Q3 2026 launch, Premium pricing); rework it before the site goes public.
+- [x] **Marketing FAQ makes a false privacy claim.** `marketing/index.html` (the "Will my receipts be private?" answer) says receipts are "processed on-device for OCR" and that "we never sell or share your data". Receipts are uploaded to our servers, and Anthropic reads them. The same answer promises an opt-in community-pricing feature, which is a later-phase feature. Rewrite it to match `privacy.ts` before the site goes public. Done 2026-11-02: the answer now says only what `privacy.ts` says (Anthropic reads receipts after consent, no selling or ad sharing, encrypted in transit, account deletion). It goes to legal review with the privacy text. The rest of the page still describes roadmap features (price tracking, household sharing, recipes, a Q3 2026 launch, Premium pricing); rework it before the site goes public. On 2026-11-03 the launch date became Q4 2026 (page, meta tags, social card), and the "When does it launch?" answer now lists only what launches. The redesign brief is [marketing/mvp/design-brief.md](marketing/mvp/design-brief.md).
 - [ ] **App Store privacy label** filled in from the table in the privacy review.
 - [x] **Sign-up "Privacy Policy" link works.** It opens the in-app policy at `onboarding/privacy`. "Terms" was dropped: no Terms document exists.
 - [ ] **Legal sign-off** on `privacy.ts`, then set `reviewed: true` to remove the draft banner. Replace the placeholder company name ("The Grocery Genie Inc.").
@@ -42,7 +42,7 @@ Sources:
   - stop requesting the unused Apple full name;
   - drop raw receipt values from the analytics logs;
   - block the email-logging fallback in production.
-- [ ] **Check Anthropic's current commercial terms** for the "does not train on it" claim, and for how long it keeps API inputs.
+- [x] **Check Anthropic's current commercial terms** for the "does not train on it" claim, and for how long it keeps API inputs. Checked 2026-11-03. We use the regular Anthropic API, so the standard [Commercial Terms](https://www.anthropic.com/legal/commercial-terms) apply, and no separate review with Anthropic is needed. They say "Anthropic may not train models on Customer Content from Services", which supports the claim. Retention: Anthropic's [Privacy Center](https://privacy.claude.com/en/articles/7996866) says API inputs and outputs are deleted within 30 days, unless they're needed longer to enforce its Usage Policy or by law. `privacy.ts` makes no retention claim for Anthropic. The legal sign-off on `privacy.ts` (§1) is our own review, and stays open.
 
 ## 3. Checks that need a real phone
 
@@ -96,3 +96,21 @@ A comparison of the design (removed in `041f38f`, still in git) with `main` on 2
 - ~~**Backend dependencies aren't locked.**~~ Fixed: `backend/uv.lock`, and `backend/requirements.lock.txt` (hashed) for the Docker image. `make backend-lock` re-locks; `scripts/check-backend-lock.sh` fails when they drift.
 - **`make hooks` says "Git hooks on" on every run in Claude worktrees** (PR 47). Their git config holds the hooks path as a full path, so the check never matches `.githooks`. It does no harm.
 - **Your shell:** a stale `GITHUB_TOKEN` in your profile breaks `gh` until it's removed. `.claude/launch.json` is untracked.
+
+## 6. Waitlist: the free year of Premium (build by V1.1)
+
+The site promises waitlist sign-ups "a free year of Premium" when Premium launches in V1.1 ([decisions](marketing/decisions.md) #2). The match is automatic: the waitlist email against the account's email (#7). Waitlist emails are contacts in the Resend audience (`RESEND_AUDIENCE_ID`), stored trimmed and lowercased by `marketing/api/_handler.js`.
+
+- [ ] **Now: say it in the privacy text.** Before the waitlist grows, the waitlist sign-up and `privacy.ts` must say the waitlist email will be used to find the person's account and apply the offer.
+- [ ] **Now: decide the cut-off.** Which sign-ups count? For example, everyone who joined before the site switches to App Store downloads. Resend keeps each contact's `created_at`. Record it in `docs/marketing/decisions.md`.
+- [ ] **Now: decide on unsubscribes.** Does someone who unsubscribed from waitlist emails still get the year? Resend keeps an unsubscribed contact, with a flag.
+- [ ] **Matching rule.** An account qualifies when its email, trimmed and lowercased like the waitlist's, equals a waitlist contact's.
+  - Match only verified emails: email-and-password accounts after `verify-email`; Apple and Google sign-ins carry an email their provider verified.
+  - One free year per waitlist email, even if several accounts use that email over time.
+- [ ] **When it runs:**
+  - once at V1.1 launch, over every existing account;
+  - then on every sign-up, email verification and confirmed email change (`confirm_email_change`).
+
+  The backend reads the audience through the Resend API, or from a one-off export taken at the cut-off.
+- [ ] **When nothing matches.** Sign in with Apple's Hide My Email gives an `@privaterelay.appleid.com` address, and some people sign up with a different email. Add "Claim your waitlist offer" in Settings: the user enters their waitlist email and taps a confirmation link sent to it (the same pattern as the email-change confirmation).
+- [ ] **Launch email.** Ask waitlist members to sign up with the email they joined with, or to use the claim flow.

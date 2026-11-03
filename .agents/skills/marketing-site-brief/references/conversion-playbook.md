@@ -84,7 +84,9 @@ Every brief names:
 
 ## 10. Same message everywhere
 
-The landing page, the App Store screenshots and the app's first onboarding screen use the same headline and hero visual. For an iOS app, most people decide on the App Store page, so remind the user that the brief feeds the screenshots as well.
+The landing page, the App Store screenshots, the app's first onboarding screen and the social share card use the same headline and hero visual.
+
+The share card (`marketing/og-image.svg`, rendered to `og-image.png` at 1200×630) is what people see when someone shares the link, so it does much of the sharing work. Every brief asks for it, along with the page's `description` and `og:description` meta tags. Render the PNG in Chromium (Playwright), not ImageMagick: without an SVG renderer, ImageMagick produces a black, garbled card. For an iOS app, most people decide on the App Store page, so remind the user that the brief feeds the screenshots as well.
 
 ## 11. The roadmap section
 

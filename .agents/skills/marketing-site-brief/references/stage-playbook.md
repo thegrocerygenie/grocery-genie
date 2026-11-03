@@ -34,7 +34,7 @@ Every stage is cumulative. The "Layers on the page" column lists every section t
 - **Persona:** add the comparison shopper (Linda) next to Sarah.
 - **Section order:** Prices (new) → Budget → Scan and review.
 - **Price:** the first pricing section. Check the tiers and prices in the build; the PRD says Premium is $5.99 a month, with limited free price history (`OPEN_QUESTIONS.md` #3). Show free next to Premium; anchor on what the free tier keeps.
-- **Promises to honour:** the free year of Premium for waitlist sign-ups (see `decisions.md`). Check how the app grants it before the site talks about it.
+- **Promises to honour:** the free year of Premium for waitlist sign-ups (see `decisions.md`). The match is automatic, by email (`decisions.md` #7, to-do list in `docs/launch-open-items.md` §6). Check that it's built and working before the site talks about the offer as available.
 - **Growth loops:** a price-change alert you can share, but only if the app has a share action.
 - **New objection:** "Is my price data shared?" Answer it from `privacy.ts` as it stands at V1.1.
 - **Never claim:** household, pantry, recipes, community pricing.
