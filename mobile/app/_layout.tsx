@@ -14,6 +14,13 @@ import { usePushNotifications } from '@/features/notifications/hooks/usePushNoti
 import { useSyncQueue } from '@/hooks/useSyncQueue';
 import { useAuthStore } from '@/store/authStore';
 
+// A screen opened straight from outside the app (a push tapped on a cold start,
+// a deep link) gets the tabs under it, so Back returns to Budget (BUG-6).
+// Without this the root stack holds only that screen: no Back, no tab bar.
+export const unstable_settings = {
+  initialRouteName: '(tabs)',
+};
+
 const queryClient = new QueryClient();
 
 function SyncQueueProvider() {

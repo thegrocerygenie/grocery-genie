@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,7 +13,7 @@ import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 
-import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
+import { colors, fontScale, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { PremiumUpgradePrompt } from '@/components/PremiumUpgradePrompt';
 import { TREND_STRINGS } from '@/features/budget/content/trend';
 import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
@@ -20,6 +21,7 @@ import type { TrendMonths } from '@/features/budget/services/budgetApi';
 import { isPremiumRequired } from '@/utils/premium';
 import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
 import { useBudgetStore } from '@/store/budgetStore';
+import { headerBlurFor } from '@/utils/headerBlur';
 import { formatMoney } from '@/utils/money';
 import { getCategoryMetaByName } from '@/constants/categories';
 import { percentChange } from '@/features/budget/utils/monthOverMonth';
@@ -140,7 +142,8 @@ export default function TrendScreen() {
           // Opened from the Budget tab; otherwise iOS shows the group name "(tabs)".
           headerBackTitle: 'Budget',
           headerLargeTitle: true,
-          headerBlurEffect: 'systemChromeMaterial',
+          // iOS 26+ draws its own glass here; a blur on top hides the large title (BUG-5).
+          headerBlurEffect: headerBlurFor(Platform.Version),
         }}
       />
       <ScrollView
@@ -175,8 +178,10 @@ export default function TrendScreen() {
             />
             <View style={styles.summaryCard}>
               <Text style={styles.caption}>{monthName(period)} spending</Text>
-              <View style={styles.totalRow}>
-                <Text style={styles.total}>{money(current)}</Text>
+              <View style={styles.totalRow} testID="trend-total-row">
+                <Text style={styles.total} numberOfLines={1} adjustsFontSizeToFit>
+                  {money(current)}
+                </Text>
                 {totalChange !== null ? (
                   <Text
                     style={[styles.totalChange, { color: changeColor(totalChange) }]}
@@ -235,7 +240,11 @@ export default function TrendScreen() {
                       </Text>
                     ) : null}
                   </View>
-                  <View style={[styles.chart, compact && styles.chartCompact]}>
+                  {/* Columns stretch to one height and grow with the text: a
+                      fixed height made big labels overflow up over the summary
+                      (BUG-1), and bottom-aligned columns of unequal height made
+                      VoiceOver read the tallest bar first (BUG-8). */}
+                  <View style={[styles.chart, compact && styles.chartCompact]} testID="trend-chart">
                     {months.map((m) => {
                       const h = (m.total / max) * 130;
                       return (
@@ -247,7 +256,15 @@ export default function TrendScreen() {
                         >
                           {/* Twelve amounts do not fit above narrow bars; VoiceOver reads each. */}
                           {compact ? null : (
-                            <Text style={styles.barValue}>${m.total.toFixed(0)}</Text>
+                            <Text
+                              style={styles.barValue}
+                              testID={`trend-amount-${m.period}`}
+                              numberOfLines={1}
+                              adjustsFontSizeToFit
+                              minimumFontScale={0.5}
+                            >
+                              {money(m.total)}
+                            </Text>
                           )}
                           <View
                             style={[
@@ -258,7 +275,18 @@ export default function TrendScreen() {
                           >
                             <StackedFill period={m.period} total={m.total} segments={m.segments} />
                           </View>
-                          <Text style={styles.barLabel}>{m.label}</Text>
+                          <Text
+                            style={styles.barLabel}
+                            testID={`trend-month-${m.period}`}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.5}
+                            maxFontSizeMultiplier={
+                              compact ? fontScale.compactChartLabelMax : undefined
+                            }
+                          >
+                            {m.label}
+                          </Text>
                         </View>
                       );
                     })}
@@ -399,8 +427,9 @@ const styles = StyleSheet.create({
   },
   totalRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'baseline',
-    gap: 8,
+    columnGap: spacing.sm,
   },
   total: {
     ...type.money,
@@ -442,9 +471,9 @@ const styles = StyleSheet.create({
   },
   chart: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'stretch',
     gap: 18,
-    height: 170,
+    minHeight: 170,
     paddingTop: spacing.lg,
   },
   chartCompact: {
