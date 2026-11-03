@@ -111,6 +111,23 @@ async def test_dashboard_p95_under_2s(client, thousand_receipts):
     assert p95(samples) <= 2.0
 
 
+async def test_dashboard_12_month_trend_p95_under_2s(client, thousand_receipts):
+    # The 12-month trend (Premium, V1.1) runs the per-month queries 4x as often.
+    from app.core.entitlements import user_is_premium
+    from main import app
+
+    app.dependency_overrides[user_is_premium] = lambda: True
+    try:
+        samples = await _timed(
+            client, "/api/dashboard/spending", {"period": "2026-03", "months": 12}
+        )
+    finally:
+        app.dependency_overrides.pop(user_is_premium, None)
+
+    print(f"12-month dashboard p95 {p95(samples) * 1000:.0f} ms over {RUNS} runs")
+    assert p95(samples) <= 2.0
+
+
 async def test_filtered_history_search_p95_under_1s(client, thousand_receipts):
     params = {
         "store": "store 7",

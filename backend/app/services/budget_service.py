@@ -534,6 +534,18 @@ class BudgetService:
         year, month = int(period[:4]), int(period[5:7])
         trend: list[DashboardTrendMonth] = []
 
+        # The overall budget line, the same for every month of the trend.
+        result = await self.db.execute(
+            select(Budget)
+            .where(
+                Budget.user_id == user_id,
+                Budget.category_id.is_(None),
+            )
+            .order_by(Budget.created_at.desc())
+            .limit(1)
+        )
+        budget = result.scalar_one_or_none()
+
         for i in range(months - 1, -1, -1):
             # Calculate the month offset
             m = month - i
@@ -561,18 +573,6 @@ class BudgetService:
                 ),
                 key=lambda c: (-c.spent, c.name),
             )
-
-            # Get budget for this period
-            result = await self.db.execute(
-                select(Budget)
-                .where(
-                    Budget.user_id == user_id,
-                    Budget.category_id.is_(None),
-                )
-                .order_by(Budget.created_at.desc())
-                .limit(1)
-            )
-            budget = result.scalar_one_or_none()
 
             trend.append(
                 DashboardTrendMonth(
@@ -634,9 +634,13 @@ class BudgetService:
         return changes
 
     async def get_dashboard_data(
-        self, user_id: uuid.UUID, period: str | None = None
+        self, user_id: uuid.UUID, period: str | None = None, months: int = 3
     ) -> DashboardSpendingResponse:
-        """Get complete dashboard data in a single call."""
+        """Get complete dashboard data in a single call.
+
+        ``months`` sets the trend length (3, or 12 for Premium) and the prior
+        window ``prior_average`` covers; the rest is about ``period`` alone.
+        """
         if period is None:
             today = date.today()
             period = f"{today.year:04d}-{today.month:02d}"
@@ -644,8 +648,8 @@ class BudgetService:
         summary = await self.get_budget_summary(user_id, period)
         period_start, period_end = await self.get_period_dates(user_id, period)
         top_items = await self.get_top_items(user_id, period_start, period_end)
-        trend = await self.get_spending_trend(user_id, period)
-        prior_average = await self.get_prior_average(user_id, period)
+        trend = await self.get_spending_trend(user_id, period, months)
+        prior_average = await self.get_prior_average(user_id, period, months)
         category_changes = await self.get_category_changes(user_id, period)
         has_receipts = await self._has_receipts(user_id)
 

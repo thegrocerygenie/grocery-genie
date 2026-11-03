@@ -2,10 +2,10 @@
 
 Mobile app that transforms grocery receipts into budget tracking, price intelligence, and meal planning from a single scan.
 
-## Current Build Phase: MVP (Budget Copilot)
+## Current Build Phase: V1.1 (Price Intelligence + Premium)
 
 See `docs/prd/PHASE_SCOPE.md` for what's in and out of scope.
-**Do not build features from later phases (V1.1+) unless explicitly asked.**
+**Do not build features from later phases (V1.5+) unless explicitly asked.** The MVP has shipped.
 
 ## Tech Stack
 
@@ -43,9 +43,9 @@ See `docs/prd/PHASE_SCOPE.md` for what's in and out of scope.
 - Fallback to rule-based processing if LLM unavailable or returns invalid output
 
 ### Monetization
-- MVP launches fully free (no paywall, no payment infrastructure)
-- Premium tier introduces with V1.1
-- Do not build payment/subscription logic in MVP
+- MVP shipped fully free; V1.1 introduces the Premium tier ($5.99/month) through RevenueCat
+- The backend trusts only RevenueCat's webhook and REST API for entitlements, never the client
+- Premium gates only the new extras (custom categories, data export, rollover, 12-month trend, unlimited receipts); price intelligence stays free
 
 ## Project Structure
 
@@ -139,7 +139,7 @@ After completing any task (feature, bugfix, refactor, scaffold):
 - If a test fails, read the failure, fix the root cause (not just the test), and re-run.
 - If a lint rule fails, fix the code to comply — do not disable the rule.
 - If an acceptance criterion isn't satisfied, implement it before reporting done.
-- If code from a later phase (V1.1+) was accidentally introduced, remove it.
+- If code from a later phase (V1.5+) was accidentally introduced, remove it.
 - After fixing, always re-run validation from the start to catch cascading issues.
 
 **When to ask for human input vs. self-correct:**

@@ -39,7 +39,7 @@ Technology-agnostic entity model. Describes entities, relationships, and access 
 | Price history for item | PriceObservations by canonical_item_id, optionally by store_id, ordered by date | Medium | V1.1 |
 | Semantic item match | The user's CanonicalItemAliases ordered by embedding cosine distance (exact scan by user_id, no ANN index: a global index filtered to one user can return no neighbours) | High (every confirm) | V1.1 |
 | Rolling average for a price alert | Mean unit_price of PriceObservations by canonical_item_id with the same unit_of_measure and currency, date in the 7 or 30 days up to the receipt date, the confirming receipt left out | Medium (every confirm, per item) | V1.1 |
-| Cross-store price comparison | Latest PriceObservation per store_id for a canonical_item_id | Medium | V1.1 |
+| Cross-store price comparison | The user's PriceObservations for a canonical_item_id (receipts not deleted) grouped by store_id: latest and mean unit price, like-for-like unit and currency, stores with at least 2 prices | Medium | V1.1 |
 | Household receipts | Receipts by household_id, ordered by date DESC | Medium | V1.5 |
 | Pantry contents | PantryItems by user_id/household_id where status != used/discarded, ordered by estimated_expiry ASC | High (meal planner) | V2.0 |
 | Recipe matching | Recipes where required ingredient_ids overlap with active PantryItem ingredient_ids | Medium | V2.0 |

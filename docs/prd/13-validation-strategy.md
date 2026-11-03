@@ -206,7 +206,7 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-06 | 3 | Chosen day, 9 AM local time | Integration | `backend/tests/tasks/test_summary_tasks.py::test_recipients_only_on_users_chosen_day` | Pass |
 | BC-06 | 4 | Links to full dashboard | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "falls back to the dashboard when the route is missing" | Pass |
 
-V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, its app screens (alert tap, mute buttons, threshold setting) come with V11-02. PI-04 (cross-store comparison) is not built yet.
+V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, its app screens (alert tap, mute buttons, threshold setting) come with V11-02. PI-04 (cross-store comparison) has its backend; its screen (AC 4) is the mobile task.
 
 | Story | AC | Criterion | Type | Test | Status |
 |---|---|---|---|---|---|
@@ -244,6 +244,31 @@ V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02; PI-03
 | PI-03 | 3 | Cooldown, default 7 days per item | Integration | `backend/tests/services/test_price_alert_service.py::test_two_concurrent_claims_for_one_item_alert_once` | Pass (Postgres only) |
 | PI-03 | 4 | Mutable per item | Integration | `backend/tests/api/test_price_alerts.py::test_a_muted_item_does_not_alert` | Pass |
 | PI-03 | 4 | Mutable per store | Integration | `backend/tests/api/test_price_alerts.py::test_a_muted_store_does_not_alert` | Pass |
+| PI-04 | 1 | Side-by-side pricing across all stores with prices | Integration | `backend/tests/api/test_price_comparison.py::test_side_by_side_latest_and_average_per_store` | Pass |
+| PI-04 | 1 | Side-by-side pricing across all stores with prices | Integration | `backend/tests/api/test_price_comparison.py::test_stores_are_cheapest_first_by_average` | Pass |
+| PI-04 | 2 | Most recent and average price per store | Integration | `backend/tests/api/test_price_comparison.py::test_side_by_side_latest_and_average_per_store` | Pass |
+| PI-04 | 2 | Most recent and average price per store | Integration | `backend/tests/api/test_price_comparison.py::test_only_like_for_like_prices_are_compared` | Pass |
+| PI-04 | 2 | Most recent and average price per store | Integration | `backend/tests/api/test_price_comparison.py::test_prices_in_another_currency_are_not_compared` | Pass |
+| PI-04 | 2 | Most recent and average price per store | Integration | `backend/tests/api/test_price_comparison.py::test_average_is_rounded_half_up_to_the_cent` | Pass |
+| PI-04 | 3 | Only stores the user has scanned from | Integration | `backend/tests/api/test_price_comparison.py::test_only_stores_the_user_bought_from_are_shown` | Pass |
+| PI-04 | 3 | Only stores the user has scanned from | Integration | `backend/tests/api/test_price_comparison.py::test_comparison_is_private_and_unknown_items_are_404` | Pass |
+| PI-04 | FR | Minimum 2 observations per store per item | Integration | `backend/tests/api/test_price_comparison.py::test_a_store_needs_two_prices_to_be_compared` | Pass |
+| PI-04 | FR | Minimum 2 observations per store per item | Integration | `backend/tests/api/test_price_comparison.py::test_one_price_anywhere_compares_nothing` | Pass |
+| PI-04 | 4 | From item detail or a comparison screen | Component | Mobile task, not built yet (it reads `GET /api/items/{id}/compare`) | Pending |
+| BC-FR | Trends | 12-month trend (V1.1), Premium per D2 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_for_premium` | Pass |
+| BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_premium_user_still_gets_3_months_by_default` | Pass |
+| BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_trend_is_3_months_with_months_3` | Pass |
+| BC-FR | Trends | `months` other than 3 or 12 is a 422 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_rejects_months_other_than_3_or_12` | Pass |
+| BC-FR | Trends | Free user asking for 12 months gets `403 premium_required` | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_needs_premium` | Pass |
+| BC-FR | Trends | Nobody is Premium until V11-P0 | Unit | `backend/tests/core/test_entitlements.py::test_nobody_is_premium_until_the_premium_tier_ships` | Pass |
+| BC-04 | 5 | 12-month dashboard loads within 2 seconds | Integration | `backend/tests/api/test_p95_postgres.py::test_dashboard_12_month_trend_p95_under_2s` (Postgres) | Pass |
+| BC-FR | Trends | 3/12-month toggle on Trend; 3 stays the default | Component | `mobile/src/__tests__/trendMonths.test.tsx` "shows 3 months by default and asks the server for 3" | Pass |
+| BC-FR | Trends | 3/12-month toggle on Trend; 12 months charts every month | Component | `mobile/src/__tests__/trendMonths.test.tsx` "switching to 12 months asks the server for 12 and charts every month" | Pass |
+| BC-FR | Trends | 3/12-month toggle on Trend; 12 months charts every month | Component | `mobile/src/__tests__/trendMonths.test.tsx` "compares the 12-month average with the 12 months before" | Pass |
+| BC-FR | Trends | Free user sees an upgrade prompt, not an error (D2) | Component | `mobile/src/__tests__/trendMonths.test.tsx` "a free user asking for 12 months sees an upgrade prompt, not an error" | Pass |
+| BC-FR | Trends | Free user sees an upgrade prompt, not an error (D2) | Component | `mobile/src/__tests__/trendMonths.test.tsx` "switching back to 3 months after the upgrade prompt shows the 3-month chart" | Pass |
+| BC-FR | Trends | Free user sees an upgrade prompt, not an error (D2) | Component | `mobile/src/components/__tests__/PremiumUpgradePrompt.test.tsx` "calls onUpgrade when the upgrade button is tapped (the V11-P0 paywall seam)" | Pass |
+| BC-FR | Trends | Another 12-month load failure offers a retry | Component | `mobile/src/__tests__/trendMonths.test.tsx` "another failure loading 12 months offers a retry" | Pass |
 
 This matrix is the source of truth for completeness. A phase is not done until every row has a passing test.
 

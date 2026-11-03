@@ -603,6 +603,28 @@ class PriceHistoryResponse(BaseModel):
     observations: list[PricePointResponse]
 
 
+class StorePriceResponse(BaseModel):
+    store_id: uuid.UUID
+    store_name: str
+    latest_price: float
+    latest_date: date
+    avg_price: float
+    observation_count: int
+
+
+class PriceComparisonResponse(BaseModel):
+    """PI-04: the item's price at each store, cheapest first by average."""
+
+    item: ItemRef
+    # Only prices in this unit and currency are compared (like for like).
+    unit_of_measure: str | None = None
+    currency: str | None = None
+    min_observations: int
+    stores: list[StorePriceResponse]
+    # Stores with a price of the item but fewer than min_observations.
+    stores_below_minimum: int
+
+
 class ItemRenameRequest(BaseModel):
     canonical_name: str = Field(min_length=1, max_length=255)
 

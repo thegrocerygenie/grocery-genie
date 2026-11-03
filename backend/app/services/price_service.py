@@ -12,7 +12,7 @@ import uuid
 from collections import Counter
 from dataclasses import dataclass
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +27,8 @@ from app.models.database import (
 
 # PI-01 AC 4: a timeline needs at least this many prices.
 MIN_TIMELINE_POINTS = 2
+# PI-04 FR: a store needs at least this many prices of an item to be compared.
+MIN_COMPARISON_OBSERVATIONS = 2
 
 # Rolling average windows (PI functional requirements). Price change alerts
 # compare with the 30-day average; the 7-day one goes along for context.
@@ -76,6 +78,37 @@ class PriceHistory:
     @property
     def has_timeline(self) -> bool:
         return len(self.timeline_points) >= MIN_TIMELINE_POINTS
+
+
+@dataclass(frozen=True)
+class StorePrice:
+    """One store's like-for-like prices of an item (PI-04 AC 2)."""
+
+    store_id: uuid.UUID
+    store_name: str
+    latest: PriceObservation
+    average: Decimal
+    observation_count: int
+
+
+@dataclass(frozen=True)
+class StoreComparison:
+    item: CanonicalItem
+    unit_of_measure: str | None
+    currency: str | None
+    # Cheapest first by average, then by latest price, then by name.
+    stores: list[StorePrice]
+    # Stores with like-for-like prices of the item, but fewer than
+    # MIN_COMPARISON_OBSERVATIONS of them.
+    stores_below_minimum: int
+
+
+def _series(observations: list[PriceObservation]) -> tuple[str | None, str | None]:
+    """The (unit, currency) most of the observations are in, or (None, None)."""
+    counts = Counter((obs.unit_of_measure, obs.currency) for obs in observations)
+    if not counts:
+        return None, None
+    return counts.most_common(1)[0][0]
 
 
 class PriceService:
@@ -293,10 +326,10 @@ class PriceService:
 
         # The series is the unit and currency most prices are in, over all of
         # the item's prices, so a filter cannot change which one is plotted.
-        series = Counter(
-            (obs.unit_of_measure, obs.currency) for obs, _ in all_rows
-        ).most_common(1)
-        unit, currency = series[0][0] if series else (item.unit_of_measure, None)
+        if all_rows:
+            unit, currency = _series([obs for obs, _ in all_rows])
+        else:
+            unit, currency = item.unit_of_measure, None
 
         points = [
             PricePoint(observation=obs, store_name=store_name)
@@ -311,4 +344,72 @@ class PriceService:
             unit_of_measure=unit,
             currency=currency,
             store_count=len({p.observation.store_id for p in points}),
+        )
+
+    async def compare(self, user_id: uuid.UUID, item: CanonicalItem) -> StoreComparison:
+        """Latest and average price of ``item`` at each store (PI-04).
+
+        Only stores on the user's own visible receipts appear (AC 3), only
+        prices in the item's main unit and currency count (edge case: unit
+        price ambiguity), and a store needs MIN_COMPARISON_OBSERVATIONS of
+        them (FR).
+        """
+        rows = (
+            await self.db.execute(
+                select(PriceObservation, Store.name)
+                .join(Receipt, PriceObservation.receipt_id == Receipt.id)
+                .outerjoin(Store, PriceObservation.store_id == Store.id)
+                .where(
+                    *self._visible(user_id),
+                    PriceObservation.canonical_item_id == item.id,
+                )
+                .order_by(PriceObservation.date, Receipt.created_at)
+            )
+        ).all()
+        if rows:
+            unit, currency = _series([obs for obs, _ in rows])
+        else:
+            unit, currency = item.unit_of_measure, None
+
+        by_store: dict[uuid.UUID, tuple[str, list[PriceObservation]]] = {}
+        for obs, store_name in rows:
+            if obs.store_id is None or store_name is None:
+                continue
+            if obs.unit_of_measure != unit or obs.currency != currency:
+                continue
+            by_store.setdefault(obs.store_id, (store_name, []))[1].append(obs)
+
+        stores: list[StorePrice] = []
+        below = 0
+        for store_id, (store_name, observations) in by_store.items():
+            if len(observations) < MIN_COMPARISON_OBSERVATIONS:
+                below += 1
+                continue
+            total = sum((Decimal(str(o.unit_price)) for o in observations), Decimal())
+            stores.append(
+                StorePrice(
+                    store_id=store_id,
+                    store_name=store_name,
+                    # Rows are oldest first, so the last is the latest.
+                    latest=observations[-1],
+                    # "Rounded to the cent" (08-api-contracts.md): half up.
+                    average=(total / len(observations)).quantize(
+                        Decimal("0.01"), rounding=ROUND_HALF_UP
+                    ),
+                    observation_count=len(observations),
+                )
+            )
+        stores.sort(
+            key=lambda s: (
+                s.average,
+                Decimal(str(s.latest.unit_price)),
+                s.store_name.casefold(),
+            )
+        )
+        return StoreComparison(
+            item=item,
+            unit_of_measure=unit,
+            currency=currency,
+            stores=stores,
+            stores_below_minimum=below,
         )

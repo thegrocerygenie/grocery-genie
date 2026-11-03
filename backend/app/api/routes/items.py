@@ -1,4 +1,4 @@
-"""Canonical items, their price history and price alerts (V1.1: PI-01..03)."""
+"""Canonical items, price history, comparison and alerts (V1.1: PI-01..04)."""
 
 import uuid
 from datetime import date
@@ -26,8 +26,10 @@ from app.models.schemas import (
     LatestPrice,
     PriceAlertSettingsResponse,
     PriceAlertSettingsUpdate,
+    PriceComparisonResponse,
     PriceHistoryResponse,
     PricePointResponse,
+    StorePriceResponse,
     StoreRef,
 )
 from app.services.analytics_service import AnalyticsService, get_analytics_service
@@ -37,7 +39,11 @@ from app.services.item_matching_service import (
     ItemNotFoundError,
 )
 from app.services.price_alert_service import PriceAlertService, PriceAlertSettings
-from app.services.price_service import MIN_TIMELINE_POINTS, PriceService
+from app.services.price_service import (
+    MIN_COMPARISON_OBSERVATIONS,
+    MIN_TIMELINE_POINTS,
+    PriceService,
+)
 
 router = APIRouter(prefix="/api/items", tags=["items"])
 
@@ -280,6 +286,41 @@ async def get_price_history(
             )
             for p in history.points
         ],
+    )
+
+
+@router.get("/{item_id}/compare", response_model=PriceComparisonResponse)
+async def compare_prices(
+    item_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User = Depends(get_current_user),
+    analytics: AnalyticsService = Depends(get_analytics_service),
+) -> PriceComparisonResponse:
+    """Latest and average price of the item at each store (PI-04)."""
+    item = await _get_item(ItemMatchingService(db), user.id, item_id)
+    comparison = await PriceService(db).compare(user.id, item)
+    analytics.emit(
+        "price_comparison_viewed",
+        {"canonical_item_id": str(item.id), "store_count": len(comparison.stores)},
+        user.id,
+    )
+    return PriceComparisonResponse(
+        item=ItemRef.model_validate(item),
+        unit_of_measure=comparison.unit_of_measure,
+        currency=comparison.currency,
+        min_observations=MIN_COMPARISON_OBSERVATIONS,
+        stores=[
+            StorePriceResponse(
+                store_id=s.store_id,
+                store_name=s.store_name,
+                latest_price=float(s.latest.unit_price),
+                latest_date=s.latest.date,
+                avg_price=float(s.average),
+                observation_count=s.observation_count,
+            )
+            for s in comparison.stores
+        ],
+        stores_below_minimum=comparison.stores_below_minimum,
     )
 
 
