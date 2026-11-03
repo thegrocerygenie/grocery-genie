@@ -71,7 +71,7 @@ const premiumRequired = new ApiError(403, {
 });
 
 function renderTrend() {
-  renderRouter(
+  return renderRouter(
     {
       _layout: () => {
         const { Stack } = jest.requireActual('expo-router');
@@ -82,6 +82,7 @@ function renderTrend() {
         );
       },
       trend: TrendScreen,
+      paywall: () => null,
     },
     { initialUrl: '/trend' },
   );
@@ -161,6 +162,18 @@ describe('Trend screen 3 or 12 months', () => {
     // premium_required is an answer, not a failure: it is not retried.
     const twelve = mockGetDashboardSpending.mock.calls.filter(([, m]) => m === 12);
     expect(twelve).toHaveLength(1);
+  });
+
+  it('the upgrade prompt opens the Premium paywall (V11-P0)', async () => {
+    mockGetDashboardSpending.mockImplementation((_p: string, months: number) =>
+      months === 12 ? Promise.reject(premiumRequired) : Promise.resolve(dashboard(3)),
+    );
+    const app = renderTrend();
+    await screen.findByLabelText('December: $120');
+    pick(1);
+
+    fireEvent.press(await screen.findByLabelText('Learn About Premium'));
+    expect(app.getPathname()).toBe('/paywall');
   });
 
   it('switching back to 3 months after the upgrade prompt shows the 3-month chart', async () => {

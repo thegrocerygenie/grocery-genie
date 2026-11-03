@@ -430,6 +430,48 @@ class UserProfileResponse(BaseModel):
     preferences: UserPreferencesPublic
     needs_onboarding: bool = False
     ai_consent: AiConsentPublic
+    # Premium (V11-P0), from RevenueCat's webhook and REST API only.
+    is_premium: bool = False
+    premium_expires_at: datetime | None = None
+
+
+# --- Premium: the RevenueCat webhook (V11-P0) ---
+
+
+class RevenueCatWebhookEvent(BaseModel):
+    """The fields of a RevenueCat webhook event the backend reads.
+
+    RevenueCat sends many more; they are ignored. Times are epoch milliseconds.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(min_length=1, max_length=255)
+    type: str = Field(min_length=1, max_length=64)
+    app_user_id: str | None = None
+    original_app_user_id: str | None = None
+    aliases: list[str] | None = None
+    entitlement_ids: list[str] | None = None
+    # Older payloads name a single entitlement.
+    entitlement_id: str | None = None
+    product_id: str | None = None
+    expiration_at_ms: int | None = None
+    event_timestamp_ms: int | None = None
+    transferred_from: list[str] | None = None
+    transferred_to: list[str] | None = None
+    environment: str | None = None
+
+
+class RevenueCatWebhookBody(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    api_version: str | None = None
+    event: RevenueCatWebhookEvent
+
+
+class RevenueCatWebhookResponse(BaseModel):
+    # applied, duplicate, stale, ignored, unknown_user
+    status: str
 
 
 def _currency_code(value: str | None) -> str | None:

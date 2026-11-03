@@ -8,7 +8,7 @@ import {
   View,
   type ColorValue,
 } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 
@@ -88,6 +88,7 @@ function changeColor(change: number): ColorValue {
 }
 
 export default function TrendScreen() {
+  const router = useRouter();
   const { selectedPeriod } = useBudgetStore();
   const currency = useBudgetCurrency();
   const money = (amount: number) => formatMoney(amount, currency, { decimals: 0 });
@@ -191,10 +192,11 @@ export default function TrendScreen() {
               </View>
               {compact && isPremiumRequired(yearly.error) ? (
                 // D2: a free user asking for 12 months is invited, never shown an error.
-                // V11-P0 passes onUpgrade (and upgradeLabel) to route to its paywall.
                 <PremiumUpgradePrompt
                   title={TREND_STRINGS.upgradeTitle}
                   message={TREND_STRINGS.upgradeMessage}
+                  upgradeLabel={TREND_STRINGS.upgradeAction}
+                  onUpgrade={() => router.push('/paywall')}
                 />
               ) : compact && yearly.isError ? (
                 <View style={styles.chartStatus}>

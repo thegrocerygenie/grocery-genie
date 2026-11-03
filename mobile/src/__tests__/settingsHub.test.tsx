@@ -62,6 +62,7 @@ function renderSettings() {
       'settings/help': () => null,
       'settings/delete-account': () => null,
       'settings/currency-settings': () => null,
+      paywall: () => null,
     },
     { initialUrl: '/' },
   );
@@ -104,6 +105,27 @@ describe('Settings hub', () => {
 
     expect(screen.getByText('€400/mo · 4 caps')).toBeTruthy();
     profile.currency_preference = 'USD';
+  });
+
+  it('a free user sees the free plan and a Premium row that opens the paywall (V11-P0)', () => {
+    const app = renderSettings();
+
+    expect(screen.getByText('sam@example.com · Free plan')).toBeTruthy();
+    const row = screen.getByLabelText('Grocery Genie Premium');
+    expect(row.props.accessibilityValue).toEqual({ text: 'Free plan · Upgrade' });
+    fireEvent.press(row);
+    expect(app.getPathname()).toBe('/paywall');
+  });
+
+  it('a Premium user sees Premium, from the backend profile', () => {
+    profile.is_premium = true;
+    renderSettings();
+
+    expect(screen.getByText('sam@example.com · Premium')).toBeTruthy();
+    expect(screen.getByLabelText('Grocery Genie Premium').props.accessibilityValue).toEqual({
+      text: 'Premium',
+    });
+    profile.is_premium = false;
   });
 
   it('has a switch to withdraw AI receipt reading (App Store 5.1.2(i))', () => {

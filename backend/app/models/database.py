@@ -103,6 +103,17 @@ class User(Base):
         Boolean, nullable=False, default=True, server_default=text("true")
     )
     price_alert_threshold_percent: Mapped[int | None] = mapped_column(SmallInteger)
+    # Premium (V11-P0). Written only from RevenueCat (its webhook or REST
+    # API), never from the app. Premium while active and before the expiry
+    # (null: no expiry); read it through app.core.entitlements.is_premium.
+    premium_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    premium_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    premium_product_id: Mapped[str | None] = mapped_column(String(255))
+    # event_timestamp of the RevenueCat event (or REST read) that last set the
+    # three columns above. An older event arriving late changes nothing.
+    premium_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -452,6 +463,31 @@ class PriceAlertStoreMute(Base):
     )
 
     store: Mapped["Store"] = relationship()
+
+
+class RevenueCatEvent(Base):
+    """Every RevenueCat webhook delivery received: the idempotency ledger.
+
+    RevenueCat retries a delivery until it gets a 200, so the same event id
+    can arrive twice. The insert on the unique ``event_id`` is the claim: the
+    second delivery finds the row and changes nothing.
+    """
+
+    __tablename__ = "revenuecat_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    event_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Null when no user matched the event's app user ids.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), index=True
+    )
+    # applied, stale, ignored, unknown_user (the webhook's response status).
+    outcome: Mapped[str] = mapped_column(String(32), nullable=False)
+    event_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class PushToken(Base):
