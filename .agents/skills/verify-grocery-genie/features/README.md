@@ -34,5 +34,6 @@ Each feature file starts with an H1 title and one paragraph describing the user-
 - [Manual receipt entry](./manual-receipt.md) covers entering a receipt without a photo and its effect on spend.
 - [Item category correction](./item-correction.md) covers correcting an item's category, retroactive update, and the mapping applied to the next scan.
 - [Delete and restore a receipt](./delete-restore.md) covers soft delete, the recently-deleted list, restore, and spend.
+- [Spending trend, 3 or 12 months](./spending-trend.md) (V1.1) covers the default 3-month trend, `403 premium_required` for a free user asking for 12 months, and the 422 on any other length.
 - [Price history and item matching](./price-history.md) (V1.1) covers matching lines to items on confirm, auto-links, "same item?" suggestions accepted and rejected, the price history, split, merge, rename, and isolation between users.
 - [Cross-store price comparison](./price-comparison.md) (V1.1) covers latest and average price per store, cheapest first, the 2-price minimum, only the user's own stores, like-for-like currency, and isolation.

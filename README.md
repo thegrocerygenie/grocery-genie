@@ -2,7 +2,7 @@
 
 Mobile app that transforms grocery receipts into budget tracking, price intelligence, and meal planning from a single scan.
 
-**Current phase:** MVP (Budget Copilot) — receipt scanning + budget tracking.
+**Current phase:** V1.1 (Price Intelligence + Premium): price history, item matching, price alerts, cross-store comparison, and the Premium tier. The MVP (Budget Copilot) has shipped.
 
 ## How It Works
 

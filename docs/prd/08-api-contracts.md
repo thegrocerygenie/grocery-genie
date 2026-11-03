@@ -136,6 +136,16 @@ Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-mont
 }
 ```
 
+**`months` [V1.1].** `?months=3|12` sets the trend length (default `3`; `GET /api/dashboard/spending?period=2026-03&months=12`). With `12`, `trend` holds the 12 months ending at `period`, oldest first, and `prior_average` covers the 12 months before them; the rest of the response is unchanged. Any other value returns `422`.
+
+The 12-month trend is Premium (decision D2). A free user asking for `months=12` gets `403`, which the app turns into an upgrade prompt, never an error screen:
+
+```json
+{ "detail": { "code": "premium_required", "feature": "trend_12_months", "message": "This feature is part of Grocery Genie Premium." } }
+```
+
+`code: "premium_required"` is the stable error for every Premium-only feature; `feature` names which one. The check lives in `backend/app/core/entitlements.py` (`is_premium`), which returns false for everyone until the Premium tier (V11-P0) ships.
+
 ## User currency
 
 ### POST /api/auth/sign-up · /api/auth/apple · /api/auth/google [MVP]

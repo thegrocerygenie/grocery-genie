@@ -441,3 +441,119 @@ async def test_dashboard_has_receipts_from_another_month(
     data = response.json()
     assert data["overall"]["spent"] == 0
     assert data["has_receipts"] is True
+
+
+# --- V1.1 BC-FR "expandable to 12 in V1.1": months=3|12, 12 is Premium (D2) ---
+
+
+@pytest.fixture
+def premium_user():
+    """Grant Premium through the one entitlement check, for this test only."""
+    from app.core.entitlements import user_is_premium
+    from main import app
+
+    app.dependency_overrides[user_is_premium] = lambda: True
+    yield
+    app.dependency_overrides.pop(user_is_premium, None)
+
+
+@pytest.mark.asyncio
+async def test_dashboard_trend_is_3_months_with_months_3(
+    client: AsyncClient, seeded_db
+):
+    response = await client.get("/api/dashboard/spending?period=2026-03&months=3")
+
+    assert response.status_code == 200
+    assert [m["period"] for m in response.json()["trend"]] == [
+        "2026-01",
+        "2026-02",
+        "2026-03",
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("months", ["0", "1", "6", "13", "24", "abc", "-3", ""])
+async def test_dashboard_rejects_months_other_than_3_or_12(
+    client: AsyncClient, seeded_db, premium_user, months
+):
+    response = await client.get(
+        f"/api/dashboard/spending?period=2026-03&months={months}"
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_dashboard_12_month_trend_needs_premium(client: AsyncClient, seeded_db):
+    response = await client.get("/api/dashboard/spending?period=2026-03&months=12")
+
+    assert response.status_code == 403
+    detail = response.json()["detail"]
+    assert detail["code"] == "premium_required"
+    assert detail["feature"] == "trend_12_months"
+    assert detail["message"]
+
+
+@pytest.mark.asyncio
+async def test_dashboard_12_month_trend_for_premium(
+    client: AsyncClient, seeded_db, db_session, premium_user
+):
+    groceries = await _category_id(db_session, "Groceries")
+    await client.post(
+        "/api/budgets",
+        json={
+            "category_id": None,
+            "amount": 500.0,
+            "period_type": "monthly",
+            "period_start": "2025-01-01",
+        },
+    )
+    # Inside the window: its first month (Apr 2025), across the year, its last.
+    await _add_receipt(db_session, date(2025, 4, 2), [(groceries, 40.0)])
+    await _add_receipt(db_session, date(2025, 12, 31), [(None, 7.5)])
+    await _add_receipt(db_session, date(2026, 3, 15), [(groceries, 30.0)])
+    # The month before the window: in prior_average only.
+    await _add_receipt(db_session, date(2025, 3, 31), [(groceries, 1200.0)])
+
+    response = await client.get("/api/dashboard/spending?period=2026-03&months=12")
+
+    assert response.status_code == 200
+    data = response.json()
+    trend = data["trend"]
+    assert [m["period"] for m in trend] == [
+        "2025-04",
+        "2025-05",
+        "2025-06",
+        "2025-07",
+        "2025-08",
+        "2025-09",
+        "2025-10",
+        "2025-11",
+        "2025-12",
+        "2026-01",
+        "2026-02",
+        "2026-03",
+    ]
+    spent = {m["period"]: m["spent"] for m in trend}
+    assert spent["2025-04"] == 40.0
+    assert spent["2025-12"] == 7.5
+    assert spent["2026-03"] == 30.0
+    assert sum(spent.values()) == 77.5
+    assert all(m["budget"] == 500.0 for m in trend)
+    assert trend[8]["categories"] == [
+        {"category_id": None, "name": "Uncategorized", "spent": 7.5}
+    ]
+    # The 12 months before the window (Apr 2024 - Mar 2025): 1200 / 12.
+    assert data["prior_average"] == 100.0
+    # The rest of the dashboard is still about `period`.
+    assert data["overall"]["spent"] == 30.0
+    assert data["previous_period"] == "2026-02"
+
+
+@pytest.mark.asyncio
+async def test_dashboard_premium_user_still_gets_3_months_by_default(
+    client: AsyncClient, seeded_db, premium_user
+):
+    response = await client.get("/api/dashboard/spending?period=2026-03")
+
+    assert len(response.json()["trend"]) == 3

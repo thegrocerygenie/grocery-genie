@@ -240,6 +240,14 @@ V1.1 matrix (Price Intelligence), started 2026-11-03 with PI-01 and PI-02. PI-04
 | PI-04 | FR | Minimum 2 observations per store per item | Integration | `backend/tests/api/test_price_comparison.py::test_a_store_needs_two_prices_to_be_compared` | Pass |
 | PI-04 | FR | Minimum 2 observations per store per item | Integration | `backend/tests/api/test_price_comparison.py::test_one_price_anywhere_compares_nothing` | Pass |
 | PI-04 | 4 | From item detail or a comparison screen | Component | Mobile task, not built yet (it reads `GET /api/items/{id}/compare`) | Pending |
+| BC-FR | Trends | 12-month trend (V1.1), Premium per D2 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_for_premium` | Pass |
+| BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_premium_user_still_gets_3_months_by_default` | Pass |
+| BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_trend_is_3_months_with_months_3` | Pass |
+| BC-FR | Trends | `months` other than 3 or 12 is a 422 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_rejects_months_other_than_3_or_12` | Pass |
+| BC-FR | Trends | Free user asking for 12 months gets `403 premium_required` | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_needs_premium` | Pass |
+| BC-FR | Trends | Nobody is Premium until V11-P0 | Unit | `backend/tests/core/test_entitlements.py::test_nobody_is_premium_until_the_premium_tier_ships` | Pass |
+| BC-04 | 5 | 12-month dashboard loads within 2 seconds | Integration | `backend/tests/api/test_p95_postgres.py::test_dashboard_12_month_trend_p95_under_2s` (Postgres) | Pass |
+| BC-FR | Trends | 3/12-month toggle on Trend (V11-06b) | — | none | Gap: mobile is V11-06b |
 
 This matrix is the source of truth for completeness. A phase is not done until every row has a passing test.
 
