@@ -10,7 +10,7 @@ The Trend screen charts monthly spend split by category, ending at the selected 
 
 ## How to get to it (user POV)
 
-- Budget tab, Trend. The 3/12-month toggle arrives with V11-06b; until then the app only asks for 3 months.
+- Budget tab, Trend. The screen opens on 3 months and asks for `months=3`. The 3 Months / 12 Months toggle at the top asks for `months=12` (V11-06b); a free user sees a "See your whole year" upgrade prompt in place of the chart, and the month-over-month summary and categories stay. The toggle and prompt are UI only: this journey proves the API they read, and a Simulator check proves the screen.
 
 ## Driving it with gg-verify
 

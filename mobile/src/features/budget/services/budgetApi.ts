@@ -32,9 +32,16 @@ export async function updateBudget(
   });
 }
 
-export async function getDashboardSpending(period?: string): Promise<DashboardData> {
-  const params = period ? `?period=${period}` : '';
-  return apiClient<DashboardData>(`/api/dashboard/spending${params}`);
+/** How many months the dashboard trend covers (V1.1: 12 is Premium, D2). */
+export type TrendMonths = 3 | 12;
+
+export async function getDashboardSpending(
+  period?: string,
+  months: TrendMonths = 3,
+): Promise<DashboardData> {
+  const params = new URLSearchParams({ months: String(months) });
+  if (period) params.set('period', period);
+  return apiClient<DashboardData>(`/api/dashboard/spending?${params.toString()}`);
 }
 
 export async function getCategories(): Promise<CategoryResponse[]> {
