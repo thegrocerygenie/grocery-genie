@@ -389,3 +389,63 @@ async def test_category_deleted_during_a_scan_moves_the_mapped_item_to_other(
     async with harness.factory() as db:
         item = await db.get(LineItem, uuid.UUID(new_item["id"]))
         assert item is not None and item.category_id == await _other_id(harness)
+
+
+def _manual_receipt(cid: str) -> dict:
+    return {
+        "store_name": "Market",
+        "date": "2026-03-10",
+        "total": 3.0,
+        "items": [
+            {
+                "name": "Kiwi",
+                "unit_price": 3.0,
+                "total_price": 3.0,
+                "category_id": cid,
+            }
+        ],
+    }
+
+
+async def test_manual_receipt_with_a_category_being_deleted_gets_a_clean_400(
+    harness: Harness,
+):
+    cid = await _custom(harness, "Garden")
+    harness.hold("first")
+
+    deleted, created = await _race(
+        harness,
+        harness.client.delete(
+            f"/api/categories/{cid}", headers={"x-test-hold": "first"}
+        ),
+        harness.client.post("/api/receipts", json=_manual_receipt(cid)),
+    )
+
+    assert deleted.status_code == 204
+    assert created.status_code == 400, created.text
+    async with harness.factory() as db:
+        assert (await db.execute(select(LineItem))).first() is None
+
+
+async def test_category_deleted_during_a_manual_receipt_moves_the_item_to_other(
+    harness: Harness,
+):
+    cid = await _custom(harness, "Garden")
+    harness.hold("first")
+
+    created, deleted = await _race(
+        harness,
+        harness.client.post(
+            "/api/receipts",
+            json=_manual_receipt(cid),
+            headers={"x-test-hold": "first"},
+        ),
+        harness.client.delete(f"/api/categories/{cid}"),
+    )
+
+    assert created.status_code == 201, created.text
+    assert deleted.status_code == 204, deleted.text
+    item_id = created.json()["items"][0]["id"]
+    async with harness.factory() as db:
+        item = await db.get(LineItem, uuid.UUID(item_id))
+        assert item is not None and item.category_id == await _other_id(harness)

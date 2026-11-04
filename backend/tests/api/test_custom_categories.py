@@ -8,6 +8,7 @@ and removes its budgets.
 """
 
 import io
+import os
 import uuid
 
 import pytest
@@ -161,6 +162,22 @@ async def test_two_users_may_use_the_same_name(
     db_session.add(Category(name="Garden", user_id=other.id, sort_order=101))
     await db_session.flush()
     assert (await _create(client, "Garden")).status_code == 201
+
+
+@pytest.mark.skipif(
+    not os.environ.get("GG_TEST_DATABASE_URL", "").startswith("postgresql"),
+    reason="SQLite's lower() folds ASCII only",
+)
+@pytest.mark.parametrize(("taken", "name"), [("Ice", "\u0130ce"), ("\u0130ce", "ice")])
+async def test_name_check_folds_case_the_same_way_on_both_sides(
+    client: AsyncClient, seeded, premium, taken: str, name: str
+):
+    # Python lowers "\u0130" (I with a dot) to "i" plus a combining dot, but
+    # Postgres lowers it to "i": both names must go through the same lower().
+    assert (await _create(client, taken)).status_code == 201
+    resp = await _create(client, name)
+    assert resp.status_code == 409
+    assert resp.json()["detail"]["code"] == "category_name_taken"
 
 
 # --- Rename ---

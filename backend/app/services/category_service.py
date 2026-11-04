@@ -246,7 +246,7 @@ class CategoryService:
         self, user_id: uuid.UUID, name: str, exclude: uuid.UUID | None = None
     ) -> None:
         query = select(Category.id).where(
-            visible_to(user_id), func.lower(Category.name) == name.lower()
+            visible_to(user_id), func.lower(Category.name) == func.lower(name)
         )
         if exclude is not None:
             query = query.where(Category.id != exclude)
