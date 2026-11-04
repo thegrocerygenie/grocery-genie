@@ -99,6 +99,14 @@ describe('Privacy policy', () => {
     );
   });
 
+  // docs/marketing/decisions.md #13: a redeemed free year leaves a one-way
+  // fingerprint of the waitlist email after account deletion, until the offer closes.
+  it('says a redeemed waitlist offer leaves a fingerprint after account deletion', () => {
+    expect(text()).toMatch(
+      /keep a one-way fingerprint of your waitlist email, not the email itself, until the offer closes/,
+    );
+  });
+
   // docker/docker-compose.yml rotates logs by size (5 × 10 MB per service), and
   // a host job deletes rotated files after 30 days (docs/DEPLOYMENT.md 1.9).
   // A quiet service's current file can hold older lines, so the text must not
