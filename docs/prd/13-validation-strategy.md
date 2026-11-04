@@ -211,6 +211,8 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 
 V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04. BC-05 AC 3 (custom categories, Premium) with V11-P1. Decision recorded with V11-P1: the LLM assigns only the eight default categories, so a custom category reaches a new scan only through the user's corrections (the item mapping, BC-05 AC 4; row "Custom category in a correction teaches the next scan"). Changing the category prompt to know custom names needs `validate-extraction` and is out of V11-P1's scope (`08-api-contracts.md`, Categories). `PREM` rows are the Premium tier (V11-P0 and V11-P4, decisions D1 and D2: `PHASE_SCOPE.md`), which has no user story ID, so the AC column names the decision. Data export (V11-P2, NFR Privacy 2) is Premium too: its rows are Story `PREM`, AC `NFR-P2`. `BC-FR | Rollover` rows are the Premium rollover toggle (V11-P3). `PREM | D5` rows are the waitlist's free year of Premium (V11-P5, plan decision D5, `docs/marketing/decisions.md` #9–#13). `EC-PI | 1` rows are `11-edge-cases.md` Price Intelligence edge case 1, store normalization with user merge (V11-05, decision D3), which has no user story ID; it is free, like the rest of price intelligence. `EC-PI | 2` and `EC-PI | 3` rows are edge cases 2 (unit price ambiguity) and 3 (promotional prices).
 
+Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLAN-2026-11-04-v1.1-design-alignment.md`): the ACs tagged "(DA-n)" in `03-price-intelligence.md` (PI-01 AC 5–10, PI-02 AC 5–15, PI-03 AC 5–14, PI-04 AC 5–8, PREM-01 to PREM-04) and `02-budget-copilot.md` (BC-04 AC 6–10, BC-05 AC 5–8), and edge cases `EC-PI | 4`–`11` and `EC-PREM | 1`–`5` (`11-edge-cases.md`). They sit at the end of the matrix with the Test "Not yet implemented (DA-n)" and the Status "Pending" until task DA-n replaces each with its tests (the traceability script checks only named tests, so a pending row names none). Decision D8 turns the `PREM | D2` row "Free features stay free: cross-store comparison" into a Premium gate (PREM-02 AC 1); DA-1 replaces that row.
+
 | Story | AC | Criterion | Type | Test | Status |
 |---|---|---|---|---|---|
 | PI-01 | 1 | Every recorded price with date and store | Integration | `backend/tests/api/test_items.py::test_every_price_is_recorded_with_date_and_store` | Pass |
@@ -460,7 +462,7 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PREM | D2 | Manual entry stays open at the cap | Integration | `backend/tests/api/test_free_tier_quota.py::test_manual_entry_is_not_capped_at_quota` | Pass |
 | PREM | D2 | Premium user is not blocked by the cap | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_premium_user_scans_past_the_free_quota` | Pass |
 | PREM | D2 | Free features stay free: price history | Integration | `backend/tests/api/test_premium_gating.py::test_price_history_is_free` | Pass |
-| PREM | D2 | Free features stay free: cross-store comparison | Integration | `backend/tests/api/test_premium_gating.py::test_price_comparison_is_free` | Pass |
+| PREM | D2 | Free features stay free: cross-store comparison | Integration | `backend/tests/api/test_premium_gating.py::test_price_comparison_is_free` | Pass; superseded by D8 (PREM-02 AC 1): DA-1 replaces it |
 | PREM | D2 | Free features stay free: item matching | Integration | `backend/tests/api/test_premium_gating.py::test_item_matching_is_free` | Pass |
 | PREM | D2 | Free features stay free: item merge and split | Integration | `backend/tests/api/test_premium_gating.py::test_merge_and_split_are_free` | Pass |
 | PREM | D2 | Free features stay free: accept a match suggestion | Integration | `backend/tests/api/test_premium_gating.py::test_accepting_a_suggestion_is_free` | Pass |
@@ -618,6 +620,87 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | EC-PI | 2 | Unit price ambiguity: per-kg and per-unit prices compare only like-for-like (timeline) | Integration | `backend/tests/api/test_items.py::test_prices_in_another_unit_are_listed_but_not_plotted` | Pass |
 | EC-PI | 2 | Unit price ambiguity: per-kg and per-unit prices compare only like-for-like (alert average) | Integration | `backend/tests/services/test_price_alert_service.py::test_the_average_is_like_for_like_and_skips_deleted_receipts` | Pass |
 | EC-PI | 3 | A sale price is a regular observation, in the timeline and the average | Integration | `backend/tests/api/test_price_comparison.py::test_a_sale_price_is_a_regular_observation` | Pass |
+| PREM-01 | 1 | Yearly and Monthly from the RevenueCat offering, App Store prices, Yearly first with /mo and SAVE % | Component | Not yet implemented (DA-1) | Pending |
+| PREM-01 | 2 | "Start 7-day free trial" only when eligible, with the after-trial price; else Subscribe | Component | Not yet implemented (DA-1) | Pending |
+| PREM-01 | 3 | Paywall look: × close, title "Premium", subtitle, feature icons, "Cancel anytime · Restore purchase" | Component | Not yet implemented (DA-1) | Pending |
+| PREM-01 | 4 | Feature list names only what is built, keeps unlimited receipts and rollover; new stay-free line | Component | Not yet implemented (DA-1) | Pending |
+| PREM-01 | 5 | Either product, trial, trial cancel, conversion and plan switch keep Premium right | Integration | Not yet implemented (DA-1) | Pending |
+| PREM-01 | 6 | Offer-unavailable, Expo Go and Premium-user states unchanged | Component | Not yet implemented (DA-1) | Pending |
+| PREM-01 | 7 | DEPLOYMENT.md lists product ids, trial offer, group, offering and packages | Manual | Not yet implemented (DA-1) | Pending |
+| PREM-02 | 1 | Compare answers a free user 403 premium_required, Premium 200 | Integration | Not yet implemented (DA-1) | Pending |
+| PREM-02 | 2 | Item and store mute POST 403 for a free user; DELETE open to all | Integration | Not yet implemented (DA-1) | Pending |
+| PREM-02 | 3 | A mute outlives a Premium lapse: still honoured, listed and removable | Integration | Not yet implemented (DA-1) | Pending |
+| PREM-02 | 4 | History, matching, alerts, alert settings and the alerts list stay free | Integration | Not yet implemented (DA-1) | Pending |
+| PREM-02 | 5 | App: comparison and mute upgrade prompts open the paywall; lapsed user can unmute | Component | Not yet implemented (DA-1) | Pending |
+| PREM-02 | 6 | App: a 403 premium_required from compare or mute shows the upgrade prompt | Component | Not yet implemented (DA-1) | Pending |
+| PREM-02 | 7 | price_comparison_viewed and price_alert_muted only on success | Integration | Not yet implemented (DA-1) | Pending |
+| PREM-03 | 1 | GG_LLM_PREMIUM_EXTRACTION_MODEL setting; unset uses the default; no provider in code | Unit | Not yet implemented (DA-2) | Pending |
+| PREM-03 | 2 | Premium scan uses the Premium model, free the default; Premium read server-side | Integration | Not yet implemented (DA-2) | Pending |
+| PREM-03 | 3 | Through provider.py, no temperature, same validation and confidence scoring | Unit | Not yet implemented (DA-2) | Pending |
+| PREM-03 | 4 | Premium model failure falls back to the default, then rule-based; the scan never fails | Integration | Not yet implemented (DA-2) | Pending |
+| PREM-03 | 5 | receipt_extraction_completed carries extraction_tier | Integration | Not yet implemented (DA-2) | Pending |
+| PREM-03 | 6 | validate-extraction on the Premium model: accuracy not below default, cost recorded, user approval | LLM harness | Not yet implemented (DA-2) | Pending |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Component | Not yet implemented (DA-3) | Pending |
+| PI-01 | 6 | Fewer than 2 plotted prices in a range: "Not enough prices in this range", no chart | Component | Not yet implemented (DA-3) | Pending |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Unit | Not yet implemented (DA-3) | Pending |
+| PI-01 | 8 | Chart: shaded area, month labels, a dot per purchase | Component | Not yet implemented (DA-3) | Pending |
+| PI-01 | 9 | Store rows lead with a coloured square, stable per store | Unit | Not yet implemented (DA-3) | Pending |
+| PI-01 | 10 | Back label names the opener; largest text size holds | Component | Not yet implemented (DA-3) | Pending |
+| PI-03 | 5 | Price alerts list: newest first, This week / Earlier, arrow, signed percent, was/now, sparkline, tap opens item | Component | Not yet implemented (DA-4) | Pending |
+| PI-03 | 6 | Empty Price alerts list says "No price alerts yet" | Component | Not yet implemented (DA-4) | Pending |
+| PI-03 | 7 | Settings group: Threshold and Cooldown rows, footer from the user's settings | Component | Not yet implemented (DA-4) | Pending |
+| PI-03 | 8 | Cooldown user setting 1–30 days (null default, 422 otherwise), used by the alert check | Integration | Not yet implemented (DA-4) | Pending |
+| PI-03 | 9 | Alert title and body per design, still naming item, store, old average, new price, percent | Integration | Not yet implemented (DA-4) | Pending |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | Not yet implemented (DA-5) | Pending |
+| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Component | Not yet implemented (DA-5) | Pending |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | Not yet implemented (DA-5) | Pending |
+| PI-02 | 8 | GET /api/items/suggestions?receipt_id= filters and carries the prompt's fields; another user's receipt 404 | Integration | Not yet implemented (DA-5) | Pending |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Component | Not yet implemented (DA-5) | Pending |
+| PI-02 | 10 | Split by line, including one of several lines sharing a receipt name | Component | Not yet implemented (DA-6) | Pending |
+| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Component | Not yet implemented (DA-6) | Pending |
+| PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Unit | Not yet implemented (DA-6) | Pending |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | Not yet implemented (DA-6) | Pending |
+| PI-02 | 14 | POST /api/items/{id}/split: 201, 409 empty original, 422, 404 | Integration | Not yet implemented (DA-6) | Pending |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Component | Not yet implemented (DA-6) | Pending |
+| PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | Not yet implemented (DA-7) | Pending |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | Not yet implemented (DA-7) | Pending |
+| PI-03 | 12 | A timed mute ends by itself; nothing sent for prices during it; ended mute not listed | Integration | Not yet implemented (DA-7) | Pending |
+| PI-03 | 12 | verify-budget-alerts rechecked for the expiry in _alert_on_price_changes | Formal | Not yet implemented (DA-7) | Pending |
+| PI-03 | 13 | Item detail mute switches and copy per design; store mute covers every item | Component | Not yet implemented (DA-7) | Pending |
+| PI-03 | 14 | Settings lists mutes with Until/Forever; failed unmute keeps the row and says so | Component | Not yet implemented (DA-7) | Pending |
+| PREM-04 | 1 | Range: Period presets and From/To months; export holds receipts in range | Integration | Not yet implemented (DA-8) | Pending |
+| PREM-04 | 2 | Format: CSV first, JSON, PDF report | Component | Not yet implemented (DA-8) | Pending |
+| PREM-04 | 3 | Includes switches; receipt images as a zip with images/ | Integration | Not yet implemented (DA-8) | Pending |
+| PREM-04 | 4 | "Export N receipts" from the server count; none disables it | Component | Not yet implemented (DA-8) | Pending |
+| PREM-04 | 5 | PDF report: spending by month and category, budgets, receipt list, chosen sections | Integration | Not yet implemented (DA-8) | Pending |
+| PREM-04 | 6 | Export and summary routes: params, Premium 403, 422, data_exported properties | Integration | Not yet implemented (DA-8) | Pending |
+| PREM-04 | 7 | All time with every include still exports all data (NFR Privacy 2) | Integration | Not yet implemented (DA-8) | Pending |
+| BC-05 | 5 | Colour and icon per category; API returns and validates them; migration | Integration | Not yet implemented (DA-9) | Pending |
+| BC-05 | 6 | Categories screen: Built-in first, Custom, New category row, footer, Edit button | Component | Not yet implemented (DA-9) | Pending |
+| BC-05 | 7 | Colour and icon in Categories, the picker and dashboard bars | Component | Not yet implemented (DA-9) | Pending |
+| BC-05 | 8 | After a lapse colours stay; changing them is 403 premium_required / upgrade prompt | Integration | Not yet implemented (DA-9) | Pending |
+| PI-04 | 5 | "Save by switching $X / unit" card, 2+ stores and a gap above zero | Component | Not yet implemented (DA-10) | Pending |
+| PI-04 | 6 | Rows lead with latest price, ordered by it; CHEAPEST badge; N purchases · avg | Component | Not yet implemented (DA-10) | Pending |
+| PI-04 | 7 | Price bar per row, latest over highest latest | Component | Not yet implemented (DA-10) | Pending |
+| PI-04 | 8 | VoiceOver reads a row as one element; largest text size holds | Component | Not yet implemented (DA-10) | Pending |
+| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Integration | Not yet implemented (DA-10) | Pending |
+| BC-04 | 7 | Headline N-month average with change (YoY for 1Y) | Component | Not yet implemented (DA-10) | Pending |
+| BC-04 | 8 | Highlights: Highest, Lowest (in progress), Trend | Component | Not yet implemented (DA-10) | Pending |
+| BC-04 | 9 | Grey bars, current month tinted, VoiceOver per bar | Component | Not yet implemented (DA-10) | Pending |
+| BC-04 | 10 | Trend strings externalized | Component | Not yet implemented (DA-10) | Pending |
+| EC-PI | 4 | Timed mute expiry | Integration | Not yet implemented (DA-7) | Pending |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Integration | Not yet implemented (DA-1, DA-7) | Pending |
+| EC-PI | 6 | Split with one line, or of every line | Integration | Not yet implemented (DA-6) | Pending |
+| EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | Not yet implemented (DA-5) | Pending |
+| EC-PI | 8 | A range with too few prices | Component | Not yet implemented (DA-3) | Pending |
+| EC-PI | 9 | Cooldown setting changes | Integration | Not yet implemented (DA-4) | Pending |
+| EC-PI | 10 | Store comparison ties | Component | Not yet implemented (DA-10) | Pending |
+| EC-PI | 11 | Price alerts list after a merge or split | Component | Not yet implemented (DA-4) | Pending |
+| EC-PREM | 1 | Free trial eligibility, cancel and refund in the trial | Integration | Not yet implemented (DA-1) | Pending |
+| EC-PREM | 2 | Plan change monthly ↔ yearly | Integration | Not yet implemented (DA-1) | Pending |
+| EC-PREM | 3 | Priority OCR model chosen at extraction start; fallback | Integration | Not yet implemented (DA-2) | Pending |
+| EC-PREM | 4 | Export: empty range, From after To, images left out | Integration | Not yet implemented (DA-8) | Pending |
+| EC-PREM | 5 | Category colour and icon after a lapse | Integration | Not yet implemented (DA-9) | Pending |
 
 This matrix is the source of truth for completeness. A phase is not done until every row has a passing test.
 
@@ -663,10 +746,13 @@ This matrix is the source of truth for completeness. A phase is not done until e
 
 ### V1.1 Definition of Done
 
-V1.1 is Price Intelligence (PI-01 through PI-04) and the Premium tier (`PHASE_SCOPE.md`, decisions D1 and D2). The MVP boxes above still hold; these are the boxes V1.1 adds.
+V1.1 is Price Intelligence (PI-01 through PI-04) and the Premium tier (`PHASE_SCOPE.md`, decisions D1 and D2), aligned with the design by DA-0 to DA-10 (decisions D6–D10). The MVP boxes above still hold; these are the boxes V1.1 adds.
 
 **Functional completeness:**
 - [ ] All V1.1 user stories (PI-01 through PI-04, BC-05 AC 3) and the Premium rows (`PREM`, `BC-FR | Trends`, `BC-FR | Rollover`) have passing tests for every acceptance criterion.
+- [ ] Design alignment (DA-1 to DA-10): every row the design alignment added (PI-01 AC 5–10, PI-02 AC 5–15, PI-03 AC 5–14, PI-04 AC 5–8, BC-04 AC 6–10, BC-05 AC 5–8, PREM-01 to PREM-04, `EC-PI | 4`–`11`, `EC-PREM | 1`–`5`) names its tests and passes; no row is left "Pending" except a Manual one listed in `device-checklist.md`.
+- [ ] Each DA screen (item detail, Same item?, split, Link items, Price alerts, mutes, Compare stores, Trend, Categories, Export data, paywall) was checked by the reviewer against its screen in `design/claude-design/` (V1.1 sections) and in the Simulator, and keeps every PRD-required element and its large-text layout (D6).
+- [ ] Premium gates follow D2 and D8: cross-store comparison, mutes (to mute; unmuting stays open), custom categories, export, rollover and trends over 3 months answer a free user `403 premium_required`, and the receipt cap `429 receipt_quota_exceeded`, each with the app's upgrade prompt; a free scan uses the default model, not Priority OCR; price history, matching and alerts stay free.
 - [ ] The V1.1 traceability matrix covers every [V1.1] acceptance criterion and every V1.1 edge case, with test locations and pass status. `python3 scripts/check-traceability.py` is clean.
 - [ ] All API endpoints from 08-api-contracts.md tagged V1.1 (items, stores and store merge, categories, export, rollover, the 12-month trend, the RevenueCat webhook) are implemented and integration-tested.
 - [ ] `/validate` passes on main (backend on SQLite and on Postgres, `alembic check`, mobile tsc, eslint, jest).
@@ -675,12 +761,14 @@ V1.1 is Price Intelligence (PI-01 through PI-04) and the Premium tier (`PHASE_SC
 - [x] Waitlist free year of Premium (V11-P5, plan D5, [launch-open-items.md](../launch-open-items.md) §6): a verified account whose email matches a waitlist contact gets a 12-month RevenueCat promotional entitlement, within the claim window, once per waitlist email. Evidence: the `PREM | D5` rows above, chiefly `backend/tests/services/test_waitlist_service.py` (matching, cut-off, window at the match, one year per email, retry backoff over 14 days, 4xx final, grants after the window for members matched in time), `backend/tests/services/test_waitlist_concurrency.py` (two accounts racing for one email, one grant, Postgres), `backend/tests/api/test_waitlist_offer.py` (verify-email, Apple, Google, email change, the claim step answering alike for any email, its rate limits, the short RevenueCat timeout), `backend/tests/tasks/test_waitlist_tasks.py` (backfill, retry, the purge of the copy and of the Resend audience's contacts) and `backend/tests/api/test_account_deletion.py` (decision #13); the `waitlist-offer` journey of `/verify-grocery-genie`. The claim screens still need the Simulator check (the Manual row).
 
 **LLM extraction quality:**
-- N/A for V1.1. The extraction and category prompts and the LLM settings are unchanged since #82. `app/llm/provider.py` and `app/core/config.py` only gained the local sentence-transformers embedder for item matching (PI-02), which sends nothing to an LLM. So the MVP accuracy boxes carry over unchanged. Custom categories reach a scan only through the user's corrections (V11-P1 decision, above). Any later prompt change runs `validate-extraction` first.
+- [ ] Priority OCR (PREM-03, DA-2): `validate-extraction` on the Premium extraction model shows accuracy no lower than the default model's, with the model and its cost per scan recorded and approved by the user. The default model's results below still hold for free scans.
+- Otherwise N/A for V1.1. The extraction and category prompts and the LLM settings are unchanged since #82. `app/llm/provider.py` and `app/core/config.py` only gained the local sentence-transformers embedder for item matching (PI-02), which sends nothing to an LLM. So the MVP accuracy boxes carry over unchanged. Custom categories reach a scan only through the user's corrections (V11-P1 decision, above). Any later prompt change runs `validate-extraction` first.
 - [ ] Item-matching precision ≥80% (`PHASE_SCOPE.md`: the gate for V1.5). Evidence: the opt-in real-model pair test `backend/tests/services/test_item_matching_real_model.py::test_pair_table_with_the_real_model`, run with `GG_REAL_EMBEDDINGS=1` (sentence-transformers/all-MiniLM-L6-v2). Last measured auto-link precision: 31/31 (100%). Rerun it after any change to the matching thresholds, the embedder, or the qualifier rules.
 
 **Edge cases:**
 - [ ] All Price Intelligence edge cases from 11-edge-cases.md are tested: store name variations (store normalization with user merge, rows `EC-PI | 1`), unit price ambiguity (only like-for-like compared, per-kg against per-kg and per-unit against per-unit, rows `EC-PI | 2`), and promotional prices recorded as regular observations (row `EC-PI | 3`).
 - [ ] Rollover edge cases (amount change, $0 budget, currency change, delete and restore, Premium lapse) are tested. Rows `BC-FR | Rollover` above.
+- [ ] Design-alignment edge cases are tested: timed mute expiry, lapsed Premium with existing mutes, split with one line, the match prompt after a confirm, a range with too few prices, cooldown changes, comparison ties, the alerts list after a merge (rows `EC-PI | 4`–`11`), and the free trial, plan change, Priority OCR status and fallback, export ranges and images, category colours after a lapse (rows `EC-PREM | 1`–`5`).
 
 **Non-functional:**
 - [ ] Dashboard API response ≤2 seconds (p95) includes the 12-month trend query. `backend/tests/api/test_p95_postgres.py::test_dashboard_12_month_trend_p95_under_2s`, run on Postgres by `make backend-test-pg`.
@@ -688,10 +776,11 @@ V1.1 is Price Intelligence (PI-01 through PI-04) and the Premium tier (`PHASE_SC
 - [ ] Touch targets ≥44×44pt on every new screen. `mobile/src/__tests__/accessibilitySweep.test.ts` "makes every Pressable at least 44pt tall, or extends it with hitSlop" checks every Pressable in `app/` and `src/`, so the V1.1 screens too.
 
 **Analytics:**
-- [ ] All V1.1 analytics events from 12-analytics.md are instrumented and tested (price_history_viewed, price_alert_triggered, price_alert_muted, price_comparison_viewed, item_match_resolved, budget_rollover_toggled, premium_status_changed, custom_category_changed, data_exported, store_merged, store_unmerged). Each has a test that checks its properties against 12-analytics.md.
+- [ ] All V1.1 analytics events from 12-analytics.md are instrumented and tested (price_history_viewed, price_alert_triggered, price_alert_muted, price_comparison_viewed, item_match_resolved, budget_rollover_toggled, premium_status_changed, custom_category_changed, data_exported, store_merged, store_unmerged). Each has a test that checks its properties against 12-analytics.md, including the design-alignment properties (`extraction_tier` on receipt_extraction_completed, the range and includes on data_exported).
 
 **Data integrity:**
 - [ ] Price observations follow their receipt: confirm records them, edit rebuilds them, delete removes them and restore brings them back (`test_items.py::test_deleted_receipts_leave_the_history_and_return_on_restore`).
+- [ ] The design-alignment migrations (cooldown setting, timed mutes, category colour and icon, and any split change) run in order from `20261104_0021`, `alembic check` is clean, and existing rows read as before (a mute with no `muted_until` is forever, a category without a colour gets the default).
 - [ ] Account deletion and purge cover the new V1.1 tables (items, aliases, match suggestions, price observations, mutes and alert records, store merges, custom categories, the RevenueCat ledger): `test_account_deletion.py::test_delete_account_erases_every_row_and_image` fills every table tied to a user and checks each is empty after the delete, and the other account untouched.
 - [ ] Entitlements come only from RevenueCat's webhook and REST API, never the client.
 
@@ -701,6 +790,8 @@ V1.1 is Price Intelligence (PI-01 through PI-04) and the Premium tier (`PHASE_SC
 
 **Manual (device and human checks):** these cannot be automated and are listed in [device-checklist.md](../device-checklist.md), V1.1 section.
 - [ ] RevenueCat sandbox purchase and restore; the webhook "Send test event" returns 200.
+- [ ] The App Store products (`gg_premium_monthly` $4.99, `gg_premium_yearly` $39.99), the 7-day trial and the RevenueCat offering exist (the user creates them, `docs/DEPLOYMENT.md`); a sandbox purchase of each plan, a trial start and a plan switch reach the backend.
+- [ ] The marketing site and its brief say $4.99/month or $39.99/year, and that store comparison and mutes are Premium (`docs/marketing/decisions.md` #18–#20).
 - [ ] Price alert push tap opens the item from foreground, background and cold start.
 - [ ] The device-check bug rechecks (BUG-1, 2, 3, 5, 6, 8, 9) pass on a device.
 - [ ] VoiceOver and dark mode on each new screen.

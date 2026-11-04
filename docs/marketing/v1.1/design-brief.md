@@ -2,6 +2,8 @@
 
 Written 2026-11-04. The facts come from [feature-scope.md](feature-scope.md) and the decisions from [decisions.md](../decisions.md). It builds on the [MVP brief](../mvp/design-brief.md): same structure and tokens, with prices added as the lead layer. Paste everything below the line into Claude Design.
 
+**Out of date on pricing (2026-11-04):** decisions [#18–#20](../decisions.md) replace this brief's $5.99/month and its "store comparison stays free" lines (sections 0, 8 and 9): Premium is $4.99/month or $39.99/year with a 7-day trial, and store comparison and mutes become Premium. Rerun `marketing-site-brief` for V1.1 once DA-1 ships, before State B goes live; State A is unaffected.
+
 ---
 
 ## 0. Goal and call to action (two states, one layout)

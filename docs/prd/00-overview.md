@@ -10,7 +10,7 @@ The core insight: a parsed grocery receipt carries budget data (what you spent),
 
 - **Habitual engagement:** Budget tracking drives weekly scanning. Price trends accumulate passively. Meal suggestions give users a reason to open the app between trips. Together these cover daily, weekly, and monthly engagement frequencies.
 - **Data compounding:** Every scan enriches all three feature layers simultaneously. The app becomes more valuable the longer a user stays.
-- **Phased revenue growth:** Free tier validates scanning + budgeting. Price intelligence is free too; Premium unlocks extras (unlimited receipts, custom categories, export, rollover, the 12-month trend) and later household sharing. Family tier adds meal planning.
+- **Phased revenue growth:** Free tier validates scanning + budgeting. Price history, item matching and price alerts are free too; Premium unlocks cross-store comparison, alert mutes, Priority OCR and the extras (unlimited receipts, custom categories, export, rollover, the 12-month trend), and later household sharing. Family tier adds meal planning.
 
 ## Personas
 
@@ -60,8 +60,8 @@ The core insight: a parsed grocery receipt carries budget data (what you spent),
 
 ## Monetization
 
-- **Free:** 20 receipts/month, basic budget tracking (8 categories), price intelligence (price history, item matching, price alerts, cross-store comparison), single user
-- **Premium ($5.99/month):** Unlimited receipts, custom categories, data export, budget rollover, 12-month spending trend (V1.1, decision D2, 2026-11-03); household sharing (up to 5) from V1.5
+- **Free:** 20 receipts/month, basic budget tracking (8 categories), price history, item matching and price alerts, single user
+- **Premium ($4.99/month or $39.99/year, with a 7-day free trial; decision D7, 2026-11-04, replacing D1's $5.99):** Unlimited receipts, custom categories, data export, budget rollover, 12-month spending trend (V1.1, decision D2, 2026-11-03); cross-store comparison, per-item and per-store alert mutes (decision D8) and Priority OCR, a stronger extraction model (decision D9), from the V1.1 design alignment; household sharing (up to 5) from V1.5
 - **Family ($8.99/month):** Unlimited members, meal planner, shopping list, export, priority processing
 - **Partnership (long-term):** Affiliate links to grocery delivery, anonymized aggregated price data licensing
 

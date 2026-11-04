@@ -41,6 +41,11 @@ Real-time spending awareness with intelligent alerts. Turns receipt data into ac
 3. Top 10 items by total spend in current period.
 4. Rolling 3-month trend visualization.
 5. Dashboard loads within 2 seconds.
+6. [V1.1] (DA-10) Range chips 1M, 3M, 6M, 1Y, All under the Trend chart. 1M and 3M are free; 6M, 1Y and All are Premium (the 12-month gate, D2, stays) and show a free user the upgrade prompt, never an error. All covers every month since the user's first receipt. `GET /api/dashboard/spending` takes `months` 1, 3, 6, 12 or `all`; over 3 answers a free user `403 premium_required`.
+7. [V1.1] (DA-10) The headline is "<N>-month average" with the change from the N months before it (labelled "YoY" for 1Y); with no earlier months, or for All, no change is shown.
+8. [V1.1] (DA-10) A "Highlights" group under the chips: Highest (month and total), Lowest (month and total; the current month marked "in progress"), and Trend (direction in words and the percent).
+9. [V1.1] (DA-10) Bars are grey with the current month in the tint colour, each labelled with its month's initial; VoiceOver reads each bar's month and total.
+10. [V1.1] (DA-10) Every Trend string lives in the content file for i18n; none is hard-coded in the screen.
 
 ### BC-05: Category Corrections [MVP]
 **As a** user, **I want to** correct a category assignment on any item, **so that** my budget tracking reflects my actual patterns.
@@ -50,6 +55,10 @@ Real-time spending awareness with intelligent alerts. Turns receipt data into ac
 2. Correction applied retroactively to all instances of that item in user's history.
 3. Custom categories supported (up to 10 additional) for premium users.
 4. Corrections feed per-user item-category mapping dictionary for future scans.
+5. [V1.1] (DA-9) Every category has a colour and an icon. The eight built-ins have fixed ones; a custom category takes a colour from the palette in `theme.ts` and an icon from a fixed set, chosen when it is created or edited (the first of each when none is chosen). `GET /api/categories` returns `color` and `icon` for every category; `POST` and `PATCH` accept them from the allowed sets (422 otherwise). A migration adds both columns.
+6. [V1.1] (DA-9) Settings → Categories follows the design: "Built-in" first, each with its icon square; then "Custom", with round icons, a "New category" row and the footer "Custom categories require Premium."; an "Edit" button in the navigation bar to rename or delete custom categories.
+7. [V1.1] (DA-9) The colour and icon show wherever the category is listed with one: Settings → Categories, the category picker, and the dashboard's category bars.
+8. [V1.1] (DA-9) After Premium lapses, custom categories keep their colour and icon; changing them needs Premium (`403 premium_required`, the app's upgrade prompt).
 
 ### BC-06: Weekly Summary [MVP]
 **As a** user, **I want to** receive a weekly spending summary, **so that** I stay informed without opening the app daily.
