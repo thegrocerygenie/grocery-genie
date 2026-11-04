@@ -425,6 +425,35 @@ class EmailChangeConfirmPayload(BaseModel):
     token: str
 
 
+# --- Waitlist free year of Premium (V11-P5) ---
+
+
+class WaitlistClaimRequest(BaseModel):
+    """The email the user joined the waitlist with."""
+
+    email: str = Field(max_length=320)
+
+
+class WaitlistClaimConfirmRequest(BaseModel):
+    token: str = Field(max_length=256)
+
+
+class WaitlistRedemptionPublic(BaseModel):
+    # pending: matched, the RevenueCat grant is being retried. granted: done.
+    status: Literal["pending", "granted"]
+    # When the free year ends: 12 months from the match.
+    expires_at: datetime | None
+
+
+class WaitlistOfferResponse(BaseModel):
+    window_open: bool
+    # Show "Claim your waitlist offer": the window is open and this account
+    # has no free year yet.
+    claim_available: bool
+    closes_at: datetime | None
+    redemption: WaitlistRedemptionPublic | None
+
+
 # --- User profile + preferences ---
 
 

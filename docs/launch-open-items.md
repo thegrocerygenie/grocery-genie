@@ -112,7 +112,7 @@ The site promises waitlist sign-ups "a free year of Premium" when Premium launch
   - **Who counts:** waitlist contacts created before the site switches to the App Store. Resend keeps each contact's `created_at`.
   - **Claim window:** 90 days after Premium launches.
   - **Length:** each free year runs 12 months from the day the account is matched.
-- [ ] **Record the switch date.** When the site moves to App Store downloads (`PUBLIC_LAUNCH_STATE=b`), write the date into decisions #9; it's the cut-off. The site hasn't switched yet (2026-11-04). The step is in `marketing/README.md` → "Before switching to State B", so it happens with the switch.
+- [ ] **Record the switch date.** The backend reads it as `GG_WAITLIST_CUTOFF` (unset: every contact so far qualifies). When the site moves to App Store downloads (`PUBLIC_LAUNCH_STATE=b`), write the date into decisions #9; it's the cut-off. The site hasn't switched yet (2026-11-04). The step is in `marketing/README.md` → "Before switching to State B", so it happens with the switch.
 - [ ] **Tell members the terms.**
   - [x] Published 2026-11-04: a State A FAQ entry on the site ("How does the free year of Premium work?"), and the 90-day window and 12 months in the welcome email. Both are checked by `marketing/tests/`.
   - [x] The launch email repeats the 90-day claim window. Drafted 2026-11-04 in [marketing/launch-email.md](marketing/launch-email.md); check its "Before sending" list on send day.
@@ -124,15 +124,16 @@ The site promises waitlist sign-ups "a free year of Premium" when Premium launch
 - [ ] **Delete the waitlist when the claim window closes.**
   - Schedule deleting the Resend audience for 90 days after Premium launches.
   - Keep each free-year grant on its account, so "one year per waitlist email" still holds afterwards. Store a salted hash of the matched waitlist email with the grant. It outlives account deletion, unlinked, until the window closes ([decisions](marketing/decisions.md) #13).
+  - Code support (V11-P5): `waitlist_redemptions` stores the salted hash with each grant, and account deletion keeps it unlinked. When the window closes, a daily beat task deletes the backend's copy of the waitlist (`waitlist_entries`) and the unlinked hashes. Deleting the Resend audience itself stays a manual step on that day: `docs/DEPLOYMENT.md` 2.10.
 The build items below are V1.1 story **V11-P5** (`.planning/PLAN-2026-11-03-v1.1.md`). The grant is a RevenueCat promotional entitlement ([decisions](marketing/decisions.md) #12, plan D5).
 
-- [ ] **Matching rule.** An account qualifies when its email, trimmed and lowercased like the waitlist's, equals a waitlist contact's.
+- [x] **Matching rule.** Built 2026-11-04 (`backend/app/services/waitlist_service.py`). An account qualifies when its email, trimmed and lowercased like the waitlist's, equals a waitlist contact's.
   - Match only verified emails: email-and-password accounts after `verify-email`; Apple and Google sign-ins carry an email their provider verified.
   - One free year per waitlist email, even if several accounts use that email over time.
-- [ ] **When it runs:**
+- [x] **When it runs:** built 2026-11-04 (the hooks in `auth.py` and `users.py`, and `app/tasks/waitlist_tasks.py`).
   - once at V1.1 launch, over every existing account;
   - then on every sign-up, email verification and confirmed email change (`confirm_email_change`).
 
-  The backend reads the audience through the Resend API, or from a one-off export taken at the cut-off.
-- [ ] **When nothing matches.** Sign in with Apple's Hide My Email gives an `@privaterelay.appleid.com` address, and some people sign up with a different email. Add "Claim your waitlist offer" in Settings: the user enters their waitlist email and taps a confirmation link sent to it (the same pattern as the email-change confirmation).
+  The backend reads the audience through the Resend API, or from a one-off export taken at the cut-off. Both are built; the launch steps are in `docs/DEPLOYMENT.md` 2.10.
+- [x] **When nothing matches.** Built 2026-11-04: Settings → "Claim your waitlist offer" (`mobile/app/settings/waitlist-offer.tsx`, `POST /api/users/me/waitlist-offer/claim`). Sign in with Apple's Hide My Email gives an `@privaterelay.appleid.com` address, and some people sign up with a different email. Add "Claim your waitlist offer" in Settings: the user enters their waitlist email and taps a confirmation link sent to it (the same pattern as the email-change confirmation).
 - [x] **Launch email.** Ask waitlist members to sign up with the email they joined with, or to use the claim flow. Drafted in [marketing/launch-email.md](marketing/launch-email.md); send it at the switch.

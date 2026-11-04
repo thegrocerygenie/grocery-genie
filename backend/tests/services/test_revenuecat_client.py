@@ -152,3 +152,35 @@ async def test_read_time_is_revenuecats_request_date():
 
     state = await _client(handler).get_premium("u1")
     assert state.read_at == asked
+
+
+@pytest.mark.asyncio
+async def test_promotional_grant_posts_the_end_time_and_no_duration():
+    """V11-P5: the waitlist's free year is a v1 promotional grant."""
+    import json
+
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(201, json={"subscriber": {"entitlements": {}}})
+
+    end = datetime(2028, 1, 10, 12, 0, tzinfo=UTC)
+    await _client(handler).grant_promotional("user/1", end)
+
+    request = seen[0]
+    assert request.method == "POST"
+    assert request.url.raw_path == (
+        b"/v1/subscribers/user%2F1/entitlements/premium/promotional"
+    )
+    assert request.headers["authorization"] == "Bearer sk_test"
+    assert json.loads(request.content) == {"end_time_ms": 1831118400000}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [400, 404, 500])
+async def test_promotional_grant_errors_raise_unavailable(status):
+    with pytest.raises(RevenueCatUnavailableError):
+        await _client(lambda request: httpx.Response(status)).grant_promotional(
+            "u", datetime(2028, 1, 10, tzinfo=UTC)
+        )

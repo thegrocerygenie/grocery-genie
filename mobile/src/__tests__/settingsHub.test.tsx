@@ -39,6 +39,17 @@ jest.mock('@/features/auth/hooks/useAuth', () => ({
 jest.mock('@/features/budget/hooks/useBudget', () => ({
   useBudgets: () => ({ data: mockBudgets }),
 }));
+let mockClaimAvailable = false;
+jest.mock('@/features/premium/hooks/useWaitlistOffer', () => ({
+  useWaitlistOffer: () => ({
+    data: {
+      window_open: true,
+      claim_available: mockClaimAvailable,
+      closes_at: '2027-04-01T00:00:00Z',
+      redemption: null,
+    },
+  }),
+}));
 
 function budget(category_id: string | null, amount: number): BudgetResponse {
   return {
@@ -65,6 +76,7 @@ function renderSettings() {
       'settings/currency-settings': () => null,
       'settings/categories': () => null,
       'settings/stores': () => null,
+      'settings/waitlist-offer': () => null,
       paywall: () => null,
     },
     { initialUrl: '/' },
@@ -118,6 +130,21 @@ describe('Settings hub', () => {
     expect(row.props.accessibilityValue).toEqual({ text: 'Free plan · Upgrade' });
     fireEvent.press(row);
     expect(app.getPathname()).toBe('/paywall');
+  });
+
+  it('offers the waitlist claim only while the server says it is open (V11-P5)', () => {
+    mockClaimAvailable = false;
+    const first = renderSettings();
+    expect(screen.queryByLabelText('Claim your waitlist offer')).toBeNull();
+    first.unmount();
+
+    mockClaimAvailable = true;
+    const app = renderSettings();
+    const row = screen.getByLabelText('Claim your waitlist offer');
+    expect(row.props.accessibilityValue).toEqual({ text: 'A free year of Premium' });
+    fireEvent.press(row);
+    expect(app.getPathname()).toBe('/settings/waitlist-offer');
+    mockClaimAvailable = false;
   });
 
   it('a Premium user sees Premium, from the backend profile', () => {

@@ -196,6 +196,26 @@ GG_REVENUECAT_WEBHOOK_SECRET=<the webhook Authorization value>
 GG_REVENUECAT_API_KEY=sk_...
 # The entitlement Premium unlocks (default premium):
 # GG_REVENUECAT_ENTITLEMENT_ID=premium
+# The waitlist's free year of Premium (V1.1, V11-P5; see 2.10). Until
+# GG_PREMIUM_LAUNCHED_AT is set the claim window is closed and nothing is
+# granted. Set it to the moment Premium goes live (ISO 8601, UTC); the window
+# runs 90 days from it. Startup then needs GG_WAITLIST_EMAIL_HASH_SALT: a
+# random value, set once and never changed (it keys the one-way hash that
+# keeps each waitlist email to one free year). Generate it like the webhook
+# secret above.
+# GG_PREMIUM_LAUNCHED_AT=2026-12-01T17:00:00Z
+# GG_WAITLIST_EMAIL_HASH_SALT=<random, 64 hex characters>
+# The marketing site's Resend audience (its RESEND_AUDIENCE_ID). The daily
+# task copies it while the window is open, with GG_RESEND_API_KEY above (a
+# full-access key: a sending-only key can't read contacts). Leave it empty to
+# load a one-off CSV export instead (2.10).
+# GG_RESEND_WAITLIST_AUDIENCE_ID=
+# The day the site switched to App Store downloads (PUBLIC_LAUNCH_STATE=b,
+# decisions #9). Only contacts created before it qualify; unset, all do.
+# GG_WAITLIST_CUTOFF=2026-12-01
+# Defaults: a 90-day claim window and a 12-month free year.
+# GG_WAITLIST_CLAIM_WINDOW_DAYS=90
+# GG_WAITLIST_FREE_MONTHS=12
 ```
 
 [`docker/.env.production.example`](../docker/.env.production.example) holds
@@ -531,6 +551,38 @@ REST API after a purchase or restore (`POST /api/users/me/premium/refresh`).
 The app logs in to RevenueCat with the user's Grocery Genie id, so webhook
 events name that id. A purchase made before sign-in arrives with the id among
 its `aliases`, and the backend finds the user from it.
+
+### 2.10 The waitlist's free year of Premium (V1.1)
+
+The marketing site promised waitlist sign-ups a free year of Premium
+(`docs/marketing/decisions.md` #2, #7, #9–#13). The backend matches each
+account's verified email against the waitlist (the site's Resend audience)
+and grants a 12-month RevenueCat promotional entitlement, once per waitlist
+email. Accounts whose email differs (Apple's Hide My Email) use Settings →
+"Claim your waitlist offer". The env vars are in 1.5.
+
+1. **The switch to App Store downloads:** record the date in decisions #9 and
+   set `GG_WAITLIST_CUTOFF` to it.
+2. **The waitlist source:** set `GG_RESEND_WAITLIST_AUDIENCE_ID` to the site's
+   `RESEND_AUDIENCE_ID` (the API key must be able to read contacts), or take a
+   CSV export of the audience at the cut-off (Resend → Audience → Export) and
+   load it on the server:
+   `docker compose exec api python -m app.tasks.waitlist_tasks import-csv /app/storage/audience.csv`.
+   Delete the export file afterwards.
+3. **At Premium launch:** set `GG_PREMIUM_LAUNCHED_AT` and
+   `GG_WAITLIST_EMAIL_HASH_SALT`, restart the api, worker and beat, then run
+   the backfill once over every existing account:
+   `docker compose exec api python -m app.tasks.waitlist_tasks backfill`.
+   From then on, sign-in with Apple or Google, `verify-email` and a confirmed
+   email change match as they happen, and beat reruns the sync and match daily.
+4. **Grants RevenueCat refused** stay pending and beat retries them every 15
+   minutes. Pending rows: `SELECT count(*) FROM waitlist_redemptions WHERE
+   status = 'pending'` (`last_error` says why).
+5. **When the window closes** (90 days after launch), beat deletes the
+   `waitlist_entries` copy and the unlinked hashes left by deleted accounts.
+   **Deleting the Resend audience itself is a manual step** (decision #11):
+   put it in the calendar for that day, then delete the audience in Resend.
+   The code never deletes it.
 
 ---
 

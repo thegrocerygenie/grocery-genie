@@ -63,8 +63,24 @@ async def test_email_change_link_opens_the_confirm_screen(captured):
     )
 
 
+async def test_waitlist_claim_link_opens_the_claim_screen(captured):
+    # V11-P5: sent to the waitlist email; the token is the proof.
+    await email.send_waitlist_claim_email(to="a@b.co", token="tok123")
+
+    assert (
+        _link(captured.html)
+        == "grocerygenie://onboarding/confirm-waitlist-claim?token=tok123"
+    )
+
+
 @pytest.mark.parametrize(
-    "field", ["verify_email_path", "reset_password_path", "email_change_path"]
+    "field",
+    [
+        "verify_email_path",
+        "reset_password_path",
+        "email_change_path",
+        "waitlist_claim_path",
+    ],
 )
 def test_every_deep_link_path_has_an_app_route(field):
     if not MOBILE_APP_DIR.is_dir():
@@ -75,7 +91,13 @@ def test_every_deep_link_path_has_an_app_route(field):
 
 
 @pytest.mark.parametrize(
-    "field", ["verify_email_path", "reset_password_path", "email_change_path"]
+    "field",
+    [
+        "verify_email_path",
+        "reset_password_path",
+        "email_change_path",
+        "waitlist_claim_path",
+    ],
 )
 def test_signed_out_links_stay_inside_onboarding(field):
     # The root layout redirects a signed-out user away from any other screen.
@@ -123,8 +145,9 @@ def test_email_delivery_off_uses_the_silent_client_even_with_a_key(monkeypatch):
         lambda: email.send_email_change_email(
             to="ada@example.com", new_email="ada@example.com", token="t"
         ),
+        lambda: email.send_waitlist_claim_email(to="ada@example.com", token="t"),
     ],
-    ids=["verify", "reset", "email-change"],
+    ids=["verify", "reset", "email-change", "waitlist-claim"],
 )
 async def test_queued_email_log_has_no_recipient_address(monkeypatch, caplog, send):
     # Production logs keep the event, not the address.

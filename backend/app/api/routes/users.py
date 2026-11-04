@@ -37,6 +37,7 @@ from app.services.revenuecat_client import (
     RevenueCatUnavailableError,
     get_revenuecat_client,
 )
+from app.services.waitlist_service import SOURCE_EMAIL_CHANGE, WaitlistService
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -240,12 +241,19 @@ async def request_email_change(
 async def confirm_email_change(
     body: EmailChangeConfirmPayload,
     db: AsyncSession = Depends(get_db, scope="function"),
+    analytics: AnalyticsService = Depends(get_analytics_service),
+    revenuecat: RevenueCatClient | None = Depends(get_revenuecat_client),
 ) -> dict:
     try:
         user = await auth_service.confirm_email_change(db, token=body.token)
     except auth_service.AuthError as e:
         _raise_auth(e)
-    return {"email": user.email}
+    email = user.email
+    # The waitlist's free year (V11-P5): the new email is verified now.
+    await WaitlistService(db, analytics, revenuecat).match_account(
+        user, source=SOURCE_EMAIL_CHANGE
+    )
+    return {"email": email}
 
 
 @router.post("/me/push-tokens", status_code=204)

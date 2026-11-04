@@ -245,8 +245,8 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
 { "apple_authorization_code": "fresh code from Sign in with Apple" }
 ```
 
-- **Deleted:** the user row (profile, preferences, password hash, Apple and Google subject IDs), all receipts (soft-deleted ones too), their line items and corrections, budgets and the alerts sent for them, notifications, push tokens, price alert cooldowns and mutes (`price_alerts_sent`, `price_alert_item_mutes`, `price_alert_store_mutes`), the RevenueCat webhook events matched to the account (`revenuecat_events`), item mappings, the user's own categories, sign-in activity (`auth_events`, including failed sign-ins logged under the account's email), analytics events (`analytics_events`), and each receipt's image, converted JPEG, and thumbnail files.
-- **Kept:** stores (shared by all users, with no user link) and the default categories.
+- **Deleted:** the user row (profile, preferences, password hash, Apple and Google subject IDs), all receipts (soft-deleted ones too), their line items and corrections, budgets and the alerts sent for them, notifications, push tokens, price alert cooldowns and mutes (`price_alerts_sent`, `price_alert_item_mutes`, `price_alert_store_mutes`), the RevenueCat webhook events matched to the account (`revenuecat_events`), a pending waitlist claim, item mappings, the user's own categories, sign-in activity (`auth_events`, including failed sign-ins logged under the account's email), analytics events (`analytics_events`), and each receipt's image, converted JPEG, and thumbnail files.
+- **Kept:** stores (shared by all users, with no user link) and the default categories. A waitlist free year (`waitlist_redemptions`, V11-P5) keeps only its salted hash of the waitlist email and its status, unlinked from the account, until the claim window closes (decisions #13), so a new account cannot take a second free year with the same waitlist email.
 - **Not cancelled:** an App Store Premium subscription. Apple bills it until the user cancels it in iOS Settings; the delete screen says so.
 - **Sessions:** the calling token's family is revoked. Every other token of the account fails too, because its user no longer exists (`/me` returns 401, `/api/auth/refresh` returns 400 `invalid_token`).
 - **Idempotent:** image files go first (a missing file is fine), then all rows in one transaction. A run cut off before the commit leaves the account in place, so the user can call again. A second call after success returns 401: its token no longer resolves to a user.
@@ -309,6 +309,43 @@ Reads the signed-in user's entitlement from RevenueCat's REST API (`GET /v1/subs
 - `429`: more than 10 refreshes in a minute for this user (`GG_MAX_PREMIUM_REFRESHES_PER_MINUTE`). Each refresh reads RevenueCat, so it has its own count, apart from the 300 requests a minute.
 
 The stored state is stamped with the time of RevenueCat's answer (`request_date_ms`). A webhook applied after that read is newer and is kept; the refresh then returns the stored state unchanged.
+
+### The waitlist's free year [V1.1]
+
+The marketing site promised waitlist sign-ups a free year of Premium (`docs/marketing/decisions.md` #2, #7, #9–#13). An account qualifies when its **verified** email, trimmed and lowercased, equals a waitlist contact's (the site's Resend audience, copied into `waitlist_entries`) created before `GG_WAITLIST_CUTOFF`; unsubscribed contacts count. Grants happen only inside the claim window: 90 days (`GG_WAITLIST_CLAIM_WINDOW_DAYS`) from `GG_PREMIUM_LAUNCHED_AT`; unset, the window is closed. Each match grants the Premium entitlement through RevenueCat's REST API (`POST /v1/subscribers/{user id}/entitlements/{GG_REVENUECAT_ENTITLEMENT_ID}/promotional` with `end_time_ms` = the match plus 12 months; `duration` is not sent), then reads it back as `premium/refresh` does. One free year per waitlist email, ever, and one per account.
+
+Matching runs, with nothing extra from the app, inside:
+- `POST /api/auth/apple` and `POST /api/auth/google` (the provider verified the email);
+- `POST /api/auth/verify-email`;
+- `POST /api/users/me/email-change/confirm`;
+- the launch backfill and a daily rerun (`app.tasks.waitlist_tasks`).
+
+Those routes answer exactly as before. A match is committed as `pending` before RevenueCat is called; if RevenueCat fails or no API key is set, it stays `pending` and a beat task retries it every 15 minutes with the same end date.
+
+#### GET /api/users/me/waitlist-offer
+```json
+{
+  "window_open": true,
+  "claim_available": false,
+  "closes_at": "2027-04-01T00:00:00Z",
+  "redemption": { "status": "granted", "expires_at": "2028-01-10T12:00:00Z" }
+}
+```
+`claim_available`: the window is open and the account has no free year; the app shows Settings → "Claim your waitlist offer" only then. `redemption` is null until a match; `status` is `pending` (the grant is being retried) or `granted`; `expires_at` is when the free year ends. `closes_at` is null while no launch date is set.
+
+#### POST /api/users/me/waitlist-offer/claim
+For an account whose email is not the waitlist one (Apple's Hide My Email, another address). The email-change pattern: the server sends a confirmation link to the waitlist email (`grocerygenie://onboarding/confirm-waitlist-claim?token=…`, valid 24 hours).
+```json
+{ "email": "member@example.com" }
+```
+**Response** `202 {"status": "sent"}`, whether or not the email is on the waitlist, so the step cannot be used to look up who is: the link goes only to a qualifying, unredeemed waitlist email. Errors, which depend only on the account: `409 waitlist_offer_closed` (window not open), `409 waitlist_offer_redeemed` (this account already has its free year), `422 invalid_email`.
+
+#### POST /api/users/me/waitlist-offer/confirm
+No session needed: the token from the link is the proof that the user holds the waitlist email.
+```json
+{ "token": "…" }
+```
+**Response** `200` with the redemption (`{"status": "granted" | "pending", "expires_at": "…"}`). Errors: `400 invalid_token` (unknown, used or expired link), `409 waitlist_offer_closed`, `409 waitlist_offer_redeemed` (the account, or the waitlist email, already has its free year), `409 waitlist_not_eligible` (the contact left the waitlist since the link was sent).
 
 ### GET /api/users/me/export?format=json|csv
 

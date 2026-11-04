@@ -11,6 +11,8 @@ import { useBudgets } from '@/features/budget/hooks/useBudget';
 import { CATEGORY_STRINGS } from '@/features/budget/content/categories';
 import { STORE_MERGE_COPY } from '@/features/price-intelligence/constants';
 import { PREMIUM_STRINGS } from '@/features/premium/content/premium';
+import { WAITLIST_OFFER_STRINGS } from '@/features/premium/content/waitlistOffer';
+import { useWaitlistOffer } from '@/features/premium/hooks/useWaitlistOffer';
 import { EXPORT_STRINGS } from '@/features/settings/content/export';
 import { alertsSummary, budgetsSummary } from '@/features/settings/utils/settingsSummary';
 import { useNotificationStore } from '@/store/notificationStore';
@@ -108,6 +110,19 @@ export default function SettingsScreen() {
     detail: isPremium ? PREMIUM_STRINGS.settingsPremium : PREMIUM_STRINGS.settingsFree,
     href: '/paywall',
   };
+  // The waitlist's free year (V11-P5): shown only while the server says this
+  // account can still claim it.
+  const { data: waitlistOffer } = useWaitlistOffer();
+  const waitlistRow: RowDef | null = waitlistOffer?.claim_available
+    ? {
+        key: 'waitlist-offer',
+        symbol: 'gift.fill',
+        iconBg: colors.tint,
+        title: WAITLIST_OFFER_STRINGS.settingsRow,
+        detail: WAITLIST_OFFER_STRINGS.settingsDetail,
+        href: '/settings/waitlist-offer',
+      }
+    : null;
   const version = Constants.expoConfig?.version;
 
   const onSignOut = async () => {
@@ -160,6 +175,13 @@ export default function SettingsScreen() {
             showDivider={false}
             onPress={() => router.push('/paywall')}
           />
+          {waitlistRow ? (
+            <SettingsRow
+              row={waitlistRow}
+              showDivider={false}
+              onPress={() => router.push('/settings/waitlist-offer')}
+            />
+          ) : null}
         </Section>
 
         <Section header="SPENDING">

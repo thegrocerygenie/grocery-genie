@@ -75,6 +75,26 @@ EMAIL_CHANGE_TEMPLATE = Template(
 )
 
 
+WAITLIST_CLAIM_TEMPLATE = Template(
+    """\
+<!doctype html>
+<html><body style="font-family: -apple-system, system-ui, sans-serif; padding: 24px;">
+  <h1 style="font-size: 22px;">Claim your free year of Premium</h1>
+  <p>Someone signed in to Grocery Genie asked to use <strong>{{ email }}</strong>, the email you joined our waitlist with, to claim the waitlist's free year of Premium.</p>
+  <p>If this was you, tap the button on your iPhone to confirm. If not, ignore this email and nothing changes.</p>
+  <p>
+    <a href="{{ link }}"
+       style="display: inline-block; background: #1F7A4A; color: #fff; padding: 12px 20px;
+              border-radius: 12px; text-decoration: none; font-weight: 600;">
+      Claim my free year
+    </a>
+  </p>
+  <p style="color: #666; font-size: 12px;">This link expires in 24 hours.</p>
+</body></html>
+"""
+)
+
+
 class EmailClient(Protocol):
     async def send(self, *, to: str, subject: str, html: str) -> None: ...
 
@@ -168,4 +188,15 @@ async def send_email_change_email(*, to: str, new_email: str, token: str) -> Non
     html = EMAIL_CHANGE_TEMPLATE.render(new_email=new_email, link=link)
     await get_email_client().send(
         to=to, subject="Confirm your Grocery Genie email change", html=html
+    )
+
+
+async def send_waitlist_claim_email(*, to: str, token: str) -> None:
+    """The "Claim your waitlist offer" link, sent to the waitlist email (V11-P5)."""
+    settings = get_settings()
+    link = _deep_link(settings.waitlist_claim_path, token)
+    log.info("[email] waitlist-claim email queued")
+    html = WAITLIST_CLAIM_TEMPLATE.render(email=to, link=link)
+    await get_email_client().send(
+        to=to, subject="Claim your free year of Grocery Genie Premium", html=html
     )

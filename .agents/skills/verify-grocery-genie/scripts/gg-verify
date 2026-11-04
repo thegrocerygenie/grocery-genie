@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Drive a throwaway Grocery Genie backend for verification. See ../SKILL.md.
 #
-#   gg-verify launch [--live-llm]   start an isolated instance and wait until usable
+#   gg-verify launch [--live-llm] [--stub-revenuecat]  start an isolated instance and wait
+#                                   until usable; --stub-revenuecat points the REST API at a
+#                                   local RevenueCat stand-in (scripts/revenuecat-stub.py)
 #   gg-verify doctor                read-only: is this instance worth driving?
 #   gg-verify signup [label] [--no-consent]  create a user; later api calls use its token.
 #                                   It allows AI receipt reading, as the app's consent sheet
@@ -13,6 +15,12 @@
 #   gg-verify sql "SELECT ..."      read the instance's database
 #   gg-verify revenuecat JSON [--secret VALUE]  POST a RevenueCat webhook body with the
 #                                   launch's webhook secret (or VALUE, to prove a wrong one fails)
+#   gg-verify waitlist import CSV | backfill | retry
+#                                   the waitlist's ops commands (app.tasks.waitlist_tasks) against
+#                                   this instance: load a Resend CSV export, match every account,
+#                                   retry pending RevenueCat grants
+#   gg-verify rcstub fail | ok | grants  make the RevenueCat stub refuse grants (503) or accept
+#                                   them, or print the grants it received
 #   gg-verify cleanup               stop what launch started, drop its database
 #   gg-verify last                  print the newest evidence directory
 set -euo pipefail
@@ -48,8 +56,14 @@ code_fingerprint() {
 guard_db() { [ "$DB" != "grocery_genie" ] && [ "$DB" != "postgres" ] || die "refusing to use database '$DB'; it belongs to the dev setup"; }
 
 cmd_launch() {
-  local mode="debug"
-  [ "${1:-}" = "--live-llm" ] && mode="live-llm"
+  local mode="debug" stub=0 arg
+  for arg in "$@"; do
+    case "$arg" in
+      --live-llm) mode="live-llm" ;;
+      --stub-revenuecat) stub=1 ;;
+      *) die "unknown launch flag: $arg" ;;
+    esac
+  done
   guard_db
   if [ -f "$STATE/pid" ]; then
     if kill -0 "$(cat "$STATE/pid")" 2>/dev/null; then
@@ -91,6 +105,29 @@ cmd_launch() {
   export GG_REVENUECAT_WEBHOOK_SECRET; GG_REVENUECAT_WEBHOOK_SECRET="$(openssl rand -hex 32)"
   export GG_REVENUECAT_API_KEY=""
   (umask 077; echo "$GG_REVENUECAT_WEBHOOK_SECRET" > "$STATE/revenuecat_secret")
+  # The waitlist's free year (V11-P5): Premium launched a day ago, so the
+  # claim window is open, and contacts created before launch qualify. With
+  # no waitlist_entries (the default) nothing ever matches.
+  export GG_PREMIUM_LAUNCHED_AT; GG_PREMIUM_LAUNCHED_AT="$(date -u -d '1 day ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-1d +%Y-%m-%dT%H:%M:%SZ)"
+  export GG_WAITLIST_CUTOFF; GG_WAITLIST_CUTOFF="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  export GG_WAITLIST_EMAIL_HASH_SALT; GG_WAITLIST_EMAIL_HASH_SALT="$(openssl rand -hex 32)"
+  export GG_RESEND_WAITLIST_AUDIENCE_ID=""
+  if [ "$stub" = 1 ]; then
+    # A local RevenueCat stand-in: grants and reads stay on this machine.
+    local stub_port=$((PORT + 100)) stub_key; stub_key="sk_stub_$(openssl rand -hex 8)"
+    [ -z "$(lsof -nP -iTCP:"$stub_port" -sTCP:LISTEN -t 2>/dev/null)" ] || die "port $stub_port (RevenueCat stub) is in use"
+    nohup "$VENV/python" -I "$REPO/.agents/skills/verify-grocery-genie/scripts/revenuecat-stub.py" \
+      "$stub_port" "$stub_key" "$run/revenuecat-stub.jsonl" "$STATE/revenuecat_fail" \
+      > "$run/revenuecat-stub.log" 2>&1 & echo $! > "$STATE/stub_pid"
+    export GG_REVENUECAT_API_KEY="$stub_key"
+    export GG_REVENUECAT_API_BASE="http://127.0.0.1:$stub_port"
+    for i in $(seq 1 10); do
+      [ -n "$(lsof -nP -iTCP:"$stub_port" -sTCP:LISTEN -t 2>/dev/null)" ] && break
+      sleep 0.5
+    done
+  fi
+  # The same settings for the waitlist ops commands (gg-verify waitlist ...).
+  (umask 077; env | grep -E '^GG_' | sed "s/'/'\\\\''/g; s/=\(.*\)/='\1'/; s/^/export /" > "$STATE/env")
 
   echo "== migrating $DB to head" >&2
   (cd "$BACKEND" && "$VENV/alembic" upgrade head) > "$run/migrate.log" 2>&1 || { cat "$run/migrate.log" >&2; die "migration failed"; }
@@ -114,6 +151,9 @@ cmd_launch() {
   {
     echo "run_id: $run_id"
     echo "mode: $mode"
+    echo "revenuecat: $([ "$stub" = 1 ] && echo "stub at $GG_REVENUECAT_API_BASE" || echo "no API key")"
+    echo "premium_launched_at: $GG_PREMIUM_LAUNCHED_AT"
+    echo "waitlist_cutoff: $GG_WAITLIST_CUTOFF"
     echo "base_url: $BASE"
     echo "database: $DB"
     echo "pid: $pid"
@@ -285,10 +325,52 @@ cmd_sql() {
   echo "$result"
 }
 
+# The waitlist's ops commands (docs/DEPLOYMENT.md 2.10), run as an operator
+# would, with this instance's settings: the real path for loading the waitlist,
+# so no journey writes rows through sql.
+cmd_waitlist() {
+  [ $# -ge 1 ] || die "usage: gg-verify waitlist import CSV | backfill | retry"
+  local run; run="$(run_dir)"
+  [ -f "$STATE/env" ] || die "no instance settings in $STATE/env; launch again"
+  local args=()
+  case "$1" in
+    import) [ -f "${2:-}" ] || die "usage: gg-verify waitlist import CSV"; args=(import-csv "$(cd "$(dirname "$2")" && pwd)/$(basename "$2")") ;;
+    backfill) args=(backfill) ;;
+    # The beat retry waits 5 minutes after an attempt; here, retry at once.
+    retry) args=(retry --older-than-minutes 0) ;;
+    *) die "usage: gg-verify waitlist import CSV | backfill | retry" ;;
+  esac
+  local seq; seq="$(next_seq)"
+  local out="$run/$seq-waitlist-$1.txt" status=0
+  # shellcheck disable=SC1091
+  (source "$STATE/env"; cd "$BACKEND" && "$VENV/python" -m app.tasks.waitlist_tasks "${args[@]}") > "$out" 2>&1 || status=$?
+  [ "$1" = import ] && printf -- '-- import file: %s\n%s\n' "$(basename "$2")" "$(cat "$2")" >> "$out"
+  echo "waitlist $1 -> exit $status" >&2
+  grep -E '^waitlist ' "$out" || true
+  return "$status"
+}
+
+cmd_rcstub() {
+  local run; run="$(run_dir)"
+  [ -f "$STATE/stub_pid" ] || die "no RevenueCat stub; launch with --stub-revenuecat"
+  case "${1:-}" in
+    fail) touch "$STATE/revenuecat_fail"; echo "RevenueCat stub: grants answer 503" >&2 ;;
+    ok) rm -f "$STATE/revenuecat_fail"; echo "RevenueCat stub: grants accepted" >&2 ;;
+    grants) cat "$run/revenuecat-stub.jsonl" 2>/dev/null || true ;;
+    *) die "usage: gg-verify rcstub fail | ok | grants" ;;
+  esac
+}
+
 cmd_cleanup() {
   guard_db
   local run=""
   [ -f "$STATE/run_id" ] && run="$ROOT/runs/$(cat "$STATE/run_id")"
+  if [ -f "$STATE/stub_pid" ]; then
+    local spid; spid="$(cat "$STATE/stub_pid")"
+    if kill -0 "$spid" 2>/dev/null && ps -p "$spid" -o command= | grep -q "revenuecat-stub.py"; then
+      kill "$spid" && echo "stopped RevenueCat stub pid $spid" >&2
+    fi
+  fi
   if [ -f "$STATE/pid" ]; then
     local pid; pid="$(cat "$STATE/pid")"
     if kill -0 "$pid" 2>/dev/null; then
@@ -315,6 +397,6 @@ cmd_cleanup() {
 cmd_last() { ls -1d "$ROOT"/runs/* 2>/dev/null | tail -1; }
 
 case "${1:-}" in
-  launch|doctor|signup|api|download|scan|sql|revenuecat|cleanup|last) sub="$1"; shift; "cmd_$sub" "$@" ;;
-  *) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  launch|doctor|signup|api|download|scan|sql|revenuecat|waitlist|rcstub|cleanup|last) sub="$1"; shift; "cmd_$sub" "$@" ;;
+  *) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

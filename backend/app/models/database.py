@@ -61,6 +61,13 @@ class User(Base):
     pending_email_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+    # "Claim your waitlist offer" (V11-P5): the waitlist email the user asked
+    # to claim, until they tap the link sent to it (like pending_email).
+    waitlist_claim_email: Mapped[str | None] = mapped_column(String(255))
+    waitlist_claim_token_hash: Mapped[str | None] = mapped_column(String(64))
+    waitlist_claim_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     apple_subject: Mapped[str | None] = mapped_column(String(255), unique=True)
     google_subject: Mapped[str | None] = mapped_column(String(255), unique=True)
     failed_signin_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -533,6 +540,72 @@ class RevenueCatEvent(Base):
     # applied, stale, ignored, unknown_user (the webhook's response status).
     outcome: Mapped[str] = mapped_column(String(32), nullable=False)
     event_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class WaitlistEntry(Base):
+    """A contact copied from the marketing site's waitlist (the Resend
+    audience), for the free year of Premium (V11-P5, decision #7).
+
+    ``email`` is trimmed and lowercased, as the site stores it. Kept only
+    while the claim window is open (decision #11); then a daily task deletes
+    every row.
+    """
+
+    __tablename__ = "waitlist_entries"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    # When the contact joined the waitlist (Resend's created_at): only those
+    # before settings.waitlist_cutoff qualify (decision #9).
+    contact_created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    # Resend's unsubscribed flag. Unsubscribed contacts still qualify (#10).
+    unsubscribed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class WaitlistRedemption(Base):
+    """One free year of Premium per waitlist email, ever (decisions #12, #13).
+
+    ``email_hash`` is a salted, one-way hash of the matched waitlist email
+    (``app.services.waitlist_service.hash_waitlist_email``), never the email
+    itself; its unique key is the "once per waitlist email" rule, and the
+    unique ``user_id`` the "once per account" rule. pending -> granted when
+    RevenueCat accepts the promotional grant; a pending row is retried.
+
+    Deleting the account keeps only the hash and the status, unlinked
+    (``user_id`` null), until the claim window closes; then it is deleted.
+    """
+
+    __tablename__ = "waitlist_redemptions"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    email_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), unique=True
+    )
+    # pending, granted.
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    # What found the match: social_sign_in, verify_email, email_change,
+    # backfill, claim.
+    source: Mapped[str | None] = mapped_column(String(32))
+    matched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The promotional grant's end: matched_at plus waitlist_free_months.
+    grant_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    granted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -17,6 +17,7 @@ celery_app = Celery(
         "app.tasks.push_tasks",
         "app.tasks.receipt_tasks",
         "app.tasks.summary_tasks",
+        "app.tasks.waitlist_tasks",
     ],
 )
 celery_app.config_from_object(
@@ -59,5 +60,20 @@ celery_app.conf.beat_schedule = {
     "purge-old-analytics-events": {
         "task": "app.tasks.analytics_event_tasks.purge_old_analytics_events",
         "schedule": crontab(hour=4, minute=0),
+    },
+    # The waitlist's free year (V11-P5): copy the Resend audience and match
+    # accounts while the claim window is open; retry grants RevenueCat
+    # refused; delete the waitlist copy once the window has closed.
+    "waitlist-sync-and-match": {
+        "task": "app.tasks.waitlist_tasks.sync_and_match_waitlist",
+        "schedule": crontab(hour=5, minute=15),
+    },
+    "waitlist-retry-grants": {
+        "task": "app.tasks.waitlist_tasks.retry_waitlist_grants",
+        "schedule": crontab(minute="*/15"),
+    },
+    "waitlist-purge-after-window": {
+        "task": "app.tasks.waitlist_tasks.purge_waitlist_after_window",
+        "schedule": crontab(hour=5, minute=45),
     },
 }
