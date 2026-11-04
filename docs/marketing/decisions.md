@@ -16,6 +16,7 @@ Standing decisions for the marketing site. The `marketing-site-brief` skill read
 | 10 | 2026-11-04 | V1.1 | **Unsubscribes keep the free year.** Unsubscribing (Resend's link, or replying "unsubscribe") stops waitlist emails only; the contact stays, flagged, so the account can still be matched. A request to delete the email removes the contact and gives up the offer. The welcome email says both. | Active |
 | 11 | 2026-11-04 | V1.1 | **Waitlist retention:** delete the whole waitlist (the Resend audience) 90 days after Premium launches, when the claim window (#9) closes, or a contact sooner if they ask. The record of who got the free year lives with their account. `privacy.ts` says this under "How long we keep it". | Active |
 | 12 | 2026-11-04 | V1.1 | **The free year is a RevenueCat promotional entitlement:** a 1-year grant of the Premium entitlement through RevenueCat's REST API, so RevenueCat stays the only source of Premium (V1.1 plan D1). Built as V1.1 story V11-P5. | Active |
+| 13 | 2026-11-04 | V1.1 | **A redeemed free year outlives account deletion as a salted, one-way hash of the waitlist email,** with no link to the account, until the claim window closes (90 days after Premium launches), then it's deleted with the waitlist. This stops a second free year from a new account. `privacy.ts` says so under "Deleting your account". | Active |
 
 ## Open
 
