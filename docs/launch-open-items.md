@@ -112,8 +112,10 @@ The site promises waitlist sign-ups "a free year of Premium" when Premium launch
   - **Who counts:** waitlist contacts created before the site switches to the App Store. Resend keeps each contact's `created_at`.
   - **Claim window:** 90 days after Premium launches.
   - **Length:** each free year runs 12 months from the day the account is matched.
-- [ ] **Record the switch date.** When the site moves to App Store downloads (`PUBLIC_LAUNCH_STATE=b`), write the date into decisions #9; it's the cut-off.
-- [ ] **Tell members the terms.** The launch email has to give the 90-day claim window. The offer terms (who qualifies, the claim window, 12 months from matching) need a home people can find, such as an offer-terms line on the site or a help article.
+- [ ] **Record the switch date.** When the site moves to App Store downloads (`PUBLIC_LAUNCH_STATE=b`), write the date into decisions #9; it's the cut-off. The site hasn't switched yet (2026-11-04). The step is in `marketing/README.md` → "Before switching to State B", so it happens with the switch.
+- [ ] **Tell members the terms.**
+  - [x] Published 2026-11-04: a State A FAQ entry on the site ("How does the free year of Premium work?"), and the 90-day window and 12 months in the welcome email. Both are checked by `marketing/tests/`.
+  - [ ] The launch email (not written yet) must repeat the 90-day claim window.
 - [x] **Now: decide on unsubscribes.** Decided 2026-11-04 ([decisions](marketing/decisions.md) #10): unsubscribed contacts still qualify, and only a deletion request gives up the offer.
   - The welcome email (`marketing/api/_handler.js`) now says: reply "unsubscribe" to stop emails, or "delete" to remove the email and give up the free year.
   - **Matching must include contacts with Resend's `unsubscribed` flag.**
@@ -121,7 +123,7 @@ The site promises waitlist sign-ups "a free year of Premium" when Premium launch
 - [x] **Now: decide retention.** Decided 2026-11-04 ([decisions](marketing/decisions.md) #11): the waitlist is deleted 90 days after Premium launches, when the claim window closes. `privacy.ts` says so, along with the unsubscribe rule (#10). It's still a draft until legal sign-off.
 - [ ] **Delete the waitlist when the claim window closes.**
   - Schedule deleting the Resend audience for 90 days after Premium launches.
-  - Keep each free-year grant on its account, so "one year per waitlist email" still holds afterwards. Store the matched waitlist email, or a hash of it, with the grant.
+  - Keep each free-year grant on its account, so "one year per waitlist email" still holds afterwards. Store a salted hash of the matched waitlist email with the grant. It outlives account deletion, unlinked, until the window closes ([decisions](marketing/decisions.md) #13).
 The build items below are V1.1 story **V11-P5** (`.planning/PLAN-2026-11-03-v1.1.md`). The grant is a RevenueCat promotional entitlement ([decisions](marketing/decisions.md) #12, plan D5).
 
 - [ ] **Matching rule.** An account qualifies when its email, trimmed and lowercased like the waitlist's, equals a waitlist contact's.

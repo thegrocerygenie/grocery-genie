@@ -221,6 +221,12 @@ const icon = (name: string) => readFileSync(join(iconDir, `${name}.svg`), 'utf8'
           {/* Same markup as the design (span around the State A sentence) so text renders identically. */}
           <p>Yes. Grocery Genie is free on iPhone. You can scan up to 20 receipts a month (about five a week) and add as many as you like by hand.{A && <span class="only-a">{' Join the waitlist and get a free year of Premium, our upcoming paid plan, when it launches.'}</span>}</p>
         </details>
+        {A && (
+          <details data-track="faq_premium_offer">
+            <summary>How does the free year of Premium work?<span class="plus" aria-hidden="true">+</span></summary>
+            <p>Premium is our upcoming paid plan. Everyone who joined the waitlist before Grocery Genie is on the App Store gets a free year of it. Sign up in the app with the same email you joined with, within 90 days of Premium launching, and we'll add it to your account automatically. If you use a different email, or Hide My Email, you can claim it in Settings by confirming your waitlist email. Your year runs 12 months from the day it's added. Unsubscribing from our emails keeps the offer; asking us to delete your email gives it up.</p>
+          </details>
+        )}
         <details data-track="faq_wrong">
           <summary>What if it reads my receipt wrong?<span class="plus" aria-hidden="true">+</span></summary>
           <p>You check every receipt before it's saved. Anything the AI isn't sure about is flagged, every field is editable, and it remembers your fixes.</p>
