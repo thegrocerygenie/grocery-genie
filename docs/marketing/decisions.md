@@ -17,6 +17,10 @@ Standing decisions for the marketing site. The `marketing-site-brief` skill read
 | 11 | 2026-11-04 | V1.1 | **Waitlist retention:** delete the whole waitlist (the Resend audience) 90 days after Premium launches, when the claim window (#9) closes, or a contact sooner if they ask. The record of who got the free year lives with their account. `privacy.ts` says this under "How long we keep it". | Active |
 | 12 | 2026-11-04 | V1.1 | **The free year is a RevenueCat promotional entitlement:** a 1-year grant of the Premium entitlement through RevenueCat's REST API, so RevenueCat stays the only source of Premium (V1.1 plan D1). Built as V1.1 story V11-P5. | Active |
 | 13 | 2026-11-04 | V1.1 | **A redeemed free year outlives account deletion as a salted, one-way hash of the waitlist email,** with no link to the account, until the claim window closes (90 days after Premium launches), then it's deleted with the waitlist. This stops a second free year from a new account. `privacy.ts` says so under "Deleting your account". | Active |
+| 14 | 2026-11-04 | V1.1 | **V1.1 brief version: 1.1.0.** `mobile/app.json` still says 0.1.0; bump it when V1.1 ships. | Active |
+| 15 | 2026-11-04 | V1.1 | **Conversion goal stays two-state:** waitlist now, App Store downloads at launch (#1). Downloads stay the one call to action in State B; Premium upgrades happen in the app. | Active |
+| 16 | 2026-11-04 | V1.1 | **Pricing section: a Free vs Premium table, in State B only,** with Premium at $5.99/month. State A keeps "a free year of Premium when it launches" (#2). Show it only once the App Store product is live. | Active |
+| 17 | 2026-11-04 | V1.1 | **No item-matching figures on the site.** The 31/31 precision and 31/33 recall come from a small development test, not a user-facing accuracy claim. This extends #5. | Active |
 
 ## Open
 
