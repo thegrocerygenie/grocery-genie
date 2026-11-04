@@ -139,6 +139,7 @@ class ReceiptService:
                             "error_type": type(exc).__name__,
                             "model": self.premium_extractor.model_name,
                         },
+                        exc_info=True,
                     )
                 else:
                     return extraction, self.premium_extractor, EXTRACTION_TIER_PRIORITY

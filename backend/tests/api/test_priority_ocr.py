@@ -7,6 +7,7 @@ default model; a scan never fails because of it.
 """
 
 import io
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -247,6 +248,25 @@ async def test_when_both_models_fail_the_scan_fails_as_any_scan_does(
 
     assert response.status_code == 503
     assert (premium.calls, default.calls) == (1, 1)
+
+
+async def test_a_failed_premium_model_logs_its_traceback(
+    client, db_session, test_image_bytes, default_extractor, caplog
+):
+    from main import app
+
+    failing = _FailingExtractor(PREMIUM_MODEL, RuntimeError("unexpected"))
+    app.dependency_overrides[get_premium_receipt_extractor] = lambda: failing
+    await _set_premium(db_session, True)
+
+    with caplog.at_level(logging.WARNING, logger="app.services.receipt_service"):
+        await _scan(client, test_image_bytes)
+
+    [record] = [
+        r for r in caplog.records if "Premium extraction model failed" in r.message
+    ]
+    assert record.exc_info is not None
+    assert record.exc_info[0] is RuntimeError
 
 
 # --- AC 5: receipt_extraction_completed carries extraction_tier ---

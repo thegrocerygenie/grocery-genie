@@ -650,8 +650,8 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PREM-03 | 3 | Through provider.py, no temperature, same validation and confidence scoring | Unit | `backend/tests/llm/test_priority_ocr_provider.py::test_the_premium_call_sends_the_same_prompt_as_the_default` | Pass |
 | PREM-03 | 3 | Through provider.py, no temperature, same validation and confidence scoring | Unit | `backend/tests/llm/test_priority_ocr_provider.py::test_premium_output_passes_the_same_validation` | Pass |
 | PREM-03 | 3 | Through provider.py, no temperature, same validation and confidence scoring | Unit | `backend/tests/llm/test_priority_ocr_provider.py::test_category_assignment_keeps_the_default_model` | Pass |
-| PREM-03 | 4 | Premium model failure falls back to the default, then the usual failed-scan path; the scan never fails because of it | Integration | `backend/tests/api/test_priority_ocr.py::test_a_failed_premium_model_hands_the_scan_to_the_default` | Pass |
-| PREM-03 | 4 | Premium model failure falls back to the default, then the usual failed-scan path; the scan never fails because of it | Integration | `backend/tests/api/test_priority_ocr.py::test_when_both_models_fail_the_scan_fails_as_any_scan_does` | Pass |
+| PREM-03 | 4 | Premium model failure falls back to the default model, then the usual failed-scan path (503, the app's offline retry, manual entry); the scan never fails because of it | Integration | `backend/tests/api/test_priority_ocr.py::test_a_failed_premium_model_hands_the_scan_to_the_default` | Pass |
+| PREM-03 | 4 | Premium model failure falls back to the default model, then the usual failed-scan path (503, the app's offline retry, manual entry); the scan never fails because of it | Integration | `backend/tests/api/test_priority_ocr.py::test_when_both_models_fail_the_scan_fails_as_any_scan_does` | Pass |
 | PREM-03 | 5 | receipt_extraction_completed carries extraction_tier | Integration | `backend/tests/api/test_priority_ocr.py::test_extraction_completed_carries_the_tier` | Pass |
 | PREM-03 | 6 | validate-extraction on the Premium model: accuracy not below default, cost recorded, user approval | Manual | `docs/device-checklist.md` §8: Priority OCR (`run extract --premium`; harness tested by `backend/tests/llm_validation/test_harness.py::test_premium_runs_score_the_premium_model`) | Manual |
 | PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Component | Not yet implemented (DA-3) | Pending |
@@ -713,9 +713,9 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | EC-PI | 11 | Price alerts list after a merge or split | Component | Not yet implemented (DA-4) | Pending |
 | EC-PREM | 1 | Free trial eligibility, cancel and refund in the trial | Integration | Not yet implemented (DA-1) | Pending |
 | EC-PREM | 2 | Plan change monthly ↔ yearly | Integration | Not yet implemented (DA-1) | Pending |
-| EC-PREM | 3 | Priority OCR model chosen at extraction start; fallback | Integration | `backend/tests/api/test_priority_ocr.py::test_premium_is_read_when_each_extraction_starts` | Pass |
-| EC-PREM | 3 | Priority OCR model chosen at extraction start; fallback | Integration | `backend/tests/api/test_priority_ocr.py::test_a_lapsed_premium_scan_uses_the_default_model` | Pass |
-| EC-PREM | 3 | Priority OCR model chosen at extraction start; fallback | Integration | `backend/tests/api/test_priority_ocr.py::test_a_failed_premium_model_hands_the_scan_to_the_default` | Pass |
+| EC-PREM | 3 | Priority OCR model chosen at extraction start; fallback to the default model, then the usual failed-scan path (503, the app's offline retry, manual entry) | Integration | `backend/tests/api/test_priority_ocr.py::test_premium_is_read_when_each_extraction_starts` | Pass |
+| EC-PREM | 3 | Priority OCR model chosen at extraction start; fallback to the default model, then the usual failed-scan path (503, the app's offline retry, manual entry) | Integration | `backend/tests/api/test_priority_ocr.py::test_a_lapsed_premium_scan_uses_the_default_model` | Pass |
+| EC-PREM | 3 | Priority OCR model chosen at extraction start; fallback to the default model, then the usual failed-scan path (503, the app's offline retry, manual entry) | Integration | `backend/tests/api/test_priority_ocr.py::test_a_failed_premium_model_hands_the_scan_to_the_default` | Pass |
 | EC-PREM | 4 | Export: empty range, From after To, images left out | Integration | Not yet implemented (DA-8) | Pending |
 | EC-PREM | 5 | Category colour and icon after a lapse | Integration | Not yet implemented (DA-9) | Pending |
 

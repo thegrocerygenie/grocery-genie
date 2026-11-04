@@ -131,7 +131,7 @@ Premium launched in V1.1 through RevenueCat (decision D1). It has no epic of its
 1. [V1.1] A setting `llm_premium_extraction_model` (`GG_LLM_PREMIUM_EXTRACTION_MODEL`) names the extraction model for Premium scans as a LiteLLM model name; unset, Premium scans use the default model. No provider or model is named in code.
 2. [V1.1] A Premium user's scan is extracted with that model and a free user's with the default; Premium is read on the server when the extraction starts, never from the app.
 3. [V1.1] The call goes through `app/llm/provider.py` with no `temperature`, and its output passes the same Pydantic validation and confidence scoring as the default model's. Category assignment is unchanged.
-4. [V1.1] If the Premium model fails or returns invalid output, the scan is retried on the default model, then the rule-based fallback, as for any scan; a scan never fails because of the Premium model.
+4. [V1.1] If the Premium model fails or returns invalid output, the scan is retried on the default model; if that fails too, the scan takes the usual failed-scan path (503, the app's offline retry, manual entry), as any scan does. A scan never fails because of the Premium model.
 5. [V1.1] `receipt_extraction_completed` carries `extraction_tier` (`priority` or `standard`), documented in `12-analytics.md`.
 6. [V1.1] Before merge, `validate-extraction` runs the receipt test set on the Premium model: accuracy no lower than the default's, with the model and its cost per scan recorded, and the user approves the choice.
 
