@@ -108,7 +108,9 @@ describe('Trend chart with VoiceOver (BUG-8)', () => {
     renderTrend(12);
 
     // iOS orders elements top to bottom first. With columns aligned to the
-    // bottom, a taller bar's column started higher and was read first.
+    // bottom, a taller bar's column started higher and was read first. Jest
+    // has no layout, so the render order is always calendar order; the column
+    // geometry is what this checks.
     expect(flat('trend-chart').alignItems).toBe('stretch');
     const columns = screen.getAllByLabelText(/^[A-Z][a-z]+: \$\d+$/);
     for (const column of columns) {
@@ -116,27 +118,6 @@ describe('Trend chart with VoiceOver (BUG-8)', () => {
     }
   });
 
-  it('reads the 12 months in calendar order', () => {
-    renderTrend(12);
-
-    const months = screen
-      .getAllByLabelText(/^[A-Z][a-z]+: \$\d+$/)
-      .map((n) => String(n.props.accessibilityLabel).split(':')[0]);
-    expect(months).toEqual([
-      'December',
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-    ]);
-  });
 });
 
 describe('Trend bar amounts in the budget currency (BUG-7)', () => {

@@ -255,7 +255,7 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "opens the item named in a price change alert (PI-03)" | Pass |
 | PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "opens a price change item from its id even when the url says otherwise" | Pass |
 | PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "never builds a route from a malformed price change item id" | Pass |
-| PI-03 | 2 | Tapping the alert opens the item, with Back to Budget (cold start: BUG-6) | Component | `mobile/src/__tests__/priceAlertColdStart.test.tsx` "opens the item a price alert names, with Back to Budget" | Pass |
+| PI-03 | 2 | Tapping the alert opens the item, with Back to Budget (cold start: BUG-6) | Component | `mobile/src/__tests__/pushTapColdStart.test.tsx` "opens the tapped item on top of the tabs when the tap launched the app" | Pass |
 | PI-03 | 2 | Tapping the alert opens the item, with Back to Budget (cold start: BUG-6) | Component | `mobile/src/__tests__/priceAlertColdStart.test.tsx` "routes a tap that is waiting on the first frame, once the root navigator is ready" | Pass |
 | PI-03 | 2 | Tapping the alert opens the item, with Back to Budget (cold start: BUG-6) | Component | `mobile/src/__tests__/priceAlertColdStart.test.tsx` "asks for the tabs under the item, in case the tap lands before the stack is built" | Pass |
 | PI-03 | 2 | Tapping the alert opens the item, with Back to Budget (cold start: BUG-6) | Component | `mobile/src/__tests__/priceAlertColdStart.test.tsx` "puts the tabs under an item opened by a deep link on launch" | Pass |
@@ -292,7 +292,6 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | BC-FR | Trends | Trend readable at accessibility text sizes | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "keeps each bar amount on one line, shrinking to fit its column" | Pass |
 | BC-FR | Trends | 12-month trend readable at accessibility text sizes (BUG-9) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "keeps the 12 one-letter labels to one line and a size that fits a narrow bar (BUG-9)" | Pass |
 | BC-FR | Trends | VoiceOver reads the bars in month order (BUG-8) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "gives every month column the same height, so VoiceOver reads them left to right" | Pass |
-| BC-FR | Trends | VoiceOver reads the bars in month order (BUG-8) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "reads the 12 months in calendar order" | Pass |
 | PREM | D1 | Premium: entitlement from RevenueCat only, checked with its expiry | Unit | `backend/tests/core/test_entitlements.py::test_a_user_with_no_entitlement_is_free` | Pass |
 | PREM | D1 | Premium: entitlement from RevenueCat only, checked with its expiry | Unit | `backend/tests/core/test_entitlements.py::test_an_active_entitlement_before_its_expiry_is_premium` | Pass |
 | PREM | D1 | Premium: entitlement from RevenueCat only, checked with its expiry | Unit | `backend/tests/core/test_entitlements.py::test_an_entitlement_past_its_expiry_is_free` | Pass |

@@ -92,15 +92,8 @@ describe('Opening an item from a cold start (BUG-6)', () => {
     useAuthStore.setState({ accessToken: null, hydrated: false });
   });
 
-  it('opens the item a price alert names, with Back to Budget', async () => {
-    mockLastResponse.value = priceAlertTap();
-    launch('/');
-
-    expect(await screen.findByText(`Item ${ITEM_ID}`)).toBeTruthy();
-    expect(mockMarkRead).toHaveBeenCalledWith('n-1', 'push');
-    await expectBackToBudget();
-  });
-
+  // The plain cold-start tap (hydrating from the keychain) is covered by
+  // pushTapColdStart.test.tsx, from main's fix for the same bug.
   it('routes a tap that is waiting on the first frame, once the root navigator is ready', async () => {
     // Signed in already when the root layout first renders its stack: the tap
     // effect runs before React Navigation is ready, and pushing then throws.
