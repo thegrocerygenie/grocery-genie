@@ -75,7 +75,6 @@ export default function ExportDataScreen() {
   const pending = exportData.isPending;
 
   const count = summary.data?.receipt_count;
-  const onCount = includes.receipts || includes.prices || includes.budgets || includes.images;
   const onlyOneOn = Object.values(includes).filter(Boolean).length === 1;
 
   let label: string;
@@ -85,8 +84,7 @@ export default function ExportDataScreen() {
   else if (count !== undefined) label = S.action(count);
   else if (summary.isError) label = S.actionNoCount;
   else label = S.counting;
-  const disabled =
-    pending || !valid || !onCount || count === 0 || (count === undefined && !summary.isError);
+  const disabled = pending || !valid || count === 0 || (count === undefined && !summary.isError);
 
   const pickPeriod = (next: ExportPeriod) => {
     if (next === 'custom' && period !== 'custom' && months.from && months.to) {
