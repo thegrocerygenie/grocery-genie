@@ -2,6 +2,8 @@
 
 **You are the coordinator.** Run `/phase-coordinator <phase> <this file>`. Plan: `<plan>` (status table current except as noted below). Earlier handoffs: <paths>. Coordinator commits go on `claude/<phase-short>-coordinator-<n+1>`, cut from `main`. Never reset or force-push.
 
+Measured at handoff: context <used>/<max> tokens (<pct>%), lineage depth <d> of <limit>.
+
 ## The user's standing instructions (verbatim)
 
 - "<quote>"
