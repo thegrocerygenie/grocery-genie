@@ -78,6 +78,7 @@ export const PRIVACY_POLICY: {
       heading: 'Deleting your account',
       paragraphs: [
         'Go to Settings → Delete account. This permanently erases your account, receipts, receipt images, budgets, settings and notifications, and, if you use Sign in with Apple, revokes the app’s access to your Apple ID.',
+        'If you redeemed the free year of Premium offered to our waitlist, we keep a one-way fingerprint of your waitlist email, not the email itself, until the offer closes 90 days after Premium launches, so the offer can’t be claimed twice. It is not linked to you and is then deleted.',
       ],
     },
     {

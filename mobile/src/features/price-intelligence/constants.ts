@@ -13,7 +13,12 @@ export const PRICES_COPY = {
     count === 1 ? '1 possible match to review' : `${count} possible matches to review`,
   matchesBannerHint: 'Opens the list of items that may be the same product',
 
+  // Item detail's Back label names the screen it returns to (itemBackTitle).
   detailBack: 'Prices',
+  backReceipt: 'Receipt',
+  backBudget: 'Budget',
+  backHistory: 'History',
+  backScan: 'Scan',
   latest: 'Latest price',
   since: (percent: string, date: string) => `${percent} since ${date}`,
   noChange: (date: string) => `Same as ${date}`,
@@ -101,6 +106,33 @@ export const PRICE_ALERT_SETTINGS_COPY = {
   unmuteLabel: (name: string) => `Unmute ${name}`,
   store: 'Store',
   item: 'Item',
+} as const;
+
+/** Settings → Stores: merging two of the user's stores (EC Price Intelligence 1). */
+export const STORE_MERGE_COPY = {
+  title: 'Stores',
+  settingsRow: 'Stores',
+  settingsDetail: 'Merge the same store',
+  back: 'Settings',
+  header: 'YOUR STORES',
+  footer:
+    'Branch numbers are matched for you. Merge two names that are the same store, like a store and its other banner, so their prices compare as one. Only your prices change.',
+  receipts: (count: number) => `${count} ${count === 1 ? 'receipt' : 'receipts'}`,
+  merge: 'Merge',
+  mergeLabel: (name: string) => `Merge ${name} into another store`,
+  pickerTitle: (name: string) => `${name} is the same store as`,
+  pickerOptionLabel: (source: string, target: string) => `Merge ${source} into ${target}`,
+  cancel: 'Cancel',
+  mergedInto: (name: string) => `Merged into ${name}`,
+  unmerge: 'Unmerge',
+  unmergeLabel: (name: string) => `Unmerge ${name}`,
+  emptyTitle: 'No stores yet',
+  emptyBody: 'Stores appear here once you save a receipt.',
+  onlyOne: 'Once you shop at a second store, you can merge two that are the same.',
+  loadFailed: 'Couldn’t load your stores',
+  retry: 'Try again',
+  saveFailedTitle: 'Couldn’t save',
+  saveFailedBody: 'Check your connection and try again.',
 } as const;
 
 /** The threshold choices; the default and the user's own are always added. */

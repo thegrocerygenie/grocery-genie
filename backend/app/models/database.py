@@ -210,6 +210,10 @@ class Receipt(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     household_id: Mapped[uuid.UUID | None] = mapped_column()
     store_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("stores.id"))
+    # The store name printed on this receipt, or the user's correction of it.
+    # The store row is shared and keeps the name its first receipt gave it,
+    # so a receipt shows this, never the row's name (V11-05).
+    store_name: Mapped[str | None] = mapped_column(String(255))
     date: Mapped[date] = mapped_column(Date, nullable=False)
     subtotal: Mapped[float | None] = mapped_column(Numeric(12, 2))
     tax: Mapped[float | None] = mapped_column(Numeric(12, 2))
@@ -465,11 +469,48 @@ class PriceAlertStoreMute(Base):
     store_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("stores.id", ondelete="CASCADE"), nullable=False
     )
+    # The user's own name for the store when they muted it (V11-05): the
+    # mute outlives its receipts, and the shared row's name may be another
+    # user's.
+    store_name: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     store: Mapped["Store"] = relationship()
+
+
+class UserStoreAlias(Base):
+    """One user's merge of a store into another (EC Price Intelligence 1, D3).
+
+    Stores are shared across users, so a merge never renames or joins the
+    shared rows: it groups this user's prices of ``store_id`` under
+    ``target_store_id``, and nobody else's. Both ids are group roots (the
+    oldest row of their normalized name); a target is never itself merged,
+    so groups are one level deep.
+    """
+
+    __tablename__ = "user_store_aliases"
+    __table_args__ = (
+        UniqueConstraint("user_id", "store_id", name="uq_user_store_alias"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    store_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("stores.id", ondelete="CASCADE"), nullable=False
+    )
+    target_store_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("stores.id", ondelete="CASCADE"), nullable=False
+    )
+    # The user's own names for both stores when they merged, so the group
+    # keeps the user's name after their receipts there are purged; the shared
+    # row's name may be another user's.
+    store_name: Mapped[str | None] = mapped_column(String(255))
+    target_name: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class RevenueCatEvent(Base):

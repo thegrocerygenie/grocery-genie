@@ -9,7 +9,7 @@ Confirming a receipt compares each price with the item's 30-day rolling average 
 - `pa.cooldown`: a further change for the same item within 7 days sends nothing.
 - `pa.threshold`: with the threshold at 25, a 20% change sends nothing and a 40% change alerts.
 - `pa.mute-item`: `POST /api/items/{id}/mute` (204, idempotent) sets `alerts_muted` on the item and lists it in `muted_items`; a muted item's change sends nothing; `DELETE` unmutes.
-- `pa.mute-store`: `POST /api/stores/{id}/mute` lists the store in `muted_stores`; a change at that store sends nothing; `DELETE` unmutes, and never 404s (it deletes only the caller's own mute, so a mute outliving its purged receipts can still be undone).
+- `pa.mute-store`: `POST /api/stores/{id}/mute` lists the store in `muted_stores`; a change at that store sends nothing; `DELETE` unmutes, and never 404s (it deletes only the caller's own mute, so a mute outliving its purged receipts can still be undone). A store mute covers the store as the user groups it (branches of one name, and their own merges): [store-merge.md](./store-merge.md) drives a muted store merged into another.
 - `pa.concurrent`: two receipts confirmed at the same moment with the same big change alert once (the ledger's unique key, on Postgres).
 - `pa.isolation`: another user muting the item, or a store they never shopped at, gets 404; unmuting their item is 404 too.
 - `pa.app-tap`: the alert's `data.canonical_item_id` is what the app routes to (`/items/{id}`); item detail then loads with it: `GET /api/items/{id}` (with `alerts_muted`), `/prices` (whose `observations[].store_id` feed the store switches) and `/compare`, all 200.

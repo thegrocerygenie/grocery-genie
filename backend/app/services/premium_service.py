@@ -165,20 +165,30 @@ class PremiumService:
             return wanted in event.entitlement_ids
         return event.entitlement_id == wanted
 
-    async def _locked_user(self, ids: list[uuid.UUID]) -> User | None:
-        """The first of ``ids`` that is a user, locked for this transaction so
-        two events for one user apply one after the other."""
+    async def _locked_users(self, ids: list[uuid.UUID]) -> dict[uuid.UUID, User]:
+        """The users among ``ids``, locked for this transaction so two events
+        for one user apply one after the other.
+
+        One statement locks them all, in id order, so two events that name
+        the same users in different orders (two transfers between A and B)
+        wait for each other instead of deadlocking.
+        """
         if not ids:
-            return None
+            return {}
         rows = (
             await self.db.execute(
                 select(User)
                 .where(User.id.in_(ids))
+                .order_by(User.id)
                 .with_for_update()
                 .execution_options(populate_existing=True)
             )
         ).scalars()
-        by_id = {u.id: u for u in rows}
+        return {u.id: u for u in rows}
+
+    async def _locked_user(self, ids: list[uuid.UUID]) -> User | None:
+        """The first of ``ids`` that is a user, locked with the rest."""
+        by_id = await self._locked_users(ids)
         return next((by_id[i] for i in ids if i in by_id), None)
 
     async def _apply(
@@ -291,8 +301,9 @@ class PremiumService:
         old = _user_ids(event.transferred_from or [])
         new = _user_ids(event.transferred_to or [])
         touched: list[uuid.UUID] = []
+        locked = await self._locked_users([*old, *new])
         for user_id in [*old, *new]:
-            user = await self._locked_user([user_id])
+            user = locked.get(user_id)
             if user is None:
                 continue
             last = _utc(user.premium_updated_at)

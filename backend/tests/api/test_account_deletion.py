@@ -43,6 +43,7 @@ from app.models.database import (
     RevenueCatEvent,
     User,
     UserItemMapping,
+    UserStoreAlias,
 )
 from app.services import account_service
 from app.services.ai_consent import AI_CONSENT_POLICY_VERSION
@@ -190,6 +191,10 @@ async def _give_user_everything(
             ),
             PriceAlertItemMute(user_id=user_id, canonical_item_id=matched_item_id),
             PriceAlertStoreMute(user_id=user_id, store_id=store_id),
+            # Store merge (V11-05): the user's own store alias.
+            UserStoreAlias(
+                user_id=user_id, store_id=store_id, target_store_id=store_id
+            ),
             # Premium (V11-P0): the RevenueCat webhook ledger.
             RevenueCatEvent(
                 event_id=f"evt-{user_id}",
