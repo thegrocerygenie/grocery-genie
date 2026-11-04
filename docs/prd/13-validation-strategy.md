@@ -631,7 +631,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PREM-02 | 2 | Item and store mute POST 403 for a free user; DELETE open to all | Integration | Not yet implemented (DA-1) | Pending |
 | PREM-02 | 3 | A mute outlives a Premium lapse: still honoured, listed and removable | Integration | Not yet implemented (DA-1) | Pending |
 | PREM-02 | 4 | History, matching, alerts, alert settings and the alerts list stay free | Integration | Not yet implemented (DA-1) | Pending |
-| PREM-02 | 5 | App: comparison and mute upgrade prompts open the paywall; lapsed user can unmute | Component | Not yet implemented (DA-1) | Pending |
+| PREM-02 | 5 | App: comparison upgrade prompt opens the paywall; on the Alerts screen a free user turning a switch off (muting) gets the upgrade prompt and the switch stays on; a lapsed user can turn a muted switch back on | Component | Not yet implemented (DA-1) | Pending |
 | PREM-02 | 6 | App: a 403 premium_required from compare or mute shows the upgrade prompt | Component | Not yet implemented (DA-1) | Pending |
 | PREM-02 | 7 | price_comparison_viewed and price_alert_muted only on success | Integration | Not yet implemented (DA-1) | Pending |
 | PREM-02 | 8 | 08-api-contracts and the verify-grocery-genie Premium journey say compare and mute POST are 403 for a free user | E2E | Not yet implemented (DA-1) | Pending |
@@ -651,7 +651,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-03 | 6 | Empty Price alerts list says "No price alerts yet" | Component | Not yet implemented (DA-4) | Pending |
 | PI-03 | 7 | Settings group: Threshold and Cooldown rows, footer from the user's settings | Component | Not yet implemented (DA-4) | Pending |
 | PI-03 | 8 | Cooldown user setting 1–30 days (null default, 422 otherwise), used by the alert check | Integration | Not yet implemented (DA-4) | Pending |
-| PI-03 | 9 | Alert title and body per design, still naming item, store, old average, new price, percent | Integration | Not yet implemented (DA-4) | Pending |
+| PI-03 | 9 | Alert title and body per design (a drop adds "stock-up worth it", push and in-app alike), still naming item, store, old average, new price, percent | Integration | Not yet implemented (DA-4) | Pending |
 | PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | Not yet implemented (DA-5) | Pending |
 | PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Component | Not yet implemented (DA-5) | Pending |
 | PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | Not yet implemented (DA-5) | Pending |

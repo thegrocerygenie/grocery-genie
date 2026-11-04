@@ -143,7 +143,7 @@ Setup for this section:
 - [ ] **Push tap, foreground.** With the app open, confirm the receipt that moves the price. The banner arrives; tapping it opens the item. (PI-03 AC 2; DEVICE-CHECK C4)
 - [ ] **Push tap, background.** Same, with the app in the background. (PI-03 AC 2)
 - [ ] **Push tap, cold start.** Force-quit the app, then tap the banner. The item opens, and Back returns to Budget. (PI-03 AC 2; BUG-6)
-- [ ] **Item and store mute switches.** On item detail, turn off alerts for the item and for one store. Relaunch: both switches stay off. A new price change at that store sends no push. (PI-03 AC 4; DEVICE-CHECK C2)
+- [ ] **Item and store mute switches.** On the Alerts screen (pushed from item detail's Alerts row; after DA-7, before it the switches are on item detail), turn off alerts for the item and for one store. Relaunch: both switches stay off. A new price change at that store sends no push. (PI-03 AC 4; DEVICE-CHECK C2)
 - [ ] **Compare stores.** Item detail lists each store cheapest first, with latest and average, and says how many stores need more prices. (PI-04 AC 4; DEVICE-CHECK C1)
 - [ ] **Threshold picker.** Settings → Alerts: pick 25%, then "10% (default)". Each choice saves, and the line under it says what size of change sends an alert. (PI-03 AC 1; DEVICE-CHECK C3)
 - [ ] **Unmute rows.** The muted item and store are listed in Settings → Alerts. Unmute each: it leaves the list, and the switch on item detail is on again. (PI-03 AC 4; DEVICE-CHECK C3)
