@@ -10,7 +10,8 @@ import {
   View,
 } from 'react-native';
 import { SymbolView } from 'expo-symbols';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useRoute } from '@react-navigation/native';
 
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { colors, fontScale, radii, spacing, touchTarget, type } from '@/constants/theme';
@@ -19,6 +20,7 @@ import { PriceChart } from '@/features/price-intelligence/components/PriceChart'
 import { StoreComparison } from '@/features/price-intelligence/components/StoreComparison';
 import { SuggestionCard } from '@/features/price-intelligence/components/SuggestionCard';
 import { PRICES_COPY } from '@/features/price-intelligence/constants';
+import { itemBackTitle, type RouteLike } from '@/features/price-intelligence/utils/itemBackTitle';
 import {
   useItem,
   usePriceComparison,
@@ -43,9 +45,19 @@ import { formatLongDate } from '@/features/receipt-capture/utils/receiptDate';
  * its price at each store. PI-03 AC 4: muting its price alerts, or a store's.
  * A price change alert opens this screen.
  */
+/** The Back label: the screen under this one in the stack (itemBackTitle). */
+function useBackTitle(): string | undefined {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { routes } = navigation.getState() ?? { routes: [] };
+  const index = routes.findIndex((r) => r.key === route.key);
+  return itemBackTitle(index > 0 ? (routes[index - 1] as RouteLike) : undefined);
+}
+
 export default function ItemDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const backTitle = useBackTitle();
   const item = useItem(id);
   const history = usePriceHistory(id);
   // Not awaited: the rest of the screen shows while the comparison loads.
@@ -91,7 +103,7 @@ export default function ItemDetailScreen() {
     <Stack.Screen
       options={{
         title: name,
-        headerBackTitle: PRICES_COPY.detailBack,
+        headerBackTitle: backTitle,
         headerRight: () =>
           item.data ? (
             <Pressable

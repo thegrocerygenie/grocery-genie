@@ -13,7 +13,12 @@ export const PRICES_COPY = {
     count === 1 ? '1 possible match to review' : `${count} possible matches to review`,
   matchesBannerHint: 'Opens the list of items that may be the same product',
 
+  // Item detail's Back label names the screen it returns to (itemBackTitle).
   detailBack: 'Prices',
+  backReceipt: 'Receipt',
+  backBudget: 'Budget',
+  backHistory: 'History',
+  backScan: 'Scan',
   latest: 'Latest price',
   since: (percent: string, date: string) => `${percent} since ${date}`,
   noChange: (date: string) => `Same as ${date}`,
