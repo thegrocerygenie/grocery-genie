@@ -23,7 +23,9 @@ mapping) takes it first through ``ensure_usable`` or ``usable_custom``. So a
 create cannot pass the cap or the name check beside another, and a delete
 never removes a category under a row about to point at it: the attach either
 commits first and is moved by the delete, or waits and finds the category
-gone (a clean 400, or no category for a scan).
+gone (a clean 400, or no category for a scan). Delete then locks the
+category's budgets in id order, as a confirm's ``check_thresholds`` does, so
+the two never hold each other's budgets.
 """
 
 import uuid
@@ -167,6 +169,11 @@ class CategoryService:
         ).scalar_one_or_none()
 
         budgets = select(Budget.id).where(Budget.category_id == category.id)
+        # Lock its budgets in id order before changing anything, the order a
+        # confirm's check_thresholds locks them in. A DELETE alone meets them
+        # in table order, so with budgets in two periods it could hold one a
+        # confirm wants while waiting for one the confirm holds: a deadlock.
+        await self.db.execute(budgets.order_by(Budget.id).with_for_update())
         statements = [
             update(LineItem)
             .where(LineItem.category_id == category.id)

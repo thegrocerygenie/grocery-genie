@@ -19,13 +19,15 @@ import os
 import uuid
 from collections.abc import AsyncGenerator, Awaitable
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 import pytest
 from fastapi import Request
 from httpx import ASGITransport, AsyncClient, Response
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core import clock
 from app.core.seed import seed_default_categories
 from app.models.database import (
     Budget,
@@ -449,3 +451,111 @@ async def test_category_deleted_during_a_manual_receipt_moves_the_item_to_other(
     async with harness.factory() as db:
         item = await db.get(LineItem, uuid.UUID(item_id))
         assert item is not None and item.category_id == await _other_id(harness)
+
+
+# --- (c) Delete against a confirm that locks the category's budgets ---
+
+# Ids chosen so the budget written first sorts last: a plain DELETE meets the
+# rows in the order they were written, the confirm locks them in id order
+# (check_thresholds).
+LOW_BUDGET = uuid.UUID("00000000-0000-0000-0000-00000000b001")
+HIGH_BUDGET = uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffb002")
+
+
+async def _budgets_in_two_periods(h: Harness, cid: str) -> None:
+    """HIGH_BUDGET (this month) written before LOW_BUDGET (last month)."""
+    this_month = clock.today().replace(day=1)
+    last_month = (this_month - timedelta(days=1)).replace(day=1)
+    async with h.factory() as db:
+        for budget_id, start in ((HIGH_BUDGET, this_month), (LOW_BUDGET, last_month)):
+            db.add(
+                Budget(
+                    id=budget_id,
+                    user_id=USER_ID,
+                    category_id=uuid.UUID(cid),
+                    amount=50,
+                    period_start=start,
+                )
+            )
+            await db.flush()
+        await db.commit()
+
+
+async def _until_waiting(h: Harness, count: int) -> None:
+    """Until ``count`` sessions wait on a lock."""
+    query = text(
+        "SELECT count(*) FROM pg_stat_activity "
+        "WHERE datname = current_database() AND wait_event_type = 'Lock'"
+    )
+    for _ in range(200):
+        async with h.factory() as db:
+            if (await db.execute(query)).scalar_one() >= count:
+                return
+        await asyncio.sleep(0.05)
+    raise AssertionError(f"expected {count} requests waiting on a lock")
+
+
+async def _race_on_low_budget(
+    h: Harness, first: Awaitable[Response], second: Awaitable[Response]
+) -> tuple[Response, Response]:
+    """Hold LOW_BUDGET's row lock from outside, queue ``first`` and then
+    ``second`` behind it, then let go: they get it in that order."""
+    async with h.factory() as blocker:
+        await blocker.execute(
+            select(Budget.id).where(Budget.id == LOW_BUDGET).with_for_update()
+        )
+        first_task = asyncio.ensure_future(first)
+        await _until_waiting(h, 1)
+        second_task = asyncio.ensure_future(second)
+        await _until_waiting(h, 2)
+        await blocker.rollback()
+    return await asyncio.wait_for(asyncio.gather(first_task, second_task), timeout=10)
+
+
+def _confirm_today(h: Harness, receipt_id: str) -> Awaitable[Response]:
+    # Dated today, so check_thresholds locks the budgets (M5).
+    return h.client.patch(
+        f"/api/receipts/{receipt_id}",
+        json={"date": clock.today().isoformat(), "status": "confirmed"},
+    )
+
+
+async def test_delete_racing_a_confirm_that_holds_a_budget_does_not_deadlock(
+    harness: Harness, test_image_bytes: bytes
+):
+    # The confirm locks LOW_BUDGET, then wants HIGH_BUDGET. A delete that took
+    # the budgets in the order they were written held HIGH_BUDGET and waited
+    # for LOW_BUDGET: Postgres broke the deadlock and one request answered 500.
+    cid = await _custom(harness, "Garden")
+    receipt_id, _ = await _bananas(harness, test_image_bytes)
+    await _budgets_in_two_periods(harness, cid)
+
+    confirmed, deleted = await _race_on_low_budget(
+        harness,
+        _confirm_today(harness, receipt_id),
+        harness.client.delete(f"/api/categories/{cid}"),
+    )
+
+    assert confirmed.status_code == 200, confirmed.text
+    assert deleted.status_code == 204, deleted.text
+    async with harness.factory() as db:
+        assert (await db.execute(select(Budget))).first() is None
+
+
+async def test_confirm_racing_a_delete_that_holds_the_budgets_skips_them(
+    harness: Harness, test_image_bytes: bytes
+):
+    cid = await _custom(harness, "Garden")
+    receipt_id, _ = await _bananas(harness, test_image_bytes)
+    await _budgets_in_two_periods(harness, cid)
+
+    deleted, confirmed = await _race_on_low_budget(
+        harness,
+        harness.client.delete(f"/api/categories/{cid}"),
+        _confirm_today(harness, receipt_id),
+    )
+
+    assert deleted.status_code == 204, deleted.text
+    assert confirmed.status_code == 200, confirmed.text
+    async with harness.factory() as db:
+        assert (await db.execute(select(Budget))).first() is None
