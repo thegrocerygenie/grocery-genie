@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
+from app.core.entitlements import FEATURE_BUDGET_ROLLOVER, require_premium
 from app.core.money import format_money
 from app.core.retention import days_remaining
 from app.core.security import get_current_user
@@ -11,6 +12,7 @@ from app.models.database import User
 from app.models.schemas import (
     BudgetCreateRequest,
     BudgetResponse,
+    BudgetRolloverRequest,
     BudgetSummaryResponse,
     BudgetUpdateRequest,
     DeletedItemResponse,
@@ -87,6 +89,31 @@ async def update_budget(
             raise HTTPException(status_code=404, detail="Budget not found") from None
         raise HTTPException(status_code=400, detail=str(e)) from e
     return BudgetResponse.model_validate(result)
+
+
+@router.put("/{budget_id}/rollover", response_model=BudgetResponse)
+async def set_budget_rollover(
+    budget_id: uuid.UUID,
+    body: BudgetRolloverRequest,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User = Depends(require_premium(FEATURE_BUDGET_ROLLOVER)),
+    analytics: AnalyticsService = Depends(get_analytics_service),
+) -> BudgetResponse:
+    """Turn rollover on or off for one budget (Premium, D2). Idempotent."""
+    service = BudgetService(db)
+    try:
+        before = await service.set_rollover(budget_id, user.id, body.enabled)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Budget not found") from None
+    analytics.emit(
+        "budget_rollover_toggled",
+        {
+            "enabled": body.enabled,
+            "type": "overall" if before.category_id is None else "category",
+        },
+        user.id,
+    )
+    return BudgetResponse.model_validate(before)
 
 
 @router.delete("/{budget_id}", status_code=204)

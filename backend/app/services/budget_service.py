@@ -1,6 +1,6 @@
 import calendar
 import uuid
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import clock
 from app.core.config import get_settings
+from app.core.entitlements import is_premium
 from app.core.retention import restore_cutoff
 from app.events.types import BudgetThresholdBreached
 from app.models.database import (
@@ -30,6 +31,7 @@ from app.models.schemas import (
     DashboardTrendCategory,
     DashboardTrendMonth,
 )
+from app.services.category_service import CategoryService, UnknownCategoryError
 
 
 class BudgetConflictError(ValueError):
@@ -93,6 +95,16 @@ def in_budget_currency(user_id: uuid.UUID):
     return Receipt.currency == func.coalesce(user_currency, Receipt.currency)
 
 
+def _rollover_running(budget: Budget) -> bool:
+    """Rollover is on and has a run. A $0 budget never carries (EC Budget 2:
+    it means "spend nothing", and alerts on any spend)."""
+    return (
+        bool(budget.rollover_enabled)
+        and budget.rollover_start is not None
+        and float(budget.amount) > 0
+    )
+
+
 class BudgetService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
@@ -115,22 +127,30 @@ class BudgetService:
         back, because the unique constraint still holds its key.
         Returns the budget and whether it is new to the user.
         """
-        if request.category_id is not None:
-            result = await self.db.execute(
-                select(Category).where(Category.id == request.category_id)
-            )
-            if result.scalar_one_or_none() is None:
-                raise ValueError(f"Category {request.category_id} not found")
+        # A default or the user's own custom category, never another's; a
+        # custom one cannot be deleted before this budget commits.
+        try:
+            await CategoryService(self.db).ensure_usable(user_id, [request.category_id])
+        except UnknownCategoryError:
+            raise ValueError(f"Category {request.category_id} not found") from None
 
         period_start = date.fromisoformat(request.period_start)
 
         active = await self._active_budget(user_id, request.category_id)
         if active is not None:
+            moves = period_start != active.period_start and not (
+                await self._period_start_taken(active, period_start)
+            )
+            affected = await self._rollover_affected(
+                user_id, active, request.amount, period_start if moves else None
+            )
+            openings = await self._carry_now(user_id, affected)
             active.amount = request.amount
             active.period_type = request.period_type
-            if not await self._period_start_taken(active, period_start):
+            if moves:
                 active.period_start = period_start
             await self.db.flush()
+            await self._restart_rollover(user_id, affected, openings)
             return active, False
 
         result = await self.db.execute(
@@ -143,9 +163,15 @@ class BudgetService:
         )
         deleted = result.scalars().first()
         if deleted is not None:
+            # A new budget to the user, so it starts with rollover off, as the
+            # app shows a new budget's switch. Restore keeps it; this is not
+            # a restore.
             deleted.deleted_at = None
             deleted.amount = request.amount
             deleted.period_type = request.period_type
+            deleted.rollover_enabled = False
+            deleted.rollover_start = None
+            deleted.rollover_opening = 0
             await self.db.flush()
             return deleted, True
 
@@ -190,14 +216,20 @@ class BudgetService:
         budget = result.scalar_one_or_none()
         if budget is None:
             raise ValueError(f"Budget {budget_id} not found")
-        if period_start is not None and period_start != budget.period_start:
-            if await self._period_start_taken(budget, period_start):
-                raise BudgetConflictError(
-                    "Another budget for this category already uses that start date"
-                )
+        moves = period_start is not None and period_start != budget.period_start
+        if moves and await self._period_start_taken(budget, period_start):
+            raise BudgetConflictError(
+                "Another budget for this category already uses that start date"
+            )
+        affected = await self._rollover_affected(
+            user_id, budget, amount, period_start if moves else None
+        )
+        openings = await self._carry_now(user_id, affected)
+        if moves:
             budget.period_start = period_start
         budget.amount = amount
         await self.db.flush()
+        await self._restart_rollover(user_id, affected, openings)
         return budget
 
     async def _active_budget(
@@ -230,8 +262,6 @@ class BudgetService:
     async def soft_delete_budget(
         self, budget_id: uuid.UUID, user_id: uuid.UUID
     ) -> Budget:
-        from datetime import UTC, datetime
-
         result = await self.db.execute(
             select(Budget).where(
                 Budget.id == budget_id,
@@ -242,13 +272,11 @@ class BudgetService:
         budget = result.scalar_one_or_none()
         if budget is None:
             raise ValueError(f"Budget {budget_id} not found")
-        budget.deleted_at = datetime.now(UTC)
+        budget.deleted_at = clock.now()
         await self.db.flush()
         return budget
 
     async def restore_budget(self, budget_id: uuid.UUID, user_id: uuid.UUID) -> Budget:
-        from datetime import UTC
-
         result = await self.db.execute(
             select(Budget).where(
                 Budget.id == budget_id,
@@ -263,13 +291,230 @@ class BudgetService:
         deleted_at = budget.deleted_at
         if deleted_at.tzinfo is None:  # SQLite drops the zone
             deleted_at = deleted_at.replace(tzinfo=UTC)
-        if deleted_at < restore_cutoff():
+        if deleted_at < restore_cutoff(clock.now()):
             raise ValueError("Budget past 30-day restore window")
         if await self._active_budget(user_id, budget.category_id) is not None:
             raise BudgetConflictError("This category already has an active budget")
         budget.deleted_at = None
         await self.db.flush()
+        await self._rollover_after_restore(user_id, budget, deleted_at)
         return budget
+
+    # --- Rollover (Premium, V11-P3; BC-FR Budget Management) ---
+    #
+    # A rollover run starts in the period holding ``rollover_start``, with
+    # ``rollover_opening`` carried into it. From there each period's unspent
+    # amount (its amount plus what carried into it, minus its spend) carries
+    # into the next. Overspend carries nothing: the PRD rolls over "unspent
+    # budget". The carry is derived on every read from the budget row and the
+    # receipts, so it is deterministic, reading it writes nothing, and a late
+    # receipt for an earlier period moves it.
+    #
+    # A change that would re-score past periods (a new amount, EC Budget 1; a
+    # new start day) restarts the run in the current period, carrying what it
+    # had reached. A change that voids the old periods (a currency change,
+    # EC Budget 4; restoring a budget deleted in an earlier period) restarts
+    # it with nothing carried. Premium decides only whether the carry applies
+    # (rollover_carries), never what it is, so a lapse pauses it.
+
+    async def set_rollover(
+        self, budget_id: uuid.UUID, user_id: uuid.UUID, enabled: bool
+    ) -> Budget:
+        """Turn rollover on or off. Turning it on again keeps the run.
+
+        A new run starts in the previous period when the budget existed then,
+        so last period's unspent amount carries into this one; otherwise it
+        starts in this period, and the first carry comes next period.
+        """
+        result = await self.db.execute(
+            select(Budget).where(
+                Budget.id == budget_id,
+                Budget.user_id == user_id,
+                Budget.deleted_at.is_(None),
+            )
+        )
+        budget = result.scalar_one_or_none()
+        if budget is None:
+            raise ValueError(f"Budget {budget_id} not found")
+        if enabled and budget.rollover_enabled and budget.rollover_start is not None:
+            return budget
+        if enabled:
+            start_day = await self._start_day(user_id)
+            _, current, _ = period_containing(await self._today(user_id), start_day)
+            _, previous, _ = period_containing(current - timedelta(days=1), start_day)
+            _, first, _ = period_containing(budget.period_start, start_day)
+            budget.rollover_start = previous if first <= previous else current
+        else:
+            budget.rollover_start = None
+        budget.rollover_enabled = enabled
+        budget.rollover_opening = 0
+        await self.db.flush()
+        return budget
+
+    async def rollover_carries(
+        self, user_id: uuid.UUID, budgets: list[Budget], period_start: date
+    ) -> dict[uuid.UUID, float]:
+        """What rolls into the period starting ``period_start``, per budget id.
+
+        Empty unless the user is Premium now (D2). A budget without rollover
+        has no entry.
+        """
+        user = await self.db.get(User, user_id)
+        if user is None or not is_premium(user):
+            return {}
+        return await self._carries(user_id, budgets, period_start)
+
+    async def _carries(
+        self, user_id: uuid.UUID, budgets: list[Budget], period_start: date
+    ) -> dict[uuid.UUID, float]:
+        running = [b for b in budgets if _rollover_running(b)]
+        if not running:
+            return {}
+        start_day = await self._start_day(user_id)
+        firsts = {
+            b.id: period_containing(b.rollover_start, start_day)[1] for b in running
+        }
+        earliest = min(firsts.values())
+        spend = (
+            await self._spend_by_period(
+                user_id, earliest, period_start - timedelta(days=1), start_day
+            )
+            if earliest < period_start
+            else {}
+        )
+        carries: dict[uuid.UUID, float] = {}
+        for budget in running:
+            first = firsts[budget.id]
+            if period_start < first:
+                carries[budget.id] = 0.0
+                continue
+            carry = float(budget.rollover_opening or 0)
+            start = first
+            while start < period_start:
+                by_category = spend.get(start, {})
+                spent = (
+                    sum(by_category.values())
+                    if budget.category_id is None
+                    else by_category.get(budget.category_id, 0.0)
+                )
+                carry = round(max(0.0, float(budget.amount) + carry - spent), 2)
+                _, _, end = period_containing(start, start_day)
+                start = end + timedelta(days=1)
+            carries[budget.id] = carry
+        return carries
+
+    async def _spend_by_period(
+        self, user_id: uuid.UUID, start: date, end: date, start_day: int
+    ) -> dict[date, dict[uuid.UUID | None, float]]:
+        """Spend from ``start`` to ``end`` by period start, then by category,
+        counted as get_spending_by_category counts it."""
+        result = await self.db.execute(
+            select(Receipt.date, LineItem.category_id, func.sum(LineItem.total_price))
+            .join(Receipt, LineItem.receipt_id == Receipt.id)
+            .where(
+                Receipt.user_id == user_id,
+                Receipt.status == "confirmed",
+                Receipt.deleted_at.is_(None),
+                in_budget_currency(user_id),
+                Receipt.date >= start,
+                Receipt.date <= end,
+            )
+            .group_by(Receipt.date, LineItem.category_id)
+        )
+        out: dict[date, dict[uuid.UUID | None, float]] = {}
+        for day, category_id, total in result.all():
+            _, period_start, _ = period_containing(day, start_day)
+            bucket = out.setdefault(period_start, {})
+            bucket[category_id] = bucket.get(category_id, 0.0) + float(total)
+        return out
+
+    async def _running_budgets(self, user_id: uuid.UUID) -> list[Budget]:
+        result = await self.db.execute(
+            select(Budget).where(
+                Budget.user_id == user_id,
+                Budget.deleted_at.is_(None),
+                Budget.rollover_enabled.is_(True),
+                Budget.rollover_start.is_not(None),
+            )
+        )
+        return list(result.scalars().all())
+
+    async def _timezone(self, user_id: uuid.UUID) -> str | None:
+        user = await self.db.get(User, user_id)
+        return user.timezone if user is not None else None
+
+    async def _today(self, user_id: uuid.UUID) -> date:
+        """Today where the user is: the dashboard's current period is the one
+        holding it, so a change near midnight lands in the same period."""
+        return clock.today_in(await self._timezone(user_id))
+
+    async def _rollover_affected(
+        self,
+        user_id: uuid.UUID,
+        budget: Budget,
+        amount: float,
+        new_period_start: date | None,
+    ) -> list[Budget]:
+        """The runs a change to ``budget`` would re-score: every run when the
+        overall budget's start day moves, else this one when its amount does."""
+        if budget.category_id is None and new_period_start is not None:
+            return await self._running_budgets(user_id)
+        running = budget.rollover_enabled and budget.rollover_start is not None
+        if running and float(amount) != float(budget.amount):
+            return [budget]
+        return []
+
+    async def _carry_now(
+        self, user_id: uuid.UUID, budgets: list[Budget]
+    ) -> dict[uuid.UUID, float]:
+        """What has carried into the current period, before a change."""
+        if not budgets:
+            return {}
+        today = await self._today(user_id)
+        _, current, _ = await self.get_period_containing(user_id, today)
+        return await self._carries(user_id, budgets, current)
+
+    async def _restart_rollover(
+        self,
+        user_id: uuid.UUID,
+        budgets: list[Budget],
+        openings: dict[uuid.UUID, float],
+    ) -> None:
+        """Start each run again in the current period (after the change, which
+        can move it), with ``openings`` carried in."""
+        if not budgets:
+            return
+        today = await self._today(user_id)
+        _, current, _ = await self.get_period_containing(user_id, today)
+        for budget in budgets:
+            if budget.rollover_enabled and budget.rollover_start is not None:
+                budget.rollover_start = current
+                budget.rollover_opening = openings.get(budget.id, 0.0)
+        await self.db.flush()
+
+    async def restart_rollovers(self, user_id: uuid.UUID) -> None:
+        """Restart every run with nothing carried: the currency changed, and
+        amounts are not converted (EC Budget 4)."""
+        await self._restart_rollover(user_id, await self._running_budgets(user_id), {})
+
+    async def _rollover_after_restore(
+        self, user_id: uuid.UUID, budget: Budget, deleted_at: datetime | None
+    ) -> None:
+        """Nothing carries from periods a budget spent deleted: restoring one
+        deleted in an earlier period restarts its run with nothing carried."""
+        if deleted_at is None or not (
+            budget.rollover_enabled and budget.rollover_start is not None
+        ):
+            return
+        if deleted_at.tzinfo is None:  # SQLite drops the zone
+            deleted_at = deleted_at.replace(tzinfo=UTC)
+        zone = await self._timezone(user_id)
+        today = clock.today_in(zone)
+        deleted_on = deleted_at.astimezone(clock.user_zone(zone)).date()
+        _, current, _ = await self.get_period_containing(user_id, today)
+        _, deleted_in, _ = await self.get_period_containing(user_id, deleted_on)
+        if deleted_in < current:
+            await self._restart_rollover(user_id, [budget], {})
 
     async def list_recently_deleted(self, user_id: uuid.UUID) -> list[Budget]:
         cutoff = restore_cutoff()
@@ -381,11 +626,17 @@ class BudgetService:
             user_id, period_start, period_end
         )
 
+        # What rolled into this period (Premium rollover); the limit is the
+        # amount plus that.
+        carries = await self.rollover_carries(user_id, budgets, period_start)
+
         # Build overall summary
         overall_budget_amount = 0.0
+        overall_rolled = 0.0
         for b in budgets:
             if b.category_id is None:
-                overall_budget_amount = float(b.amount)
+                overall_rolled = carries.get(b.id, 0.0)
+                overall_budget_amount = round(float(b.amount) + overall_rolled, 2)
                 break
 
         total_spent = sum(spending.values())
@@ -408,18 +659,19 @@ class BudgetService:
             if b.category_id is None:
                 continue
             cat_spent = spending.get(b.category_id, 0.0)
-            cat_remaining = float(b.amount) - cat_spent
-            cat_percent = (
-                (cat_spent / float(b.amount) * 100) if float(b.amount) > 0 else 0.0
-            )
+            cat_rolled = carries.get(b.id, 0.0)
+            cat_limit = round(float(b.amount) + cat_rolled, 2)
+            cat_remaining = cat_limit - cat_spent
+            cat_percent = (cat_spent / cat_limit * 100) if cat_limit > 0 else 0.0
             category_summaries.append(
                 BudgetCategorySummary(
                     category_id=b.category_id,
                     name=category_names.get(b.category_id, "Unknown"),
-                    budget=float(b.amount),
+                    budget=cat_limit,
                     spent=cat_spent,
                     remaining=cat_remaining,
                     percent=round(cat_percent, 1),
+                    rolled_over=cat_rolled,
                 )
             )
             seen_categories.add(b.category_id)
@@ -445,6 +697,7 @@ class BudgetService:
                 spent=round(total_spent, 2),
                 remaining=round(overall_remaining, 2),
                 percent=round(overall_percent, 1),
+                rolled_over=overall_rolled,
             ),
             categories=category_summaries,
         )
@@ -707,20 +960,30 @@ class BudgetService:
         # Today is the server's (UTC), and the user's local date can be a day
         # either side of it, so the periods holding those days count too.
         today = clock.today()
-        current_starts = set()
+        current: dict[date, date] = {}
         for offset in (-1, 0, 1):
-            _, start, _ = await self.get_period_containing(
+            _, start, end = await self.get_period_containing(
                 user_id, today + timedelta(days=offset)
             )
-            current_starts.add(start)
+            current[start] = end
         periods: dict[date, date] = {}
+        earliest_past: date | None = None
         for receipt_date in receipt_dates:
             _, period_start, period_end = await self.get_period_containing(
                 user_id, receipt_date
             )
-            if period_start in current_starts:
+            if period_start in current:
                 periods[period_start] = period_end
-        if not periods:
+            elif period_start < max(current) and (
+                earliest_past is None or period_start < earliest_past
+            ):
+                earliest_past = period_start
+        # Spend in an earlier period alerts nowhere (M5), unless rollover
+        # carries that period into the current one: then it shrinks the
+        # current limit, and can reach a threshold there (V11-P3).
+        if not periods and (
+            earliest_past is None or not await self._running_budgets(user_id)
+        ):
             return []
 
         # Lock all of the user's budgets until the request commits, before the
@@ -738,6 +1001,16 @@ class BudgetService:
         )
         budgets = list(result.scalars().all())
         if not budgets:
+            return []
+
+        # Under the lock: an earlier period's spend reaches every current
+        # period after it while a rollover run covers it. Checking a period
+        # the carry does not reach claims nothing new.
+        if earliest_past is not None and any(_rollover_running(b) for b in budgets):
+            for start, end in current.items():
+                if start > earliest_past:
+                    periods[start] = end
+        if not periods:
             return []
 
         # BC-03 AC 4: a muted category's budget sends no alert. Filtered after
@@ -775,11 +1048,14 @@ class BudgetService:
             user_id, period_start, period_end
         )
         total_spent = sum(spending.values())
+        # Each limit is the amount plus what rolled into this period, read
+        # under the same budget lock as the spend (Premium rollover).
+        carries = await self.rollover_carries(user_id, budgets, period_start)
 
         breaches: list[BudgetThresholdBreached] = []
 
         for budget in budgets:
-            budget_amount = float(budget.amount)
+            budget_amount = round(float(budget.amount) + carries.get(budget.id, 0.0), 2)
             if budget_amount < 0:
                 continue
             if budget_amount == 0:

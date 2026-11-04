@@ -144,10 +144,14 @@ class BudgetResponse(BaseModel):
 
 
 class BudgetOverallSummary(BaseModel):
+    # The period's limit: the amount plus what rolled over into it.
     budget: float
     spent: float
     remaining: float
     percent: float
+    # What rolled over from earlier periods (Premium rollover, V11-P3); 0
+    # without rollover. ``budget - rolled_over`` is the budget's own amount.
+    rolled_over: float = 0.0
 
 
 class BudgetUpdateRequest(BaseModel):
@@ -156,13 +160,21 @@ class BudgetUpdateRequest(BaseModel):
     period_start: date | None = None
 
 
+class BudgetRolloverRequest(BaseModel):
+    """PUT /api/budgets/{id}/rollover: carry unspent budget forward (Premium)."""
+
+    enabled: bool
+
+
 class BudgetCategorySummary(BaseModel):
     category_id: uuid.UUID
     name: str
+    # As in BudgetOverallSummary: the amount plus what rolled over.
     budget: float
     spent: float
     remaining: float
     percent: float
+    rolled_over: float = 0.0
 
 
 class BudgetSummaryResponse(BaseModel):
@@ -259,6 +271,33 @@ class CategoryResponse(BaseModel):
     name: str
     is_default: bool
     sort_order: int
+
+
+# Longest custom category name; it has to fit a budget row and a chart legend.
+CATEGORY_NAME_MAX = 40
+
+
+def _category_name(value: str) -> str:
+    name = " ".join(value.split())
+    if not name:
+        raise ValueError("name must not be blank")
+    if len(name) > CATEGORY_NAME_MAX:
+        raise ValueError(f"name must be at most {CATEGORY_NAME_MAX} characters")
+    return name
+
+
+class CategoryCreateRequest(BaseModel):
+    """A custom category (BC-05 AC 3, Premium). Whitespace is collapsed."""
+
+    name: str
+
+    _check_name = field_validator("name")(_category_name)
+
+
+class CategoryUpdateRequest(BaseModel):
+    name: str
+
+    _check_name = field_validator("name")(_category_name)
 
 
 # --- Common ---

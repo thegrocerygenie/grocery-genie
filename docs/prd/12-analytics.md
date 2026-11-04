@@ -28,7 +28,9 @@ MVP notes on the table below:
 | `price_alert_triggered` | direction (up/down), percent_change | Price alert frequency (PI-03) |
 | `price_alert_muted` | scope (item/store) | Price alert fatigue: how often users mute |
 | `price_comparison_viewed` | canonical_item_id, store_count (stores compared) | Cross-store comparison engagement (PI-04) |
+| `budget_rollover_toggled` | enabled, type (overall/category) | Rollover adoption (V1.1, Premium): sent by the server on each `PUT /api/budgets/{id}/rollover` |
 | `premium_status_changed` | is_premium, source (webhook/refresh), event_type (RevenueCat's, webhook only) | Conversion and churn by tier: sent by the server only when a user becomes Premium or stops being Premium |
+| `custom_category_changed` | action (created/renamed/deleted), custom_count (after the change) | Custom category adoption (BC-05 AC 3, Premium): how many users make their own, and how many they keep |
 | `data_exported` | format (json/csv), receipt_count, line_item_count, budget_count, price_observation_count | Data export use (NFR Privacy 2, Premium): sent by the server when an export is built, not for a refused free user |
 | `item_match_resolved` | decision (accepted/rejected), method (fuzzy/semantic), confidence | Item matching precision against user-confirmed matches |
 | `recipe_suggestion_viewed` | recipe_id, match_score, had_expiring_ingredient | Recipe relevance |
