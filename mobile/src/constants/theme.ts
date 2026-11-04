@@ -122,6 +122,8 @@ export const spacing = {
   lg: 16,
   xl: 24,
   xxl: 32,
+  /** Room under a scroll view's last card, so it clears the home indicator. */
+  screenBottom: 80,
 } as const;
 
 /**

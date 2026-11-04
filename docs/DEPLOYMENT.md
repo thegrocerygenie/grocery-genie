@@ -196,6 +196,29 @@ GG_REVENUECAT_WEBHOOK_SECRET=<the webhook Authorization value>
 GG_REVENUECAT_API_KEY=sk_...
 # The entitlement Premium unlocks (default premium):
 # GG_REVENUECAT_ENTITLEMENT_ID=premium
+# The waitlist's free year of Premium (V1.1, V11-P5; see 2.10). Until
+# GG_PREMIUM_LAUNCHED_AT is set the claim window is closed and nothing is
+# granted. Set it to the moment Premium goes live (ISO 8601, UTC); the window
+# runs 90 days from it. Startup then needs GG_WAITLIST_EMAIL_HASH_SALT: a
+# random value, set once and never changed (it keys the one-way hash that
+# keeps each waitlist email to one free year). Generate it like the webhook
+# secret above.
+# GG_PREMIUM_LAUNCHED_AT=2026-12-01T17:00:00Z
+# GG_WAITLIST_EMAIL_HASH_SALT=<random, 64 hex characters>
+# The marketing site's Resend audience (its RESEND_AUDIENCE_ID). The daily
+# task copies it while the window is open, and beat deletes its contacts
+# once the window has closed (2.10). Leave it empty to load a one-off CSV
+# export instead (the contacts are then deleted by hand).
+# GG_RESEND_WAITLIST_AUDIENCE_ID=
+# The key for that audience: it reads and deletes contacts, so it must be a
+# full-access key (a sending-only key can't). Empty: GG_RESEND_API_KEY above.
+# GG_RESEND_AUDIENCE_API_KEY=re_...
+# The day the site switched to App Store downloads (PUBLIC_LAUNCH_STATE=b,
+# decisions #9). Only contacts created before it qualify; unset, all do.
+# GG_WAITLIST_CUTOFF=2026-12-01
+# Defaults: a 90-day claim window and a 12-month free year.
+# GG_WAITLIST_CLAIM_WINDOW_DAYS=90
+# GG_WAITLIST_FREE_MONTHS=12
 ```
 
 [`docker/.env.production.example`](../docker/.env.production.example) holds
@@ -531,6 +554,79 @@ REST API after a purchase or restore (`POST /api/users/me/premium/refresh`).
 The app logs in to RevenueCat with the user's Grocery Genie id, so webhook
 events name that id. A purchase made before sign-in arrives with the id among
 its `aliases`, and the backend finds the user from it.
+
+### 2.10 The waitlist's free year of Premium (V1.1)
+
+The marketing site promised waitlist sign-ups a free year of Premium
+(`docs/marketing/decisions.md` #2, #7, #9–#13). The backend matches each
+account's verified email against the waitlist (the site's Resend audience)
+and grants a 12-month RevenueCat promotional entitlement, once per waitlist
+email. Accounts whose email differs (Apple's Hide My Email) use Settings →
+"Claim your waitlist offer". The env vars are in 1.5.
+
+1. **The switch to App Store downloads:** record the date in decisions #9 and
+   set `GG_WAITLIST_CUTOFF` to it.
+2. **The waitlist source:** set `GG_RESEND_WAITLIST_AUDIENCE_ID` to the site's
+   `RESEND_AUDIENCE_ID`, and `GG_RESEND_AUDIENCE_API_KEY` to a full-access
+   Resend key if `GG_RESEND_API_KEY` is sending-only (the audience key reads
+   the contacts now and deletes them when the window closes), or take a
+   CSV export of the audience at the cut-off (Resend → Audience → Export) and
+   load it on the server:
+   `docker compose exec api python -m app.tasks.waitlist_tasks import-csv /app/storage/audience.csv`.
+   Delete the export file afterwards.
+3. **At Premium launch:** set `GG_PREMIUM_LAUNCHED_AT` and
+   `GG_WAITLIST_EMAIL_HASH_SALT`, restart the api, worker and beat, then run
+   the backfill once over every existing account:
+   `docker compose exec api python -m app.tasks.waitlist_tasks backfill`.
+   From then on, sign-in with Apple or Google, `verify-email` and a confirmed
+   email change match as they happen, and beat reruns the sync and match daily.
+4. **Grants RevenueCat could not take.** Inside sign-in, `verify-email`,
+   an email change or the claim link, a grant waits at most
+   `GG_WAITLIST_INLINE_GRANT_TIMEOUT_SECONDS` (3 s) for RevenueCat; past it,
+   or on a 5xx, 408 or 429, it stays `pending` and beat (every 15 minutes)
+   retries it with backoff: 15 minutes after the first attempt, doubling, at
+   most 6 hours apart. A member matched inside the window is owed the year
+   (decision #9), so retries **go on after the window closes**, and every
+   attempt sends the same end time, 12 months from the match. A row becomes
+   `failed`, never retried, on a RevenueCat 4xx (`last_error`
+   `revenuecat_rejected_<code>`: check the secret key and the entitlement
+   id), after `GG_WAITLIST_GRANT_RETRY_DAYS` (14) days from the match
+   (`gave_up_after_14_days`: RevenueCat was down that long), or if the end
+   time has already passed (`grant_end_passed`). Each is logged at **error**
+   level (`waitlist grant failed for good for user …`): alert on it. The app
+   shows a failed row as "We couldn't apply your free year. Contact support."
+   Watch them:
+   `SELECT status, last_error, count(*) FROM waitlist_redemptions GROUP BY 1, 2`.
+   After fixing the cause, set a failed row back so beat retries it (it
+   keeps its end time):
+   `UPDATE waitlist_redemptions SET status = 'pending', attempts = 0,
+   matched_at = now() WHERE status = 'failed' AND last_error LIKE
+   'revenuecat_rejected_%'` (`matched_at` restarts the 14 days only; the
+   end time stays in `grant_expires_at`).
+5. **The claim step** ("Claim your waitlist offer") answers `202` at once for
+   any email and enqueues a Celery task that looks the email up and sends
+   the link, so the **worker must be running**. A failed Resend send is
+   logged by the worker (`waitlist claim email not sent`), never shown to the
+   user. Limits: 5 claims an hour per account (`429`), and 3 links a day per
+   account and waitlist email (past it, the same `202` and nothing sent;
+   keyed per account, so nobody can use up a member's claims).
+6. **When the window closes** (90 days after launch), beat (05:45 UTC daily)
+   deletes the `waitlist_entries` copy, the unlinked hashes left by deleted
+   accounts, unconfirmed claims and, with `GG_RESEND_WAITLIST_AUDIENCE_ID`
+   set, **the Resend audience's contacts** (decision #11; plan: retention):
+   a page of 100 at a time, at most 2,000 a run, so a large audience takes a
+   few daily runs. It does nothing before the window closes or while
+   `GG_PREMIUM_LAUNCHED_AT` is unset, and a rerun deletes only what is left.
+   Its log line `waitlist purged: …` has counts only, such as
+   `resend_contacts_deleted` and `resend_failed`; `resend_failed=True` means
+   Resend refused part way and the next run continues. The first run that
+   finds the audience empty records it (`waitlist_audience_purges`, log
+   `resend audience purge complete`), and **from then on the purge never
+   calls Resend again**, so later sign-ups to that audience are left alone.
+   The daily run still deletes the backend copy and new unlinked hashes.
+   Then delete the empty audience in Resend, or point the site at a new one.
+   With a CSV import and no audience id, delete the contacts in Resend by
+   hand that day.
 
 ---
 

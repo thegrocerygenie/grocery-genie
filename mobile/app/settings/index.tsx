@@ -11,6 +11,8 @@ import { useBudgets } from '@/features/budget/hooks/useBudget';
 import { CATEGORY_STRINGS } from '@/features/budget/content/categories';
 import { STORE_MERGE_COPY } from '@/features/price-intelligence/constants';
 import { PREMIUM_STRINGS } from '@/features/premium/content/premium';
+import { WAITLIST_OFFER_STRINGS } from '@/features/premium/content/waitlistOffer';
+import { useWaitlistOffer } from '@/features/premium/hooks/useWaitlistOffer';
 import { EXPORT_STRINGS } from '@/features/settings/content/export';
 import { alertsSummary, budgetsSummary } from '@/features/settings/utils/settingsSummary';
 import { useNotificationStore } from '@/store/notificationStore';
@@ -108,6 +110,19 @@ export default function SettingsScreen() {
     detail: isPremium ? PREMIUM_STRINGS.settingsPremium : PREMIUM_STRINGS.settingsFree,
     href: '/paywall',
   };
+  // The waitlist's free year (V11-P5): shown only while the server says this
+  // account can still claim it.
+  const { data: waitlistOffer } = useWaitlistOffer();
+  const waitlistRow: RowDef | null = waitlistOffer?.claim_available
+    ? {
+        key: 'waitlist-offer',
+        symbol: 'gift.fill',
+        iconBg: colors.tint,
+        title: WAITLIST_OFFER_STRINGS.settingsRow,
+        detail: WAITLIST_OFFER_STRINGS.settingsDetail,
+        href: '/settings/waitlist-offer',
+      }
+    : null;
   const version = Constants.expoConfig?.version;
 
   const onSignOut = async () => {
@@ -133,7 +148,12 @@ export default function SettingsScreen() {
       <ScrollView
         style={styles.root}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg, paddingBottom: 80 }}
+        testID="settings-scroll"
+        contentContainerStyle={{
+          padding: spacing.lg,
+          gap: spacing.lg,
+          paddingBottom: spacing.screenBottom,
+        }}
       >
         <Pressable
           onPress={() => router.push('/email-change')}
@@ -154,31 +174,31 @@ export default function SettingsScreen() {
           <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
         </Pressable>
 
-        <Section header="PREMIUM">
-          <SettingsRow
-            row={premiumRow}
-            showDivider={false}
-            onPress={() => router.push('/paywall')}
-          />
+        <Section header="PREMIUM" id="premium">
+          <SettingsRow row={premiumRow} onPress={() => router.push('/paywall')} />
+          {waitlistRow ? (
+            <SettingsRow
+              row={waitlistRow}
+              onPress={() => router.push('/settings/waitlist-offer')}
+            />
+          ) : null}
         </Section>
 
         <Section header="SPENDING">
-          {spendingRows.map((r, i) => (
+          {spendingRows.map((r) => (
             <SettingsRow
               key={r.key}
               row={r}
-              showDivider={i > 0}
               onPress={() => r.href && router.push(r.href as never)}
             />
           ))}
         </Section>
 
         <Section header="RECEIPTS">
-          {RECEIPT_ROWS.map((r, i) => (
+          {RECEIPT_ROWS.map((r) => (
             <SettingsRow
               key={r.key}
               row={r}
-              showDivider={i > 0}
               onPress={() => r.href && router.push(r.href as never)}
             />
           ))}
@@ -230,10 +250,13 @@ export default function SettingsScreen() {
 
 interface SectionProps {
   header?: string;
+  /** Names the dividers for tests: `settings-divider-<id>-<row index>`. */
+  id?: string;
   children: React.ReactNode;
 }
 
-function Section({ header, children }: SectionProps) {
+/** A grouped list: draws the divider between each pair of rows itself. */
+function Section({ header, id, children }: SectionProps) {
   const items = React.Children.toArray(children).filter(Boolean);
   return (
     <View>
@@ -242,7 +265,12 @@ function Section({ header, children }: SectionProps) {
         {items.map((c, i) => (
           <React.Fragment key={i}>
             {c}
-            {i < items.length - 1 ? <View style={styles.separator} /> : null}
+            {i < items.length - 1 ? (
+              <View
+                style={styles.separator}
+                testID={id ? `settings-divider-${id}-${i + 1}` : undefined}
+              />
+            ) : null}
           </React.Fragment>
         ))}
       </View>
@@ -252,7 +280,6 @@ function Section({ header, children }: SectionProps) {
 
 interface SettingsRowProps {
   row: RowDef;
-  showDivider: boolean;
   onPress: () => void;
 }
 

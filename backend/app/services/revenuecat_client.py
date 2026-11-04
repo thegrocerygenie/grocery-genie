@@ -2,7 +2,9 @@
 
 The backend asks RevenueCat, never the app, whether a user is Premium
 (decision D1). This client reads ``GET /v1/subscribers/{app_user_id}`` with the
-secret API key. Tests replace it through ``get_revenuecat_client``.
+secret API key, and grants the waitlist's free year as a promotional
+entitlement (``POST .../entitlements/{id}/promotional``, V11-P5). Tests
+replace it through ``get_revenuecat_client``.
 """
 
 from __future__ import annotations
@@ -37,8 +39,23 @@ class RevenueCatUnavailableError(Exception):
     answer). The stored entitlement is left as it was."""
 
 
+class RevenueCatRejectedError(RevenueCatUnavailableError):
+    """RevenueCat refused a grant with a 4xx that a retry won't change (a bad
+    key, entitlement id or body). 408 and 429 are not this: they pass."""
+
+    def __init__(self, message: str, *, status_code: int) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+# 4xx answers worth retrying: a timeout and a rate limit.
+_RETRYABLE_4XX = {408, 429}
+
+
 class RevenueCatClient(Protocol):
     async def get_premium(self, app_user_id: str) -> PremiumState: ...
+
+    async def grant_promotional(self, app_user_id: str, end_time: datetime) -> None: ...
 
 
 class _Entitlement(BaseModel):
@@ -81,6 +98,39 @@ class HttpRevenueCatClient:
             return await self.http.get(url, headers=headers)
         async with httpx.AsyncClient(timeout=10.0) as http:
             return await http.get(url, headers=headers)
+
+    async def _post(self, url: str, body: dict) -> httpx.Response:
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        if self.http is not None:
+            return await self.http.post(url, headers=headers, json=body)
+        async with httpx.AsyncClient(timeout=10.0) as http:
+            return await http.post(url, headers=headers, json=body)
+
+    async def grant_promotional(self, app_user_id: str, end_time: datetime) -> None:
+        """Grant the Premium entitlement to ``app_user_id`` until ``end_time``.
+
+        RevenueCat's v1 promotional grant with ``end_time_ms`` (``duration``
+        is deprecated, so it is not sent). RevenueCat treats a grant ending
+        within 2 hours of an active promotional's end as a duplicate, so a
+        retry with the same end time cannot stack a second year.
+        """
+        url = (
+            f"{self.base_url}/v1/subscribers/{quote(app_user_id, safe='')}"
+            f"/entitlements/{quote(self.entitlement_id, safe='')}/promotional"
+        )
+        end = end_time if end_time.tzinfo else end_time.replace(tzinfo=UTC)
+        try:
+            resp = await self._post(url, {"end_time_ms": int(end.timestamp() * 1000)})
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code
+            logger.warning("revenuecat promotional grant failed: HTTP %d", status)
+            if 400 <= status < 500 and status not in _RETRYABLE_4XX:
+                raise RevenueCatRejectedError(str(e), status_code=status) from e
+            raise RevenueCatUnavailableError(str(e)) from e
+        except httpx.HTTPError as e:
+            logger.warning("revenuecat promotional grant failed: %s", type(e).__name__)
+            raise RevenueCatUnavailableError(str(e)) from e
 
     async def get_premium(self, app_user_id: str) -> PremiumState:
         url = f"{self.base_url}/v1/subscribers/{quote(app_user_id, safe='')}"

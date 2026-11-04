@@ -55,3 +55,24 @@ def test_email_delivery_off_lets_production_start_without_a_key():
         resend_api_key="", email_delivery="off"
     ).production_safety_errors()
     assert errors == []
+
+
+def test_premium_launch_needs_the_waitlist_hash_salt():
+    # V11-P5: the salt keys the one-way hash of redeemed waitlist emails.
+    errors = _settings(
+        premium_launched_at="2027-01-01T00:00:00Z"
+    ).production_safety_errors()
+    assert any("GG_WAITLIST_EMAIL_HASH_SALT" in e for e in errors)
+    assert (
+        _settings(
+            premium_launched_at="2027-01-01T00:00:00Z",
+            waitlist_email_hash_salt="s" * 32,
+        ).production_safety_errors()
+        == []
+    )
+
+
+def test_waitlist_cutoff_accepts_a_date(monkeypatch):
+    # The cut-off is the day the site switched to the App Store.
+    monkeypatch.setenv("GG_WAITLIST_CUTOFF", "2026-12-15")
+    assert Settings().waitlist_cutoff.isoformat().startswith("2026-12-15T00:00")

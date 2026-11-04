@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -44,6 +44,7 @@ from app.models.database import (
     User,
     UserItemMapping,
     UserStoreAlias,
+    WaitlistRedemption,
 )
 from app.services import account_service
 from app.services.ai_consent import AI_CONSENT_POLICY_VERSION
@@ -201,6 +202,14 @@ async def _give_user_everything(
                 event_type="INITIAL_PURCHASE",
                 user_id=user_id,
                 outcome="applied",
+            ),
+            # Waitlist free year (V11-P5): the redemption, unlinked on delete.
+            WaitlistRedemption(
+                email_hash=f"hash-{user_id}",
+                user_id=user_id,
+                status="granted",
+                source="verify_email",
+                attempts=1,
             ),
             AnalyticsEvent(
                 user_id=user_id,
@@ -580,3 +589,73 @@ async def test_non_apple_user_ignores_apple_code(
 
     assert resp.status_code == 204, resp.text
     assert apple_revocations["calls"] == []
+
+
+@pytest.mark.asyncio
+async def test_redeemed_waitlist_email_outlives_the_account_as_an_unlinked_hash(
+    api_client, db_session, monkeypatch
+):
+    """Decision #13: deleting the account keeps only a salted hash of the
+    redeemed waitlist email, with no link to the account, so a new account
+    with the same email cannot take a second free year."""
+    from app.core import clock
+    from app.models.database import WaitlistEntry
+    from app.services.waitlist_service import WaitlistService, hash_waitlist_email
+    from tests.services.test_waitlist_service import (
+        CUTOFF,
+        LAUNCHED,
+        NOW,
+        FakeRevenueCat,
+    )
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "premium_launched_at", LAUNCHED)
+    monkeypatch.setattr(settings, "waitlist_cutoff", CUTOFF)
+    monkeypatch.setattr(settings, "waitlist_email_hash_salt", "test-salt")
+    monkeypatch.setattr(clock, "now", lambda: NOW)
+    db_session.add(
+        WaitlistEntry(email="gone@test.com", contact_created_at=CUTOFF - timedelta(1))
+    )
+    _, headers = await _sign_up(api_client, "gone@test.com")
+    user = (
+        await db_session.execute(select(User).where(User.email == "gone@test.com"))
+    ).scalar_one()
+    user.email_verified_at = NOW
+    rc = FakeRevenueCat()
+    assert await WaitlistService(db_session, revenuecat=rc).match_account(
+        user, source="verify_email"
+    )
+    await db_session.commit()
+
+    resp = await api_client.delete("/api/users/me", headers=headers)
+
+    assert resp.status_code == 204, resp.text
+    db_session.expire_all()
+    row = (await db_session.execute(select(WaitlistRedemption))).scalar_one()
+    assert row.email_hash == hash_waitlist_email("gone@test.com")
+    assert row.user_id is None
+    # Nothing else about the account or its grant is kept.
+    assert (row.source, row.matched_at, row.grant_expires_at, row.granted_at) == (
+        None,
+        None,
+        None,
+        None,
+    )
+    assert (row.last_attempt_at, row.last_error) == (None, None)
+    # Decision #13 needs only the hash until the window closes (the purge
+    # deletes every unlinked row then), so not even when it was made.
+    assert (row.created_at, row.attempts) == (None, None)
+
+    # A new account with the same email, verified, gets no second year.
+    _, _ = await _sign_up(api_client, "gone@test.com")
+    again = (
+        await db_session.execute(select(User).where(User.email == "gone@test.com"))
+    ).scalar_one()
+    again.email_verified_at = NOW
+    assert (
+        await WaitlistService(db_session, revenuecat=rc).match_account(
+            again, source="verify_email"
+        )
+        is None
+    )
+    assert len(rc.grants) == 1

@@ -23,6 +23,8 @@ REDIS_KEY_PREFIX = "gg:ratelimit:"
 RECEIPT_SUBMISSIONS = {("POST", "/api/receipts/scan"), ("POST", "/api/receipts")}
 # Each refresh reads RevenueCat's REST API (V11-P0): counted on its own.
 PREMIUM_REFRESH = ("POST", "/api/users/me/premium/refresh")
+# Each claim may send an email to an address the user typed (V11-P5).
+WAITLIST_CLAIM = ("POST", "/api/users/me/waitlist-offer/claim")
 
 
 class RateLimitStore(Protocol):
@@ -136,6 +138,13 @@ async def close_stores() -> None:
         await store.close()
 
 
+async def allow(key: str, *, window: float, limit: int) -> bool:
+    """Count one hit for ``key`` in the shared store; False past ``limit`` in
+    the last ``window`` seconds. For limits keyed on something only a route
+    can read, such as a request body field."""
+    return await _store_for(get_settings()).hit(key, window=window, limit=limit)
+
+
 def reset_ip_state() -> None:
     """Clear every in-memory counter. Test-only helper."""
     _memory_store.clear()
@@ -152,9 +161,12 @@ def _too_many(detail: str, retry_after: str) -> JSONResponse:
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Sliding window rate limiter.
 
-    Four tiers:
+    Five tiers:
     - Receipt submissions (RECEIPT_SUBMISSIONS): keyed by user,
       cap = max_receipt_submissions_per_hour
+    - Waitlist claims (WAITLIST_CLAIM), each a possible email: keyed by
+      user, cap = max_waitlist_claims_per_hour. The route adds a per-target
+      email cap through ``allow``.
     - Premium refreshes (PREMIUM_REFRESH), each a RevenueCat REST read:
       keyed by user, cap = max_premium_refreshes_per_minute
     - Every other authenticated request, reads and writes alike: keyed by
@@ -207,6 +219,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 )
                 if not allowed:
                     return _too_many("Rate limit exceeded. Try again later.", "60")
+            elif (request.method, path) == WAITLIST_CLAIM:
+                allowed = await store.hit(
+                    f"waitlist-claim:{caller}",
+                    window=3600.0,
+                    limit=settings.max_waitlist_claims_per_hour,
+                )
+                if not allowed:
+                    return _too_many("Rate limit exceeded. Try again later.", "600")
             elif (request.method, path) == PREMIUM_REFRESH:
                 allowed = await store.hit(
                     f"premium-refresh:{caller}",

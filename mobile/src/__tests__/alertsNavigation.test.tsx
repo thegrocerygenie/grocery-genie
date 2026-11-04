@@ -30,6 +30,9 @@ jest.mock('@/features/budget/hooks/useBudget', () => ({
 jest.mock('@/features/budget/hooks/useCategories', () => ({
   useCategories: () => ({ data: [] }),
 }));
+jest.mock('@/features/premium/hooks/useWaitlistOffer', () => ({
+  useWaitlistOffer: () => ({ data: undefined }),
+}));
 jest.mock('@/features/price-intelligence/hooks/useItems', () => ({
   usePriceAlertSettings: () => ({ data: undefined }),
   useUpdatePriceAlertSettings: () => ({ mutate: jest.fn(), isPending: false }),

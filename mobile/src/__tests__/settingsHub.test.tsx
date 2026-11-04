@@ -8,6 +8,7 @@ import { Stack, router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 
 import SettingsScreen from '../../app/settings/index';
+import { spacing } from '@/constants/theme';
 import type { BudgetResponse } from '@/features/budget/types';
 import type { UserProfile } from '@/features/auth/types';
 
@@ -39,6 +40,17 @@ jest.mock('@/features/auth/hooks/useAuth', () => ({
 jest.mock('@/features/budget/hooks/useBudget', () => ({
   useBudgets: () => ({ data: mockBudgets }),
 }));
+let mockClaimAvailable = false;
+jest.mock('@/features/premium/hooks/useWaitlistOffer', () => ({
+  useWaitlistOffer: () => ({
+    data: {
+      window_open: true,
+      claim_available: mockClaimAvailable,
+      closes_at: '2027-04-01T00:00:00Z',
+      redemption: null,
+    },
+  }),
+}));
 
 function budget(category_id: string | null, amount: number): BudgetResponse {
   return {
@@ -65,6 +77,7 @@ function renderSettings() {
       'settings/currency-settings': () => null,
       'settings/categories': () => null,
       'settings/stores': () => null,
+      'settings/waitlist-offer': () => null,
       paywall: () => null,
     },
     { initialUrl: '/' },
@@ -118,6 +131,42 @@ describe('Settings hub', () => {
     expect(row.props.accessibilityValue).toEqual({ text: 'Free plan · Upgrade' });
     fireEvent.press(row);
     expect(app.getPathname()).toBe('/paywall');
+  });
+
+  it('offers the waitlist claim only while the server says it is open (V11-P5)', () => {
+    mockClaimAvailable = false;
+    const first = renderSettings();
+    expect(screen.queryByLabelText('Claim your waitlist offer')).toBeNull();
+    first.unmount();
+
+    mockClaimAvailable = true;
+    const app = renderSettings();
+    const row = screen.getByLabelText('Claim your waitlist offer');
+    expect(row.props.accessibilityValue).toEqual({ text: 'A free year of Premium' });
+    fireEvent.press(row);
+    expect(app.getPathname()).toBe('/settings/waitlist-offer');
+    mockClaimAvailable = false;
+  });
+
+  it('draws a divider between the Premium row and the waitlist row (V11-P5)', () => {
+    mockClaimAvailable = false;
+    const first = renderSettings();
+    expect(screen.queryByTestId('settings-divider-premium-1')).toBeNull();
+    first.unmount();
+
+    mockClaimAvailable = true;
+    renderSettings();
+    expect(screen.getByTestId('settings-divider-premium-1')).toBeTruthy();
+    mockClaimAvailable = false;
+  });
+
+  it('pads the bottom of the list with a theme token', () => {
+    renderSettings();
+
+    const style = StyleSheet.flatten(
+      screen.getByTestId('settings-scroll').props.contentContainerStyle as ViewStyle,
+    );
+    expect(style.paddingBottom).toBe(spacing.screenBottom);
   });
 
   it('a Premium user sees Premium, from the backend profile', () => {

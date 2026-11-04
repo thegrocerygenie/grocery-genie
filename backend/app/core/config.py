@@ -1,3 +1,4 @@
+from datetime import datetime
 from functools import lru_cache
 from typing import Literal
 
@@ -64,6 +65,11 @@ class Settings(BaseSettings):
     # API, so it has a count of its own: the app calls it only after a
     # purchase or a restore.
     max_premium_refreshes_per_minute: int = 10
+    # "Claim your waitlist offer" (V11-P5) sends an email to an address the
+    # user types: per user an hour (429 past it), and per account and target
+    # email a day (past it the same 202, and nothing sent).
+    max_waitlist_claims_per_hour: int = 5
+    max_waitlist_claims_per_email_per_day: int = 3
 
     # Per-IP cap on unauthenticated /api/auth/* POSTs (sign-up, sign-in, social,
     # forgot/reset password, verify, refresh). 30/min/IP is generous enough for
@@ -107,6 +113,36 @@ class Settings(BaseSettings):
     revenuecat_api_key: str = ""
     revenuecat_api_base: str = "https://api.revenuecat.com"
     revenuecat_entitlement_id: str = "premium"
+
+    # The waitlist's free year of Premium (V11-P5, decisions #9-#13). The
+    # waitlist is the marketing site's Resend audience (its RESEND_AUDIENCE_ID);
+    # a daily task copies it into waitlist_entries while the claim window is
+    # open (needs GG_RESEND_API_KEY too). Contacts created before the cut-off
+    # (the day the site switched to the App Store; unset: everyone so far)
+    # qualify. The claim window runs waitlist_claim_window_days from
+    # premium_launched_at; unset, it is closed and nothing is granted. A match
+    # grants waitlist_free_months of the Premium entitlement through
+    # RevenueCat. The salt keys the one-way hash of each redeemed waitlist
+    # email (decision #13); set it once and never change it.
+    # The audience key reads the audience's contacts and, once the window has
+    # closed, deletes them (plan: retention, decision #11). It must be a
+    # full-access Resend key; empty uses GG_RESEND_API_KEY.
+    # A grant inside sign-in, verify-email, email change or the claim link
+    # waits at most waitlist_inline_grant_timeout_seconds for RevenueCat,
+    # then stays pending for the beat retry. The retry backs off (15 min,
+    # doubling, at most 6 h apart) and gives up (failed) only
+    # waitlist_grant_retry_days after the match: a member matched in time is
+    # owed the year (decision #9), even after the window closes.
+    resend_waitlist_audience_id: str = ""
+    resend_audience_api_key: str = ""
+    waitlist_inline_grant_timeout_seconds: float = Field(default=3.0, gt=0)
+    waitlist_grant_retry_days: int = Field(default=14, ge=1)
+    resend_api_base: str = "https://api.resend.com"
+    waitlist_cutoff: datetime | None = None
+    premium_launched_at: datetime | None = None
+    waitlist_claim_window_days: int = Field(default=90, ge=1)
+    waitlist_free_months: int = Field(default=12, ge=1)
+    waitlist_email_hash_salt: str = ""
 
     # Budget alert thresholds (BC-03: configurable at 50%, 80%, 100%).
     budget_alert_thresholds: list[int] = [50, 80, 100]
@@ -161,6 +197,7 @@ class Settings(BaseSettings):
     verify_email_path: str = "onboarding/verify-email"
     reset_password_path: str = "onboarding/reset-password"
     email_change_path: str = "onboarding/confirm-email-change"
+    waitlist_claim_path: str = "onboarding/confirm-waitlist-claim"
 
     # Apple Sign In
     apple_team_id: str = ""
@@ -202,6 +239,12 @@ class Settings(BaseSettings):
                 "GG_RESEND_API_KEY must be set in production; without it, "
                 "verification and password-reset emails are never sent. "
                 "(GG_EMAIL_DELIVERY=off turns email off on purpose.)"
+            )
+        if self.premium_launched_at is not None and not self.waitlist_email_hash_salt:
+            errors.append(
+                "GG_WAITLIST_EMAIL_HASH_SALT must be set once "
+                "GG_PREMIUM_LAUNCHED_AT is; it keys the one-way hash that keeps "
+                "each waitlist email to one free year."
             )
         return errors
 

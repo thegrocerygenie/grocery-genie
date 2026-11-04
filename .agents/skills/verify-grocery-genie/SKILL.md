@@ -20,9 +20,10 @@ G=.agents/skills/verify-grocery-genie/scripts/gg-verify
 ```bash
 $G launch              # mock LLM extractor (GG_DEBUG=true); no API key needed
 $G launch --live-llm   # real extraction; needs GG_LLM_API_KEY; GG_DEBUG=false
+$G launch --stub-revenuecat  # also: RevenueCat's REST API is a local stand-in (features/waitlist-offer.md)
 ```
 
-Launch runs `make db-up` (it starts the shared dev containers if they are down, and never stops them). It then drops and recreates the `gg_verify` database, migrates it to head, starts `uvicorn main:app` on `127.0.0.1:8011` with a random JWT secret, Redis at the dev container on `localhost:54441` DB 1 (`GG_REDIS_URL`; override with `VERIFY_REDIS_URL`), so rate limit counts stay apart from the dev API on DB 0, uploads under `.verification/state/uploads`, and empty email and push keys, so nothing leaves the machine. It waits for `/health`. `/health` never touches the database, so launch then signs up a probe user and reads `/api/users/me`. **Ready** is the `READY http://127.0.0.1:8011  evidence: <dir>` line on stderr, printed only after that probe passes.
+Launch runs `make db-up` (it starts the shared dev containers if they are down, and never stops them). It then drops and recreates the `gg_verify` database, migrates it to head, starts `uvicorn main:app` on `127.0.0.1:8011` with a random JWT secret, Redis at the dev container on `localhost:54441` DB 1 (`GG_REDIS_URL`; override with `VERIFY_REDIS_URL`), so rate limit counts stay apart from the dev API on DB 0, uploads under `.verification/state/uploads`, and empty email and push keys, so nothing leaves the machine. The waitlist's claim window is open (Premium launched a day ago) with an empty waitlist, so nothing matches unless a journey loads one; `--stub-revenuecat` adds a local RevenueCat stand-in on `VERIFY_PORT`+100 for the REST API, which otherwise has no key. It also starts a Celery worker (`--pool=solo`, no beat) on the same Redis DB, logging to `worker.log` in the evidence, for tasks the API enqueues (the waitlist claim link); `doctor` checks it and `cleanup` stops it. It waits for `/health`. `/health` never touches the database, so launch then signs up a probe user and reads `/api/users/me`. **Ready** is the `READY http://127.0.0.1:8011  evidence: <dir>` line on stderr, printed only after that probe passes.
 
 Debug mode swaps in `MockReceiptExtractor` and `MockCategoryAssigner` (`backend/app/llm/provider.py`). The LLM is an external boundary, so this is the one mock the proof allows. Debug mode also turns on a static `api_token` auth fallback, wildcard CORS, and skips the production config check. The helper authenticates with real JWTs, so the fallback is never used. Use `--live-llm` when the change touches prompts, extraction, or `production_safety_errors`.
 
@@ -51,6 +52,10 @@ $G sql "SELECT ..."               # read gg_verify (observe only; never write th
 $G revenuecat JSON [--secret V]   # POST a RevenueCat webhook body as RevenueCat does, with the
                                   # launch's random GG_REVENUECAT_WEBHOOK_SECRET (or V, to prove a
                                   # wrong one is refused); see features/premium.md
+$G waitlist import CSV | backfill | retry   # the waitlist ops commands (docs/DEPLOYMENT.md 2.10)
+                                  # against this instance; see features/waitlist-offer.md
+$G rcstub fail | ok | grants      # with --stub-revenuecat: refuse grants (503), accept them, or
+                                  # print the grants the stand-in received
 ```
 
 All routes sit under `/api/` except `/health`. Pipe bodies through `jq`, for example `rid=$($G scan | jq -r .receipt_id)`. Use a fresh `signup` per journey so the users never share state.

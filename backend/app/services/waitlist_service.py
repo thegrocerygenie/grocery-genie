@@ -1,0 +1,587 @@
+"""The waitlist's free year of Premium (V11-P5).
+
+The marketing site promised waitlist sign-ups "a free year of Premium" when
+it launches (decision #2). The rules (decisions #7, #9-#13, plan D5):
+
+- **Who:** an account whose verified email, trimmed and lowercased, equals a
+  waitlist contact's (``waitlist_entries``, copied from the Resend audience),
+  for a contact created before ``settings.waitlist_cutoff``. Unsubscribed
+  contacts count (#10).
+- **When:** only inside the claim window, ``waitlist_claim_window_days`` from
+  ``settings.premium_launched_at`` (#9). Matching runs on an Apple or Google
+  sign-in, on ``verify-email``, on a confirmed email change, once over every
+  account at launch (``match_all``), and through the Settings claim step for
+  an account whose email is not the waitlist one (Hide My Email).
+- **What:** a RevenueCat promotional grant of the Premium entitlement for
+  ``waitlist_free_months`` from the match (#9, #12). RevenueCat stays the
+  only source of Premium (D1): the grant goes to RevenueCat's REST API, then
+  ``PremiumService.refresh`` reads it back.
+- **Once:** one free year per waitlist email, ever, and one per account. A
+  ``waitlist_redemptions`` row holds a salted hash of the waitlist email (its
+  unique key) and the account; it is written, and committed, before the
+  grant, so a RevenueCat failure leaves it pending for ``retry_pending``.
+  Account deletion keeps the hash unlinked until the window closes (#13).
+- **Never slow, never final by accident:** inside a request (sign-in,
+  verify-email, email change, the claim link) a grant waits at most
+  ``waitlist_inline_grant_timeout_seconds`` for RevenueCat, then stays
+  pending for the beat retry. The window is checked at the match only: a
+  member matched in time is owed the year (#9), so retries go on after the
+  window closes, backing off from 15 minutes to 6 hours, for
+  ``waitlist_grant_retry_days`` from the match. The grant always ends 12
+  months from the match. It stops for good (``failed``, the reason in
+  ``last_error``, logged at error level) on a RevenueCat 4xx, when the 14
+  days run out, or if that end time has already passed.
+- **The claim step can't look up the waitlist:** the route checks only the
+  account's own state and enqueues ``send_claim_link`` for any email; the
+  worker does the lookup and the send.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import calendar
+import hashlib
+import hmac
+import logging
+import time
+import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from typing import Protocol
+
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core import clock
+from app.core.config import get_settings
+from app.core.security import generate_email_token, hash_email_token
+from app.models.database import User, WaitlistEntry, WaitlistRedemption
+from app.services import email as email_service
+from app.services.premium_service import PremiumService
+from app.services.revenuecat_client import (
+    RevenueCatClient,
+    RevenueCatRejectedError,
+    RevenueCatUnavailableError,
+)
+
+logger = logging.getLogger(__name__)
+
+PENDING = "pending"
+GRANTED = "granted"
+# RevenueCat refused for good, too many attempts, or the window closed first;
+# last_error says which. Never retried; it still holds the email (#12).
+FAILED = "failed"
+
+SOURCE_SOCIAL_SIGN_IN = "social_sign_in"
+SOURCE_VERIFY_EMAIL = "verify_email"
+SOURCE_EMAIL_CHANGE = "email_change"
+SOURCE_BACKFILL = "backfill"
+SOURCE_CLAIM = "claim"
+
+# A claim link is sent to the waitlist inbox, which the user may not have on
+# the phone: a day to tap it.
+CLAIM_TOKEN_TTL = timedelta(hours=24)
+# The beat retry's backoff: 15 minutes after the first attempt, doubling,
+# at most 6 hours apart. The first delay also keeps the retry from racing
+# the request that just tried.
+RETRY_FIRST = timedelta(minutes=15)
+RETRY_MAX = timedelta(hours=6)
+
+
+def retry_delay(attempts: int) -> timedelta:
+    """How long after its last attempt a pending grant is retried."""
+    return min(RETRY_FIRST * 2 ** min(max(attempts - 1, 0), 10), RETRY_MAX)
+
+
+class Analytics(Protocol):
+    def emit(self, event_name: str, properties: dict, user_id: uuid.UUID) -> None: ...
+
+
+# -- pure helpers --------------------------------------------------------------
+
+
+def normalize_email(email: str) -> str:
+    """Trimmed and lowercased, as the site stores waitlist emails."""
+    return email.strip().lower()
+
+
+def hash_waitlist_email(email: str, salt: str | None = None) -> str:
+    """A salted, one-way hash of a waitlist email (decision #13): HMAC-SHA256
+    keyed with ``settings.waitlist_email_hash_salt``."""
+    key = get_settings().waitlist_email_hash_salt if salt is None else salt
+    return hmac.new(
+        key.encode(), normalize_email(email).encode(), hashlib.sha256
+    ).hexdigest()
+
+
+def add_months(value: datetime, months: int) -> datetime:
+    """``value`` plus ``months`` calendar months; a day the target month lacks
+    (29 February next year) becomes its last day."""
+    index = value.month - 1 + months
+    year, month = value.year + index // 12, index % 12 + 1
+    day = min(value.day, calendar.monthrange(year, month)[1])
+    return value.replace(year=year, month=month, day=day)
+
+
+def _utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
+@dataclass(frozen=True)
+class ClaimWindow:
+    opens_at: datetime
+    closes_at: datetime
+
+    def is_open(self, now: datetime) -> bool:
+        return self.opens_at <= now < self.closes_at
+
+
+def claim_window() -> ClaimWindow | None:
+    """The claim window, or None while Premium has no launch date set."""
+    settings = get_settings()
+    launched = _utc(settings.premium_launched_at)
+    if launched is None:
+        return None
+    return ClaimWindow(
+        launched, launched + timedelta(days=settings.waitlist_claim_window_days)
+    )
+
+
+def window_is_open(now: datetime | None = None) -> bool:
+    window = claim_window()
+    return window is not None and window.is_open(now or clock.now())
+
+
+def window_has_closed(now: datetime | None = None) -> bool:
+    window = claim_window()
+    return window is not None and (now or clock.now()) >= window.closes_at
+
+
+# -- errors --------------------------------------------------------------------
+
+
+class WaitlistError(Exception):
+    code = "waitlist_error"
+    status = 400
+
+
+class OfferClosedError(WaitlistError):
+    code = "waitlist_offer_closed"
+    status = 409
+
+
+class AlreadyRedeemedError(WaitlistError):
+    code = "waitlist_offer_redeemed"
+    status = 409
+
+
+class NotEligibleError(WaitlistError):
+    code = "waitlist_not_eligible"
+    status = 409
+
+
+class InvalidClaimTokenError(WaitlistError):
+    code = "invalid_token"
+    status = 400
+
+
+class InvalidEmailError(WaitlistError):
+    code = "invalid_email"
+    status = 422
+
+
+@dataclass(frozen=True)
+class OfferStatus:
+    window_open: bool
+    closes_at: datetime | None
+    redemption: WaitlistRedemption | None
+
+    @property
+    def claim_available(self) -> bool:
+        return self.window_open and self.redemption is None
+
+
+# -- the service ---------------------------------------------------------------
+
+
+class WaitlistService:
+    def __init__(
+        self,
+        db: AsyncSession,
+        analytics: Analytics | None = None,
+        revenuecat: RevenueCatClient | None = None,
+    ) -> None:
+        self.db = db
+        self.analytics = analytics
+        self.revenuecat = revenuecat
+
+    # -- lookups ---------------------------------------------------------------
+
+    async def redemption_for(self, user_id: uuid.UUID) -> WaitlistRedemption | None:
+        return (
+            await self.db.execute(
+                select(WaitlistRedemption).where(WaitlistRedemption.user_id == user_id)
+            )
+        ).scalar_one_or_none()
+
+    async def has_redemption(self, user_id: uuid.UUID) -> bool:
+        return await self.redemption_for(user_id) is not None
+
+    def _qualifying(self):
+        """Waitlist entries that qualify: created before the cut-off."""
+        query = select(WaitlistEntry)
+        cutoff = _utc(get_settings().waitlist_cutoff)
+        if cutoff is not None:
+            query = query.where(WaitlistEntry.contact_created_at < cutoff)
+        return query
+
+    async def _qualifying_entry(self, email: str) -> WaitlistEntry | None:
+        return (
+            await self.db.execute(
+                self._qualifying().where(WaitlistEntry.email == normalize_email(email))
+            )
+        ).scalar_one_or_none()
+
+    async def _email_redeemed(self, email_hash: str) -> bool:
+        found = await self.db.execute(
+            select(WaitlistRedemption.id).where(
+                WaitlistRedemption.email_hash == email_hash
+            )
+        )
+        return found.first() is not None
+
+    async def status(self, user: User) -> OfferStatus:
+        window = claim_window()
+        return OfferStatus(
+            window_open=window is not None and window.is_open(clock.now()),
+            closes_at=window.closes_at if window else None,
+            redemption=await self.redemption_for(user.id),
+        )
+
+    # -- matching ----------------------------------------------------------------
+
+    async def match_account(
+        self, user: User, *, source: str, inline: bool = True
+    ) -> WaitlistRedemption | None:
+        """Match ``user``'s own email, if verified; None when it does not
+        qualify. Never raises for an account that does not match, so it can
+        run inside sign-in, verify-email and email change; ``inline`` caps
+        the wait on RevenueCat there."""
+        if user.email_verified_at is None or not window_is_open():
+            return None
+        try:
+            return await self.redeem(user, user.email, source=source, inline=inline)
+        except WaitlistError:
+            return None
+
+    async def redeem(
+        self, user: User, waitlist_email: str, *, source: str, inline: bool = True
+    ) -> WaitlistRedemption:
+        """Record ``user``'s free year for ``waitlist_email`` and grant it.
+
+        The caller has proved ``user`` holds ``waitlist_email`` (a verified
+        account email, or a tapped claim link). Commits the pending
+        redemption before calling RevenueCat, so a failed grant is retried.
+        ``inline``: a request is waiting, so RevenueCat gets
+        ``waitlist_inline_grant_timeout_seconds`` before the grant is left
+        pending for the retry.
+        """
+        now = clock.now()
+        if not window_is_open(now):
+            raise OfferClosedError("the waitlist offer is closed")
+        if await self.has_redemption(user.id):
+            raise AlreadyRedeemedError("this account already has its free year")
+        if await self._qualifying_entry(waitlist_email) is None:
+            raise NotEligibleError("that email is not on the waitlist")
+        email_hash = hash_waitlist_email(waitlist_email)
+        if await self._email_redeemed(email_hash):
+            raise AlreadyRedeemedError("that waitlist email already has its free year")
+
+        insert = (
+            pg_insert if self.db.bind.dialect.name == "postgresql" else (sqlite_insert)
+        )
+        redemption_id = (
+            await self.db.execute(
+                insert(WaitlistRedemption)
+                .values(
+                    id=uuid.uuid4(),
+                    email_hash=email_hash,
+                    user_id=user.id,
+                    status=PENDING,
+                    source=source,
+                    matched_at=now,
+                    grant_expires_at=add_months(
+                        now, get_settings().waitlist_free_months
+                    ),
+                    attempts=0,
+                    # Stamped now, so the beat retry leaves it to this
+                    # request's grant instead of calling RevenueCat twice.
+                    last_attempt_at=now,
+                )
+                # Either unique key: the email or the account, redeemed by a
+                # request running at the same time.
+                .on_conflict_do_nothing()
+                .returning(WaitlistRedemption.id)
+            )
+        ).scalar_one_or_none()
+        if redemption_id is None:
+            raise AlreadyRedeemedError("already redeemed")
+        redemption = await self.db.get(WaitlistRedemption, redemption_id)
+        assert redemption is not None
+        self._emit("waitlist_offer_matched", {"source": source}, user.id)
+        logger.info("waitlist offer matched user=%s source=%s", user.id, source)
+        await self.db.commit()
+        timeout = get_settings().waitlist_inline_grant_timeout_seconds
+        await self._grant(redemption, timeout=timeout if inline else None)
+        return redemption
+
+    async def match_all(self) -> int:
+        """Match every verified account on the waitlist that has no free year
+        yet (the launch backfill; rerun daily as the waitlist copy updates).
+        Each account commits on its own. Returns how many matched."""
+        if not window_is_open():
+            return 0
+        qualifying = self._qualifying().with_only_columns(WaitlistEntry.email)
+        redeemed = select(WaitlistRedemption.user_id).where(
+            WaitlistRedemption.user_id.is_not(None)
+        )
+        user_ids = (
+            (
+                await self.db.execute(
+                    select(User.id)
+                    .where(
+                        User.email_verified_at.is_not(None),
+                        func.lower(func.trim(User.email)).in_(qualifying),
+                        User.id.not_in(redeemed),
+                    )
+                    .order_by(User.created_at)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        matched = 0
+        for user_id in user_ids:
+            user = await self.db.get(User, user_id)
+            if user is None:
+                continue
+            try:
+                if await self.match_account(user, source=SOURCE_BACKFILL, inline=False):
+                    matched += 1
+            except Exception:
+                await self.db.rollback()
+                logger.exception("waitlist backfill failed for user %s", user_id)
+        return matched
+
+    # -- the grant -------------------------------------------------------------
+
+    async def _grant(
+        self, redemption: WaitlistRedemption, *, timeout: float | None = None
+    ) -> bool:
+        """Ask RevenueCat for the promotional grant; True when it took.
+
+        ``timeout`` (seconds) bounds the grant and the read-back together,
+        for a request that is waiting: past it the grant stays pending (the
+        beat retry sends the same end date, which RevenueCat treats as a
+        duplicate if the first call did land), and a slow read-back is left
+        to the webhook.
+        """
+        now = clock.now()
+        user_id = redemption.user_id
+        expires = _utc(redemption.grant_expires_at)
+        if user_id is None or expires is None:
+            redemption.last_error = "account_deleted"
+            await self.db.flush()
+            return False
+        # No window check here: the match was made inside it (decision #9).
+        if expires <= now:
+            return await self._fail(redemption, "grant_end_passed")
+        days = get_settings().waitlist_grant_retry_days
+        matched = _utc(redemption.matched_at)
+        if matched is not None and now - matched >= timedelta(days=days):
+            return await self._fail(redemption, f"gave_up_after_{days}_days")
+        redemption.attempts = (redemption.attempts or 0) + 1
+        redemption.last_attempt_at = now
+        if self.revenuecat is None:
+            redemption.last_error = "revenuecat_not_configured"
+            await self.db.flush()
+            logger.warning("waitlist grant pending: RevenueCat API key not set")
+            return False
+        deadline = None if timeout is None else time.monotonic() + timeout
+        try:
+            await asyncio.wait_for(
+                self.revenuecat.grant_promotional(str(user_id), expires), timeout
+            )
+        except TimeoutError:
+            redemption.last_error = "revenuecat_timeout"
+            await self.db.flush()
+            logger.warning("waitlist grant pending (RevenueCat slow) for %s", user_id)
+            return False
+        except RevenueCatRejectedError as e:
+            return await self._fail(redemption, f"revenuecat_rejected_{e.status_code}")
+        except RevenueCatUnavailableError:
+            redemption.last_error = "revenuecat_unavailable"
+            await self.db.flush()
+            logger.warning("waitlist grant pending for user %s", user_id)
+            return False
+        redemption.status = GRANTED
+        redemption.granted_at = now
+        redemption.last_error = None
+        await self.db.flush()
+        self._emit(
+            "waitlist_offer_granted",
+            {"source": redemption.source, "attempts": redemption.attempts},
+            user_id,
+        )
+        user = await self.db.get(User, user_id)
+        if user is not None:
+            left = None if deadline is None else max(deadline - time.monotonic(), 0.01)
+            try:
+                await asyncio.wait_for(
+                    PremiumService(self.db, self.analytics, self.revenuecat).refresh(
+                        user
+                    ),
+                    left,
+                )
+            except (RevenueCatUnavailableError, TimeoutError):
+                # Granted at RevenueCat; its webhook (or the app's refresh)
+                # brings the entitlement here.
+                logger.info("premium refresh after waitlist grant failed")
+        return True
+
+    async def _fail(self, redemption: WaitlistRedemption, reason: str) -> bool:
+        """Stop retrying this grant for good, with the reason."""
+        redemption.status = FAILED
+        redemption.last_error = reason
+        await self.db.flush()
+        # Error level: ops alerting must see a member who won't get the year.
+        logger.error(
+            "waitlist grant failed for good for user %s: %s",
+            redemption.user_id,
+            reason,
+        )
+        return False
+
+    async def retry_pending(self, older_than: timedelta | None = None) -> int:
+        """Retry the pending grants that are due: ``retry_delay`` after their
+        last attempt, or ``older_than`` when given (the ops command). Each row
+        is locked (skipping one another worker holds) and committed on its
+        own. Returns how many were granted."""
+        now = clock.now()
+        rows = (
+            await self.db.execute(
+                select(
+                    WaitlistRedemption.id,
+                    WaitlistRedemption.attempts,
+                    WaitlistRedemption.last_attempt_at,
+                )
+                .where(
+                    WaitlistRedemption.status == PENDING,
+                    WaitlistRedemption.user_id.is_not(None),
+                )
+                .order_by(WaitlistRedemption.created_at)
+            )
+        ).all()
+        due = [
+            row.id
+            for row in rows
+            if row.last_attempt_at is None
+            or _utc(row.last_attempt_at)
+            + (retry_delay(row.attempts or 0) if older_than is None else older_than)
+            <= now
+        ]
+        granted = 0
+        for redemption_id in due:
+            redemption = (
+                await self.db.execute(
+                    select(WaitlistRedemption)
+                    .where(
+                        WaitlistRedemption.id == redemption_id,
+                        WaitlistRedemption.status == PENDING,
+                    )
+                    .with_for_update(skip_locked=True)
+                    .execution_options(populate_existing=True)
+                )
+            ).scalar_one_or_none()
+            if redemption is None:
+                continue
+            if await self._grant(redemption):
+                granted += 1
+            await self.db.commit()
+        return granted
+
+    # -- the claim step ----------------------------------------------------------
+
+    async def check_claim(self, user: User, waitlist_email: str) -> str:
+        """The request half of "Claim your waitlist offer": checks only what
+        the account itself can know (a plausible email, the window, its own
+        free year) and returns the normalized email for ``send_claim_link``.
+        It never looks at the waitlist, so neither the answer nor its timing
+        says whether the email is on it."""
+        email = normalize_email(waitlist_email)
+        if "@" not in email or len(email) > 255:
+            raise InvalidEmailError("enter the email you joined the waitlist with")
+        if not window_is_open():
+            raise OfferClosedError("the waitlist offer is closed")
+        if await self.has_redemption(user.id):
+            raise AlreadyRedeemedError("this account already has its free year")
+        self._emit("waitlist_claim_requested", {}, user.id)
+        return email
+
+    async def send_claim_link(self, user_id: uuid.UUID, waitlist_email: str) -> bool:
+        """The worker half (Celery): send a confirmation link to
+        ``waitlist_email`` (the email-change pattern) when it is a
+        qualifying, unredeemed waitlist email and the account can still
+        claim. True when a link was sent. Commits the token before sending;
+        a failed send is logged (never the email) and not raised."""
+        email = normalize_email(waitlist_email)
+        user = await self.db.get(User, user_id)
+        if user is None or not window_is_open() or await self.has_redemption(user_id):
+            return False
+        if await self._qualifying_entry(email) is None or await self._email_redeemed(
+            hash_waitlist_email(email)
+        ):
+            logger.info("waitlist claim for an email that does not qualify")
+            return False
+        raw_token = generate_email_token()
+        user.waitlist_claim_email = email
+        user.waitlist_claim_token_hash = hash_email_token(raw_token)
+        user.waitlist_claim_expires_at = clock.now() + CLAIM_TOKEN_TTL
+        await self.db.commit()
+        try:
+            await email_service.send_waitlist_claim_email(to=email, token=raw_token)
+        except Exception as e:  # noqa: BLE001 - a failed send is only logged
+            logger.warning("waitlist claim email not sent: %s", type(e).__name__)
+            return False
+        return True
+
+    async def confirm_claim(self, token: str) -> tuple[User, WaitlistRedemption]:
+        """The user tapped the link sent to their waitlist email: redeem it."""
+        user = (
+            await self.db.execute(
+                select(User).where(
+                    User.waitlist_claim_token_hash == hash_email_token(token)
+                )
+            )
+        ).scalar_one_or_none()
+        if user is None or user.waitlist_claim_email is None:
+            raise InvalidClaimTokenError("invalid or expired claim link")
+        expires = _utc(user.waitlist_claim_expires_at)
+        if expires is not None and expires < clock.now():
+            raise InvalidClaimTokenError("claim link expired")
+        email = user.waitlist_claim_email
+        user.waitlist_claim_email = None
+        user.waitlist_claim_token_hash = None
+        user.waitlist_claim_expires_at = None
+        redemption = await self.redeem(user, email, source=SOURCE_CLAIM)
+        return user, redemption
+
+    # -- shared ----------------------------------------------------------------
+
+    def _emit(self, name: str, props: dict, user_id: uuid.UUID) -> None:
+        if self.analytics is not None:
+            self.analytics.emit(name, props, user_id)

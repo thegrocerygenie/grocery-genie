@@ -24,8 +24,15 @@ from app.models.schemas import (
     VerifyEmailRequest,
 )
 from app.services import auth as auth_service
+from app.services.analytics_service import AnalyticsService, get_analytics_service
 from app.services.apple_auth import verify_apple_sign_in
 from app.services.google_auth import verify_google_id_token
+from app.services.revenuecat_client import RevenueCatClient, get_revenuecat_client
+from app.services.waitlist_service import (
+    SOURCE_SOCIAL_SIGN_IN,
+    SOURCE_VERIFY_EMAIL,
+    WaitlistService,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 bearer = HTTPBearer(auto_error=False)
@@ -145,12 +152,19 @@ async def refresh(
 async def verify_email(
     body: VerifyEmailRequest,
     db: AsyncSession = Depends(get_db, scope="function"),
+    analytics: AnalyticsService = Depends(get_analytics_service),
+    revenuecat: RevenueCatClient | None = Depends(get_revenuecat_client),
 ) -> dict:
     try:
         user = await auth_service.verify_email(db, token=body.token)
     except auth_service.AuthError as e:
         _raise_auth(e)
-    return {"verified_at": user.email_verified_at}
+    verified_at = user.email_verified_at
+    # The waitlist's free year (V11-P5): the email is verified now.
+    await WaitlistService(db, analytics, revenuecat).match_account(
+        user, source=SOURCE_VERIFY_EMAIL
+    )
+    return {"verified_at": verified_at}
 
 
 @router.post("/resend-verification", status_code=202)
@@ -189,6 +203,8 @@ async def reset_password(
 async def apple_sign_in(
     body: AppleSignInRequest,
     db: AsyncSession = Depends(get_db, scope="function"),
+    analytics: AnalyticsService = Depends(get_analytics_service),
+    revenuecat: RevenueCatClient | None = Depends(get_revenuecat_client),
 ) -> TokenPairResponse:
     try:
         identity = await verify_apple_sign_in(
@@ -207,6 +223,10 @@ async def apple_sign_in(
         currency_preference=body.currency_preference,
         timezone=body.timezone,
     )
+    # The waitlist's free year (V11-P5): the provider verified the email.
+    await WaitlistService(db, analytics, revenuecat).match_account(
+        user, source=SOURCE_SOCIAL_SIGN_IN
+    )
     pair = auth_service.issue_tokens(user.id)
     needs = await auth_service.user_needs_onboarding(db, user.id)
     return _to_pair(pair, needs_onboarding=needs)
@@ -216,6 +236,8 @@ async def apple_sign_in(
 async def google_sign_in(
     body: GoogleSignInRequest,
     db: AsyncSession = Depends(get_db, scope="function"),
+    analytics: AnalyticsService = Depends(get_analytics_service),
+    revenuecat: RevenueCatClient | None = Depends(get_revenuecat_client),
 ) -> TokenPairResponse:
     try:
         identity = await verify_google_id_token(body.id_token)
@@ -230,6 +252,10 @@ async def google_sign_in(
         name=identity.name,
         currency_preference=body.currency_preference,
         timezone=body.timezone,
+    )
+    # The waitlist's free year (V11-P5): the provider verified the email.
+    await WaitlistService(db, analytics, revenuecat).match_account(
+        user, source=SOURCE_SOCIAL_SIGN_IN
     )
     pair = auth_service.issue_tokens(user.id)
     needs = await auth_service.user_needs_onboarding(db, user.id)

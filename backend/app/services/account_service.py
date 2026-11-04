@@ -6,6 +6,9 @@ the rows, so the next run deletes them; a run for a user who is already gone
 deletes nothing.
 
 Kept: stores (shared across users, no user link) and the default categories.
+A waitlist free-year redemption (V11-P5) keeps only its salted hash of the
+waitlist email and its status, with no link to the account, until the claim
+window closes (decision #13), so a new account can't take a second free year.
 """
 
 from __future__ import annotations
@@ -13,7 +16,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.image.storage import (
@@ -45,6 +48,7 @@ from app.models.database import (
     User,
     UserItemMapping,
     UserStoreAlias,
+    WaitlistRedemption,
 )
 from app.services.apple_auth import AppleAccountMismatch, revoke_apple_grant
 
@@ -144,6 +148,20 @@ async def delete_account(
         delete(AuthEvent).where(AuthEvent.user_id == user_id),
         delete(AnalyticsEvent).where(AnalyticsEvent.user_id == user_id),
         delete(RevenueCatEvent).where(RevenueCatEvent.user_id == user_id),
+        # Decision #13: only the hash and status stay, unlinked.
+        update(WaitlistRedemption)
+        .where(WaitlistRedemption.user_id == user_id)
+        .values(
+            user_id=None,
+            source=None,
+            matched_at=None,
+            grant_expires_at=None,
+            granted_at=None,
+            last_attempt_at=None,
+            last_error=None,
+            attempts=None,
+            created_at=None,
+        ),
     ]
     if email is not None:
         # Failed sign-ins for an unknown email log it with no user_id.

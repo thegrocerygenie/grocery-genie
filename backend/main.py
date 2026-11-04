@@ -15,6 +15,7 @@ from app.api.routes import (
     notifications,
     receipts,
     stores,
+    waitlist,
     webhooks,
 )
 from app.api.routes import (
@@ -89,6 +90,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(auth_routes.router)
 app.include_router(users_routes.router)
+app.include_router(waitlist.router)
 app.include_router(receipts.router)
 app.include_router(budgets.router)
 app.include_router(dashboard.router)
