@@ -519,14 +519,19 @@ Set `EXPO_TOKEN` in GitHub repository secrets (generate at expo.dev → Account 
 
 ### 2.9 Premium through RevenueCat (V1.1)
 
-Premium is $5.99/month (`docs/prd/00-overview.md`), sold as an App Store
-auto-renewing subscription through RevenueCat. The app buys and restores with
+Premium is $4.99/month or $39.99/year, each with a 7-day free trial
+(`docs/prd/00-overview.md`, decision D7, replacing $5.99), sold as an App Store
+auto-renewing subscription through RevenueCat. **Changing in DA-1:** until it
+ships the paywall sells only the monthly package; DA-1 adds the yearly product
+and the trial to these steps (PRD PREM-01 AC 7). The app buys and restores with
 `react-native-purchases`; the backend never believes the app about Premium.
 It stores the entitlement from RevenueCat's webhook, and reads RevenueCat's
 REST API after a purchase or restore (`POST /api/users/me/premium/refresh`).
 
 1. **App Store Connect:** create an auto-renewable subscription (for example
-   `gg_premium_monthly`, $5.99/month) in a subscription group, and an
+   `gg_premium_monthly`, $4.99/month; from DA-1 also `gg_premium_yearly`,
+   $39.99/year, and a 7-day free introductory offer on both) in one
+   subscription group, and an
    In-App Purchase key (Users and Access → Integrations → In-App Purchase).
 2. **RevenueCat:** create a project with an Apple App Store app for the bundle
    ID `com.grocerygenie.app`, upload the In-App Purchase key, import the

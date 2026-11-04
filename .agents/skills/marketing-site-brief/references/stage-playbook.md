@@ -33,7 +33,7 @@ Every stage is cumulative. The "Layers on the page" column lists every section t
 - **Contrast:** "Flyers show list prices. We track what you actually paid."
 - **Persona:** add the comparison shopper (Linda) next to Sarah.
 - **Section order:** Prices (new) → Budget → Scan and review.
-- **Price:** the first pricing section. Check the tiers and prices in the build; the PRD says Premium is $5.99 a month, with limited free price history (`OPEN_QUESTIONS.md` #3). Show free next to Premium; anchor on what the free tier keeps.
+- **Price:** the first pricing section. Check the tiers and prices in the build; the PRD says Premium is $4.99 a month or $39.99 a year with a 7-day free trial (V1.1 decision D7, replacing $5.99), and that price history, matching and alerts are free while store comparison and alert mutes are Premium (D8, changing in DA-1; `OPEN_QUESTIONS.md` #3, `docs/marketing/decisions.md` #18–#20). Show free next to Premium; anchor on what the free tier keeps.
 - **Promises to honour:** the free year of Premium for waitlist sign-ups (see `decisions.md`). The match is automatic, by email (`decisions.md` #7, to-do list in `docs/launch-open-items.md` §6). Check that it's built and working before the site talks about the offer as available.
 - **Growth loops:** a price-change alert you can share, but only if the app has a share action.
 - **New objection:** "Is my price data shared?" Answer it from `privacy.ts` as it stands at V1.1.
