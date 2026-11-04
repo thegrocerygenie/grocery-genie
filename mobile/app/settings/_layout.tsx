@@ -11,11 +11,13 @@ export default function SettingsLayout() {
     <Stack>
       <Stack.Screen name="index" options={{ title: 'Settings' }} />
       <Stack.Screen name="notification-settings" options={{ title: 'Alerts' }} />
+      <Stack.Screen name="categories" options={{ title: 'Categories' }} />
       <Stack.Screen name="language-settings" options={{ title: 'Receipt Languages' }} />
       <Stack.Screen name="about" options={{ title: 'About' }} />
       <Stack.Screen name="help" options={{ title: 'Help & feedback' }} />
       <Stack.Screen name="privacy" options={{ title: 'Privacy' }} />
       <Stack.Screen name="delete-account" options={{ title: 'Delete account' }} />
+      <Stack.Screen name="export-data" options={{ title: 'Export data' }} />
     </Stack>
   );
 }

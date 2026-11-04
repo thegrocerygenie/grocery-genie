@@ -39,6 +39,13 @@
 (*           transaction. Both writes stay invisible to others until       *)
 (*           commit, so they are one step here. A second inserter of the   *)
 (*           same key waits for the first transaction to end.              *)
+(*           Rollover (V11-P3): with a rollover run (Rollover), the limit  *)
+(*           is Budget plus last period's unspent amount (rollover_carries *)
+(*           in _period_breaches, read under the same lock), so a receipt  *)
+(*           dated last period (PriorReceipts) shrinks this period's       *)
+(*           limit. check_thresholds then checks the current period for    *)
+(*           it too (PriorChecksCurrent: the earliest_past branch); without *)
+(*           a run it returns before the lock and claims nothing.          *)
 (*   Commit  core/dependencies.py get_db: await session.commit()           *)
 (*   Abort   core/dependencies.py get_db: await session.rollback(); the    *)
 (*           user can confirm again                                        *)
@@ -46,11 +53,14 @@
 EXTENDS Naturals, FiniteSets
 
 CONSTANTS
-    Receipts,       \* pending receipts, each adds 1 unit of spend
+    Receipts,       \* pending receipts dated this period, each adds 1 unit of spend
+    PriorReceipts,  \* pending receipts dated last period (late scans), 1 unit each
     Budget,         \* budget amount in the same units
     Thresholds,     \* active thresholds in percent, claimed in ascending order
     UniqueLedger,   \* TRUE = code: unique key + ON CONFLICT DO NOTHING
     BudgetRowLock,  \* TRUE = code: check_thresholds locks the budget rows before Read (H1 fix)
+    Rollover,       \* TRUE = a Premium rollover run carries last period into this one
+    PriorChecksCurrent, \* TRUE = code: a last-period receipt checks this period under a run
     MaxAborts       \* how many request rollbacks the model may inject
 
 VARIABLES
@@ -70,26 +80,41 @@ NoOne == "NoOne"
 
 Min(S) == CHOOSE x \in S : \A y \in S : x <= y
 
-Breached(spend) == {t \in Thresholds : spend * 100 >= t * Budget}
+AllReceipts == Receipts \cup PriorReceipts
+
+\* This period's limit: Budget, plus last period's unspent under a rollover run
+\* (overspend carries nothing).
+Limit(prior) ==
+    IF Rollover THEN Budget + (IF prior < Budget THEN Budget - prior ELSE 0) ELSE Budget
+
+\* Thresholds reached by ``spend`` this period, with ``prior`` spent last period.
+Breached(spend, prior) == {t \in Thresholds : spend * 100 >= t * Limit(prior)}
+
+\* Spend this period and last period in a set of receipts.
+Cur(S) == Cardinality(S \cap Receipts)
+Prior(S) == Cardinality(S \cap PriorReceipts)
+
+\* Whether check_thresholds checks this period for receipt r.
+Checks(r) == r \in Receipts \/ (Rollover /\ PriorChecksCurrent)
 
 TypeOK ==
-    /\ confirmed \subseteq Receipts
+    /\ confirmed \subseteq AllReceipts
     /\ ledger \subseteq Thresholds
     /\ alerts \in [Thresholds -> Nat]
-    /\ pc \in [Receipts -> {"idle", "flushed", "claiming", "done"}]
-    /\ todo \in [Receipts -> SUBSET Thresholds]
-    /\ claimed \in [Receipts -> SUBSET Thresholds]
-    /\ newAlerts \in [Receipts -> SUBSET Thresholds]
-    /\ lockHolder \in Receipts \cup {NoOne}
+    /\ pc \in [AllReceipts -> {"idle", "flushed", "claiming", "done"}]
+    /\ todo \in [AllReceipts -> SUBSET Thresholds]
+    /\ claimed \in [AllReceipts -> SUBSET Thresholds]
+    /\ newAlerts \in [AllReceipts -> SUBSET Thresholds]
+    /\ lockHolder \in AllReceipts \cup {NoOne}
 
 Init ==
     /\ confirmed = {}
     /\ ledger = {}
     /\ alerts = [t \in Thresholds |-> 0]
-    /\ pc = [r \in Receipts |-> "idle"]
-    /\ todo = [r \in Receipts |-> {}]
-    /\ claimed = [r \in Receipts |-> {}]
-    /\ newAlerts = [r \in Receipts |-> {}]
+    /\ pc = [r \in AllReceipts |-> "idle"]
+    /\ todo = [r \in AllReceipts |-> {}]
+    /\ claimed = [r \in AllReceipts |-> {}]
+    /\ newAlerts = [r \in AllReceipts |-> {}]
     /\ lockHolder = NoOne
     /\ aborts = 0
 
@@ -100,11 +125,17 @@ Flush(r) ==
     /\ UNCHANGED <<confirmed, ledger, alerts, todo, claimed, newAlerts, lockHolder, aborts>>
 
 \* check_thresholds reads spend in one statement: committed confirmed receipts plus its own.
+\* Under a rollover run the carry's read of last period's spend is under the same lock.
+\* A receipt it does not check this period for returns before the lock, claiming nothing.
 Read(r) ==
     /\ pc[r] = "flushed"
-    /\ BudgetRowLock => lockHolder = NoOne
-    /\ lockHolder' = IF BudgetRowLock THEN r ELSE lockHolder
-    /\ todo' = [todo EXCEPT ![r] = Breached(Cardinality(confirmed \cup {r}))]
+    /\ IF Checks(r)
+         THEN /\ BudgetRowLock => lockHolder = NoOne
+              /\ lockHolder' = IF BudgetRowLock THEN r ELSE lockHolder
+              /\ todo' = [todo EXCEPT ![r] =
+                     Breached(Cur(confirmed \cup {r}), Prior(confirmed \cup {r}))]
+         ELSE /\ todo' = [todo EXCEPT ![r] = {}]
+              /\ UNCHANGED lockHolder
     /\ pc' = [pc EXCEPT ![r] = "claiming"]
     /\ UNCHANGED <<confirmed, ledger, alerts, claimed, newAlerts, aborts>>
 
@@ -113,7 +144,7 @@ Claim(r) ==
     /\ pc[r] = "claiming"
     /\ todo[r] # {}
     /\ LET t == Min(todo[r]) IN
-        /\ UniqueLedger => \A q \in Receipts \ {r} : t \notin claimed[q]  \* else wait
+        /\ UniqueLedger => \A q \in AllReceipts \ {r} : t \notin claimed[q]  \* else wait
         /\ todo' = [todo EXCEPT ![r] = @ \ {t}]
         /\ IF UniqueLedger /\ t \in ledger
              THEN UNCHANGED <<claimed, newAlerts>>                     \* DO NOTHING -> skip
@@ -147,11 +178,11 @@ Abort(r) ==
 
 \* Every receipt confirmed: stop without TLC calling it a deadlock.
 Finished ==
-    /\ \A r \in Receipts : pc[r] = "done"
+    /\ \A r \in AllReceipts : pc[r] = "done"
     /\ UNCHANGED vars
 
 Next ==
-    \/ \E r \in Receipts : Flush(r) \/ Read(r) \/ Claim(r) \/ Commit(r) \/ Abort(r)
+    \/ \E r \in AllReceipts : Flush(r) \/ Read(r) \/ Claim(r) \/ Commit(r) \/ Abort(r)
     \/ Finished
 
 Spec == Init /\ [][Next]_vars
@@ -163,8 +194,9 @@ Spec == Init /\ [][Next]_vars
 \* Each threshold makes at most one notification per budget period.
 OneAlertPerThreshold == \A t \in Thresholds : alerts[t] <= 1
 
-\* Once every confirm has committed, each threshold the committed spend has reached has an alert.
+\* Once every confirm has committed, each threshold the committed spend has reached has an alert,
+\* against this period's limit (with a rollover run, the limit last period's spend leaves).
 NoMissedAlert ==
-    (\A r \in Receipts : pc[r] = "done") =>
-        \A t \in Breached(Cardinality(confirmed)) : alerts[t] >= 1
+    (\A r \in AllReceipts : pc[r] = "done") =>
+        \A t \in Breached(Cur(confirmed), Prior(confirmed)) : alerts[t] >= 1
 =============================================================================

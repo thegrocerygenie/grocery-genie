@@ -71,6 +71,18 @@ describe('Dashboard with a reset day of 15', () => {
   });
 });
 
+describe('Dashboard over budget with a reset day of 15', () => {
+  it('shows the period end in the ring, not the whole range', () => {
+    mockDashboard.data = dashboard('2026-10', '2026-10-15', '2026-11-14', 600);
+    renderDashboard();
+
+    expect(screen.getByText('to Nov 14')).toBeTruthy();
+    // The whole range stays in the heading only.
+    expect(screen.queryByText('Oct 15 – Nov 14')).toBeNull();
+    expect(screen.getByText('Oct 15 – Nov 14 · day 20')).toBeTruthy();
+  });
+});
+
 describe('Dashboard with a reset day of 1', () => {
   it('keeps the month name and the day of the month', () => {
     mockDashboard.data = dashboard('2026-11', '2026-11-01', '2026-11-30', 10);

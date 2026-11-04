@@ -3,6 +3,7 @@ import {
   periodDaysLeft,
   periodHeading,
   periodName,
+  periodRingName,
   periodShareElapsed,
 } from '../period';
 
@@ -19,6 +20,9 @@ const calendar = periodBounds({
 });
 const nov3 = new Date(2026, 10, 3);
 
+/** The label as read, with its no-break spaces as plain ones. */
+const plain = (label: string) => label.replace(/\u00a0/g, ' ');
+
 describe('periodBounds', () => {
   it('reads the dates the server sends, as local days', () => {
     expect(midMonth.start).toEqual(new Date(2026, 9, 15));
@@ -34,11 +38,11 @@ describe('periodBounds', () => {
 
 describe('periodName', () => {
   it('is the month name when the period starts on the 1st', () => {
-    expect(periodName(calendar)).toBe('November');
+    expect(plain(periodName(calendar))).toBe('November');
   });
 
   it('is the date range for any other reset day', () => {
-    expect(periodName(midMonth)).toBe('Oct 15 – Nov 14');
+    expect(plain(periodName(midMonth))).toBe('Oct 15 – Nov 14');
   });
 
   it('spans the new year', () => {
@@ -47,21 +51,48 @@ describe('periodName', () => {
       period_start: '2026-12-15',
       period_end: '2027-01-14',
     });
-    expect(periodName(bounds)).toBe('Dec 15 – Jan 14');
+    expect(plain(periodName(bounds))).toBe('Dec 15 – Jan 14');
   });
 });
 
 describe('periodHeading', () => {
   it('counts the day within the period, not the day of the month', () => {
-    expect(periodHeading(midMonth, nov3)).toBe('Oct 15 – Nov 14 · day 20');
+    expect(plain(periodHeading(midMonth, nov3))).toBe('Oct 15 – Nov 14 · day 20');
   });
 
   it('keeps "Month · day N" for a calendar month', () => {
-    expect(periodHeading(calendar, nov3)).toBe('November · day 3');
+    expect(plain(periodHeading(calendar, nov3))).toBe('November · day 3');
   });
 
   it('has no day count outside the period', () => {
-    expect(periodHeading(midMonth, new Date(2026, 10, 20))).toBe('Oct 15 – Nov 14');
+    expect(plain(periodHeading(midMonth, new Date(2026, 10, 20)))).toBe('Oct 15 – Nov 14');
+  });
+});
+
+describe('periodHeading line breaks', () => {
+  // At the largest text sizes the heading wraps. It may break around the dash
+  // or before "· day N", never inside a date or the day count.
+  it('keeps each date and the day count whole', () => {
+    expect(periodHeading(midMonth, nov3).split(' ')).toEqual([
+      'Oct\u00a015',
+      '–',
+      'Nov\u00a014',
+      '·\u00a0day\u00a020',
+    ]);
+  });
+
+  it('keeps the day count whole after a month name', () => {
+    expect(periodHeading(calendar, nov3).split(' ')).toEqual(['November', '·\u00a0day\u00a03']);
+  });
+});
+
+describe('periodRingName', () => {
+  it('is the month name when the period starts on the 1st', () => {
+    expect(periodRingName(calendar)).toBe('November');
+  });
+
+  it('is the end date for any other reset day, short enough for the ring', () => {
+    expect(periodRingName(midMonth)).toBe('to Nov\u00a014');
   });
 });
 

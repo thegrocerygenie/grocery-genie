@@ -39,6 +39,7 @@ from app.models.schemas import (
     ReceiptUpdateRequest,
 )
 from app.services.budget_service import BudgetService
+from app.services.category_service import CategoryService
 from app.services.item_matching_service import ItemMatchingService
 from app.services.notification_service import NotificationService
 from app.services.price_alert_service import NOTIFICATION_TYPE, PriceAlertService
@@ -178,6 +179,20 @@ class ReceiptService:
         categories = await self._get_categories(user_id)
         category_lookup = {cat.name: cat.id for cat in categories}
 
+        # A mapping (or a name) may give a custom category. Hold those, so a
+        # delete cannot remove one under the line items below; one a delete
+        # already removed is not applied (CategoryService).
+        category_service = CategoryService(self.db)
+        usable = {cat.id for cat in categories if cat.is_default}
+        planned: set[uuid.UUID] = set()
+        for extracted_item in extraction.items:
+            mapping = mappings.get(extracted_item.name.strip().lower())
+            if mapping and mapping.category_id:
+                planned.add(mapping.category_id)
+            if extracted_item.category in category_lookup:
+                planned.add(category_lookup[extracted_item.category])
+        usable |= await category_service.usable_custom(user_id, planned - usable)
+
         # Create receipt
         receipt = Receipt(
             user_id=user_id,
@@ -206,10 +221,10 @@ class ReceiptService:
             category_confidence = None
 
             mapping = mappings.get(extracted_item.name.strip().lower())
-            if mapping and mapping.category_id:
+            if mapping and mapping.category_id in usable:
                 category_id = mapping.category_id
                 category_confidence = 1.0  # Deterministic override
-            elif extracted_item.category and extracted_item.category in category_lookup:
+            elif category_lookup.get(extracted_item.category or "") in usable:
                 category_id = category_lookup[extracted_item.category]
                 category_confidence = extracted_item.confidence * 0.9
 
@@ -288,11 +303,17 @@ class ReceiptService:
                     assignments = []
 
             assignment_map = {a["name"]: a for a in assignments}
+            assigned = {
+                cat_id
+                for a in assignments
+                if (cat_id := category_lookup.get(a.get("category") or ""))
+            }
+            usable |= await category_service.usable_custom(user_id, assigned - usable)
             for li, resp in uncategorized_items:
                 assignment = assignment_map.get(li.raw_name)
                 if assignment and assignment.get("category"):
                     cat_id = category_lookup.get(assignment["category"])
-                    if cat_id:
+                    if cat_id in usable:
                         li.category_id = cat_id
                         li.category_confidence = assignment.get("confidence", 0.7)
                         resp.category_id = cat_id
@@ -547,6 +568,10 @@ class ReceiptService:
             receipt.date = updates.date
 
         if updates.items:
+            # Before any change: a default or the user's own category only.
+            await CategoryService(self.db).ensure_usable(
+                user_id, (c.category_id for c in updates.items)
+            )
             line_items_by_id = {li.id: li for li in receipt.line_items}
             # Subtotal and total are not edited; they move by what price
             # corrections changed, which keeps any unitemised discount.
@@ -855,6 +880,9 @@ class ReceiptService:
         items: list[dict],
     ) -> Receipt:
         """Create a receipt without an image (manual entry fallback)."""
+        await CategoryService(self.db).ensure_usable(
+            user_id, (item.get("category_id") for item in items)
+        )
         store = await self.store_service.find_or_create(store_name)
         receipt = Receipt(
             user_id=user_id,

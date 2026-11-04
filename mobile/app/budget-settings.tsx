@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -16,16 +17,21 @@ import { SymbolView } from 'expo-symbols';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { DEFAULT_CATEGORIES, getCategoryMetaByName } from '@/constants/categories';
+import { PremiumUpgradePrompt } from '@/components/PremiumUpgradePrompt';
+import { ROLLOVER_STRINGS } from '@/features/budget/content/rollover';
 import {
   useBudgetCreate,
   useBudgetDelete,
+  useBudgetRollover,
   useBudgetUpdate,
   useBudgets,
 } from '@/features/budget/hooks/useBudget';
 import { useCategories } from '@/features/budget/hooks/useCategories';
 import type { BudgetResponse } from '@/features/budget/types';
+import { useIsPremium } from '@/features/premium/hooks/usePremium';
 import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
 import { currencySymbol, formatMoney } from '@/utils/money';
+import { isPremiumRequired } from '@/utils/premium';
 
 /** Amount text for an input: "200", "12.5". */
 function amountText(amount: number): string {
@@ -80,10 +86,14 @@ export default function BudgetSettingsScreen() {
   const budgetCreate = useBudgetCreate();
   const budgetUpdate = useBudgetUpdate();
   const budgetDelete = useBudgetDelete();
+  const budgetRollover = useBudgetRollover();
+  const isPremium = useIsPremium();
 
   const [overall, setOverall] = useState('');
   const [startDay, setStartDay] = useState('1');
   const [catAmounts, setCatAmounts] = useState<Record<string, string>>({});
+  // Rollover per budget, by category id ('' = overall), Premium only.
+  const [rollover, setRollover] = useState<Record<string, boolean>>({});
   const [isSaving, setIsSaving] = useState(false);
 
   // The saved budgets, by category id ('' = overall). Edits are compared with
@@ -106,6 +116,7 @@ export default function BudgetSettingsScreen() {
           .map((b) => [b.category_id as string, amountText(b.amount)]),
       ),
     );
+    setRollover(Object.fromEntries(budgets.map((b) => [b.category_id ?? '', b.rollover_enabled])));
   }, [budgets]);
 
   const categories =
@@ -129,6 +140,8 @@ export default function BudgetSettingsScreen() {
 
   const handleSave = async () => {
     setIsSaving(true);
+    // The budget each key ends up with, for the rollover switches.
+    const savedIds = new Map<string, string>();
     try {
       const periodStart = periodStartFor(startDay);
 
@@ -145,13 +158,15 @@ export default function BudgetSettingsScreen() {
             data: startChanged ? { amount, period_start: periodStart } : { amount },
           });
         }
+        savedIds.set('', savedOverall.id);
       } else if (overallAmount > 0) {
-        await budgetCreate.mutateAsync({
+        const created = await budgetCreate.mutateAsync({
           category_id: null,
           amount: overallAmount,
           period_type: 'monthly',
           period_start: periodStart,
         });
+        if (created?.id) savedIds.set('', created.id);
       }
 
       // Categories: update changed limits, delete cleared ones, create new ones.
@@ -161,25 +176,52 @@ export default function BudgetSettingsScreen() {
         if (existing) {
           if (amount <= 0) {
             await budgetDelete.mutateAsync(existing.id);
+            continue;
           } else if (amount !== existing.amount) {
             await budgetUpdate.mutateAsync({ budgetId: existing.id, data: { amount } });
           }
+          savedIds.set(categoryId, existing.id);
         } else if (amount > 0) {
-          await budgetCreate.mutateAsync({
+          const created = await budgetCreate.mutateAsync({
             category_id: categoryId,
             amount,
             period_type: 'monthly',
             period_start: periodStart,
           });
+          if (created?.id) savedIds.set(categoryId, created.id);
+        }
+      }
+
+      // Rollover: only the switches that changed, and only for Premium (D2).
+      if (isPremium) {
+        for (const [key, budgetId] of savedIds) {
+          const enabled = rollover[key] ?? false;
+          if (enabled !== (saved.get(key)?.rollover_enabled ?? false)) {
+            await budgetRollover.mutateAsync({ budgetId, enabled });
+          }
         }
       }
       router.back();
-    } catch {
+    } catch (error) {
+      if (isPremiumRequired(error)) {
+        // Premium lapsed while the screen was open: invite, never an error.
+        router.push('/paywall');
+        return;
+      }
       Alert.alert('Error', 'Failed to save budget. Please try again.');
     } finally {
       setIsSaving(false);
     }
   };
+
+  // A budget can roll over once it has a limit: the overall one, then each
+  // category with an amount entered.
+  const rolloverRows = [
+    ...(parseAmount(overall) > 0 ? [{ key: '', name: ROLLOVER_STRINGS.overallLabel }] : []),
+    ...categories
+      .filter((c) => parseAmount(catAmounts[c.id] ?? '') > 0)
+      .map((c) => ({ key: c.id, name: c.name })),
+  ];
 
   return (
     <>
@@ -257,6 +299,34 @@ export default function BudgetSettingsScreen() {
               />
             ))}
           </Section>
+
+          {isPremium ? (
+            rolloverRows.length > 0 ? (
+              <Section header={ROLLOVER_STRINGS.sectionHeader} footer={ROLLOVER_STRINGS.footer}>
+                {rolloverRows.map((r) => (
+                  <RowSwitch
+                    key={r.key}
+                    label={r.name}
+                    accessibilityLabel={ROLLOVER_STRINGS.switchLabel(r.name)}
+                    value={rollover[r.key] ?? false}
+                    onValueChange={(v) => setRollover((p) => ({ ...p, [r.key]: v }))}
+                  />
+                ))}
+              </Section>
+            ) : null
+          ) : (
+            <View>
+              <Text style={styles.sectionLabel}>{ROLLOVER_STRINGS.sectionHeader}</Text>
+              <View style={styles.listCard}>
+                <PremiumUpgradePrompt
+                  title={ROLLOVER_STRINGS.upgradeTitle}
+                  message={ROLLOVER_STRINGS.upgradeMessage}
+                  upgradeLabel={ROLLOVER_STRINGS.upgradeAction}
+                  onUpgrade={() => router.push('/paywall')}
+                />
+              </View>
+            </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </>
@@ -349,6 +419,28 @@ function RowNumericInput({ label, value, onChangeText, format }: RowNumericInput
   );
 }
 
+interface RowSwitchProps {
+  label: string;
+  accessibilityLabel: string;
+  value: boolean;
+  onValueChange: (v: boolean) => void;
+}
+
+function RowSwitch({ label, accessibilityLabel, value, onValueChange }: RowSwitchProps) {
+  return (
+    <View style={styles.row}>
+      <Text style={[type.body, styles.rowLabel]}>{label}</Text>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: colors.iosFill1, true: colors.green }}
+        ios_backgroundColor={colors.iosFill1}
+        accessibilityLabel={accessibilityLabel}
+      />
+    </View>
+  );
+}
+
 interface RowCategoryInputProps {
   cat: { id: string; name: string; color: ColorValue; symbol: string };
   value: string;
@@ -422,6 +514,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 11,
   },
+  rowLabel: { flex: 1 },
   rowDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.iosSeparator,

@@ -21,7 +21,10 @@ jest.mock('@/features/budget/hooks/useBudget', () => ({
   useBudgetCreate: () => ({ mutateAsync: mockCreate }),
   useBudgetUpdate: () => ({ mutateAsync: mockUpdate }),
   useBudgetDelete: () => ({ mutateAsync: mockDelete }),
+  useBudgetRollover: () => ({ mutateAsync: jest.fn() }),
 }));
+// Rollover switches are Premium (budgetRollover.test.tsx); these tests are free.
+jest.mock('@/features/premium/hooks/usePremium', () => ({ useIsPremium: () => false }));
 jest.mock('@/features/budget/hooks/useCategories', () => ({
   useCategories: () => ({
     data: [

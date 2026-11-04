@@ -178,6 +178,9 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-02 | 2 | Per-category budgets configurable | E2E | `backend/tests/e2e/test_user_journeys.py::test_journey_per_category_budget` | Pass |
 | BC-02 | 3 | Calendar months default; custom start | Integration | `backend/tests/services/test_budget_service.py::test_get_period_dates_custom_start` | Pass |
 | BC-02 | 3 | Calendar months default; custom start | Integration | `backend/tests/services/test_budget_service.py::test_get_period_dates_default` | Pass |
+| BC-02 | 3 | Calendar months default; custom start | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_default_period_follows_the_reset_day` | Pass |
+| BC-02 | 3 | Calendar months default; custom start | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_default_period_uses_the_users_local_date` | Pass |
+| BC-02 | 3 | Calendar months default; custom start | Component | `mobile/src/__tests__/dashboardResetDay.test.tsx` "labels the period by its dates and counts days within it" | Pass |
 | BC-02 | 4 | Edits apply immediately to current period | Integration | `backend/tests/api/test_edge_cases.py::test_mid_month_budget_change` | Pass |
 | BC-02 | 4 | Edits apply immediately to current period | Component | `mobile/src/__tests__/budgetSettings.test.tsx` "updates a changed limit instead of creating another budget" | Pass |
 | BC-03 | 1 | Push at 80% (50/80/100 configurable) | Integration | `backend/tests/services/test_budget_service.py::test_check_thresholds_at_80` | Pass |
@@ -197,7 +200,7 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-04 | 5 | Dashboard loads within 2 seconds | Integration | `backend/tests/api/test_p95_postgres.py::test_dashboard_p95_under_2s` (Postgres: `make backend-test-pg`) | Pass |
 | BC-05 | 1 | Tap item to reassign category | E2E | `backend/tests/e2e/test_user_journeys.py::test_journey_item_correction` | Pass |
 | BC-05 | 2 | Correction applied retroactively to history | Integration | `backend/tests/api/test_budget_alerts.py::test_category_correction_alerts_in_every_period_it_moves_spend` | Pass (indirect, through alerts) |
-| BC-05 | 3 | Up to 10 custom categories (premium) | — | none | Gap: premium only; MVP has no premium tier (V1.1) |
+| BC-05 | 3 | Up to 10 custom categories (premium) | — | see the V1.1 matrix | Moved to V1.1 (V11-P1): MVP had no premium tier |
 | BC-05 | 4 | Corrections feed per-user mapping | Integration | `backend/tests/api/test_receipts.py::test_category_only_correction_applies_on_next_scan` | Pass |
 | BC-06 | 1 | Push with total, top category, budget status | Integration | `backend/tests/tasks/test_summary_tasks.py::test_summary_gives_the_budget_status` | Pass |
 | BC-06 | 1 | Push with total, top category, budget status | Integration | `backend/tests/tasks/test_summary_tasks.py::test_summary_includes_top_category` | Pass |
@@ -206,7 +209,7 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-06 | 3 | Chosen day, 9 AM local time | Integration | `backend/tests/tasks/test_summary_tasks.py::test_recipients_only_on_users_chosen_day` | Pass |
 | BC-06 | 4 | Links to full dashboard | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "falls back to the dashboard when the route is missing" | Pass |
 
-V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04. `PREM` rows are the Premium tier (V11-P0, decisions D1 and D2: `PHASE_SCOPE.md`), which has no user story ID.
+V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04. BC-05 AC 3 (custom categories, Premium) with V11-P1. Decision recorded with V11-P1: the LLM assigns only the eight default categories, so a custom category reaches a new scan only through the user's corrections (the item mapping, BC-05 AC 4; row "Custom category in a correction teaches the next scan"). Changing the category prompt to know custom names needs `validate-extraction` and is out of V11-P1's scope (`08-api-contracts.md`, Categories). `PREM` rows are the Premium tier (V11-P0 and V11-P4, decisions D1 and D2: `PHASE_SCOPE.md`), which has no user story ID, so the AC column names the decision. Data export (V11-P2, NFR Privacy 2) is Premium too: its rows are Story `PREM`, AC `NFR-P2`. `BC-FR | Rollover` rows are the Premium rollover toggle (V11-P3).
 
 | Story | AC | Criterion | Type | Test | Status |
 |---|---|---|---|---|---|
@@ -218,12 +221,22 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PI-01 | 3 | Unit price (per item, kg, lb) | Component | `mobile/src/__tests__/priceHistory.test.tsx` "shows unit prices and the change since the first price (AC 3)" | Pass |
 | PI-01 | 4 | Timeline needs 2 data points | Integration | `backend/tests/api/test_items.py::test_one_price_is_not_yet_a_timeline` | Pass |
 | PI-01 | 4 | Timeline needs 2 data points | Component | `mobile/src/__tests__/priceHistory.test.tsx` "waits for a second price before showing a trend (AC 4)" | Pass |
+| PI-01 | 1 | Every recorded price with date and store (app, at AX5: device check BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "stacks each price under its date and store at AX5" | Pass |
+| PI-01 | 1 | Every recorded price with date and store (app, Prices list at AX5: BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "stacks the price under the name at AX5, and lets the name wrap" | Pass |
+| PI-01 | 3 | Unit price (per item, kg, lb) (app, latest price at AX5: BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "keeps the latest price on one line, shrinking it to fit" | Pass |
 | PI-02 | 1 | Hybrid: embedding similarity + fuzzy strings | Integration | `backend/tests/services/test_item_matching.py::test_high_semantic_similarity_auto_links` | Pass |
 | PI-02 | 1 | Hybrid: embedding similarity + fuzzy strings | Integration | `backend/tests/services/test_item_matching.py::test_high_fuzzy_score_auto_links_and_learns_the_alias` | Pass |
 | PI-02 | 2 | >= 0.85 auto-link | Integration | `backend/tests/services/test_item_matching.py::test_high_fuzzy_score_auto_links_and_learns_the_alias` | Pass |
 | PI-02 | 2 | 0.6-0.85 asks the user | Integration | `backend/tests/services/test_item_matching.py::test_medium_score_asks_the_user_and_keeps_the_line_separate` | Pass |
 | PI-02 | 2 | 0.6-0.85 asks the user | Component | `mobile/src/__tests__/priceHistory.test.tsx` "asks on the item and merges when the user says Same Item" | Pass |
 | PI-02 | 2 | < 0.6 distinct | Integration | `backend/tests/services/test_item_matching.py::test_low_score_is_a_distinct_item_with_no_question` | Pass |
+| PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Unit | `backend/tests/services/test_item_matching.py::test_a_qualifier_difference_is_detected` | Pass |
+| PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Integration | `backend/tests/services/test_item_matching.py::test_a_qualifier_difference_asks_instead_of_auto_linking` | Pass |
+| PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Integration | `backend/tests/services/test_item_matching.py::test_bananas_is_asked_about_not_linked_to_organic_bananas` | Pass |
+| PI-02 | 2 | Same product written differently still auto-links | Integration | `backend/tests/services/test_item_matching.py::test_the_same_product_still_auto_links` | Pass |
+| PI-02 | 2 | Same product written differently still auto-links | Integration | `backend/tests/services/test_item_matching.py::test_a_name_links_to_the_item_with_its_qualifiers` | Pass |
+| PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Unit | `backend/tests/services/test_item_matching.py::test_french_qualifiers_read_as_their_english_meaning` | Pass |
+| PI-02 | 2 | Same product written differently still auto-links | Unit | `backend/tests/services/test_item_matching.py::test_common_french_product_words_carry_no_qualifier` | Pass |
 | PI-02 | 3 | Manually link items | Integration | `backend/tests/api/test_items.py::test_merge_and_split_through_the_api` | Pass |
 | PI-02 | 3 | Manually link items | Component | `mobile/src/__tests__/priceHistory.test.tsx` "combines the item into another one and opens the result" | Pass |
 | PI-02 | 3 | Manually unlink items | Integration | `backend/tests/services/test_item_matching.py::test_split_moves_one_alias_with_its_lines_and_prices` | Pass |
@@ -252,6 +265,10 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "opens the item named in a price change alert (PI-03)" | Pass |
 | PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "opens a price change item from its id even when the url says otherwise" | Pass |
 | PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "never builds a route from a malformed price change item id" | Pass |
+| PI-03 | 2 | Tapping the alert opens the item, with Back to Budget (cold start: BUG-6) | Component | `mobile/src/__tests__/pushTapColdStart.test.tsx` "opens the tapped item on top of the tabs when the tap launched the app" | Pass |
+| PI-03 | 2 | Tapping the alert opens the item, with Back to Budget (cold start: BUG-6) | Component | `mobile/src/__tests__/priceAlertColdStart.test.tsx` "routes a tap that is waiting on the first frame, once the root navigator is ready" | Pass |
+| PI-03 | 2 | Tapping the alert opens the item, with Back to Budget (cold start: BUG-6) | Component | `mobile/src/__tests__/priceAlertColdStart.test.tsx` "asks for the tabs under the item, in case the tap lands before the stack is built" | Pass |
+| PI-03 | 2 | Tapping the alert opens the item, with Back to Budget (cold start: BUG-6) | Component | `mobile/src/__tests__/priceAlertColdStart.test.tsx` "puts the tabs under an item opened by a deep link on launch" | Pass |
 | PI-03 | 4 | Mutable per item (app) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "mutes price alerts for the item" | Pass |
 | PI-03 | 4 | Mutable per item (app) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "unmutes an item whose price alerts are muted" | Pass |
 | PI-03 | 4 | Mutable per item (app): a failed save puts the switch back | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "puts the switch back and says so when a mute fails" | Pass |
@@ -274,11 +291,81 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PI-04 | 4 | From item detail or a comparison screen | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "shows the latest and average price at each store, cheapest first (AC 4)" | Pass |
 | PI-04 | 4 | From item detail or a comparison screen | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "says how many stores need more prices before they compare" | Pass |
 | PI-04 | 4 | From item detail or a comparison screen | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "explains an empty comparison when no store has enough prices yet" | Pass |
+| BC-05 | 3 | Up to 10 custom categories, Premium: created | Integration | `backend/tests/api/test_custom_categories.py::test_premium_user_creates_a_category` | Pass |
+| BC-05 | 3 | Up to 10 custom categories: the 11th is refused | Integration | `backend/tests/api/test_custom_categories.py::test_premium_user_can_create_ten_and_the_eleventh_is_refused` | Pass |
+| BC-05 | 3 | Up to 10 custom categories: deleting frees a slot | Integration | `backend/tests/api/test_custom_categories.py::test_deleting_one_frees_a_slot` | Pass |
+| BC-05 | 3 | Up to 10 custom categories: the cap is per user | Integration | `backend/tests/api/test_custom_categories.py::test_the_cap_is_per_user` | Pass |
+| BC-05 | 3 | Premium only: a free user gets `403 premium_required` | Integration | `backend/tests/api/test_custom_categories.py::test_free_user_cannot_create_a_category` | Pass |
+| BC-05 | 3 | Premium lapses: categories stay, deletable, not renamed or added | Integration | `backend/tests/api/test_custom_categories.py::test_after_premium_lapses_categories_stay_and_can_be_deleted_not_changed` | Pass |
+| BC-05 | 3 | Names: 1-40 characters, unique among defaults and own | Integration | `backend/tests/api/test_custom_categories.py::test_name_must_not_repeat_a_default_or_own_category` | Pass |
+| BC-05 | 3 | Rename a custom category | Integration | `backend/tests/api/test_custom_categories.py::test_premium_user_renames_a_category` | Pass |
+| BC-05 | 3 | Defaults and other users' categories cannot be changed | Integration | `backend/tests/api/test_custom_categories.py::test_another_users_category_cannot_be_renamed_or_deleted` | Pass |
+| BC-05 | 3 | Custom category in a correction teaches the next scan (AC 2, 4) | Integration | `backend/tests/api/test_custom_categories.py::test_custom_category_in_a_correction_teaches_the_next_scan` | Pass |
+| BC-05 | 3 | Custom category in a budget, the summary and the dashboard | Integration | `backend/tests/api/test_custom_categories.py::test_custom_category_budget_and_dashboard_spending` | Pass |
+| BC-05 | 3 | Another user's category is refused in corrections and budgets | Integration | `backend/tests/api/test_custom_categories.py::test_correction_refuses_another_users_category` | Pass |
+| BC-05 | 3 | Another user's category is refused in corrections and budgets | Integration | `backend/tests/api/test_custom_categories.py::test_budget_refuses_another_users_category` | Pass |
+| BC-05 | 3 | Delete: items move to Other, mappings clear, budgets go | Integration | `backend/tests/api/test_custom_categories.py::test_delete_moves_items_to_other_and_removes_its_budget` | Pass |
+| BC-05 | 3 | Concurrent creates stop at 10; the rest get 409 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_concurrent_creates_stop_at_the_cap` | Pass |
+| BC-05 | 3 | Concurrent creates of one name (any case) make one | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_concurrent_creates_of_one_name_make_one` | Pass |
+| BC-05 | 3 | Delete racing a budget, correction or scan: no 500 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_budget_saved_while_its_category_is_deleted_gets_a_clean_400` | Pass |
+| BC-05 | 3 | Delete racing a budget, correction or scan: no 500 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_category_deleted_while_a_budget_is_saved_takes_the_budget` | Pass |
+| BC-05 | 3 | Delete racing a budget, correction or scan: no 500 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_correction_to_a_category_being_deleted_gets_a_clean_400` | Pass |
+| BC-05 | 3 | Delete racing a budget, correction or scan: no 500 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_category_deleted_during_a_correction_moves_the_item_to_other` | Pass |
+| BC-05 | 3 | Delete racing a budget, correction or scan: no 500 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_scan_applying_a_mapping_to_a_category_being_deleted_skips_it` | Pass |
+| BC-05 | 3 | Delete racing a budget, correction or scan: no 500 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_category_deleted_during_a_scan_moves_the_mapped_item_to_other` | Pass |
+| BC-05 | 3 | App: a free user sees the upgrade prompt, never an error | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a free user sees the upgrade prompt that opens the paywall, not an add button" | Pass |
+| BC-05 | 3 | App: a refused create shows the upgrade prompt | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a refused create (Premium lapsed) shows the upgrade prompt, not an error" | Pass |
+| BC-05 | 3 | App: add, rename, delete | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a Premium user adds a category by name" | Pass |
+| BC-05 | 3 | App: add, rename, delete | Component | `mobile/src/__tests__/categorySettings.test.tsx` "renames a custom category" | Pass |
+| BC-05 | 3 | App: add, rename, delete | Component | `mobile/src/__tests__/categorySettings.test.tsx` "deletes a custom category after confirming" | Pass |
+| BC-05 | 3 | App: at 10 the add button is disabled | Component | `mobile/src/__tests__/categorySettings.test.tsx` "at 10 the add button is disabled and says why" | Pass |
+| BC-05 | 3 | App: the paywall lists custom categories | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "shows what Premium unlocks and the App Store price" | Pass |
 | BC-FR | Trends | 12-month trend (V1.1), Premium per D2 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_for_premium` | Pass |
 | BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_premium_user_still_gets_3_months_by_default` | Pass |
 | BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_trend_is_3_months_with_months_3` | Pass |
 | BC-FR | Trends | `months` other than 3 or 12 is a 422 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_rejects_months_other_than_3_or_12` | Pass |
 | BC-FR | Trends | Free user asking for 12 months gets `403 premium_required` | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_needs_premium` | Pass |
+| BC-FR | Trends | Trend bar amounts in the budget currency (BUG-7) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "labels each bar in euros when the budget is in euros" | Pass |
+| BC-FR | Trends | Trend readable at accessibility text sizes (BUG-1) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "lets the chart grow down with the text, not up over the summary (BUG-1)" | Pass |
+| BC-FR | Trends | Trend readable at accessibility text sizes (BUG-2) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "wraps the month-over-month change under the total instead of off the screen (BUG-2)" | Pass |
+| BC-FR | Trends | Trend readable at accessibility text sizes | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "keeps each bar amount on one line, shrinking to fit its column" | Pass |
+| BC-FR | Trends | 12-month trend readable at accessibility text sizes (BUG-9) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "keeps the 12 one-letter labels to one line and a size that fits a narrow bar (BUG-9)" | Pass |
+| BC-FR | Trends | VoiceOver reads the bars in month order (BUG-8) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "gives every month column the same height, so VoiceOver reads them left to right" | Pass |
+| BC-FR | Rollover | Free user turning rollover on gets `403 premium_required` | Integration | `backend/tests/api/test_budget_rollover.py::test_free_user_turning_rollover_on_gets_premium_required` | Pass |
+| BC-FR | Rollover | Unspent budget does not roll over by default | Integration | `backend/tests/api/test_budget_rollover.py::test_rollover_is_off_by_default` | Pass |
+| BC-FR | Rollover | Optional rollover toggle (Premium), per budget | Integration | `backend/tests/api/test_budget_rollover.py::test_premium_user_turns_rollover_on_and_off` | Pass |
+| BC-FR | Rollover | Optional rollover toggle (Premium), per budget | Integration | `backend/tests/api/test_budget_rollover.py::test_category_budget_carries_its_own_unspent` | Pass |
+| BC-FR | Rollover | Unspent budget rolls into the next period | Integration | `backend/tests/api/test_budget_rollover.py::test_last_periods_unspent_rolls_into_this_period` | Pass |
+| BC-FR | Rollover | Unspent budget rolls into the next period | Integration | `backend/tests/api/test_budget_rollover.py::test_next_periods_limit_includes_this_periods_unspent` | Pass |
+| BC-FR | Rollover | Unspent budget rolls into the next period | Integration | `backend/tests/api/test_budget_rollover.py::test_carry_compounds_across_periods` | Pass |
+| BC-FR | Rollover | Overspend does not carry | Integration | `backend/tests/api/test_budget_rollover.py::test_overspend_does_not_carry` | Pass |
+| BC-FR | Rollover | Rollover: budget created mid-month, partial first period | Integration | `backend/tests/api/test_budget_rollover.py::test_a_budget_created_this_period_has_nothing_to_carry_yet` | Pass |
+| BC-FR | Rollover | Rollover: only from the period before it was turned on | Integration | `backend/tests/api/test_budget_rollover.py::test_periods_before_rollover_was_turned_on_do_not_carry` | Pass |
+| BC-FR | Rollover | Rollover: deterministic, idempotent, reads write nothing | Integration | `backend/tests/api/test_budget_rollover.py::test_reading_the_carry_is_deterministic_and_writes_nothing` | Pass |
+| BC-FR | Rollover | Rollover: amount change applies from now (EC Budget 1) | Integration | `backend/tests/api/test_budget_rollover.py::test_amount_change_applies_from_now_and_keeps_the_carry` | Pass |
+| BC-FR | Rollover | Rollover: start-day change keeps the carry | Integration | `backend/tests/api/test_budget_rollover.py::test_start_day_change_keeps_the_carry` | Pass |
+| BC-FR | Rollover | Rollover: $0 budget never carries (EC Budget 2) | Integration | `backend/tests/api/test_budget_rollover.py::test_zero_budget_never_carries` | Pass |
+| BC-FR | Rollover | Rollover: currency change restarts it (EC Budget 4) | Integration | `backend/tests/api/test_budget_rollover.py::test_currency_change_restarts_rollover` | Pass |
+| BC-FR | Rollover | Rollover: deleted and restored budgets | Integration | `backend/tests/api/test_budget_rollover.py::test_restoring_a_budget_deleted_in_an_earlier_period_restarts_rollover` | Pass |
+| BC-FR | Rollover | Rollover: deleted and restored budgets | Integration | `backend/tests/api/test_budget_rollover.py::test_restoring_within_the_same_period_keeps_the_carry` | Pass |
+| BC-FR | Rollover | Rollover: Premium lapse pauses it and keeps the toggle | Integration | `backend/tests/api/test_budget_rollover.py::test_premium_lapse_pauses_rollover_and_keeps_the_toggle` | Pass |
+| BC-FR | Rollover | Rollover: Premium lapse pauses it and keeps the toggle | Integration | `backend/tests/api/test_budget_rollover.py::test_lapsed_premium_alerts_on_the_base_amount` | Pass |
+| BC-FR | Rollover | Rollover: deleted and restored budgets | Integration | `backend/tests/api/test_budget_rollover.py::test_restore_near_midnight_keeps_a_same_period_carry` | Pass |
+| BC-FR | Rollover | Rollover: a budget revived through create starts with rollover off | Integration | `backend/tests/api/test_budget_rollover.py::test_a_budget_revived_through_create_starts_with_rollover_off` | Pass |
+| BC-FR | Rollover | Rollover: Premium lapse pauses it and keeps the toggle | Integration | `backend/tests/api/test_budget_rollover.py::test_months_premium_lapsed_carry_when_it_returns` | Pass |
+| BC-FR | Rollover | Rollover: changes use the user's local date, as the dashboard does | Integration | `backend/tests/api/test_budget_rollover.py::test_turning_rollover_on_near_midnight_uses_the_users_date` | Pass |
+| BC-FR | Rollover | Rollover: changes use the user's local date, as the dashboard does | Integration | `backend/tests/api/test_budget_rollover.py::test_amount_change_near_midnight_keeps_the_carry` | Pass |
+| BC-FR | Rollover | Threshold alerts use the limit with rollover (BC-03) | Integration | `backend/tests/api/test_budget_rollover.py::test_threshold_alert_fires_on_the_effective_limit` | Pass |
+| BC-FR | Rollover | Threshold alerts use the limit with rollover (BC-03) | Integration | `backend/tests/api/test_budget_rollover.py::test_late_receipt_in_last_period_shrinks_the_carry_and_alerts` | Pass |
+| BC-FR | Rollover | Rollover toggle analytics (`budget_rollover_toggled`) | Integration | `backend/tests/api/test_budget_rollover.py::test_toggling_rollover_emits_analytics` | Pass |
+| BC-FR | Rollover | Rollover switch per budget on Budget settings (app) | Component | `mobile/src/__tests__/budgetRollover.test.tsx` "shows a rollover switch for each budget, set as saved" | Pass |
+| BC-FR | Rollover | Rollover switch per budget on Budget settings (app) | Component | `mobile/src/__tests__/budgetRollover.test.tsx` "saves only the switches that changed" | Pass |
+| BC-FR | Rollover | Rollover switch per budget on Budget settings (app) | Component | `mobile/src/__tests__/budgetRollover.test.tsx` "turns rollover on for a budget it creates" | Pass |
+| BC-FR | Rollover | Free user sees the upgrade prompt, never an error (app, D2) | Component | `mobile/src/__tests__/budgetRollover.test.tsx` "invites a free user to upgrade instead of showing switches" | Pass |
+| BC-FR | Rollover | Free user sees the upgrade prompt, never an error (app, D2) | Component | `mobile/src/__tests__/budgetRollover.test.tsx` "opens the paywall from the prompt" | Pass |
+| BC-FR | Rollover | Free user sees the upgrade prompt, never an error (app, D2) | Component | `mobile/src/__tests__/budgetRollover.test.tsx` "opens the paywall, not an error, when Premium lapsed before Save" | Pass |
+| BC-FR | Rollover | Dashboard shows what rolled over (app) | Component | `mobile/src/__tests__/budgetRollover.test.tsx` "says how much of the limit rolled over" | Pass |
+| BC-FR | Rollover | Dashboard shows what rolled over (app) | Component | `mobile/src/__tests__/budgetRollover.test.tsx` "says nothing without a rollover" | Pass |
 | PREM | D1 | Premium: entitlement from RevenueCat only, checked with its expiry | Unit | `backend/tests/core/test_entitlements.py::test_a_user_with_no_entitlement_is_free` | Pass |
 | PREM | D1 | Premium: entitlement from RevenueCat only, checked with its expiry | Unit | `backend/tests/core/test_entitlements.py::test_an_active_entitlement_before_its_expiry_is_premium` | Pass |
 | PREM | D1 | Premium: entitlement from RevenueCat only, checked with its expiry | Unit | `backend/tests/core/test_entitlements.py::test_an_entitlement_past_its_expiry_is_free` | Pass |
@@ -382,6 +469,36 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PREM | D2 | Queued photo that hit the cap: upgrade prompt opens the paywall | Component | `mobile/src/__tests__/historyOfflineQueue.test.tsx` "offers Premium for a photo over the monthly quota, and keeps the photo (D2)" | Pass |
 | PREM | D2 | Cap, Premium unblock and free endpoints through the API | E2E | `.agents/skills/verify-grocery-genie/features/premium.md` `premium-quota-free`, `premium-unlimited`, `premium-free-features` | Pass |
 | PREM | D1 | Sandbox purchase and restore on a device | Manual | `docs/DEPLOYMENT.md` 2.9 step 6 (needs the RevenueCat keys and App Store product) | Pending |
+| PREM | NFR-P2 | Export: JSON with receipts, line items, budgets and prices | Integration | `backend/tests/api/test_data_export.py::test_json_export_has_receipts_line_items_budgets_and_prices` | Pass |
+| PREM | NFR-P2 | Export: CSV, a zip with one file per entity | Integration | `backend/tests/api/test_data_export.py::test_csv_export_is_a_zip_of_one_file_per_entity` | Pass |
+| PREM | NFR-P2 | Export: an empty account exports empty lists and CSV headers | Integration | `backend/tests/api/test_data_export.py::test_json_export_of_an_empty_account` | Pass |
+| PREM | NFR-P2 | Export: an empty account exports empty lists and CSV headers | Integration | `backend/tests/api/test_data_export.py::test_csv_export_of_an_empty_account_has_headers` | Pass |
+| PREM | NFR-P2 | Export: only the user's own data, deleted receipts left out | Integration | `backend/tests/api/test_data_export.py::test_json_export_has_receipts_line_items_budgets_and_prices` | Pass |
+| PREM | NFR-P2 | Export: only the user's own data, deleted receipts left out | Integration | `backend/tests/api/test_data_export.py::test_csv_export_is_a_zip_of_one_file_per_entity` | Pass |
+| PREM | NFR-P2 | Export: deleted budgets left out | Integration | `backend/tests/api/test_data_export.py::test_export_leaves_out_a_deleted_budget` | Pass |
+| PREM | NFR-P2 | Export: CSV formula injection escaped | Unit | `backend/tests/api/test_data_export.py::test_csv_text_cells_are_escaped` | Pass |
+| PREM | NFR-P2 | Export: CSV formula injection escaped | Integration | `backend/tests/api/test_data_export.py::test_csv_escapes_store_names_too` | Pass |
+| PREM | NFR-P2 | Export: Premium only (D2), `403 premium_required` | Integration | `backend/tests/api/test_data_export.py::test_export_needs_premium` | Pass |
+| PREM | NFR-P2 | Export: Premium only (D2), `403 premium_required` | Integration | `backend/tests/api/test_data_export.py::test_free_user_refused_export_records_no_event` | Pass |
+| PREM | NFR-P2 | Export: large accounts read in batches (receipts, line items and price observations past one page) | Integration | `backend/tests/api/test_data_export.py::test_export_reads_in_batches` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (streamed, client gone first, analytics error) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_after_streaming` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (streamed, client gone first, analytics error) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_when_client_disconnects_before_streaming` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (streamed, client gone first, analytics error) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_when_analytics_fails` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (a read failing mid-build) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_when_build_fails` | Pass |
+| PREM | NFR-P2 | Export: `data_exported` analytics event | Integration | `backend/tests/api/test_data_export.py::test_export_records_data_exported_event` | Pass |
+| PREM | NFR-P2 | Export: unknown format is a 422; signed out is a 401 | Integration | `backend/tests/api/test_data_export.py::test_export_rejects_unknown_format` | Pass |
+| PREM | NFR-P2 | Export: unknown format is a 422; signed out is a 401 | Integration | `backend/tests/api/test_data_export.py::test_export_needs_sign_in` | Pass |
+| PREM | NFR-P2 | Export (app): download with the session, iOS share sheet, cached copy removed | Unit | `mobile/src/features/settings/__tests__/exportApi.test.ts` "downloads the chosen format with the session token into the cache" | Pass |
+| PREM | NFR-P2 | Export (app): download with the session, iOS share sheet, cached copy removed | Unit | `mobile/src/features/settings/__tests__/exportApi.test.ts` "opens the share sheet with the file, then deletes the cached copy" | Pass |
+| PREM | NFR-P2 | Export (app): a 403 from the download is premium_required | Unit | `mobile/src/features/settings/__tests__/exportApi.test.ts` "a 403 from the download is premium_required (Premium lapsed meanwhile)" | Pass |
+| PREM | NFR-P2 | Export (app): Settings → Export data, JSON or CSV | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "exports JSON by default and opens the share sheet" | Pass |
+| PREM | NFR-P2 | Export (app): Settings → Export data, JSON or CSV | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "exports CSV when CSV is chosen" | Pass |
+| PREM | NFR-P2 | Export (app): Settings → Export data, JSON or CSV | Component | `mobile/src/__tests__/settingsHub.test.tsx` "opens %s in the app" | Pass |
+| PREM | NFR-P2 | Export (app): a free user sees the upgrade prompt, never an error (D2) | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "a free user sees the upgrade prompt, which opens the paywall" | Pass |
+| PREM | NFR-P2 | Export (app): a free user sees the upgrade prompt, never an error (D2) | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "a premium_required answer turns into the upgrade prompt, not an error" | Pass |
+| PREM | NFR-P2 | Export (app): any other failure is inline, with retry | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "any other failure says so inline and can be tried again" | Pass |
+| PREM | NFR-P2 | Export (app): paywall lists data export | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "shows what Premium unlocks and the App Store price" | Pass |
+| PREM | NFR-P2 | Export (app): share sheet on a device (Save to Files, AirDrop) | Manual | Simulator / device check; API-only verify cannot drive the share sheet | Pending |
 | BC-04 | 5 | 12-month dashboard loads within 2 seconds | Integration | `backend/tests/api/test_p95_postgres.py::test_dashboard_12_month_trend_p95_under_2s` (Postgres) | Pass |
 | BC-FR | Trends | 3/12-month toggle on Trend; 3 stays the default | Component | `mobile/src/__tests__/trendMonths.test.tsx` "shows 3 months by default and asks the server for 3" | Pass |
 | BC-FR | Trends | 3/12-month toggle on Trend; 12 months charts every month | Component | `mobile/src/__tests__/trendMonths.test.tsx` "switching to 12 months asks the server for 12 and charts every month" | Pass |

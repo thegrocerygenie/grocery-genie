@@ -64,6 +64,8 @@ export const colors = {
   redBg: pair('rgba(255,59,48,0.12)', 'rgba(255,69,58,0.20)'),
   /** Text and glyphs on a brand-green fill: white, black on the brighter dark-mode green. */
   onTint: pair('#FFFFFF', '#000000'),
+  /** Glyphs on a Settings-style colored icon square: white in both modes (HIG). */
+  onIconSquare: pair('#FFFFFF', '#FFFFFF'),
   /** systemRed at 40% — the border of a field with an error. */
   redBorder: pair('rgba(255,59,48,0.40)', 'rgba(255,69,58,0.50)'),
   /** systemBlue at 8% (16% in dark) — tip cards. */
@@ -161,4 +163,18 @@ export const springs = {
 export const touchTarget = {
   minHeight: 44,
   minWidth: 44,
+} as const;
+
+/**
+ * Dynamic Type thresholds, as React Native's iOS font scale (1 at the default
+ * size, about 1.7 at AX1 and 3.6 at AX5). `accessibility` is where rows stack
+ * instead of sitting side by side. The caps stop text that must fit a fixed
+ * space from growing further; VoiceOver still reads it in full.
+ */
+export const fontScale = {
+  accessibility: 1.7,
+  // Native header bar buttons stop growing about here, as UIKit's do.
+  headerButtonMax: 1.3,
+  // One letter under each of 12 bars on an iPhone SE (about 22pt a column).
+  compactChartLabelMax: 1.5,
 } as const;

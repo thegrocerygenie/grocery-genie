@@ -46,6 +46,7 @@ $G signup [label] [--no-consent]  # new user (example.com); later calls use its 
                                   # it off, so a scan gets 403 ai_consent_required
 $G api METHOD PATH [JSON]         # body on stdout, "METHOD PATH -> status" on stderr; exits non-zero on >= 400
 $G scan [PHOTO]                   # POST /api/receipts/scan (default: a generated photo); prints the scan response
+$G download PATH                  # GET a file (the data export) raw into the evidence directory; prints its path
 $G sql "SELECT ..."               # read gg_verify (observe only; never write through it)
 $G revenuecat JSON [--secret V]   # POST a RevenueCat webhook body as RevenueCat does, with the
                                   # launch's random GG_REVENUECAT_WEBHOOK_SECRET (or V, to prove a

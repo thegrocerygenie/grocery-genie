@@ -61,7 +61,9 @@ function renderSettings() {
       'settings/privacy': () => null,
       'settings/help': () => null,
       'settings/delete-account': () => null,
+      'settings/export-data': () => null,
       'settings/currency-settings': () => null,
+      'settings/categories': () => null,
       paywall: () => null,
     },
     { initialUrl: '/' },
@@ -128,6 +130,15 @@ describe('Settings hub', () => {
     profile.is_premium = false;
   });
 
+  it('opens Categories, and tells a free user they are Premium (V11-P1)', () => {
+    const app = renderSettings();
+
+    const row = screen.getByLabelText('Categories');
+    expect(row.props.accessibilityValue).toEqual({ text: 'Your own categories with Premium' });
+    fireEvent.press(row);
+    expect(app.getPathname()).toBe('/settings/categories');
+  });
+
   it('has a switch to withdraw AI receipt reading (App Store 5.1.2(i))', () => {
     renderSettings();
     expect(screen.getByRole('switch', { name: 'Read receipts with AI' }).props.value).toBe(true);
@@ -147,6 +158,7 @@ describe('Settings hub', () => {
     ['Privacy', '/settings/privacy'],
     ['Help & feedback', '/settings/help'],
     ['Delete account', '/settings/delete-account'],
+    ['Export data', '/settings/export-data'],
   ])('opens %s in the app', (label, path) => {
     const routerScreen = renderSettings();
 

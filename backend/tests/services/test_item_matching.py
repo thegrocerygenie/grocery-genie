@@ -31,7 +31,9 @@ from app.services.item_matching_service import (
     normalize_item_name,
     numbers_compatible,
 )
+from app.services.item_qualifiers import qualifiers_compatible, read_qualifiers
 from tests.conftest import ensure_user
+from tests.services.item_match_pairs import QUALIFIER_DIFFERS, SAME_PRODUCT
 
 USER = uuid.UUID("00000000-0000-0000-0000-0000000000a1")
 OTHER_USER = uuid.UUID("00000000-0000-0000-0000-0000000000a2")
@@ -176,9 +178,9 @@ async def test_high_fuzzy_score_auto_links_and_learns_the_alias(db_session):
 async def test_high_semantic_similarity_auto_links(db_session):
     """PI-02 AC 1: embedding similarity finds what spelling cannot."""
     embedder = MockEmbedder(
-        {"cheddar cheese": _vec(1, 0, 0), "ks ched chs": _vec(0.9, 0.3, 0)}
+        {"kirkland cheddar cheese": _vec(1, 0, 0), "ks ched chs": _vec(0.9, 0.3, 0)}
     )
-    _, [first] = await _match(db_session, "Cheddar Cheese", embedder=embedder)
+    _, [first] = await _match(db_session, "Kirkland Cheddar Cheese", embedder=embedder)
     _, [second] = await _match(db_session, "KS CHED CHS", embedder=embedder)
 
     assert second.method == MATCH_SEMANTIC
@@ -233,6 +235,149 @@ async def test_numbers_that_differ_block_even_a_close_match(db_session):
 
     assert second.item_id != first.item_id
     assert await _count(db_session, ItemMatchSuggestion) == 0
+
+
+# --- Qualifiers (BUG-4) ----------------------------------------------------
+# Names that differ in a qualifier (organic, size, fat, flavour, store brand,
+# colour, form, diet) are different products to the price history. The
+# similarity scores rate them close ("bananas" / "organic bananas" is 0.86
+# with the real model), so a rule decides: they never auto-link, and the
+# user is asked instead.
+
+
+@pytest.mark.parametrize(("existing", "new"), SAME_PRODUCT)
+def test_same_product_written_differently_keeps_its_qualifiers(existing, new):
+    assert qualifiers_compatible(
+        normalize_item_name(existing), normalize_item_name(new)
+    )
+
+
+@pytest.mark.parametrize(("existing", "new"), QUALIFIER_DIFFERS)
+def test_a_qualifier_difference_is_detected(existing, new):
+    assert not qualifiers_compatible(
+        normalize_item_name(existing), normalize_item_name(new)
+    )
+
+
+def _identical(*names: str) -> MockEmbedder:
+    """Every name embeds to the same vector: semantic similarity 1.0."""
+    return MockEmbedder({normalize_item_name(n): _vec(1, 0) for n in names})
+
+
+@pytest.mark.parametrize(("existing", "new"), QUALIFIER_DIFFERS)
+async def test_a_qualifier_difference_asks_instead_of_auto_linking(
+    db_session, existing, new
+):
+    """Even at similarity 1.0 the pair becomes a suggestion, not a link."""
+    embedder = _identical(existing, new)
+    _, [first] = await _match(db_session, existing, embedder=embedder)
+    lines, [second] = await _match(db_session, new, embedder=embedder)
+
+    assert second.method == MATCH_NEW
+    assert second.item_id != first.item_id
+    assert lines[0].canonical_item_id == second.item_id
+    suggestion = (await db_session.execute(select(ItemMatchSuggestion))).scalar_one()
+    assert suggestion.item_id == second.item_id
+    assert suggestion.suggested_item_id == first.item_id
+    assert suggestion.status == "pending"
+
+
+@pytest.mark.parametrize(("existing", "new"), SAME_PRODUCT)
+async def test_the_same_product_still_auto_links(db_session, existing, new):
+    """The guard costs no recall: abbreviations, word order, plurals link."""
+    embedder = _identical(existing, new)
+    _, [first] = await _match(db_session, existing, embedder=embedder)
+    _, [second] = await _match(db_session, new, embedder=embedder)
+
+    assert second.method in (MATCH_FUZZY, MATCH_SEMANTIC, MATCH_ALIAS)
+    assert second.item_id == first.item_id
+    assert await _count(db_session, ItemMatchSuggestion) == 0
+
+
+async def test_bananas_is_asked_about_not_linked_to_organic_bananas(db_session):
+    """BUG-4 as seen on the device: semantic 0.857 >= 0.80 linked them."""
+    embedder = MockEmbedder(
+        {"organic bananas": _vec(1, 0), "bananas": _vec(0.857, 0.5153)}
+    )
+    _, [organic] = await _match(db_session, "Organic Bananas", embedder=embedder)
+    _, [plain] = await _match(db_session, "Bananas", embedder=embedder)
+
+    assert plain.method == MATCH_NEW
+    assert plain.item_id != organic.item_id
+    suggestion = (await db_session.execute(select(ItemMatchSuggestion))).scalar_one()
+    assert suggestion.suggested_item_id == organic.item_id
+    assert suggestion.confidence == pytest.approx(0.857, abs=1e-3)
+
+
+def test_qualifier_abbreviations_score_as_the_full_word():
+    """ "ORG" is organic, "CHOC" chocolate: fuzzy matching reads them so."""
+    assert fuzzy_similarity("org bananas", "organic bananas") == 1.0
+    assert fuzzy_similarity("dark choc bar", "dark chocolate bar") == 1.0
+    assert fuzzy_similarity("nonfat milk", "skim milk") == 1.0
+
+
+@pytest.mark.parametrize(
+    ("french", "english"),
+    [
+        ("Lait entier", "Whole Milk"),
+        ("Lait écrémé", "Skim Milk"),
+        ("Lait 2 %", "Reduced Fat Milk"),
+        ("Lait partiellement écrémé", "Reduced Fat Milk"),
+        ("Bananes biologiques", "Organic Bananas"),
+        ("Pain sans gluten", "Gluten Free Bread"),
+        ("Pain de blé entier", "Whole Wheat Bread"),
+        ("Yogourt nature", "Plain Yogurt"),
+        ("Yogourt à la vanille", "Vanilla Yogurt"),
+        ("Yogourt aux fraises", "Strawberry Yogurt"),
+    ],
+)
+def test_french_qualifiers_read_as_their_english_meaning(french, english):
+    """Accents are ignored: "ecreme" on a receipt is "écrémé"."""
+    found = read_qualifiers(normalize_item_name(french))[1]
+    assert found
+    assert found == read_qualifiers(normalize_item_name(english))[1]
+    assert found == read_qualifiers(normalize_item_name(french.upper()))[1]
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Orge perlé",
+        "Pain de mie",
+        "Biscuits",
+        "Yogourt naturel",
+        "Framboises",
+        "Fraisier",
+        "Saumon fumé",
+        "Jus d'orange",
+        "Beurre d'arachide",
+        "Céréales",
+        "Fromage cheddar fort",
+        "Lait 12 %",
+    ],
+)
+def test_common_french_product_words_carry_no_qualifier(name):
+    """Only whole words match: "biscuits" is not bio, "naturel" not nature."""
+    assert read_qualifiers(normalize_item_name(name))[1] == frozenset()
+
+
+async def test_a_name_links_to_the_item_with_its_qualifiers(db_session):
+    """Bananas and Organic Bananas are both items: ORG BANANAS goes to the
+    organic one even when plain bananas scores higher."""
+    embedder = MockEmbedder(
+        {
+            "organic bananas": _vec(1, 0),
+            "bananas": _vec(0, 1),
+            "org bananas": _vec(0.6, 0.8),
+        }
+    )
+    _, [organic] = await _match(db_session, "Organic Bananas", embedder=embedder)
+    _, [plain] = await _match(db_session, "Bananas", embedder=embedder)
+    _, [abbreviated] = await _match(db_session, "ORG BANANAS", embedder=embedder)
+
+    assert plain.item_id != organic.item_id
+    assert abbreviated.item_id == organic.item_id
+    assert abbreviated.method == MATCH_FUZZY
 
 
 async def test_same_name_twice_on_a_receipt_is_one_item(db_session):

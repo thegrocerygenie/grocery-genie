@@ -95,6 +95,9 @@ describe('Paywall', () => {
     expect(await screen.findByLabelText('Subscribe for $5.99/month')).toBeTruthy();
     expect(screen.getByText('12-month spending trend')).toBeTruthy();
     expect(screen.getByText('Unlimited receipts')).toBeTruthy();
+    expect(screen.getByText('Budget rollover')).toBeTruthy();
+    expect(screen.getByText('Your own categories')).toBeTruthy();
+    expect(screen.getByText('Export your data')).toBeTruthy();
     expect(screen.getByText(/stay free/)).toBeTruthy();
     expect(screen.getByLabelText('Restore Purchases')).toBeTruthy();
     expect(screen.getByLabelText('Terms of Use')).toBeTruthy();

@@ -101,11 +101,29 @@ A comparison of the design (removed in `041f38f`, still in git) with `main` on 2
 
 The site promises waitlist sign-ups "a free year of Premium" when Premium launches in V1.1 ([decisions](marketing/decisions.md) #2). The match is automatic: the waitlist email against the account's email (#7). Waitlist emails are contacts in the Resend audience (`RESEND_AUDIENCE_ID`), stored trimmed and lowercased by `marketing/api/_handler.js`.
 
-- [ ] **Now: say it in the privacy text.** Before the waitlist grows, the waitlist sign-up and `privacy.ts` must say the waitlist email will be used to find the person's account and apply the offer.
+- [x] **Now: say it in the privacy text.** Before the waitlist grows, the waitlist sign-up and `privacy.ts` must say the waitlist email will be used to find the person's account and apply the offer.
   - [x] `privacy.ts` ("What we collect" → "Our waitlist", and Resend "keeps our waitlist"), updated November 3, 2026. Still a draft until legal sign-off.
-  - [ ] The waitlist sign-up on the marketing site: waits on the redesign.
-- [ ] **Now: decide the cut-off.** Which sign-ups count? For example, everyone who joined before the site switches to App Store downloads. Resend keeps each contact's `created_at`. Record it in `docs/marketing/decisions.md`.
-- [ ] **Now: decide on unsubscribes.** Does someone who unsubscribed from waitlist emails still get the year? Resend keeps an unsubscribed contact, with a flag.
+  - [x] The waitlist sign-up on the marketing site, done November 3, 2026:
+    - a note under each waitlist form (`marketing/src/components/CtaSlot.astro`): "We'll email you once, at launch. Sign up in the app with this same email and we'll match it to your account for the free Premium year.";
+    - the same line in the default welcome email (`marketing/api/_handler.js`).
+
+    `marketing/tests/page.mjs` and `tests/smoke.mjs` check both. A custom `WAITLIST_WELCOME_TEXT` must keep that line.
+- [x] **Now: decide the cut-off.** Decided 2026-11-04 ([decisions](marketing/decisions.md) #9):
+  - **Who counts:** waitlist contacts created before the site switches to the App Store. Resend keeps each contact's `created_at`.
+  - **Claim window:** 90 days after Premium launches.
+  - **Length:** each free year runs 12 months from the day the account is matched.
+- [ ] **Record the switch date.** When the site moves to App Store downloads (`PUBLIC_LAUNCH_STATE=b`), write the date into decisions #9; it's the cut-off.
+- [ ] **Tell members the terms.** The launch email has to give the 90-day claim window. The offer terms (who qualifies, the claim window, 12 months from matching) need a home people can find, such as an offer-terms line on the site or a help article.
+- [x] **Now: decide on unsubscribes.** Decided 2026-11-04 ([decisions](marketing/decisions.md) #10): unsubscribed contacts still qualify, and only a deletion request gives up the offer.
+  - The welcome email (`marketing/api/_handler.js`) now says: reply "unsubscribe" to stop emails, or "delete" to remove the email and give up the free year.
+  - **Matching must include contacts with Resend's `unsubscribed` flag.**
+  - Whoever handles replies: "unsubscribe" means set the flag, not delete the contact.
+- [x] **Now: decide retention.** Decided 2026-11-04 ([decisions](marketing/decisions.md) #11): the waitlist is deleted 90 days after Premium launches, when the claim window closes. `privacy.ts` says so, along with the unsubscribe rule (#10). It's still a draft until legal sign-off.
+- [ ] **Delete the waitlist when the claim window closes.**
+  - Schedule deleting the Resend audience for 90 days after Premium launches.
+  - Keep each free-year grant on its account, so "one year per waitlist email" still holds afterwards. Store the matched waitlist email, or a hash of it, with the grant.
+The build items below are V1.1 story **V11-P5** (`.planning/PLAN-2026-11-03-v1.1.md`). The grant is a RevenueCat promotional entitlement ([decisions](marketing/decisions.md) #12, plan D5).
+
 - [ ] **Matching rule.** An account qualifies when its email, trimmed and lowercased like the waitlist's, equals a waitlist contact's.
   - Match only verified emails: email-and-password accounts after `verify-email`; Apple and Google sign-ins carry an email their provider verified.
   - One free year per waitlist email, even if several accounts use that email over time.
@@ -115,4 +133,4 @@ The site promises waitlist sign-ups "a free year of Premium" when Premium launch
 
   The backend reads the audience through the Resend API, or from a one-off export taken at the cut-off.
 - [ ] **When nothing matches.** Sign in with Apple's Hide My Email gives an `@privaterelay.appleid.com` address, and some people sign up with a different email. Add "Claim your waitlist offer" in Settings: the user enters their waitlist email and taps a confirmation link sent to it (the same pattern as the email-change confirmation).
-- [ ] **Launch email.** Ask waitlist members to sign up with the email they joined with, or to use the claim flow.
+- [ ] **Launch email.** Ask waitlist members to sign up with the email they joined with, or to use the claim flow. The welcome email already asks them to use the same email.

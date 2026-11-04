@@ -12,13 +12,13 @@ Technology-agnostic entity model. Describes entities, relationships, and access 
 | **Receipt** | id, user_id, household_id (nullable), store_id, date, subtotal, tax, total, currency, image_url, extraction_confidence, status (pending/confirmed), created_at | Belongs to User; has many LineItems; belongs to Store | MVP |
 | **LineItem** | id, receipt_id, raw_name, canonical_item_id (nullable; V1.1 sets it on confirm), match_confidence, match_method (V1.1), quantity, unit_price, total_price, unit_of_measure, category_id, category_confidence, corrected (bool) | Belongs to Receipt; belongs to CanonicalItem; belongs to Category | MVP |
 | **ReceiptCorrection** | id, receipt_id, line_item_id (nullable for store/date), user_id, household_id (nullable), field (store_name/date/name/category_id/quantity/total_price), original_value, corrected_value, created_at | Belongs to Receipt; optionally to LineItem; belongs to User. Append-only: one row per changed field per save; the oldest row for a field holds the extracted value (RC-02 AC 3) | MVP |
-| **Category** | id, name, is_default (bool), user_id (nullable for defaults), sort_order | Has many LineItems | MVP |
+| **Category** | id, name, is_default (bool), user_id (nullable for defaults), sort_order | Has many LineItems. V1.1: a user has up to 10 custom categories (`is_default` false, `user_id` set; Premium to create or rename), named uniquely among the defaults and their own, ignoring case; they sort after the defaults (`sort_order` from 101). Deleting one moves its LineItems to the default "Other", clears it from UserItemMappings, and deletes its Budgets | MVP |
 | **Store** | id, name, normalized_name, location (optional) | Has many Receipts | MVP |
-| **Budget** | id, user_id, household_id (nullable), category_id (nullable for overall), amount, period_start, period_type (monthly), rollover_enabled | Belongs to User or Household; optionally to Category | MVP |
+| **Budget** | id, user_id, household_id (nullable), category_id (nullable for overall), amount, period_start, period_type (monthly), rollover_enabled, rollover_start (V1.1, nullable), rollover_opening (V1.1) | Belongs to User or Household; optionally to Category. Rollover (V1.1, Premium): see below | MVP |
 | **CanonicalItem** | id, user_id, household_id (nullable), canonical_name, unit_of_measure, created_at | Each user's own registry (merges and splits are the user's call; names never cross accounts). Has many CanonicalItemAliases, LineItems, PriceObservations | V1.1 |
 | **CanonicalItemAlias** | id, canonical_item_id, user_id, alias, normalized_name (unique per user), embedding (pgvector, 384-d, nullable) | Belongs to CanonicalItem. The names receipts gave the item: exact-alias and semantic matching run on these | V1.1 |
 | **PriceObservation** | id, user_id, household_id, canonical_item_id, receipt_id, line_item_id (unique), store_id, date, unit_price, quantity, unit_of_measure, currency | One per confirmed, matched line item; rebuilt when its receipt changes. Reads exclude deleted receipts | V1.1 |
-| **ItemMatchSuggestion** | id, user_id, item_id, suggested_item_id, confidence, method (fuzzy/semantic), status (pending/accepted/rejected), resolved_at | A medium-confidence (0.6–0.85) match waiting for the user (PI-02 AC 2) | V1.1 |
+| **ItemMatchSuggestion** | id, user_id, item_id, suggested_item_id, confidence, method (fuzzy/semantic), status (pending/accepted/rejected), resolved_at | A medium-confidence (0.6–0.85) match waiting for the user (PI-02 AC 2), or a higher-scoring one whose qualifiers differ ("Bananas" / "Organic Bananas"), which never auto-links (the qualifier exception in PI-02 AC 2; qualifiers are read in English and common French, ignoring accents). `confidence` is the raw score, so it can be ≥0.85 | V1.1 |
 | **PriceAlertSent** | id, user_id, canonical_item_id (unique), alerted_at | The price change alert cooldown ledger (PI-03 AC 3): one row per item. Claiming is one upsert on the unique key that moves alerted_at only when it is a cooldown old, so two concurrent confirms cannot both alert | V1.1 |
 | **PriceAlertItemMute** | id, user_id, canonical_item_id, created_at; unique (user_id, canonical_item_id) | The user muted price alerts for this item (PI-03 AC 4). Merging a muted item mutes the target | V1.1 |
 | **PriceAlertStoreMute** | id, user_id, store_id, created_at; unique (user_id, store_id) | The user muted price alerts for prices paid at this store (PI-03 AC 4). Stores are shared; the mute is the user's | V1.1 |
@@ -28,6 +28,22 @@ Technology-agnostic entity model. Describes entities, relationships, and access 
 | **PantryItem** | id, user_id, household_id, ingredient_id, quantity, unit, purchased_date, estimated_expiry, status (fresh/use_soon/expired/used/discarded) | Belongs to User/Household; belongs to Ingredient | V2.0 |
 | **Recipe** | id, name, description, prep_time_min, cuisine, servings, dietary_labels[], source | Has many RecipeIngredients | V2.0 |
 | **RecipeIngredient** | recipe_id, ingredient_id, quantity, unit, is_optional | Belongs to Recipe; belongs to Ingredient | V2.0 |
+
+
+### Budget rollover [V1.1, Premium]
+
+BC-FR Budget Management: "unspent budget does not roll over by default. Optional rollover toggle (premium)." `rollover_enabled` is the toggle; `rollover_start` (a day in the run's first period) and `rollover_opening` (what carries into that period) hold the current rollover run. No row stores a carry: each period's carry is derived from the budget row and the user's confirmed receipts (`BudgetService.rollover_carries`), so it is deterministic, a read writes nothing, and a late receipt for an earlier period moves it.
+
+- **The carry.** From the run's first period on, each period's unspent amount (its amount plus what carried into it, minus its spend) carries into the next. The period's limit is its amount plus its carry; progress, `remaining`, `percent` and threshold alerts use that limit.
+- **Overspend** carries nothing: the carry is never below 0 (the PRD rolls over "unspent budget").
+- **Turning it on** starts a run in the previous period when the budget existed then (the period holding its `period_start`), so last period's unspent amount joins this period; otherwise the run starts this period. Turning it on again keeps the run; turning it off clears it.
+- **Partial periods and budgets created mid-month.** The first period counts its whole-period spend against its whole amount, as its progress bar does. No proration.
+- **A new amount or start day** (EC Budget 1) restarts the run in the current period, carrying what it had reached, so past periods are not re-scored against the new amount.
+- **Currency** (EC Budget 4): amounts are not converted, so changing the currency restarts every run with nothing carried.
+- **Deleted and restored budgets.** Restoring a budget deleted in an earlier period restarts its run with nothing carried: nothing carries from periods it spent deleted. Restored within the same period, the run is unchanged. Saving a new budget where a deleted one still holds the key (`POST /api/budgets`) revives that row as a new budget, with rollover off and no run, as the app shows a new budget's switch.
+- **A $0 budget** never carries (EC Budget 2: it alerts on any spend).
+- **Premium lapse.** The carry applies only while the user is Premium. While Premium lapses, the limit is the amount, alerts use it, and the toggle and run are kept; if Premium returns, the carry applies again, computed the same way. Decided rule (user, 2026-11-04): the months Premium lapsed count, so their unspent amounts carry too when Premium returns; the run is not restarted at the lapse.
+- **The current period** for every rollover change (turning it on, a new amount or start day, a restore) is the one holding today in the user's time zone, the period the dashboard shows, so a change near midnight lands in the period the user sees.
 
 ## Primary Access Patterns
 
@@ -42,6 +58,7 @@ Technology-agnostic entity model. Describes entities, relationships, and access 
 | Rolling average for a price alert | Mean unit_price of PriceObservations by canonical_item_id with the same unit_of_measure and currency, date in the 7 or 30 days up to the receipt date, the confirming receipt left out | Medium (every confirm, per item) | V1.1 |
 | Cross-store price comparison | The user's PriceObservations for a canonical_item_id (receipts not deleted) grouped by store_id: latest and mean unit price, like-for-like unit and currency, stores with at least 2 prices | Medium | V1.1 |
 | Premium check | The signed-in user's premium_active and premium_expires_at (on the user row, already loaded: no extra query) | High (every Premium gate, every scan) | V1.1 |
+| Data export | The user's not-deleted Receipts (with Store) by user_id ordered by date, id in keyset pages of 500, their LineItems by receipt_id; Budgets by user_id not deleted; PriceObservations by user_id joined to not-deleted Receipts, ordered by date, id in keyset pages | Low (Premium, on request) | V1.1 |
 | Household receipts | Receipts by household_id, ordered by date DESC | Medium | V1.5 |
 | Pantry contents | PantryItems by user_id/household_id where status != used/discarded, ordered by estimated_expiry ASC | High (meal planner) | V2.0 |
 | Recipe matching | Recipes where required ingredient_ids overlap with active PantryItem ingredient_ids | Medium | V2.0 |

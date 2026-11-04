@@ -108,7 +108,7 @@ export async function handleWaitlistJoin(input, env) {
     const subject = env.WAITLIST_WELCOME_SUBJECT || "You're on the Grocery Genie list";
     const body =
       env.WAITLIST_WELCOME_TEXT ||
-      `You're on the Grocery Genie waitlist.\n\nWe'll email you once, at launch, with your invite. That's it until then.\n\nIf you change your mind, reply with "unsubscribe" and we'll remove you within 24 hours.\n\n— The Grocery Genie team`;
+      `You're on the Grocery Genie waitlist.\n\nWe'll email you once, at launch, with your invite. That's it until then.\n\nWhen Premium launches, your free year of Premium goes to the Grocery Genie account that uses this email address, so sign up in the app with this same email.\n\nIf you change your mind, reply with "unsubscribe" and we'll stop emailing you within 24 hours. You'll still get the free year if you sign up with this email. To have your email deleted instead, reply with "delete"; that also gives up the free year.\n\n— The Grocery Genie team`;
 
     // fire-and-forget: don't block the user response
     callResend('/emails', {

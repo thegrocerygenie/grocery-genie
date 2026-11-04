@@ -16,6 +16,12 @@ of it is an exact match. Names whose numbers differ ("milk 1%" and "milk 2%",
 "cola 1l" and "cola 2l") never match by similarity: the numbers are what tell
 those products apart, and both similarity scores rate them close.
 
+Qualifiers work the same way, one step softer (``item_qualifiers``). Names
+that differ in a qualifier (organic, fat, size, flavour, store brand,
+colour, form, diet: "bananas" and "organic bananas") never auto-link,
+however close they score; step 4 asks the user instead. Fuzzy matching
+reads a qualifier's receipt abbreviations as the word ("org" is organic).
+
 The user can also merge two items, split an alias off into its own item,
 and rename an item.
 """
@@ -51,6 +57,7 @@ from app.models.database import (
     Receipt,
 )
 from app.models.types import EMBEDDING_DIMENSIONS
+from app.services.item_qualifiers import qualifiers_compatible, read_qualifiers
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +68,7 @@ MATCH_NEW = "new"
 MATCH_MANUAL = "manual"
 
 # Nearest aliases fetched per semantic lookup: the closest may fail the
-# number check, so look a little further.
+# number or qualifier check, so look a little further.
 _SEMANTIC_CANDIDATES = 5
 
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
@@ -103,9 +110,11 @@ def fuzzy_similarity(a: str, b: str) -> float:
     Sorting the words makes "gala apples" equal "apples gala". Jaro-Winkler
     alone rewards a shared prefix too much ("chicken breast" and "chicken
     thighs" score 0.87); averaging with Levenshtein pulls such pairs down.
+    Qualifier abbreviations are spelled out first: "org bananas" is
+    "organic bananas".
     """
-    sorted_a = " ".join(sorted(a.split()))
-    sorted_b = " ".join(sorted(b.split()))
+    sorted_a = " ".join(sorted(read_qualifiers(a)[0].split()))
+    sorted_b = " ".join(sorted(read_qualifiers(b)[0].split()))
     return (
         JaroWinkler.normalized_similarity(sorted_a, sorted_b)
         + Levenshtein.normalized_similarity(sorted_a, sorted_b)
@@ -198,17 +207,23 @@ class ItemMatchingService:
         if exact is not None:
             return MatchResult(exact.item_id, 1.0, MATCH_ALIAS)
 
-        fuzzy = self._best_fuzzy(name, aliases)
-        semantic = (
+        # Each step gives its best candidate that may auto-link (same
+        # qualifiers) and its best candidate overall (to ask the user about).
+        fuzzy_link, fuzzy = self._best_fuzzy(name, aliases)
+        semantic_link, semantic = (
             await self._best_semantic(user_id, name, embedding)
             if embedding is not None
-            else None
+            else (None, None)
         )
 
-        if fuzzy and fuzzy.score >= self.settings.item_match_fuzzy_threshold:
-            chosen = fuzzy
-        elif semantic and semantic.score >= self.settings.item_match_semantic_threshold:
-            chosen = semantic
+        settings = self.settings
+        if fuzzy_link and fuzzy_link.score >= settings.item_match_fuzzy_threshold:
+            chosen = fuzzy_link
+        elif (
+            semantic_link
+            and semantic_link.score >= settings.item_match_semantic_threshold
+        ):
+            chosen = semantic_link
         else:
             chosen = None
 
@@ -251,23 +266,39 @@ class ItemMatchingService:
             )
         return MatchResult(item.id, 1.0, MATCH_NEW)
 
-    def _best_fuzzy(self, name: str, aliases: list[_Alias]) -> _Candidate | None:
+    def _best_fuzzy(
+        self, name: str, aliases: list[_Alias]
+    ) -> tuple[_Candidate | None, _Candidate | None]:
+        """(best alias with the same qualifiers, best alias overall)."""
+        best_link: _Candidate | None = None
         best: _Candidate | None = None
         for alias in aliases:
             if not numbers_compatible(name, alias.normalized):
                 continue
-            score = fuzzy_similarity(name, alias.normalized)
-            if best is None or score > best.score:
-                best = _Candidate(alias.item_id, score, MATCH_FUZZY)
-        return best
+            candidate = _Candidate(
+                alias.item_id, fuzzy_similarity(name, alias.normalized), MATCH_FUZZY
+            )
+            if best is None or candidate.score > best.score:
+                best = candidate
+            if qualifiers_compatible(name, alias.normalized) and (
+                best_link is None or candidate.score > best_link.score
+            ):
+                best_link = candidate
+        return best_link, best
 
     async def _best_semantic(
         self, user_id: uuid.UUID, name: str, embedding: list[float]
-    ) -> _Candidate | None:
+    ) -> tuple[_Candidate | None, _Candidate | None]:
+        """(nearest alias with the same qualifiers, nearest alias overall)."""
+        best: _Candidate | None = None
         for alias_name, item_id, similarity in await self._nearest(user_id, embedding):
-            if numbers_compatible(name, alias_name):
-                return _Candidate(item_id, similarity, MATCH_SEMANTIC)
-        return None
+            if not numbers_compatible(name, alias_name):
+                continue
+            candidate = _Candidate(item_id, similarity, MATCH_SEMANTIC)
+            best = best or candidate
+            if qualifiers_compatible(name, alias_name):
+                return candidate, best
+        return None, best
 
     async def _nearest(
         self, user_id: uuid.UUID, embedding: list[float]

@@ -19,13 +19,14 @@ import { BudgetRing } from '@/components/BudgetRing';
 import { headerBlurFor } from '@/utils/headerBlur';
 import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { getCategoryMetaByName } from '@/constants/categories';
+import { ROLLOVER_STRINGS } from '@/features/budget/content/rollover';
 import { capBreachMessage } from '@/features/budget/utils/capBreach';
 import { budgetPace } from '@/features/budget/utils/pace';
 import {
   periodBounds,
   periodDaysLeft,
   periodHeading,
-  periodName,
+  periodRingName,
   periodShareElapsed,
 } from '@/features/budget/utils/period';
 import { LoadErrorState } from '@/components/LoadErrorState';
@@ -52,10 +53,12 @@ type DashboardViewState =
       state: 'on-track' | 'over';
       /** "November · day 3", or "Oct 15 – Nov 14 · day 20" for another reset day. */
       periodLabel: string;
-      /** The label without the day count, for the ring when over. */
-      periodName: string;
+      /** "November" or "to Nov 14", for the ring when over. */
+      ringName: string;
       spent: number;
       cap: number;
+      /** The part of ``cap`` that rolled over from earlier periods (Premium). */
+      rolledOver: number;
       daysLeft: number;
       /** Share of the period gone, 0–1, for the pace line. */
       monthShare: number;
@@ -96,9 +99,10 @@ function adaptDashboard(api: ApiDashboardData | undefined, now: Date): Dashboard
     return {
       state: 'on-track',
       periodLabel: periodHeading(bounds, now),
-      periodName: periodName(bounds),
+      ringName: periodRingName(bounds),
       spent: api.overall.spent,
       cap: 0,
+      rolledOver: 0,
       daysLeft: periodDaysLeft(bounds, now),
       monthShare: periodShareElapsed(bounds, now),
       categories,
@@ -109,9 +113,10 @@ function adaptDashboard(api: ApiDashboardData | undefined, now: Date): Dashboard
   return {
     state: over ? 'over' : 'on-track',
     periodLabel: periodHeading(bounds, now),
-    periodName: periodName(bounds),
+    ringName: periodRingName(bounds),
     spent: api.overall.spent,
     cap: api.overall.budget,
+    rolledOver: api.overall.rolled_over ?? 0,
     daysLeft: periodDaysLeft(bounds, now),
     monthShare: periodShareElapsed(bounds, now),
     categories,
@@ -279,13 +284,11 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend, onPrices }: Fille
           <BudgetRing
             progress={progress}
             label={over ? `${Math.round(progress * 100)}%` : whole(remaining)}
-            sub={over ? data.periodName : `left · ${data.daysLeft}d`}
-            accessibilityLabel={ringAccessibilityLabel(
-              data.spent,
-              data.cap,
-              data.daysLeft,
-              currency,
-            )}
+            sub={over ? data.ringName : `left · ${data.daysLeft}d`}
+            accessibilityLabel={
+              ringAccessibilityLabel(data.spent, data.cap, data.daysLeft, currency) +
+              (data.rolledOver > 0 ? ROLLOVER_STRINGS.rolledOverA11y(whole(data.rolledOver)) : '')
+            }
           />
         )}
         <View style={{ flex: 1 }}>
@@ -333,6 +336,11 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend, onPrices }: Fille
                   ? `Over by ${whole(overBy)} · ${data.daysLeft} days left`
                   : paceLine(pace, data.daysLeft)}
               </Text>
+              {data.rolledOver > 0 ? (
+                <Text style={styles.rolledOver}>
+                  {ROLLOVER_STRINGS.includesRolledOver(whole(data.rolledOver))}
+                </Text>
+              ) : null}
             </>
           )}
         </View>
@@ -521,6 +529,7 @@ function CategoryRow({ cat, showDivider }: CategoryRowProps) {
 }
 
 const styles = StyleSheet.create({
+  rolledOver: { ...type.caption1, color: colors.iosLabel2, marginTop: 2 },
   root: { flex: 1, backgroundColor: colors.iosBg },
   center: { alignItems: 'center', justifyContent: 'center' },
 

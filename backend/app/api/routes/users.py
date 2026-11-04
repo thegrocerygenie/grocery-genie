@@ -3,13 +3,15 @@ from __future__ import annotations
 import contextlib
 from typing import NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.types import Receive, Scope, Send
 
 from app.core.config import get_settings
 from app.core.dependencies import get_db
-from app.core.entitlements import is_premium
+from app.core.entitlements import FEATURE_DATA_EXPORT, is_premium, require_premium
 from app.core.security import bearer_scheme, get_current_user
 from app.image.storage import LocalFileStorage
 from app.models.database import User
@@ -26,6 +28,8 @@ from app.models.schemas import (
 from app.services import account_service, ai_consent
 from app.services import auth as auth_service
 from app.services.analytics_service import AnalyticsService, get_analytics_service
+from app.services.budget_service import BudgetService
+from app.services.export_service import ExportFile, ExportFormat, ExportService
 from app.services.premium_service import PremiumService
 from app.services.push_token_service import PushTokenService
 from app.services.revenuecat_client import (
@@ -125,7 +129,13 @@ async def update_me(
 ) -> UserProfileResponse:
     if body.locale is not None:
         user.locale = body.locale
-    if body.currency_preference is not None:
+    if (
+        body.currency_preference is not None
+        and body.currency_preference != user.currency_preference
+    ):
+        # Budget amounts are not converted, so no rollover carry crosses a
+        # currency change (EC Budget 4).
+        await BudgetService(db).restart_rollovers(user.id)
         user.currency_preference = body.currency_preference
     if body.timezone is not None:
         user.timezone = body.timezone
@@ -284,3 +294,59 @@ async def delete_me(
         # The DEBUG-only legacy api_token is not a JWT; nothing to revoke.
         with contextlib.suppress(HTTPException):
             await auth_service.revoke_session(credentials.credentials)
+
+
+@router.get("/me/export")
+async def export_data(
+    fmt: ExportFormat = Query(
+        default=ExportFormat.JSON,
+        alias="format",
+        description="json: one document. csv: a zip of one CSV file per entity.",
+    ),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User = Depends(require_premium(FEATURE_DATA_EXPORT)),
+    analytics: AnalyticsService = Depends(get_analytics_service),
+) -> StreamingResponse:
+    """Download receipts, line items, budgets and prices (NFR Privacy 2).
+
+    Premium (D2). The file is built from batched reads into a spooled
+    temporary file, then streamed, so a large account stays bounded in memory.
+    """
+    export = await ExportService(db).build(user, fmt)
+    try:
+        analytics.emit(
+            "data_exported",
+            {"format": fmt.value, **export.counts.model_dump()},
+            user.id,
+        )
+    except BaseException:
+        export.close()
+        raise
+    return _export_response(export)
+
+
+class _ExportResponse(StreamingResponse):
+    """Streams an export and closes its spooled file however the response
+    ends: fully sent, the client gone before the first byte, or an error."""
+
+    def __init__(self, export: ExportFile) -> None:
+        self._export = export
+        super().__init__(
+            export.chunks(),
+            media_type=export.media_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{export.filename}"',
+                "Content-Length": str(export.size),
+                "Cache-Control": "no-store",
+            },
+        )
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self._export.close()
+
+
+def _export_response(export: ExportFile) -> StreamingResponse:
+    return _ExportResponse(export)
