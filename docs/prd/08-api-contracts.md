@@ -80,6 +80,7 @@ Set a budget. A user has at most one active budget per category (`null` = overal
 ```json
 { "category_id": "cat-uuid | null", "amount": 500.00, "period_type": "monthly", "period_start": "2026-03-01" }
 ```
+A deleted budget with the same category and `period_start` comes back as a new budget (`201`), with `rollover_enabled` false (V1.1).
 
 ### GET /api/budgets [MVP]
 The user's active budgets, overall first. Response: a list of `{ "id", "category_id", "amount", "period_type", "period_start", "rollover_enabled" }`.

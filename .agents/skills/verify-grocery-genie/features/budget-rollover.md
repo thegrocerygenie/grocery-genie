@@ -12,6 +12,7 @@ Budget rollover (V1.1, Premium per decision D2; BC-FR Budget Management) lets a 
 - `rollover-next` the next period's summary includes this period's unspent amount; overspend carries nothing.
 - `rollover-mid-month` a budget created this period carries nothing into this period; its first carry is next period's.
 - `rollover-amount-change` a new amount applies to this period at once and restarts the run there, carrying what it had reached.
+- `rollover-revive` deleting a budget and saving a new one for the same category and start (`POST /api/budgets`) brings back the same row as a new budget: `201`, same `id`, `rollover_enabled` false and no run, as the app shows a new budget's switch.
 - `rollover-lapse` when Premium ends, the limit is the amount again (`rolled_over` 0), `GET /api/budgets` keeps `rollover_enabled` true, and the toggle answers `403`.
 - `rollover-delete` deleting the account deletes the budgets that hold the run.
 
@@ -41,6 +42,7 @@ manual() {  # manual DATE AMOUNT
 - **Lapse (`rollover-lapse`).** `$G revenuecat "$(ev "e-$uid" EXPIRATION $((now+1000)) $now)"` is `applied`. This period's summary is `{"budget":30.0,"spent":41.0,"remaining":-11.0,"percent":136.7,"rolled_over":0.0}`; `GET /api/budgets` still has `rollover_enabled` true; `PUT /api/budgets/$bid/rollover '{"enabled":false}' || true` prints `-> 403`.
 - **Next period with a carry, a budget created this month (`rollover-next`, `rollover-mid-month`).** `$G signup rollover-next`, grant Premium for the new `uid` as above, then create a 30 budget with `period_start` the 1st of this month, `PUT .../rollover '{"enabled":true}'` (`200`) and `manual $TODAY 5`. This period's summary has `budget` 30.0 and `rolled_over` 0.0 (nothing before the budget carries); `period=$NEXT` has `{"budget":55.0,...,"rolled_over":25.0}`.
 - **Amount change (`rollover-amount-change`).** `$G api PATCH /api/budgets/$bid '{"amount":60}'` is `200`; `period=$NEXT` is now `{"budget":115.0,...,"rolled_over":55.0}`: this period's limit is 60 at once, and 55 of it is left.
+- **Revive (`rollover-revive`).** `$G api DELETE /api/budgets/$bid` is `204`. `$G api POST /api/budgets "{\"category_id\":null,\"amount\":40,\"period_type\":\"monthly\",\"period_start\":\"$THIS-01\"}"` is `201` with the same `id` and `rollover_enabled` false; the row is `f||0.00|t` (`rollover_enabled, rollover_start, rollover_opening, deleted_at IS NULL`), `GET /api/budgets` is `[false]`, and `period=$NEXT` is `{"budget":40.0,...,"rolled_over":0.0}`. (`POST /api/budgets/{id}/restore` keeps the toggle; that is pytest's.)
 - **Delete (`rollover-delete`).** `$G api DELETE /api/users/me` prints `-> 204`; `$G sql "SELECT id FROM budgets WHERE user_id = '$uid'"` prints nothing. Rollover adds columns to `budgets` and no table.
 
 ## Gotchas
@@ -48,4 +50,6 @@ manual() {  # manual DATE AMOUNT
 - Use a fresh user per run: the 80% and 100% alerts fire once per budget per period (`budget_alerts_sent`), and `ev` ids must be new.
 - A new user has the 50% alert off (the column default), so the first alert seen is 80%.
 - Alerts fire only in the period that holds today (M5). A receipt dated last month alerts in this period only through the rollover carry, which is what `rollover-late-receipt` proves.
+- While Premium lapses the run is kept, so when it returns the lapsed months' unspent amounts carry too (decided 2026-11-04, `07-data-model.md`). This instance cannot move the clock across months; `test_months_premium_lapsed_carry_when_it_returns` covers it.
+- Every rollover change takes the current period from today in the user's time zone, as the dashboard does; near-midnight cases are pytest's (`test_*_near_midnight_*`).
 - Carries across several periods, start-day and currency changes, restores after a deletion, and category budgets are covered by `backend/tests/api/test_budget_rollover.py` with the clock pinned: this instance runs on today's date and cannot move it.

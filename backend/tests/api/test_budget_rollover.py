@@ -37,9 +37,7 @@ async def seeded(db_session: AsyncSession) -> AsyncSession:
 async def _set_premium(db_session: AsyncSession, on: bool) -> None:
     user = await db_session.get(User, DEV_USER_ID)
     user.premium_active = on
-    user.premium_expires_at = (
-        datetime.now(UTC) + timedelta(days=3650) if on else datetime.now(UTC)
-    )
+    user.premium_expires_at = clock.now() + timedelta(days=3650) if on else clock.now()
     await db_session.flush()
 
 
@@ -51,9 +49,28 @@ async def premium(client: AsyncClient, db_session: AsyncSession) -> None:
 def _pin_today(monkeypatch, day: str) -> None:
     """Pin the server's today, and its now to noon that day."""
     pinned = date.fromisoformat(day)
-    noon = datetime(pinned.year, pinned.month, pinned.day, 12, tzinfo=UTC)
-    monkeypatch.setattr(clock, "today", lambda: pinned)
-    monkeypatch.setattr(clock, "now", lambda: noon)
+    _pin_now(
+        monkeypatch, datetime(pinned.year, pinned.month, pinned.day, 12, tzinfo=UTC)
+    )
+
+
+def _pin_now(monkeypatch, moment: datetime) -> None:
+    """Pin the server's now, and its today to the UTC date of it."""
+    monkeypatch.setattr(clock, "today", lambda: moment.date())
+    monkeypatch.setattr(clock, "now", lambda: moment)
+
+
+@pytest.fixture(autouse=True)
+def _noon_on_test_today(monkeypatch) -> None:
+    """The rollover reads the user's local date (from clock.now), so pin now
+    too: noon UTC on the conftest's today."""
+    _pin_today(monkeypatch, "2026-03-20")
+
+
+async def _set_timezone(db_session: AsyncSession, zone: str) -> None:
+    user = await db_session.get(User, DEV_USER_ID)
+    user.timezone = zone
+    await db_session.flush()
 
 
 async def _budget(
@@ -386,6 +403,96 @@ async def test_restoring_within_the_same_period_keeps_the_carry(
     assert (await _overall(client))["rolled_over"] == 40.0
 
 
+# --- The user's local date, not the server's (UTC) ---
+# 03:00 UTC on April 1 is still March 31 in Los Angeles: the dashboard shows
+# March there, so a change made then is a March change.
+
+LA_LATE_MARCH_31 = datetime(2026, 4, 1, 3, tzinfo=UTC)
+
+
+async def test_turning_rollover_on_near_midnight_uses_the_users_date(
+    client: AsyncClient, seeded, db_session, premium, monkeypatch
+):
+    await _set_timezone(db_session, "America/Los_Angeles")
+    budget_id = await _budget(client, 100.0, period_start="2026-02-01")
+    await _spend(client, 60.0, "2026-02-10")
+
+    _pin_now(monkeypatch, LA_LATE_MARCH_31)
+    await _rollover(client, budget_id, True)
+
+    # February's 40 carries into March, the period the user is in.
+    assert (await _overall(client))["rolled_over"] == 40.0
+    dashboard = (await client.get("/api/dashboard/spending")).json()
+    assert dashboard["period"] == "2026-03"
+    assert dashboard["overall"]["rolled_over"] == 40.0
+
+
+async def test_amount_change_near_midnight_keeps_the_carry(
+    client: AsyncClient, seeded, db_session, premium, monkeypatch
+):
+    await _set_timezone(db_session, "America/Los_Angeles")
+    budget_id = await _budget(client, 100.0, period_start="2026-02-01")
+    await _spend(client, 60.0, "2026-02-10")
+    await _rollover(client, budget_id, True)
+
+    _pin_now(monkeypatch, LA_LATE_MARCH_31)
+    resp = await client.patch(f"/api/budgets/{budget_id}", json={"amount": 200.0})
+    assert resp.status_code == 200
+
+    overall = await _overall(client)
+    assert overall["rolled_over"] == 40.0
+    assert overall["budget"] == 240.0
+
+
+async def test_restore_near_midnight_keeps_a_same_period_carry(
+    client: AsyncClient, seeded, db_session, premium, monkeypatch
+):
+    await _set_timezone(db_session, "America/Los_Angeles")
+    budget_id = await _budget(client, 100.0, period_start="2026-02-01")
+    await _spend(client, 60.0, "2026-02-10")
+    await _rollover(client, budget_id, True)
+    # Deleted the evening of March 30 in Los Angeles (03:00 UTC March 31).
+    _pin_now(monkeypatch, datetime(2026, 3, 31, 3, tzinfo=UTC))
+    assert (await client.delete(f"/api/budgets/{budget_id}")).status_code == 204
+
+    _pin_now(monkeypatch, LA_LATE_MARCH_31)
+    resp = await client.post(f"/api/budgets/{budget_id}/restore")
+    assert resp.status_code == 200
+
+    # Deleted and restored in March, where the user is: the carry stays.
+    assert (await _overall(client))["rolled_over"] == 40.0
+
+
+# --- Reviving a deleted budget through create ---
+
+
+async def test_a_budget_revived_through_create_starts_with_rollover_off(
+    client: AsyncClient, seeded, premium
+):
+    # Saving a new budget where a deleted one held the key revives that row.
+    # To the user it is a new budget, and the app shows a new budget's switch
+    # off, so the server must not carry the old row's rollover over.
+    budget_id = await _budget(client, 100.0, period_start="2026-03-01")
+    await _rollover(client, budget_id, True)
+    assert (await client.delete(f"/api/budgets/{budget_id}")).status_code == 204
+
+    revived = await client.post(
+        "/api/budgets",
+        json={
+            "category_id": None,
+            "amount": 150.0,
+            "period_type": "monthly",
+            "period_start": "2026-03-01",
+        },
+    )
+
+    assert revived.status_code == 201
+    assert revived.json()["id"] == budget_id
+    assert revived.json()["rollover_enabled"] is False
+    assert (await client.get("/api/budgets")).json()[0]["rollover_enabled"] is False
+    assert (await _overall(client, "2026-04"))["rolled_over"] == 0.0
+
+
 async def test_currency_change_restarts_rollover(client: AsyncClient, seeded, premium):
     # EC Budget 4: amounts are not converted, so a carry in the old currency
     # does not carry into the new one.
@@ -416,6 +523,24 @@ async def test_premium_lapse_pauses_rollover_and_keeps_the_toggle(
 
     await _set_premium(db_session, True)
     assert (await _overall(client))["rolled_over"] == 40.0
+
+
+async def test_months_premium_lapsed_carry_when_it_returns(
+    client: AsyncClient, seeded, db_session, premium, monkeypatch
+):
+    # Decided rule (user, 2026-11-04; 07-data-model.md, Premium lapse): the
+    # run is not restarted at the lapse, so the lapsed months' unspent counts.
+    budget_id = await _budget(client, 100.0)
+    await _spend(client, 60.0, "2026-02-10")
+    await _rollover(client, budget_id, True)
+    await _set_premium(db_session, False)
+
+    _pin_today(monkeypatch, "2026-05-05")
+    assert (await _overall(client, "2026-05"))["rolled_over"] == 0.0
+    await _set_premium(db_session, True)
+
+    # February's 40, then March and April unspent: 40 + 100 + 100.
+    assert (await _overall(client, "2026-05"))["rolled_over"] == 240.0
 
 
 # --- Threshold alerts on the effective limit (BC-03) ---

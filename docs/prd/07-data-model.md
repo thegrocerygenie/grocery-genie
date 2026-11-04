@@ -40,9 +40,10 @@ BC-FR Budget Management: "unspent budget does not roll over by default. Optional
 - **Partial periods and budgets created mid-month.** The first period counts its whole-period spend against its whole amount, as its progress bar does. No proration.
 - **A new amount or start day** (EC Budget 1) restarts the run in the current period, carrying what it had reached, so past periods are not re-scored against the new amount.
 - **Currency** (EC Budget 4): amounts are not converted, so changing the currency restarts every run with nothing carried.
-- **Deleted and restored budgets.** Restoring a budget deleted in an earlier period restarts its run with nothing carried: nothing carries from periods it spent deleted. Restored within the same period, the run is unchanged.
+- **Deleted and restored budgets.** Restoring a budget deleted in an earlier period restarts its run with nothing carried: nothing carries from periods it spent deleted. Restored within the same period, the run is unchanged. Saving a new budget where a deleted one still holds the key (`POST /api/budgets`) revives that row as a new budget, with rollover off and no run, as the app shows a new budget's switch.
 - **A $0 budget** never carries (EC Budget 2: it alerts on any spend).
-- **Premium lapse.** The carry applies only while the user is Premium. While Premium lapses, the limit is the amount, alerts use it, and the toggle and run are kept; if Premium returns, the carry applies again, computed the same way.
+- **Premium lapse.** The carry applies only while the user is Premium. While Premium lapses, the limit is the amount, alerts use it, and the toggle and run are kept; if Premium returns, the carry applies again, computed the same way. Decided rule (user, 2026-11-04): the months Premium lapsed count, so their unspent amounts carry too when Premium returns; the run is not restarted at the lapse.
+- **The current period** for every rollover change (turning it on, a new amount or start day, a restore) is the one holding today in the user's time zone, the period the dashboard shows, so a change near midnight lands in the period the user sees.
 
 ## Primary Access Patterns
 

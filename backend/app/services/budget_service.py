@@ -162,17 +162,16 @@ class BudgetService:
         )
         deleted = result.scalars().first()
         if deleted is not None:
-            deleted_at = deleted.deleted_at
-            affected = await self._rollover_affected(
-                user_id, deleted, request.amount, None
-            )
-            openings = await self._carry_now(user_id, affected)
+            # A new budget to the user, so it starts with rollover off, as the
+            # app shows a new budget's switch. Restore keeps it; this is not
+            # a restore.
             deleted.deleted_at = None
             deleted.amount = request.amount
             deleted.period_type = request.period_type
+            deleted.rollover_enabled = False
+            deleted.rollover_start = None
+            deleted.rollover_opening = 0
             await self.db.flush()
-            await self._restart_rollover(user_id, affected, openings)
-            await self._rollover_after_restore(user_id, deleted, deleted_at)
             return deleted, True
 
         budget = Budget(
@@ -340,7 +339,7 @@ class BudgetService:
             return budget
         if enabled:
             start_day = await self._start_day(user_id)
-            _, current, _ = period_containing(clock.today(), start_day)
+            _, current, _ = period_containing(await self._today(user_id), start_day)
             _, previous, _ = period_containing(current - timedelta(days=1), start_day)
             _, first, _ = period_containing(budget.period_start, start_day)
             budget.rollover_start = previous if first <= previous else current
@@ -439,6 +438,15 @@ class BudgetService:
         )
         return list(result.scalars().all())
 
+    async def _timezone(self, user_id: uuid.UUID) -> str | None:
+        user = await self.db.get(User, user_id)
+        return user.timezone if user is not None else None
+
+    async def _today(self, user_id: uuid.UUID) -> date:
+        """Today where the user is: the dashboard's current period is the one
+        holding it, so a change near midnight lands in the same period."""
+        return clock.today_in(await self._timezone(user_id))
+
     async def _rollover_affected(
         self,
         user_id: uuid.UUID,
@@ -461,7 +469,8 @@ class BudgetService:
         """What has carried into the current period, before a change."""
         if not budgets:
             return {}
-        _, current, _ = await self.get_period_containing(user_id, clock.today())
+        today = await self._today(user_id)
+        _, current, _ = await self.get_period_containing(user_id, today)
         return await self._carries(user_id, budgets, current)
 
     async def _restart_rollover(
@@ -474,7 +483,8 @@ class BudgetService:
         can move it), with ``openings`` carried in."""
         if not budgets:
             return
-        _, current, _ = await self.get_period_containing(user_id, clock.today())
+        today = await self._today(user_id)
+        _, current, _ = await self.get_period_containing(user_id, today)
         for budget in budgets:
             if budget.rollover_enabled and budget.rollover_start is not None:
                 budget.rollover_start = current
@@ -497,8 +507,11 @@ class BudgetService:
             return
         if deleted_at.tzinfo is None:  # SQLite drops the zone
             deleted_at = deleted_at.replace(tzinfo=UTC)
-        _, current, _ = await self.get_period_containing(user_id, clock.today())
-        _, deleted_in, _ = await self.get_period_containing(user_id, deleted_at.date())
+        zone = await self._timezone(user_id)
+        today = clock.today_in(zone)
+        deleted_on = deleted_at.astimezone(clock.user_zone(zone)).date()
+        _, current, _ = await self.get_period_containing(user_id, today)
+        _, deleted_in, _ = await self.get_period_containing(user_id, deleted_on)
         if deleted_in < current:
             await self._restart_rollover(user_id, [budget], {})
 

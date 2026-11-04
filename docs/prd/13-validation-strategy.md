@@ -314,6 +314,11 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | BC-FR | Rollover | Rollover: deleted and restored budgets | Integration | `backend/tests/api/test_budget_rollover.py::test_restoring_within_the_same_period_keeps_the_carry` | Pass |
 | BC-FR | Rollover | Rollover: Premium lapse pauses it and keeps the toggle | Integration | `backend/tests/api/test_budget_rollover.py::test_premium_lapse_pauses_rollover_and_keeps_the_toggle` | Pass |
 | BC-FR | Rollover | Rollover: Premium lapse pauses it and keeps the toggle | Integration | `backend/tests/api/test_budget_rollover.py::test_lapsed_premium_alerts_on_the_base_amount` | Pass |
+| BC-FR | Rollover | Rollover: deleted and restored budgets | Integration | `backend/tests/api/test_budget_rollover.py::test_restore_near_midnight_keeps_a_same_period_carry` | Pass |
+| BC-FR | Rollover | Rollover: a budget revived through create starts with rollover off | Integration | `backend/tests/api/test_budget_rollover.py::test_a_budget_revived_through_create_starts_with_rollover_off` | Pass |
+| BC-FR | Rollover | Rollover: Premium lapse pauses it and keeps the toggle | Integration | `backend/tests/api/test_budget_rollover.py::test_months_premium_lapsed_carry_when_it_returns` | Pass |
+| BC-FR | Rollover | Rollover: changes use the user's local date, as the dashboard does | Integration | `backend/tests/api/test_budget_rollover.py::test_turning_rollover_on_near_midnight_uses_the_users_date` | Pass |
+| BC-FR | Rollover | Rollover: changes use the user's local date, as the dashboard does | Integration | `backend/tests/api/test_budget_rollover.py::test_amount_change_near_midnight_keeps_the_carry` | Pass |
 | BC-FR | Rollover | Threshold alerts use the limit with rollover (BC-03) | Integration | `backend/tests/api/test_budget_rollover.py::test_threshold_alert_fires_on_the_effective_limit` | Pass |
 | BC-FR | Rollover | Threshold alerts use the limit with rollover (BC-03) | Integration | `backend/tests/api/test_budget_rollover.py::test_late_receipt_in_last_period_shrinks_the_carry_and_alerts` | Pass |
 | BC-FR | Rollover | Rollover toggle analytics (`budget_rollover_toggled`) | Integration | `backend/tests/api/test_budget_rollover.py::test_toggling_rollover_emits_analytics` | Pass |
