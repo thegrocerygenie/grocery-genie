@@ -16,6 +16,7 @@ Each line is a failure that happened, and the rule that came from it.
 - **Phase Definition of Done.** V1.1 had none until an audit asked; write it early (as a task) so the final check has something to walk.
 - **Context.** The coordinator stayed small by never reading source: plans, reports and `git` metadata only. Long agent reports are capped by the prompt ("under 300 words"). Session 3 finished V1.1 (5 merges, then 4 more tasks, a done check and this skill) at about 30% context, measured with `get_session`; it had been guessing until then. Measure after every merge.
 - **Session lineage.** Each handoff session is a child of the last; `get_session` showed depth 3 of a limit of 8 after two handoffs. Near the limit, ask the user to start a fresh top-level session.
+- **Start the next session on the coordinator branch.** Handoffs live on the coordinator branch, not `main`. V1.1 session 3 worked because it was created with revision `claude/v11-coordinator-2`; a session cloned from `main` would not have found the handoff.
 - **Handoff approval takes time.** The commit-gate question for the handoff can wait while context grows; ask at 30%, hand off at 35%.
 - **Worktrees.** `.claude/worktrees/` goes in `.git/info/exclude` (local to each clone), or the stop hook complains about untracked files. Use detached worktrees for your own status-row commits: the agent's worktree may still hold the branch.
 - **Pushes.** `git push` once hung at negotiation for minutes: wrap it in `timeout 300`. `merge_pull_request` needs the full 40-character `expectedHeadSha`.
