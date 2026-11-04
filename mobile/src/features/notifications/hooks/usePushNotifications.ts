@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import { type Href, useRootNavigationState, useRouter } from 'expo-router';
+import { type Href, useNavigationContainerRef, useRouter } from 'expo-router';
 
 import { useAuthStore } from '@/store/authStore';
 import { usePushStore } from '@/store/pushStore';
@@ -35,6 +35,28 @@ function easProjectId(): string | undefined {
 }
 
 /**
+ * True once React Navigation can take a navigation. A tap that launched the app
+ * is already waiting on the first frame, before the root stack is ready, and
+ * pushing then throws. The container ref has no ready event, so check each
+ * frame until it is.
+ */
+function useNavigationReady(): boolean {
+  const navigation = useNavigationContainerRef();
+  const [ready, setReady] = useState(() => navigation.isReady());
+
+  useEffect(() => {
+    if (ready) return;
+    let frame = requestAnimationFrame(function check() {
+      if (navigation.isReady()) setReady(true);
+      else frame = requestAnimationFrame(check);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [ready, navigation]);
+
+  return ready;
+}
+
+/**
  * Registers this device for push after sign-in, and opens the right screen
  * when the user taps a push (including one that launched the app).
  */
@@ -42,7 +64,7 @@ export function usePushNotifications(): void {
   const accessToken = useAuthStore((s) => s.accessToken);
   const setToken = usePushStore((s) => s.setToken);
   const router = useRouter();
-  const navigationReady = !!useRootNavigationState()?.key;
+  const navigationReady = useNavigationReady();
   const lastResponse = Notifications.useLastNotificationResponse();
 
   useEffect(() => {
@@ -62,7 +84,10 @@ export function usePushNotifications(): void {
     if (notificationId) {
       void markNotificationRead(notificationId, 'push').catch(() => undefined);
     }
-    router.push(route as Href);
+    // withAnchor: if the tap lands while the root stack is still being built,
+    // the stack gets its initialRouteName (the tabs) under the item, so Back
+    // returns to Budget (BUG-6). Into a built stack this is a plain push.
+    router.push(route as Href, { withAnchor: true });
     // Handle each tap once, even if this hook remounts.
     void Notifications.clearLastNotificationResponseAsync();
   }, [lastResponse, accessToken, navigationReady, router]);
