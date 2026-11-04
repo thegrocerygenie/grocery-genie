@@ -303,7 +303,7 @@ async def test_a_refund_in_the_trial_ends_premium_now(client):
         client,
         _event(
             "CANCELLATION",
-            expires=now - timedelta(seconds=1),
+            expires=now + timedelta(days=7),  # the trial end: the refund ends it anyway
             at=now + timedelta(seconds=5),
             period_type="TRIAL",
             cancel_reason="CUSTOMER_SUPPORT",

@@ -314,7 +314,7 @@ cmd_premium() {
   uid="$(cmd_api GET /api/users/me 2>/dev/null | jq -r .id)"
   [ -n "$uid" ] && [ "$uid" != null ] || die "could not read the signed-in user"
   now="$(date +%s)000"
-  cmd_revenuecat "$(jq -nc --arg u "$uid" --argjson at "$now" '{api_version:"1.0",event:{id:("gg-verify-premium-"+$u),type:"INITIAL_PURCHASE",app_user_id:$u,aliases:[$u],entitlement_ids:["premium"],product_id:"gg_premium_yearly",period_type:"NORMAL",environment:"SANDBOX",event_timestamp_ms:$at,expiration_at_ms:($at+31536000000)}}')"
+  cmd_revenuecat "$(jq -nc --arg u "$uid" --argjson at "$now" '{api_version:"1.0",event:{id:("gg-verify-premium-"+$u+"-"+($at|tostring)),type:"INITIAL_PURCHASE",app_user_id:$u,aliases:[$u],entitlement_ids:["premium"],product_id:"gg_premium_yearly",period_type:"NORMAL",environment:"SANDBOX",event_timestamp_ms:$at,expiration_at_ms:($at+31536000000)}}')"
 }
 
 cmd_scan() {

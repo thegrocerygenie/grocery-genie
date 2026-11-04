@@ -195,10 +195,10 @@ describe('Paywall', () => {
       'Per-item & per-store mute',
       'Unlimited receipts',
       'Budget rollover',
+      'Priority OCR processing',
     ]) {
       expect(screen.getByText(title)).toBeTruthy();
     }
-    expect(screen.queryByText(/Priority OCR/)).toBeNull();
     expect(screen.getByText('Price history and price alerts stay free.')).toBeTruthy();
   });
 

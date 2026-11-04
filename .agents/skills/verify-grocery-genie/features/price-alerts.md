@@ -78,3 +78,4 @@ $G api DELETE /api/stores/$store/mute                                        # 2
 - The mock scan's items carry `unit_of_measure`; manual entries carry none. The average compares like with like, so a scanned per-lb price and a manual unitless price of the same item are separate series.
 - Pushes go through the existing pipeline (`deliver_pending_pushes`), which needs a Celery worker and an Expo token; the journey checks the notification rows. `backend/tests/tasks/test_push_tasks.py::test_a_price_change_push_opens_its_item` covers the push payload.
 - Verified 2026-11-03 against Postgres 16 (run `20261103-181419`, after the unmute fix); `pa.app-tap` and `pa.app-settings` with the app's calls in run `20261103-183706`.
+- Run in full as Premium users (`$G premium`, decision D8) on 2026-11-04: run `20261104-231631`.

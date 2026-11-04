@@ -47,3 +47,4 @@ $G signup compare-third && $G premium && $G api GET /api/items/$iid/compare     
 - Stores are shared rows matched by name; the `sql` check groups every user's observations, Costco included, which is the point: it is in the database but not in this user's comparison.
 - The last call answers 404, so `$G api` exits non-zero there: that is the pass. The third user is Premium first: a free user gets `403 premium_required` before the item is looked up.
 - Verified 2026-11-03 against Postgres 16 in debug mode (run `20261103-151240`; again with the app's screen built, run `20261103-183706`).
+- Run in full as Premium users (`$G premium`, decision D8) on 2026-11-04: run `20261104-231532`.

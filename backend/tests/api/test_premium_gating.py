@@ -10,6 +10,8 @@ covered here too; custom categories, export and rollover gate themselves in
 their own tests.
 """
 
+import uuid
+
 import pytest
 from httpx import AsyncClient
 
@@ -96,6 +98,46 @@ async def test_muting_is_premium_and_unmuting_is_open(client, db_session):
     await set_premium(db_session, DEV_USER_ID, True)
     assert (await client.post(f"/api/items/{item_id}/mute")).status_code == 204
     assert (await client.post(f"/api/stores/{store_id}/mute")).status_code == 204
+
+
+async def _assert_free_calls_are_403(client, item_id, store_id) -> None:
+    _assert_premium_required(
+        await client.get(f"/api/items/{item_id}/compare"), "price_comparison"
+    )
+    _assert_premium_required(
+        await client.post(f"/api/items/{item_id}/mute"), "price_alert_mute"
+    )
+    _assert_premium_required(
+        await client.post(f"/api/stores/{store_id}/mute"), "price_alert_mute"
+    )
+
+
+async def test_the_premium_check_comes_before_an_unknown_id(client):
+    """08-api-contracts: a free user gets 403, not 404, for an id that is not
+    theirs or does not exist, so the gate never says whether an id exists."""
+    await _assert_free_user(client)
+    await _assert_free_calls_are_403(client, uuid.uuid4(), uuid.uuid4())
+
+
+async def test_the_premium_check_comes_before_another_users_item(
+    client_user_b, db_session
+):
+    from app.models.database import Store
+    from app.services.item_matching_service import ItemMatchingService
+    from tests.services.test_item_matching import _receipt
+
+    receipt, lines = await _receipt(db_session, "Limes", user_id=DEV_USER_ID)
+    store = Store(name="Elsewhere", normalized_name="elsewhere")
+    db_session.add(store)
+    await db_session.flush()
+    receipt.store_id = store.id
+    await ItemMatchingService(db_session).match_line_items(DEV_USER_ID, lines)
+    await db_session.flush()
+
+    assert (await client_user_b.get("/api/users/me")).json()["is_premium"] is False
+    await _assert_free_calls_are_403(
+        client_user_b, lines[0].canonical_item_id, store.id
+    )
 
 
 async def test_a_mute_outlives_a_premium_lapse(

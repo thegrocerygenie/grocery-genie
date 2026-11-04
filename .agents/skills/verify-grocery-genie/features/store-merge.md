@@ -87,3 +87,4 @@ $G api POST /api/stores/00000000-0000-0000-0000-0000000000ff/merge "{\"into_stor
 - Verified 2026-11-04 against Postgres 16 in debug mode (run `20261104-045939`; again with the end-only branch markers and per-receipt store names, run `20261104-052245`; with saved names and the "No." rule, run `20261104-055037`).
 - The filler stores (Chinese, Bar) buy Kiwis at one price, so they add no price alert.
 - A mute is recorded on the group's store: after `DELETE /api/stores/{id}/merge`, a mute set on the group stays with the group's store, one set before the merge stays with the merged store.
+- Run in full with `$G premium` before the first comparison (decision D8) on 2026-11-04: run `20261104-231707`.

@@ -18,6 +18,7 @@ export const PREMIUM_STRINGS = {
     { key: 'export', symbol: 'square.and.arrow.up', title: 'Data export · CSV/JSON' },
     { key: 'trend', symbol: 'chart.bar.xaxis', title: '12-month trends' },
     { key: 'mute', symbol: 'bell.slash.fill', title: 'Per-item & per-store mute' },
+    { key: 'ocr', symbol: 'viewfinder', title: 'Priority OCR processing' },
     { key: 'receipts', symbol: 'infinity', title: 'Unlimited receipts' },
     { key: 'rollover', symbol: 'arrow.uturn.forward', title: 'Budget rollover' },
   ],
