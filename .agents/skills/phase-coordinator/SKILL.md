@@ -68,16 +68,48 @@ When every row is merged or dropped:
 
 ## Handoff
 
-Before your context passes 40% (check your usage; if you can't see it, hand off after about 8 merged tasks or any time a session has run many hours), write `.planning/HANDOFF-<date>-<phase>-coordinator-<n>.md` from `references/handoff-template.md`:
+The coordinator hands off to a new session before its context passes 40%. Measure it; don't guess.
+
+### Measure after every merge (and at the start of each session)
+
+Call `get_session` (Claude Code Remote tools) with no `session_id`. It describes your own session:
+
+- `external_metadata.context_usage.used_tokens / max_tokens` is your context use;
+- `lineage.depth` and `lineage.limit` show how deep the session chain is. Each handoff session is a child of the last, and the chain stops at the limit.
+
+Act on the numbers:
+
+| Context use | Do |
+|---|---|
+| under 30% | Keep going. Refresh the handoff file after each merge once the session has run a few hours. |
+| 30% | Write the handoff now and ask the user to approve committing and pushing it. The approval prompt can wait a while, and your context grows meanwhile. Don't dispatch new tasks after this point; let running ones finish. |
+| 35% | Hand off: push the approved handoff and start the next session, even mid-task. |
+| 40% | Hard limit. Never pass it. |
+
+Without `get_session` (another harness, or the tool is missing): hand off after about 6 merged tasks, or whenever the session has run many hours. In Codex, ask the user how full the context is.
+
+### Write the handoff
+
+Write `.planning/HANDOFF-<date>-<phase>-coordinator-<n>.md` from `references/handoff-template.md`:
 
 - the user's standing instructions **verbatim**, and every per-task approval answer;
 - merged PRs, in-flight agents with branch, head SHA and next step, the next tasks;
 - what this session learned (add lasting lessons to `references/lessons.md` in a later PR);
-- the queued manual checks.
+- the queued manual checks;
+- the context use and lineage depth you measured.
 
-Commit and push it on the coordinator branch, then start the next session (`create_session` from the Claude Code Remote tools if available, otherwise tell the user) with: "Read <handoff> and continue as coordinator with /phase-coordinator <phase> <handoff>." Agents still running in your session keep running: forward each final report to the new session with `send_message`, then stop.
+Commit it on the coordinator branch and push it (after the user's OK, per the commit gate).
 
-Also refresh the handoff after each merge once a session is long: a container restart can end the session without warning.
+### Start the next session
+
+1. Check the depth. If `lineage.depth + 1` would reach `lineage.limit`, `create_session` can't start a child. Ask the user to start a fresh top-level session with the prompt below, and stop there.
+2. Otherwise call `create_session` with the prompt "Read <handoff> and continue as coordinator with /phase-coordinator <phase> <handoff>." Give it a title such as "<phase> coordinator, session <n+1>", and keep the same environment and repository.
+3. Confirm it started: `get_session` on the new id shows it running. If `create_session` is missing or fails, give the user that prompt to paste into a new session.
+4. Agents still running in your session keep running. Forward each final report to the new session with `send_message`, then stop. Do no more coordinator work once the new session exists: two coordinators would race to merge.
+
+### On a restart
+
+A container restart can end the session without warning. That's why the handoff gets refreshed after each merge once a session is long: the next session can always pick up from the last one pushed.
 
 ## Rules that never bend
 
