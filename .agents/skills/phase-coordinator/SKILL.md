@@ -98,13 +98,19 @@ Write `.planning/HANDOFF-<date>-<phase>-coordinator-<n>.md` from `references/han
 - the queued manual checks;
 - the context use and lineage depth you measured.
 
-Commit it on the coordinator branch and push it (after the user's OK, per the commit gate).
+Commit it on the coordinator branch and push it (after the user's OK, per the commit gate). It does not need to be merged to `main`: the next session starts from the coordinator branch and reads it there. Status rows reach `main` through each task's own PR, so `main` stays current without the handoff.
 
 ### Start the next session
 
 1. Check the depth. If `lineage.depth + 1` would reach `lineage.limit`, `create_session` can't start a child. Ask the user to start a fresh top-level session with the prompt below, and stop there.
-2. Otherwise call `create_session` with the prompt "Read <handoff> and continue as coordinator with /phase-coordinator <phase> <handoff>." Give it a title such as "<phase> coordinator, session <n+1>", and keep the same environment and repository.
-3. Confirm it started: `get_session` on the new id shows it running. If `create_session` is missing or fails, give the user that prompt to paste into a new session.
+2. Otherwise call `create_session` with:
+   - `source_url`: the repository URL (`git remote get-url origin`);
+   - `source_revision`: the coordinator branch you just pushed. Without it the new session clones `main`, where the handoff doesn't exist;
+   - the prompt "Read <handoff> and continue as coordinator with /phase-coordinator <phase> <handoff>. The handoff is on branch <coordinator branch>.";
+   - a title such as "<phase> coordinator, session <n+1>".
+
+   It keeps your environment by default.
+3. Confirm it started: `get_session` on the new id shows it running on the coordinator branch (`session_context.sources[].git_repository.revision`). If `create_session` is missing or fails, give the user that prompt and tell them to start the new session on the coordinator branch.
 4. Agents still running in your session keep running. Forward each final report to the new session with `send_message`, then stop. Do no more coordinator work once the new session exists: two coordinators would race to merge.
 
 ### On a restart
