@@ -156,6 +156,8 @@ Skills live in `.agents/skills/<name>/` and load in both Claude Code and Codex. 
 
 Four skills build and keep verification skills: `gg-create-verification-skill` and `gg-maintain-verification-skill` drive the app the way a user does, and `gg-create-formal-verification-skill` and `gg-maintain-formal-verification-skill` check risky code formally.
 
+`phase-coordinator` drives a whole roadmap phase to done: it plans the phase into tasks, sends each one to an implementer subagent, has a fresh reviewer check it, asks the user before each merge, and writes a handoff before its context fills. It is user-invoked: `/phase-coordinator V1.5` (Codex: `$phase-coordinator V1.5`).
+
 `marketing-site-brief` writes the Claude Design brief for the marketing site at a roadmap stage. The brief covers the whole app as built up to that stage, and every claim is checked against the code. Its output goes in `docs/marketing/<stage>/`.
 
 ## Key Conventions

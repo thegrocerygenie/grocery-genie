@@ -1,0 +1,5 @@
+interface:
+  display_name: "Phase Coordinator"
+  short_description: "Drive a roadmap phase to done with subagents, reviews and handoffs"
+policy:
+  allow_implicit_invocation: false
