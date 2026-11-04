@@ -65,6 +65,24 @@ Screenshots and trees are in `.verification/device/`. File names start with `se-
 | D6 | Sandbox purchase | Not checked | | | Needs the keys and products listed under "Not checked" |
 | X1 | Currency on Trend bar labels (found while checking A) | Fail | | `se-A10-trend-eur-bar-dollar.png`, `se-A10-trend-eur-ax.txt` | BUG-7 |
 
+## Fix verification, 2026-11-03 evening
+
+All nine bugs were re-checked on `main` at `11a2863`, after #99 (BUG-6), #101 (V11-D1: BUG-1, 2, 3, 5, 6, 7, 8, 9) and #104 (V11-D2: BUG-4) merged. The same Debug build ran (no native change since `ef4cefe`), with Metro and the backend on `11a2863` and the check database migrated to `20261104_0018`. Before the device runs, the mobile suite passed (125 suites, 930 tests) and so did `tests/services/test_item_matching.py` (215 tests).
+
+| Bug | Result | How it was checked | Evidence |
+|---|---|---|---|
+| BUG-1 | Fixed | SE at AX5, 3 months: the bar amounts sit below "+22% vs prior 3 months". The text ends at y 708 and the bar columns start at y 730 | `se-FIX-A-AX5-trend-3m-chart.png`, `se-FIX-A-AX5-trend-3m-ax.txt` |
+| BUG-2 | Fixed | SE and Pro Max at AX5: "−74% vs Oct" wraps under the amount and ends at x 298 | `se-FIX-A-AX5-trend-3m.png`, `pm-FIX-A-AX5-trend-3m.png` |
+| BUG-3 | Fixed | SE at AX5: Prices rows show the whole name with the price under it. On item detail "$4.79" is on one line and "Rename" is not clipped | `se-FIX-B3-AX5-prices.png`, `se-FIX-B3-AX5-item.png` |
+| BUG-4 | Fixed | A fresh user, the same receipts as the first run. "Bananas" gets its own item and a Review Matches suggestion (0.857). ORG BANANAS links to Organic Bananas and GRK YGRT to Greek Yogurt. Organic Whole Milk, Chicken Thighs and Brown Eggs stay suggestions | `fixcheck/match-probe.txt` |
+| BUG-5 | Fixed | The "Prices" large title is drawn | `se-FIX-B5-prices-title.png` |
+| BUG-6 | Fixed | Cold-start link 2 of 2 and cold-start push tap 2 of 2 open the item with Back. Before #99 both were red, 3 of 3 | `se-loop-bug6-ax.txt`, `se-C18-cold-trial-main1.png`, `se-C18-cold-trial-main2.png` |
+| BUG-7 | Fixed | An EUR user sees "€0" on the bars, as in the summary | `se-FIX-A10-trend-eur.png`, `se-FIX-A10-trend-eur-ax.txt` |
+| BUG-8 | Fixed | The 12-month bars are in month order in the accessibility tree, December to November | `se-FIX-A-AX5-trend-12m-ax.txt` |
+| BUG-9 | Fixed | SE at AX5, 12 months: the one-letter labels stay readable and the bars clear "12-month average $53" | `se-FIX-A-AX5-trend-12m.png` |
+
+Still open from this report: O1 to O9, the observations below, and the items under "Not checked". The Back button on an item opened from a push or link reads "Prices" but leads to Budget (`items/[id].tsx` sets `headerBackTitle`).
+
 ## Bugs
 
 Fix status (2026-11-04): BUG-1, 2, 3, 5, 6, 7, 8 and 9 are fixed in code by V11-D1 (BUG-6 also by #99); BUG-4 is fixed by V11-D2 (qualifier differences ask instead of auto-linking; PI-02 AC 2 amended). A Simulator recheck of BUG-1, 2, 3, 5, 6, 8 and 9 is still due (BUG-7 is covered by its test).
