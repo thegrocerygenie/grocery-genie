@@ -30,6 +30,7 @@ from app.llm.provider import (
     ReceiptExtractor,
     get_category_assigner,
     get_embedder,
+    get_premium_receipt_extractor,
     get_receipt_extractor,
 )
 from app.models.database import Receipt as ReceiptModel
@@ -112,6 +113,8 @@ async def scan_receipt(
     # 5.1.2(i): the photo and item names go to Anthropic, so consent comes first.
     user: User = Depends(require_ai_consent),
     extractor: ReceiptExtractor = Depends(get_receipt_extractor),
+    # Priority OCR (PREM-03): the service uses it only for a Premium user.
+    premium_extractor: ReceiptExtractor | None = Depends(get_premium_receipt_extractor),
     category_assigner: CategoryAssigner = Depends(get_category_assigner),
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> ReceiptScanResponse | Response:
@@ -174,6 +177,7 @@ async def scan_receipt(
     service = ReceiptService(
         db=db,
         extractor=extractor,
+        premium_extractor=premium_extractor,
         category_assigner=category_assigner,
         analytics=analytics,
     )

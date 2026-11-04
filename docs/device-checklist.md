@@ -159,6 +159,9 @@ Setup for this section:
 - [ ] **Review Matches.** Confirm "Organic Bananas", then "Bananas". Review Matches asks whether they are the same item; neither links on its own. Different keeps two items; Same Item merges their prices. (PI-02 AC 2; BUG-4)
 - [ ] **Settings → Stores.** Branch numbers ("Loblaws" and "Loblaws #1234") show as one store. Merge one name into another (for example "REAL CANADIAN SUPERSTORE" into "Loblaws"): an item bought at both now compares as one store. Unmerge splits them again. Only this account's prices regroup. (11-edge-cases Price Intelligence 1; V11-05, decision D3)
 
+**Priority OCR (PREM-03 AC 6, decision D9):**
+- [ ] **Premium model accuracy, before it is switched on in production.** With `GG_LLM_API_KEY`, `GG_LLM_PREMIUM_EXTRACTION_MODEL` set to the chosen model, and the real receipt set's images in place, run `/validate-extraction` (from `backend/`: `.venv/bin/python -m tests.llm_validation.run extract`, then `... extract --premium`). The Premium run's field accuracy and item recall are no lower than the default run's, hallucination is 0%, and both reports' `tokens_per_scan` give the cost per scan (`docs/DEPLOYMENT.md` Part 3, Priority OCR model). Commit both reports; the product owner approves the model and cost before production sets the variable.
+
 **Device-check bug rechecks (`.planning/DEVICE-CHECK-2026-11-03.md`):**
 - [ ] **BUG-1.** At AX1 and AX5, Trend's bar amounts stay clear of the summary above the chart.
 - [ ] **BUG-2.** At AX5, the month-over-month change wraps under the total, on the SE.

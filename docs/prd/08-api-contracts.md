@@ -272,6 +272,8 @@ The profile (`/api/auth/me`, `/api/users/me`, and every route that returns it) c
 ```
 `code` is the stable test; the hourly rate limit's `429` has none. It is not `403 premium_required`, because the scan itself is a free feature: the month's allowance is spent. `detail` stays a string because app builds from before V1.1 match it ("quota") and must keep treating the cap as final, not retrying it. The app answers it with the upgrade prompt (See Premium opens the paywall, or Enter manually), never an error (D2).
 
+**Priority OCR (D9, PREM-03).** `POST /api/receipts/scan` reads a Premium user's receipt with the Premium extraction model (`GG_LLM_PREMIUM_EXTRACTION_MODEL`) and a free user's with the default model. The request and the response are unchanged: the app sends nothing about it, and the server reads Premium from the user's entitlement when extraction starts. A Premium model that fails hands the scan to the default model, so the response is the same `200` (or the usual `503` when the default fails too). The model that read the receipt is stored as `receipts.extraction_model`.
+
 Price history, item matching and price alerts stay free (D2, D8) and answer a free user `200`. **Changing in DA-1 (D8, PREM-02):** today cross-store comparison and the mute routes also answer a free user (`200`, `204`); from DA-1, `GET /api/items/{canonical_id}/compare`, `POST /api/items/{canonical_id}/mute` and `POST /api/stores/{store_id}/mute` answer a free user `403 premium_required`, while both mute `DELETE`s stay open to everyone, and a mute made while Premium keeps working after a lapse.
 
 ### POST /api/webhooks/revenuecat

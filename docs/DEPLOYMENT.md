@@ -135,6 +135,12 @@ GG_LLM_API_KEY=sk-ant-...
 # A starting value until extraction latency is measured on the receipt test set.
 GG_LLM_TIMEOUT_SECONDS=60
 GG_LLM_NUM_RETRIES=1
+# Priority OCR (V1.1, PREM-03): the extraction model for Premium users' scans,
+# as a LiteLLM model name ("provider/model" as is; a bare name gets
+# GG_LLM_PROVIDER). Same key, base URL, timeout and max_tokens; no temperature.
+# Unset: Premium scans use GG_LLM_MODEL. Set GG_LLM_PREMIUM_EXTRACTION_MODEL
+# to the stronger extraction model the product owner chose (decision D9),
+# after the check in "Priority OCR model" (Part 3).
 
 # Item matching (V1.1, PI-02). Defaults shown; the image bakes in the default
 # model, so another one is downloaded on first use (and needs a migration of
@@ -641,11 +647,30 @@ email. Accounts whose email differs (Apple's Hide My Email) use Settings →
 |---------|------|-------|
 | Hetzner VPS (CX22 or CX32) | €4-8/month | 2-4 vCPU, 4-8GB RAM. Already paying for this. |
 | Supabase PostgreSQL (Free/Pro) | $0-25/month | Free tier: 500MB. Pro: 8GB, $25/month. |
-| Anthropic API | ~$50-200/month | Depends on receipt volume. ~$0.003-0.01 per receipt with Sonnet. |
+| Anthropic API | ~$50-200/month | Depends on receipt volume. ~$0.03-0.06 per receipt on the default model (the earlier ~$0.003-0.01 was stale: it predates adaptive thinking); Premium scans ~2x, see Priority OCR model below. |
 | Apple Developer Program | $99/year (~$8/month) | Required for App Store. |
 | Expo EAS (Free tier) | $0 | 15 iOS builds/month. Sufficient for MVP. |
 | Domain name | ~$12/year | For api.grocerygenie.app |
 | **Total** | **~$65-250/month** | Before revenue. Lower end if using Supabase free tier. |
+
+### Priority OCR model (V1.1, PREM-03)
+
+Premium users' scans are read by `GG_LLM_PREMIUM_EXTRACTION_MODEL`; free users' by `GG_LLM_MODEL`. The backend decides from the user's Premium entitlement (written only from RevenueCat) when extraction starts. If the Premium model fails or returns output the schema rejects, the scan goes to the default model; if that fails too, the scan fails the usual way (503; the app keeps the photo and retries it, and manual entry stays open). `receipt_extraction_completed` records `extraction_tier` (`priority` or `standard`) and each receipt records the model that read it (`receipts.extraction_model`).
+
+**Which model:** the operator sets `GG_LLM_PREMIUM_EXTRACTION_MODEL` to the stronger extraction model the product owner chose (decision D9), as a LiteLLM model name. A model from the default's provider uses the same key and gateway. The backend sends it no sampling settings.
+
+Estimated cost per scan, from the provider's published per-token prices, for one call of about 3,000-6,000 input tokens (the system prompt plus the receipt photo) and 2,500-4,500 output tokens (adaptive thinking plus the JSON for a typical receipt). The stronger tier costs about 2x the default's per token, so about 2x per scan:
+
+| Tier | Used for | Estimated cost per scan |
+|------|----------|-------------------------|
+| Default (`GG_LLM_MODEL`) | Free scans, and the fallback | ~$0.03-0.06 |
+| Stronger tier (`GG_LLM_PREMIUM_EXTRACTION_MODEL`) | Premium scans | ~$0.06-0.11 (about 2x) |
+
+At 30 scans a month a Premium user costs about $1-2 more than on the default, against $4.99/month or $39.99/year. These are estimates: the token counts are not measured yet, because the receipt test set has no images. Before turning it on (PREM-03 AC 6):
+
+1. Run `cd backend && .venv/bin/python -m tests.llm_validation.run extract` and then `... extract --premium` with `GG_LLM_API_KEY` and `GG_LLM_PREMIUM_EXTRACTION_MODEL` set. Each report in `tests/llm_validation/reports/` records the model, the accuracy metrics and `tokens_per_scan` (mean input and output tokens).
+2. The Premium model's field accuracy and item recall must be no lower than the default's, with 0% hallucination. Multiply `tokens_per_scan` by the provider's prices for the cost per scan, and record both in the release notes.
+3. The owner approves the model and its cost; then set `GG_LLM_PREMIUM_EXTRACTION_MODEL` in production. This run is the manual check in `docs/device-checklist.md` §8 (Priority OCR).
 
 ---
 

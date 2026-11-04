@@ -16,6 +16,7 @@ Run from backend/ directory. `tests/llm_validation/README.md` explains the set a
 3. If thresholds are not met, review the failing receipts, identify the extraction error pattern, and adjust the system prompt in `app/llm/prompts/receipt_extraction.py`.
 4. Increment the prompt version number after any change.
 5. Re-run the harness after prompt changes to confirm improvement without regression.
+6. When `GG_LLM_PREMIUM_EXTRACTION_MODEL` is set (Priority OCR, PREM-03), also run `.venv/bin/python -m tests.llm_validation.run extract --premium`. The Premium model must score no lower than the default on accuracy and recall, with 0% hallucination. Report both models' `tokens_per_scan` and the cost per scan they come to (`docs/DEPLOYMENT.md` Part 3).
 
 ## Consistency Check (optional, slower)
 

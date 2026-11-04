@@ -396,6 +396,41 @@ def test_extract_without_a_key_makes_no_calls(cli_dirs, monkeypatch, capsys):
     assert "GG_LLM_API_KEY" in capsys.readouterr().out
 
 
+# ---------- Priority OCR (PREM-03 AC 6) ----------
+
+
+def test_extract_premium_without_a_premium_model_makes_no_calls(
+    cli_dirs, monkeypatch, capsys
+):
+    settings = type("S", (), {"llm_api_key": "k", "llm_premium_extraction_model": ""})
+    monkeypatch.setattr(run, "get_settings", lambda: settings)
+
+    assert run.main(["extract", "--premium"]) == 2
+    assert "GG_LLM_PREMIUM_EXTRACTION_MODEL" in capsys.readouterr().out
+
+
+def test_premium_runs_score_the_premium_model():
+    from app.core.config import Settings
+
+    settings = Settings(
+        _env_file=None, llm_api_key="k", llm_premium_extraction_model="x/strong"
+    )
+
+    assert run.build_extractor(settings, premium=True).model_name == "x/strong"
+    assert run.build_extractor(settings, premium=False).model_name == (
+        f"{settings.llm_provider}/{settings.llm_model}"
+    )
+
+
+def test_the_report_records_mean_tokens_per_scan():
+    assert run.mean_tokens([(3000, 1000), None, (5000, 3000)]) == {
+        "calls": 2,
+        "input": 4000,
+        "output": 2000,
+    }
+    assert run.mean_tokens([None]) == {"calls": 0, "input": None, "output": None}
+
+
 # ---------- running ----------
 
 
