@@ -64,6 +64,7 @@ function renderSettings() {
       'settings/export-data': () => null,
       'settings/currency-settings': () => null,
       'settings/categories': () => null,
+      'settings/stores': () => null,
       paywall: () => null,
     },
     { initialUrl: '/' },
@@ -137,6 +138,15 @@ describe('Settings hub', () => {
     expect(row.props.accessibilityValue).toEqual({ text: 'Your own categories with Premium' });
     fireEvent.press(row);
     expect(app.getPathname()).toBe('/settings/categories');
+  });
+
+  it('opens Stores, where the user merges the same store (V11-05)', () => {
+    const app = renderSettings();
+
+    const row = screen.getByLabelText('Stores');
+    expect(row.props.accessibilityValue).toEqual({ text: 'Merge the same store' });
+    fireEvent.press(row);
+    expect(app.getPathname()).toBe('/settings/stores');
   });
 
   it('has a switch to withdraw AI receipt reading (App Store 5.1.2(i))', () => {

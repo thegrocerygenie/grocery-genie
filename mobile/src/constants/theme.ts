@@ -72,6 +72,8 @@ export const colors = {
   blueBg: pair('rgba(0,122,255,0.08)', 'rgba(10,132,255,0.16)'),
   /** Action sheet cards: near-opaque white, or the dark elevated gray. */
   sheetBg: pair('rgba(255,255,255,0.96)', 'rgba(44,44,46,0.96)'),
+  /** The dimmed backdrop behind a bottom sheet. */
+  scrim: pair('rgba(0,0,0,0.4)', 'rgba(0,0,0,0.4)'),
   /** Sign in with Apple: black in light mode, white in dark (Apple HIG). */
   appleButton: pair('#000000', '#FFFFFF'),
   appleButtonLabel: pair('#FFFFFF', '#000000'),

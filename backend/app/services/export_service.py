@@ -48,6 +48,7 @@ from app.models.export import (
     ExportReceipt,
     ExportReceiptWithLines,
 )
+from app.services.store_service import StoreService
 
 FORMAT_VERSION = 1
 BATCH_SIZE = 500
@@ -279,13 +280,22 @@ class ExportService:
             rows = (await self.db.execute(query)).all()
             if not rows:
                 return
+            # The store as the user's price history groups it (their merges);
+            # a receipt row keeps the store printed on it.
+            groups = await StoreService(self.db).groups(
+                user_id, {obs.store_id for obs, _, _ in rows}
+            )
             yield [
                 ExportPriceObservation(
                     id=obs.id,
                     date=obs.date,
                     canonical_item_id=obs.canonical_item_id,
                     item_name=item_name,
-                    store_name=store_name,
+                    store_name=(
+                        groups[obs.store_id].name
+                        if obs.store_id in groups
+                        else store_name
+                    ),
                     unit_price=float(obs.unit_price),
                     quantity=float(obs.quantity),
                     unit_of_measure=obs.unit_of_measure,

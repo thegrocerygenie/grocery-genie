@@ -341,6 +341,51 @@ async def test_export_leaves_out_a_deleted_budget(premium_client):
     assert [b["id"] for b in budgets] == [kept.json()["id"]]
 
 
+# --- store merge (V11-05) ----------------------------------------------------
+
+
+async def test_export_prices_use_the_users_store_grouping(
+    premium_client, mock_extractor, test_image_bytes
+):
+    """A price row names the store as the user's price history groups it; a
+    receipt keeps the store printed on it."""
+    await _scan_and_confirm(
+        premium_client,
+        mock_extractor,
+        test_image_bytes,
+        "Loblaws",
+        "2026-03-01",
+        ("LIMES", 1.0, 1.0),
+    )
+    await _scan_and_confirm(
+        premium_client,
+        mock_extractor,
+        test_image_bytes,
+        "REAL CANADIAN SUPERSTORE",
+        "2026-03-02",
+        ("LIMES", 1.0, 0.8),
+    )
+    stores = {
+        s["name"]: s["id"]
+        for s in (await premium_client.get("/api/stores")).json()["stores"]
+    }
+    resp = await premium_client.post(
+        f"/api/stores/{stores['REAL CANADIAN SUPERSTORE']}/merge",
+        json={"into_store_id": stores["Loblaws"]},
+    )
+    assert resp.status_code == 200, resp.text
+
+    body = (
+        await premium_client.get("/api/users/me/export", params={"format": "json"})
+    ).json()
+
+    assert {p["store_name"] for p in body["price_observations"]} == {"Loblaws"}
+    assert sorted(r["store_name"] for r in body["receipts"]) == [
+        "Loblaws",
+        "REAL CANADIAN SUPERSTORE",
+    ]
+
+
 # --- CSV formula injection ---------------------------------------------------
 
 

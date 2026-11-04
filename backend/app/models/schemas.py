@@ -739,6 +739,29 @@ class StoreRef(BaseModel):
     name: str
 
 
+# --- Stores: normalization and user merge (EC Price Intelligence 1) ---
+
+
+class StoreSummaryResponse(BaseModel):
+    """One of the user's stores as their prices group it."""
+
+    id: uuid.UUID
+    name: str
+    # Not-deleted receipts in the group.
+    receipt_count: int
+    # Stores the user merged into this one; each can be unmerged.
+    merged_stores: list[StoreRef]
+
+
+class StoreListResponse(BaseModel):
+    stores: list[StoreSummaryResponse]
+
+
+class StoreMergeRequest(BaseModel):
+    # The store this one is the same store as; its name is kept.
+    into_store_id: uuid.UUID
+
+
 class PriceAlertSettingsResponse(BaseModel):
     enabled: bool
     # The user's threshold, or the default when they have not set one.

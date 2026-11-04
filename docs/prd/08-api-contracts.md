@@ -459,7 +459,35 @@ Only a confirm alerts: editing a confirmed receipt later sends none. A failure i
 204. No price alerts for the item, or alerts again. Both are idempotent; another user's item is 404. Item detail (`GET /api/items/{canonical_id}`) carries `alerts_muted: bool`. Merging a muted item into another mutes the other.
 
 ### POST /api/stores/{store_id}/mute · DELETE /api/stores/{store_id}/mute
-204. No price alerts for prices paid at the store, or alerts again. Idempotent. Muting a store the user has no receipt from is 404 (stores are shared across users); unmuting removes only the user's own mute and is never 404, so a mute whose receipts were since deleted and purged can still be undone. Store ids come from `GET /api/items/{canonical_id}/prices` (`observations[].store_id`).
+204. No price alerts for prices paid at the store, or alerts again. Idempotent. Muting a store the user has no receipt from is 404 (stores are shared across users); unmuting removes only the user's own mute and is never 404, so a mute whose receipts were since deleted and purged can still be undone. Store ids come from `GET /api/items/{canonical_id}/prices` (`observations[].store_id`), `/compare` or `GET /api/stores`.
+
+**Mutes and merged stores (V11-05).** A mute covers the store as the user groups it ([Stores](#stores-normalization-and-merge-v11)): muting any store of a group mutes the whole group, and the mute is recorded on the group's store (`muted_stores` lists it once, with the group's id and name). A muted store merged into another mutes the merged group. Unmuting a group removes every one of the user's mutes inside it. Unmerging leaves each mute on the store it was recorded on: a mute set on a store before it was merged stays with that store, and one set on the group stays with the group's store.
+
+### Stores: normalization and merge [V1.1]
+
+EC Price Intelligence 1 ("Loblaws" vs "Loblaws #1234" vs "REAL CANADIAN SUPERSTORE"), decision D3. Free, like the rest of price intelligence.
+
+**Normalization, for everyone.** A store name is matched on its normalized form: casefolded, accents dropped, branch numbers dropped ("#1234", "Store 1234", "No. 12", "- 1234", a bare trailing number of 3+ digits), punctuation turned into spaces, apostrophes removed. "Loblaws", "LOBLAWS #1234" and "Loblaws - 1234" are one store; "Food 4 Less" and "7-Eleven" keep their numbers. A new receipt joins the store row of its normalized name, which keeps the name it was first saved with. Rows saved before normalization that now share a normalized name are kept (receipts keep pointing at their own row) and group under the oldest of them, which gives the group its id and name.
+
+**A user's merge, for that user only.** A different banner ("REAL CANADIAN SUPERSTORE") is joined by the user: their prices of the merged store group under the other everywhere stores group prices: `GET /api/items` and item detail (`store_count`, `latest_price.store_name`), `/prices` (`store_id`, `store_name`, `store_count`, and the `store` filter, which takes any store of a group and returns the whole group), `/compare` (one row per group, counted once in `stores_below_minimum`), price alert bodies, store mutes (above) and the data export's `price_observations[].store_name`. A receipt keeps the store printed on it: receipt detail, history and the export's `receipts[].store_name` are unchanged, and so is the receipt history's `store` text filter, which searches printed names. Shared store rows are never renamed or joined, and another user's merges never change this user's grouping.
+
+### GET /api/stores
+The user's stores, as their prices group them, by name. Only stores on receipts the user has not deleted.
+```json
+{
+  "stores": [
+    { "id": "uuid", "name": "Loblaws", "receipt_count": 4,
+      "merged_stores": [{ "id": "uuid", "name": "REAL CANADIAN SUPERSTORE" }] }
+  ]
+}
+```
+`id` is the group's store; `merged_stores` are the stores the user merged into it.
+
+### POST /api/stores/{store_id}/merge
+**Request:** `{ "into_store_id": "uuid" }`. The store, and any store already merged into it, now group under `into_store_id`'s group, which keeps its name. Groups stay one level deep. Returns `GET /api/stores`. 404 when either store is not one the user has a receipt from (a branch of one they have counts); 409 when the two already group as one (including a store into itself); 422 without `into_store_id`. Records `store_merged`.
+
+### DELETE /api/stores/{store_id}/merge
+204. Undo the merge of this store (an id from `merged_stores`): its prices group on their own again. Stores merged into it before it was merged moved to the target then, and stay there. Idempotent, and never 404: it removes only the user's own merge. Records `store_unmerged`.
 
 ### GET /api/items/{canonical_id}/compare
 Cross-store comparison (PI-04): the item's latest and average unit price at each store the user has bought it from, cheapest first.

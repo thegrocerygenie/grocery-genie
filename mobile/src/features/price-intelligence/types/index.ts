@@ -119,3 +119,18 @@ export interface PriceComparison {
   /** Stores with a price of the item but too few to compare. */
   stores_below_minimum: number;
 }
+
+/** EC Price Intelligence 1: one of the user's stores as their prices group it. */
+export interface StoreSummary {
+  id: string;
+  name: string;
+  /** Receipts in the group (deleted ones left out). */
+  receipt_count: number;
+  /** Stores the user merged into this one; each can be unmerged. */
+  merged_stores: StoreRef[];
+}
+
+/** `GET /api/stores`, by name. */
+export interface StoreList {
+  stores: StoreSummary[];
+}

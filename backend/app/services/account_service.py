@@ -44,6 +44,7 @@ from app.models.database import (
     RevenueCatEvent,
     User,
     UserItemMapping,
+    UserStoreAlias,
 )
 from app.services.apple_auth import AppleAccountMismatch, revoke_apple_grant
 
@@ -132,6 +133,7 @@ async def delete_account(
         delete(PriceAlertSent).where(PriceAlertSent.user_id == user_id),
         delete(PriceAlertItemMute).where(PriceAlertItemMute.user_id == user_id),
         delete(PriceAlertStoreMute).where(PriceAlertStoreMute.user_id == user_id),
+        delete(UserStoreAlias).where(UserStoreAlias.user_id == user_id),
         delete(CanonicalItemAlias).where(CanonicalItemAlias.user_id == user_id),
         delete(CanonicalItem).where(CanonicalItem.user_id == user_id),
         delete(Budget).where(Budget.user_id == user_id),
