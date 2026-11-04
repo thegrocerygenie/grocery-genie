@@ -154,7 +154,7 @@ Setup for this section:
 - [ ] **Receipt quota prompt.** As a free user at the monthly receipt limit, scan: the prompt offers Premium, and nothing uploads. As Premium, the scan goes through. (D2, unlimited receipts)
 
 **Item matching and stores (PI-02, store normalization):**
-- [ ] **Review Matches.** Confirm "Organic Bananas", then "Bananas". Review Matches asks whether they are the same item; neither links on its own. Not the Same keeps two items; Same Item merges their prices. (PI-02 AC 2; BUG-4)
+- [ ] **Review Matches.** Confirm "Organic Bananas", then "Bananas". Review Matches asks whether they are the same item; neither links on its own. Different keeps two items; Same Item merges their prices. (PI-02 AC 2; BUG-4)
 - [ ] **Settings → Stores.** Branch numbers ("Loblaws" and "Loblaws #1234") show as one store. Merge one name into another (for example "REAL CANADIAN SUPERSTORE" into "Loblaws"): an item bought at both now compares as one store. Unmerge splits them again. Only this account's prices regroup. (11-edge-cases Price Intelligence 1; V11-05, decision D3)
 
 **Device-check bug rechecks (`.planning/DEVICE-CHECK-2026-11-03.md`):**
