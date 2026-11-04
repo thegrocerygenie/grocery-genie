@@ -151,7 +151,7 @@ A pass covers the model within its bounds, not the whole system.
 
 ## Coverage record
 
-Sync commit: `dcc0b0c`
+Sync commit: `ad7bc87`
 
 The verification was last confirmed to describe these files and functions at the sync commit. `run.sh` reads this table and the sync commit.
 
@@ -163,7 +163,7 @@ The verification was last confirmed to describe these files and functions at the
 | `backend/app/services/notification_service.py` | `create_notification` | `ConfirmAlerts`: `Claim` |
 | `backend/app/services/price_alert_service.py` | watched, not modeled: `detect`, `claim` (the second `notifications` writer and its ledger lock order; see Scope) | none |
 | `backend/app/models/database.py` | `BudgetAlertSent` unique key, `Notification.push_status`, `ix_notifications_push_pending`, `ix_notifications_push_sending`; watched: `PriceAlertSent` unique key | `UniqueLedger`, `PushDelivery` statuses |
-| `backend/app/tasks/push_tasks.py` | `deliver_pending_pushes`, `BATCH_SIZE`; `push_data` builds each message's payload (a price alert carries its item's url), not modeled: the model is the same for any payload | `PushDelivery`: `Expire`, `Select`, `Claim`, `Record`, `Finish`, `Crash` |
+| `backend/app/tasks/push_tasks.py` | `deliver_pending_pushes`, `BATCH_SIZE`, `_set_push_status` (after the claim, each `sent`, `NULL`, and `failed` write is one `UPDATE ... WHERE id IN`); `push_data` builds each message's payload (a price alert carries its item's url), not modeled: the model is the same for any payload | `PushDelivery`: `Expire`, `Select`, `Claim`, `Record`, `Finish`, `Crash` |
 | `backend/app/services/push_service.py` | `ExpoPushClient.send`, `expo_rejected`, `EXPO_MAX_BATCH` | `PushDelivery`: `SendChunk` |
 | `backend/app/tasks/celery_app.py` | `deliver-pending-pushes` beat schedule | `PushDelivery`: workers and fairness |
 
