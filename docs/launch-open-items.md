@@ -115,7 +115,7 @@ The site promises waitlist sign-ups "a free year of Premium" when Premium launch
 - [ ] **Record the switch date.** When the site moves to App Store downloads (`PUBLIC_LAUNCH_STATE=b`), write the date into decisions #9; it's the cut-off. The site hasn't switched yet (2026-11-04). The step is in `marketing/README.md` → "Before switching to State B", so it happens with the switch.
 - [ ] **Tell members the terms.**
   - [x] Published 2026-11-04: a State A FAQ entry on the site ("How does the free year of Premium work?"), and the 90-day window and 12 months in the welcome email. Both are checked by `marketing/tests/`.
-  - [ ] The launch email (not written yet) must repeat the 90-day claim window.
+  - [x] The launch email repeats the 90-day claim window. Drafted 2026-11-04 in [marketing/launch-email.md](marketing/launch-email.md); check its "Before sending" list on send day.
 - [x] **Now: decide on unsubscribes.** Decided 2026-11-04 ([decisions](marketing/decisions.md) #10): unsubscribed contacts still qualify, and only a deletion request gives up the offer.
   - The welcome email (`marketing/api/_handler.js`) now says: reply "unsubscribe" to stop emails, or "delete" to remove the email and give up the free year.
   - **Matching must include contacts with Resend's `unsubscribed` flag.**
@@ -135,4 +135,4 @@ The build items below are V1.1 story **V11-P5** (`.planning/PLAN-2026-11-03-v1.1
 
   The backend reads the audience through the Resend API, or from a one-off export taken at the cut-off.
 - [ ] **When nothing matches.** Sign in with Apple's Hide My Email gives an `@privaterelay.appleid.com` address, and some people sign up with a different email. Add "Claim your waitlist offer" in Settings: the user enters their waitlist email and taps a confirmation link sent to it (the same pattern as the email-change confirmation).
-- [ ] **Launch email.** Ask waitlist members to sign up with the email they joined with, or to use the claim flow. The welcome email already asks them to use the same email.
+- [x] **Launch email.** Ask waitlist members to sign up with the email they joined with, or to use the claim flow. Drafted in [marketing/launch-email.md](marketing/launch-email.md); send it at the switch.
