@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Grocery Genie · V3 Screens (V3.0)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens-v2.css" />
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+  .v-narrative { font-size: 13px; color: var(--ios-label-2); max-width: 720px; line-height: 1.5; padding: 0 4px 8px; }
+  .v-narrative strong { color: var(--ios-label); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="components-v2/primitives.jsx"></script>
+<script type="text/babel" src="components-v2/patterns.jsx"></script>
+<script type="text/babel" src="components-v2/phone-shell.jsx"></script>
+<script type="text/babel" src="components-v2/roadmap-shell.jsx"></script>
+<script type="text/babel" src="components-v2/roadmap-v30.jsx"></script>
+<script type="text/babel" src="components-v2/v30-ai-gap.jsx"></script>
+<script type="text/babel" src="components-v2/v30-ai-gap2.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const G = window.AI3Gap;
+const G2 = window.AI3Gap2;
+function Note({ children }) { return <div className="v-narrative">{children}</div>; }
+
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection id="v30-core" title="V3.0 · Advanced — core flows" subtitle="LLM recipe remix · semantic search · waste score · taste profile">
+        <DCArtboard id="v30-core" label="The system learns you" width={1340} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note><strong>V3.0 · Advanced.</strong> Recipes adapt to what's in the pantry via LLM substitution. Semantic search finds purchases by intent. A food-waste score gamifies pantry hygiene. A taste profile personalises future recipe ranking.</Note>
+            <window.V30Screens />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="v30-gap" title="V3.0 · Substitution feedback" subtitle="Rate the swap → improves future suggestions">
+        <DCArtboard id="v30-feedback" label="Closing the substitution loop" width={680} height={760}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>After "mark as cooked," the recipe asks how each LLM-proposed swap turned out. "Worse" retires that swap from your suggestions and lowers it in the global pool. The history view shows what you've kept.</Note>
+            <G.SectionAI3Gap />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="v30-predict" title="V3.0 · Predictive meal planning" subtitle="The week plans itself from pantry, expiry order, taste profile, and routines">
+        <DCArtboard id="v30-pred" label="A week your kitchen can already cook" width={340} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>The endgame of the meal planner: the user opens Sunday and sees a fully-formed week. It accepts your patterns (Friday salmon, Saturday pizza), avoids what you've discarded before, prioritises items expiring soon, and tells you exactly which 4 things to buy.</Note>
+            <G2.SectionAI3Gap2 />
+          </div>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Grocery Genie · V2 Screens (V2.0 + V2.5)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens-v2.css" />
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+  .v-narrative { font-size: 13px; color: var(--ios-label-2); max-width: 720px; line-height: 1.5; padding: 0 4px 8px; }
+  .v-narrative strong { color: var(--ios-label); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="components-v2/primitives.jsx"></script>
+<script type="text/babel" src="components-v2/patterns.jsx"></script>
+<script type="text/babel" src="components-v2/phone-shell.jsx"></script>
+<script type="text/babel" src="components-v2/roadmap-shell.jsx"></script>
+<script type="text/babel" src="components-v2/roadmap-v20.jsx"></script>
+<script type="text/babel" src="components-v2/v20-mp-gap.jsx"></script>
+<script type="text/babel" src="components-v2/v20-mp-gap2.jsx"></script>
+<script type="text/babel" src="components-v2/roadmap-v25.jsx"></script>
+<script type="text/babel" src="components-v2/v25-ai-gap.jsx"></script>
+<script type="text/babel" src="components-v2/v25-ai-gap2.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const MP = window.MPGap;
+const MP2 = window.MPGap2;
+const AI = window.AIGap;
+const AI2 = window.AIGap2;
+
+function Note({ children }) { return <div className="v-narrative">{children}</div>; }
+
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection id="v20-core" title="V2.0 · Meal Planner — core flows" subtitle="Pantry · recipes · expiry push · shopping list">
+        <DCArtboard id="v20-core" label="Receipt items become a virtual pantry" width={1340} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note><strong>V2.0 · Meal Planner.</strong> Receipt items become a pantry with shelf-life tracking. Recipes match against what's actually in the kitchen, prioritising items about to expire.</Note>
+            <window.V20Screens />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="v20-gaps" title="V2.0 · Pantry mechanics" subtitle="Ingredient fix · recipe detail · used/discarded · diet · duplicates">
+        <DCArtboard id="v20-mech" label="The flows that keep pantry data accurate" width={1700} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>Ingredient classification correction trains the model. Recipe detail shows the cooking flow + "mark as cooked" deduction. The action sheet handles partial use and discards (waste tracking). Filters and duplicate detection round out pantry hygiene.</Note>
+            <MP.SectionMPGap />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="v20-data" title="V2.0 · Pantry data flow" subtitle="Receipt → pantry import · shelf-life learning · weekly meal planner">
+        <DCArtboard id="v20-data-flow" label="How items enter the pantry, how shelf life is learned, how a week is planned" width={1100} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>After every receipt save, perishables flow into a confirmation sheet. Shelf-life adapts to your habits: when you discard things early or eat them late, the default updates. The meal planner sits above it all — drag recipes onto a week to drive the smart shopping list.</Note>
+            <MP2.SectionMPGap2 />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="v25-core" title="V2.5 · Advanced Intelligence — core flows" subtitle="Basket comparison · personal inflation · restock · community">
+        <DCArtboard id="v25-core" label="Accumulated data answers harder questions" width={1340} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note><strong>V2.5 · Advanced Intelligence.</strong> Basket-level cross-store comparison. Personal inflation rates. Restock reminders based on consumption cadence. Community price corroboration.</Note>
+            <window.V25Screens />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="v25-gaps" title="V2.5 · Inflation drill-down" subtitle="Tap the personal-inflation card → item-level contributors">
+        <DCArtboard id="v25-detail" label="Why your inflation is what it is" width={340} height={760}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>The summary card opens this view: which items drove the increase, which items got cheaper, ranked and filterable.</Note>
+            <AI.SectionAIGap />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="v25-anomaly" title="V2.5 · Anomaly detection" subtitle="Receipts that don't fit your pattern get flagged before they pollute baselines">
+        <DCArtboard id="v25-anom" label="A 3× receipt asks why before saving" width={340} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>An unusually large or unusually-categorised receipt would skew personal inflation and restock predictions. Before saving, we ask the user to label it: hosting, OCR error, normal big shop. Hosting trips are excluded from baselines.</Note>
+            <AI2.SectionAIGap2 />
+          </div>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

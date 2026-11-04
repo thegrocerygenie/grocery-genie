@@ -23,7 +23,7 @@ Status values: `todo`, `in progress (branch ..., migration ...)`, `**done, verif
 
 ## Task specs (what each subagent gets)
 
-**<P>-01 <name>.** Stories and ACs: <ids, file paths>. Edge cases: <ids>. Contracts: <08-api-contracts sections, frozen before mobile work starts>. Migration: `<YYYYMMDD>_<NNNN>` or none. Covered verify skills: <verify-budget-alerts, ...>. Risks for the reviewer: <security, concurrency, data loss ...>.
+**<P>-01 <name>.** Stories and ACs: <ids, file paths>. Edge cases: <ids>. Contracts: <08-api-contracts sections, frozen before mobile work starts>. Migration: `<YYYYMMDD>_<NNNN>` or none. Design screens: <`design/claude-design/` file and component, or none>. Covered verify skills: <verify-budget-alerts, ...>. Risks for the reviewer: <security, concurrency, data loss ...>.
 
 ## Parallelism and conflict rules
 

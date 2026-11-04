@@ -81,6 +81,7 @@ backend/                 # Python FastAPI backend
 
 docs/prd/                # Product requirements — see directory for full listing
 docs/marketing/          # Marketing site briefs per roadmap stage, and decisions.md
+design/claude-design/    # Claude Design export: app screens for every phase, design system, marketing site (see its README)
 
 .agents/skills/           # Agent skills, shared by Claude Code and Codex
 .claude/skills/           # Symlinks into .agents/skills for Claude Code
@@ -230,6 +231,7 @@ Use the `validate` checklist (or `make validate`) for the full suite.
 - All user-facing strings externalized for i18n.
 - Accessibility: every interactive element needs `accessibilityLabel`. Test with VoiceOver.
 - **When building any screen or component, run the `design-ui` checklist first** for design system rules, screen-specific guidance, and Apple HIG compliance.
+- The visual reference for each phase's screens is `design/claude-design/` (its README maps phases to files). Build a phase's screens to match its design; where the design and the PRD disagree, ask.
 
 ### Backend (Python / FastAPI)
 - Python 3.12+ with modern syntax (type hints, `match`, `|` unions). Async by default — `async def` for all routes and services.

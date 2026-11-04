@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Grocery Genie — See what your grocery money actually buys</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M74.5 29.4 A32 32 0 1 0 82 50' fill='none' stroke='%231F7A4A' stroke-width='18'/%3E%3Cpath d='M91 50 C80 36 61 36 46 53 C60 65 80 64 91 50 Z' fill='%2334D17A'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Bricolage+Grotesque:opsz,wght@12..96,800&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens-v2.css">
+<style>
+:root{--ink:#15140F;--ink-2:#4F4B41;--ink-3:#6E695D;--paper:#F0EEE9;--paper-2:#E6E2D8;--paper-3:#F8F6F1;--rule:rgba(21,20,15,0.12);--rule-strong:rgba(21,20,15,0.28);--accent:#1F7A4A;--accent-pressed:#195F3A}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+a{color:inherit;text-decoration:none}
+a:hover{color:var(--accent)}
+.nav-wrap{position:sticky;top:0;z-index:50;background:color-mix(in oklab,var(--paper) 88%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:0.5px solid transparent;transition:border-color .2s}
+.nav-wrap.scrolled{border-bottom-color:var(--rule)}
+.nav{max-width:1200px;margin:0 auto;padding:16px 56px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+.wordmark{display:inline-flex;align-items:center;gap:7px;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:24px;letter-spacing:-0.04em;color:var(--ink)}
+.wordmark:hover{color:var(--ink)}
+.wordmark em{font-style:normal;color:#1F7A4A}
+.wordmark svg{width:26px;height:26px;flex:none;position:relative;top:2px}
+.nav-links{display:flex;gap:28px;font-size:14px;color:var(--ink-2)}
+.nav-cta{padding:10px 16px;background:var(--ink);color:var(--paper);border-radius:4px;font-size:14px;font-weight:500;white-space:nowrap}
+.nav-cta:hover{background:var(--accent);color:#fff}
+.page{max-width:1200px;margin:0 auto;padding:0 56px}
+.hero{padding:56px 0 96px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:56px;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;background:var(--paper-2);border-radius:999px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-2);margin-bottom:28px}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+h1{font-family:'Instrument Serif',serif;font-weight:400;font-size:80px;line-height:1;letter-spacing:-0.02em;margin:0 0 24px;text-wrap:balance}
+h1 em,h2 em{font-style:italic;color:var(--ink-2)}
+.lede{font-size:19px;line-height:1.55;color:var(--ink-2);max-width:520px;margin:0 0 32px;text-wrap:pretty}
+.cta-slot{max-width:480px}
+.waitlist{display:flex;gap:8px}
+.waitlist input{flex:1;min-width:0;padding:15px 16px;border:1px solid var(--rule-strong);border-radius:4px;font-size:16px;background:var(--paper-3);font-family:inherit;outline:none;color:var(--ink)}
+.waitlist input:focus{border-color:var(--ink)}
+.waitlist button{padding:0 22px;background:var(--ink);color:var(--paper);border:none;border-radius:4px;font-size:15px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap}
+.waitlist button:hover{background:var(--accent)}
+.cta-line{margin-top:14px;font-size:14px;color:var(--ink-2)}
+.joined{padding:16px 18px;background:var(--paper-3);border:1px solid var(--rule-strong);border-radius:6px;font-size:16px;line-height:1.5}
+.joined strong{color:var(--accent)}
+.badge-row{display:flex;align-items:center;gap:20px}
+.badge-row .badge img{display:block;height:54px;width:auto}
+.badge-row .qr{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--ink-2);line-height:1.4}
+.badge-row .qr img{width:72px;height:72px;border-radius:4px;background:#fff;padding:4px}
+.badge-ph{display:flex;align-items:center;justify-content:center;height:54px;padding:0 18px;border:1.5px dashed currentColor;border-radius:9px;font-size:13px;letter-spacing:0.04em;white-space:nowrap;opacity:.8}
+.qr-ph{width:72px;height:72px;flex:none;display:grid;place-items:center;border:1.5px dashed currentColor;border-radius:4px;font-size:12px;letter-spacing:0.1em;opacity:.8}
+.hero-visual{display:flex;justify-content:center}
+.hero-visual .mock{transform:scale(1.15);transform-origin:top center;margin-bottom:78px}
+.hero-visual .mock-label{display:none}
+.hm-receipt{position:absolute;left:50%;top:58px;width:154px;padding:12px 12px 16px;background:#fff;color:#000;font-family:var(--font-mono);font-size:7px;line-height:1.65;box-shadow:0 12px 30px rgba(0,0,0,0.5);transform:translateX(-50%) rotate(-3deg) skewY(1deg);clip-path:polygon(0 1%,8% 0,20% 1.5%,33% 0,47% 1%,60% 0,74% 1.5%,88% 0,100% 1%,99% 30%,100% 55%,98.5% 80%,100% 99%,88% 100%,74% 98.5%,60% 100%,47% 99%,33% 100%,20% 98.5%,8% 100%,0 99%,1.5% 70%,0 40%);background-image:linear-gradient(172deg,transparent 30%,rgba(0,0,0,0.07) 31%,transparent 34%),linear-gradient(8deg,transparent 62%,rgba(0,0,0,0.06) 63%,transparent 66%),linear-gradient(95deg,transparent 45%,rgba(0,0,0,0.05) 46%,transparent 49%)}
+.hm-frame{position:absolute;left:30px;right:30px;top:44px;height:250px}
+.hm-frame span{position:absolute;width:22px;height:22px;border:2px solid var(--gg-tint)}
+.hm-frame span:nth-child(1){left:0;top:0;border-right:0;border-bottom:0}
+.hm-frame span:nth-child(2){right:0;top:0;border-left:0;border-bottom:0}
+.hm-frame span:nth-child(3){left:0;bottom:0;border-right:0;border-top:0}
+.hm-frame span:nth-child(4){right:0;bottom:0;border-left:0;border-top:0}
+.hm-frame i{position:absolute;left:8px;right:8px;height:2px;background:var(--gg-tint);box-shadow:0 0 12px var(--gg-tint);animation:hmscan 1.6s ease-in-out infinite alternate}
+@keyframes hmscan{from{top:6%}to{top:94%}}
+@media (prefers-reduced-motion:reduce){.hm-frame i{animation:none;top:50%}}
+.mock-label{position:absolute;bottom:-34px;left:50%;transform:translateX(-50%);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap}
+.label{font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:18px}
+h2{font-family:'Instrument Serif',serif;font-weight:400;font-size:56px;line-height:1.05;letter-spacing:-0.015em;margin:0 0 16px;text-wrap:balance}
+.sub{font-size:18px;line-height:1.55;color:var(--ink-2);max-width:600px;margin:0;text-wrap:pretty}
+.contrast{padding:0 0 96px;display:flex;flex-direction:column;gap:20px}
+.contrast-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:16px;align-items:stretch}
+.cc{background:var(--paper-3);border:0.5px solid var(--rule);border-radius:8px;padding:24px 26px;display:flex;flex-direction:column;gap:14px}
+.cc .q-label{font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-3)}
+.cc-bank{justify-content:flex-start}
+.cc-bank .row{display:flex;justify-content:space-between;gap:16px;font-size:18px;color:var(--ink-2);padding:12px 0;border-top:0.5px solid var(--rule);border-bottom:0.5px solid var(--rule);font-variant-numeric:tabular-nums}
+.cc-bank .muted{font-size:14px;color:var(--ink-3);margin-top:auto}
+.cats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 24px}
+.cat{padding:10px 0;border-top:0.5px solid var(--rule)}
+.cat-h{display:flex;justify-content:space-between;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.cat-i{margin-top:4px;font-size:13px;color:var(--ink-2);line-height:1.5}
+.cc-total{display:flex;justify-content:space-between;font-size:16px;font-weight:600;padding-top:12px;border-top:1px solid var(--rule-strong);font-variant-numeric:tabular-nums}
+.contrast-cap{font-family:'Instrument Serif',serif;font-size:30px;line-height:1.2;color:var(--ink)}
+.contrast-cap em{color:var(--accent)}
+.section-head{padding:96px 0 48px;max-width:760px}
+.how{border-top:1px solid var(--rule-strong)}
+.how .section-head{padding-top:72px}
+.how-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:0.5px solid var(--rule)}
+.step{padding:36px 32px 36px 0;border-right:0.5px solid var(--rule)}
+.step+.step{padding-left:32px}
+.step:last-child{border-right:none}
+.step .num{font-family:'Instrument Serif',serif;font-size:56px;line-height:1;color:var(--accent);margin-bottom:18px}
+.step h3{font-size:19px;font-weight:600;margin:0 0 10px}
+.step p{font-size:15px;line-height:1.55;color:var(--ink-2);margin:0}
+.feature{padding:80px 0;border-top:0.5px solid var(--rule);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:80px;align-items:center}
+.feature.flip>.copy{order:2}
+.feature .meta{font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);margin-bottom:14px;font-weight:600}
+.feature h3{font-family:'Instrument Serif',serif;font-weight:400;font-size:46px;line-height:1.05;letter-spacing:-0.01em;margin:0 0 24px;text-wrap:balance}
+.feature ul{list-style:none;margin:0;padding:0;max-width:470px}
+.feature li{padding:12px 0;border-top:0.5px solid var(--rule);font-size:16px;line-height:1.5;display:flex;gap:12px}
+.feature li:last-child{border-bottom:0.5px solid var(--rule)}
+.feature li::before{content:"→";color:var(--accent)}
+.feature-visual{display:flex;justify-content:center;align-items:center;min-height:560px}
+.cta-mid{padding:40px 44px;background:var(--paper-3);border:0.5px solid var(--rule);border-radius:8px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,480px);gap:40px;align-items:center}
+.cta-mid h3{font-family:'Instrument Serif',serif;font-weight:400;font-size:36px;line-height:1.1;margin:0}
+.trust{margin-top:96px;padding:64px 0;border-top:1px solid var(--rule-strong);border-bottom:1px solid var(--rule-strong);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:56px}
+.trust h2{font-size:48px;margin:0}
+.trust-body{display:flex;flex-direction:column;gap:36px}
+.trust-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px 40px}
+.trust-grid h4{font-size:17px;font-weight:600;margin:0 0 6px}
+.trust-grid p{font-size:15px;line-height:1.55;color:var(--ink-2);margin:0}
+.privacy-copy{font-size:18px;line-height:1.55;margin:0;padding-top:28px;border-top:0.5px solid var(--rule);color:var(--ink);text-wrap:pretty}
+.included{padding:96px 0 0}
+.inc-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:0.5px solid var(--rule);border-left:0.5px solid var(--rule)}
+.inc{display:flex;align-items:center;gap:14px;padding:22px 20px;border-right:0.5px solid var(--rule);border-bottom:0.5px solid var(--rule);font-size:15px;line-height:1.35}
+.inc i{width:22px;height:22px;flex:none;color:var(--accent);display:grid;place-items:center}
+.inc i svg{width:22px;height:22px;display:block}
+.faq{padding:96px 0 0}
+.faq .section-head{padding:0 0 16px}
+details{padding:24px 0;border-top:0.5px solid var(--rule)}
+details:last-of-type{border-bottom:0.5px solid var(--rule)}
+details summary{list-style:none;display:flex;justify-content:space-between;align-items:baseline;gap:16px;font-size:19px;font-weight:500;cursor:pointer}
+details summary::-webkit-details-marker{display:none}
+details summary .plus{font-family:'Instrument Serif',serif;font-size:28px;color:var(--ink-3);transition:transform .2s}
+details[open] summary .plus{transform:rotate(45deg)}
+details p{margin:14px 0 0;font-size:16px;line-height:1.6;color:var(--ink-2);max-width:720px}
+.cta-block{margin:96px 0 0;padding:72px 56px;background:var(--ink);color:var(--paper);border-radius:8px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:56px;align-items:center}
+.cta-block h2{color:var(--paper);margin:0}
+.cta-block .waitlist input{background:rgba(240,238,233,0.08);border-color:rgba(240,238,233,0.3);color:var(--paper)}
+.cta-block .waitlist input::placeholder{color:#A8A398}
+.cta-block .waitlist input:focus{border-color:var(--paper)}
+.cta-block .waitlist button{background:var(--accent);color:#fff}
+.cta-block .waitlist button:hover{background:#fff;color:var(--ink)}
+.cta-block .cta-line,.cta-block .badge-row .qr{color:#D6D2C8}
+.cta-block .joined{background:rgba(240,238,233,0.06);border-color:rgba(240,238,233,0.25);color:var(--paper)}
+.cta-block .joined strong{color:#fff}
+.next{padding:72px 0 24px}
+.next-head{display:flex;justify-content:space-between;align-items:baseline;gap:24px;flex-wrap:wrap;margin-bottom:24px}
+.next-head h3{font-family:'Instrument Serif',serif;font-weight:400;font-size:36px;margin:0}
+.next-head .tag{font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-2);padding:4px 8px;border:1px solid var(--rule-strong);border-radius:999px}
+.next-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.vote{padding:20px 22px;border:1px dashed var(--rule-strong);border-radius:6px;background:transparent;font:inherit;font-size:16px;color:var(--ink);text-align:left;display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:64px}
+body[data-state="a"] .vote{cursor:pointer}
+body[data-state="a"] .vote:hover{border-color:var(--ink)}
+.vote .pick{font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap}
+.vote[aria-pressed="true"]{border-style:solid;border-color:var(--accent);background:var(--paper-3)}
+.vote[aria-pressed="true"] .pick{color:var(--accent)}
+.vote-hint{margin-top:12px;font-size:14px;color:var(--ink-2)}
+body[data-state="b"] .only-a,body[data-state="b"] .vote .pick{display:none}
+body[data-state="a"] .only-b{display:none}
+footer{margin-top:72px;padding:40px 0;border-top:0.5px solid var(--rule);display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
+footer p{margin:6px 0 0;font-size:14px;color:var(--ink-2)}
+footer nav{display:flex;gap:24px;font-size:14px;color:var(--ink-2)}
+.legal{padding:20px 0 40px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)}
+body[data-green="cta"] .nav-cta,body[data-green="cta"] .waitlist button,body[data-green="block"] .nav-cta,body[data-green="block"] .waitlist button{background:var(--accent);color:#fff}
+body[data-green="cta"] .nav-cta:hover,body[data-green="cta"] .waitlist button:hover,body[data-green="block"] .nav-cta:hover,body[data-green="block"] .waitlist button:hover{background:var(--accent-pressed);color:#fff}
+body[data-green="block"] .cta-block{background:var(--accent-pressed)}
+body[data-green="block"] .cta-block .cta-line,body[data-green="block"] .cta-block .badge-row .qr{color:#E3EFE7}
+body[data-green="block"] .cta-block .waitlist input::placeholder{color:#C9E2D3}
+body[data-green="block"] .cta-block .waitlist button{background:var(--paper);color:var(--ink)}
+body[data-green="block"] .cta-block .waitlist button:hover{background:#fff;color:var(--ink)}
+@media (max-width:960px){
+.nav,.page{padding-left:20px;padding-right:20px}
+.nav-links{display:none}
+.hero,.feature,.cta-block,.trust,.cta-mid,.contrast-grid{grid-template-columns:minmax(0,1fr);gap:40px}
+.hero{padding:28px 0 64px}
+.feature.flip>.copy{order:0}
+h1{font-size:50px}
+h2{font-size:40px}
+.feature h3{font-size:36px}
+.hero-visual .mock{transform:none;margin-bottom:0}
+.how-grid,.trust-grid,.next-list{grid-template-columns:minmax(0,1fr)}
+.inc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.step,.step+.step{padding:28px 0;border-right:none;border-bottom:0.5px solid var(--rule)}
+.cta-block{padding:40px 24px}
+.cta-mid{padding:28px 22px;gap:20px}
+.feature-visual{min-height:auto;padding-bottom:40px}
+.section-head{padding:64px 0 32px}
+.badge-row .qr{display:none}
+.contrast-cap{font-size:24px}
+}
+@media (max-width:480px){.waitlist{flex-direction:column}.waitlist button{padding:15px}h1{font-size:42px}.cats{grid-template-columns:minmax(0,1fr)}.inc-grid{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body data-state="a" data-green="block">
+<div class="nav-wrap" id="navwrap">
+<div class="nav">
+<a class="wordmark" href="#top" aria-label="Grocery Genie"><svg viewBox="9 9 82 82" aria-hidden="true"><path d="M74.5 29.4 A32 32 0 1 0 82 50" fill="none" stroke="#1F7A4A" stroke-width="18"></path><path d="M91 50 C80 36 61 36 46 53 C60 65 80 64 91 50 Z" fill="#34D17A"></path></svg><span>grocery<em>genie</em></span></a>
+<nav class="nav-links"><a href="#how">How it works</a><a href="#features">Features</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a></nav>
+<a class="nav-cta" id="nav-cta" href="#join" data-cta="nav">Get early access</a>
+</div>
+</div>
+<div class="page" id="top">
+<section class="hero" data-screen-label="Hero">
+<div>
+<div class="pill"><span class="dot"></span><span id="pill-text">Early access · iPhone</span></div>
+<h1 id="headline">See what your grocery money actually buys.</h1>
+<p class="lede">Scan a grocery receipt, and Grocery Genie sorts every item, updates your budget, and warns you before you overspend. Free on iPhone.</p>
+<div id="join" class="cta-slot" data-loc="hero"></div>
+</div>
+<div class="hero-visual" id="hero-moment" aria-label="A receipt scan turning into categorized items and an updated budget"></div>
+</section>
+<section class="contrast" data-screen-label="Contrast">
+<div class="contrast-grid">
+<div class="cc cc-bank">
+<div class="q-label">Your bank</div>
+<div class="row"><span>Grocery store</span><span>$187.43</span></div>
+<div class="muted">One line. No idea what's in it.</div>
+</div>
+<div class="cc">
+<div class="q-label">Grocery Genie</div>
+<div class="cats">
+<div class="cat"><div class="cat-h"><span>Groceries</span><span>$121</span></div><div class="cat-i">Chicken thighs $11.48 · Strawberries $4.99 · Whole milk $3.79 · 24 more</div></div>
+<div class="cat"><div class="cat-h"><span>Household</span><span>$38</span></div><div class="cat-i">Paper towels $8.99 · Laundry pods $17.99 · 3 more</div></div>
+<div class="cat"><div class="cat-h"><span>Snacks &amp; Treats</span><span>$18</span></div><div class="cat-i">Tortilla chips $4.29 · Dark chocolate $3.49 · 3 more</div></div>
+<div class="cat"><div class="cat-h"><span>Pet</span><span>$10</span></div><div class="cat-i">Cat food, 12 cans $9.99</div></div>
+</div>
+<div class="cc-total"><span>Total</span><span>$187.43</span></div>
+</div>
+</div>
+<div class="contrast-cap">Item by item, <em>even when you pay cash.</em></div>
+</section>
+<section id="how" class="how" data-screen-label="How it works">
+<div class="section-head"><div class="label">How it works</div><h2>Three steps. <em>No typing.</em></h2></div>
+<div class="how-grid">
+<div class="step"><div class="num">01</div><h3>Snap.</h3><p>Scan the receipt, or import a photo or PDF you already have.</p></div>
+<div class="step"><div class="num">02</div><h3>Check.</h3><p>AI reads every line. You fix anything in a tap and confirm.</p></div>
+<div class="step"><div class="num">03</div><h3>Stay on budget.</h3><p>Your budget updates right away, and alerts reach you before you overspend.</p></div>
+</div>
+</section>
+<section id="features" data-screen-label="Features">
+<div class="section-head"><div class="label">Features</div></div>
+<div class="feature" style="border-top:none;padding-top:0">
+<div class="copy"><div class="meta">Scan any receipt</div><h3>One photo. <em>No typing.</em></h3>
+<ul><li>Finds the receipt's edges, crops it, and checks it's sharp</li><li>Import from Photos or Files</li><li>No signal? Scan anyway. It uploads when you're back online.</li></ul></div>
+<div class="feature-visual" id="feat-scan"></div>
+</div>
+<div class="feature flip">
+<div class="copy"><div class="meta">Alerts before you overspend</div><h3>A heads-up before the overspend, <em>not after.</em></h3>
+<ul><li>Alerts at 50%, 80% and 100% of your budget, with what's left and how many days remain</li><li>A weekly summary on the day you choose</li><li>Mute any category you don't care about</li></ul></div>
+<div class="feature-visual" id="feat-alert"></div>
+</div>
+<div class="feature">
+<div class="copy"><div class="meta">See where it all went</div><h3>Your month <em>at a glance.</em></h3>
+<ul><li>Your budget, category by category, with a pace line that tells you mid-month whether you're on track</li><li>This month vs. last month, a 3-month trend, and your top 10 items</li><li>Every receipt, searchable, with the original photo</li></ul></div>
+<div class="feature-visual" id="feat-dash"></div>
+</div>
+</section>
+<div class="cta-mid" data-screen-label="Mid CTA">
+<h3>Try it on your next grocery run.</h3>
+<div class="cta-slot" data-loc="mid"></div>
+</div>
+<section class="trust" id="privacy" data-screen-label="Trust">
+<h2>You stay <em>in control.</em></h2>
+<div class="trust-body">
+<div class="trust-grid">
+<div><h4>You approve every receipt.</h4><p>Nothing counts until you confirm it.</p></div>
+<div><h4>You choose before AI reads anything.</h4><p>The app asks before your first scan, and you can change your mind any time.</p></div>
+<div><h4>Fix it once, it remembers.</h4><p>Your corrections carry over to future receipts.</p></div>
+<div><h4>Delete anything.</h4><p>A deleted receipt can be restored for 30 days. You can delete your whole account from inside the app.</p></div>
+</div>
+<p class="privacy-copy">Receipt photos are sent securely to Anthropic's Claude to read them. Anthropic doesn't use them to train its models. We keep the photo with your receipt until you delete it.</p>
+</div>
+</section>
+<section class="included" data-screen-label="Also included">
+<div class="label">Also included</div>
+<div class="inc-grid" id="inc-grid"></div>
+</section>
+<section id="faq" class="faq" data-screen-label="FAQ">
+<div class="section-head"><div class="label">FAQ</div><h2>Straight answers.</h2></div>
+<details data-track="faq_free"><summary>Is it free?<span class="plus">+</span></summary><p>Yes. Grocery Genie is free on iPhone. You can scan up to 20 receipts a month (about five a week) and add as many as you like by hand.<span class="only-a"> Join the waitlist and get a free year of Premium, our upcoming paid plan, when it launches.</span></p></details>
+<details data-track="faq_wrong"><summary>What if it reads my receipt wrong?<span class="plus">+</span></summary><p>You check every receipt before it's saved. Anything the AI isn't sure about is flagged, every field is editable, and it remembers your fixes.</p></details>
+<details data-track="faq_privacy"><summary>Is my data private?<span class="plus">+</span></summary><p>Receipt photos are sent securely to Anthropic's Claude to read them. Anthropic doesn't use them to train its models. We keep the photo with your receipt until you delete it. You decide before AI reads your first receipt, and you can delete your account and all its data from inside the app.</p></details>
+<details data-track="faq_receipts"><summary>Which receipts work?<span class="plus">+</span></summary><p>Printed grocery receipts from any store, plus photos and PDFs you already have.</p></details>
+<details data-track="faq_android"><summary>Android?<span class="plus">+</span></summary><p>iPhone first. We'll share Android plans later.</p></details>
+<details data-track="faq_launch"><summary>When does it launch?<span class="plus">+</span></summary><p id="faq-launch"><span class="only-a">Early sign-ups get TestFlight access first, ahead of the public launch on the App Store. We'll email you once, at launch.</span><span class="only-b">It's out now. Grocery Genie is free on the App Store.</span></p></details>
+</section>
+<div class="cta-block" data-screen-label="Final CTA">
+<h2>Start seeing where your grocery money goes.</h2>
+<div class="cta-slot" data-loc="final"></div>
+</div>
+<section class="next" data-screen-label="Coming later">
+<div class="next-head"><h3>What's next.</h3><span class="tag">Coming later</span></div>
+<div class="next-list" id="next-list"></div>
+<div class="vote-hint only-a">Tap the one you want most. It helps us decide what to build first.</div>
+</section>
+<footer>
+<div><div class="wordmark" aria-label="Grocery Genie"><svg viewBox="9 9 82 82" aria-hidden="true"><path d="M74.5 29.4 A32 32 0 1 0 82 50" fill="none" stroke="#1F7A4A" stroke-width="18"></path><path d="M91 50 C80 36 61 36 46 53 C60 65 80 64 91 50 Z" fill="#34D17A"></path></svg><span>grocery<em>genie</em></span></div><p>Grocery budgets that start with a receipt. Built by a small team.</p></div>
+<nav><a href="#features">Features</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a></nav>
+</footer>
+<div class="legal">© 2026 Grocery Genie</div>
+</div>
+<script>
+// TODO(team): replace with the real App Store ID once the listing exists.
+const APP_ID = '0000000000';
+const APP_STORE_URL = 'https://apps.apple.com/app/id' + APP_ID;
+const BADGE = c => `https://tools.applemarketingtools.com/api/badges/download-on-the-app-store/${c}/en-us?size=250x83`;
+const HL = { a: 'See what your grocery money actually buys.', b: 'Your bank sees one total. We see every item.', c: 'Know you\u2019re over budget <em>before</em> the month is over.' };
+const INCLUDED = [['file-image','Import photos and PDFs'],['wifi-off','Works offline'],['pencil-line','Manual entry'],['copy','Duplicate-receipt warning'],['circle-alert','Catches big-ticket typos'],['tags','8 automatic categories'],['chart-pie','Per-category budgets'],['calendar-days','Budget month starts on your payday'],['coins','11 currencies'],['rotate-ccw','Restore deleted receipts for 30 days'],['apple','Sign in with Apple'],['accessibility','VoiceOver and Dynamic Type']];
+const NEXT = ['Price tracking across stores', 'Household sharing', 'Meal planning from what you bought'];
+
+const qs = new URLSearchParams(location.search);
+const UTM_KEYS = ['utm_source','utm_medium','utm_campaign','utm_term','utm_content'];
+const utmNow = {}; UTM_KEYS.forEach(k => { if (qs.get(k)) utmNow[k] = qs.get(k); });
+if (Object.keys(utmNow).length) sessionStorage.setItem('gg_utm', JSON.stringify(utmNow));
+const UTM = JSON.parse(sessionStorage.getItem('gg_utm') || '{}');
+
+let autoVariant = localStorage.getItem('gg_hl_variant');
+if (!HL[autoVariant]) { autoVariant = 'abc'[Math.floor(Math.random() * 3)]; localStorage.setItem('gg_hl_variant', autoVariant); }
+const G = { state: 'a', variant: HL[qs.get('hl')] ? qs.get('hl') : autoVariant, joined: false };
+
+function track(event, props = {}) { (window.dataLayer = window.dataLayer || []).push({ event, state: G.state, headline: G.variant, ...UTM, ...props }); }
+
+function slotHTML(loc) {
+  if (G.state === 'b') {
+    const dark = loc === 'final';
+    return `<div class="badge-row"><a class="badge" href="${APP_STORE_URL}" data-appstore="${loc}"><img src="${BADGE(dark ? 'white' : 'black')}" alt="Download on the App Store" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'badge-ph',textContent:'Official App Store badge'}))"></a>${loc !== 'mid' ? `<div class="qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=144x144&margin=0&data=${encodeURIComponent(APP_STORE_URL)}" alt="QR code to the App Store" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'qr-ph',textContent:'QR'}))"><span>Scan with your<br>iPhone camera</span></div>` : ''}</div><div class="cta-line">Free on iPhone</div>`;
+  }
+  if (G.joined) return `<div class="joined" role="status"><strong>You're in.</strong> We'll email you once, at launch.</div>`;
+  return `<form class="waitlist" onsubmit="return joinWaitlist(event)"><input type="email" placeholder="you@email.com" required aria-label="Email address"><button type="submit" data-cta="${loc}">Get early access</button></form><div class="cta-line">iPhone · Free · A free year of Premium when it launches</div>`;
+}
+function renderSlots() { document.querySelectorAll('.cta-slot').forEach(s => s.innerHTML = slotHTML(s.dataset.loc)); }
+
+// TODO(team): POST to the waitlist API. Include utm + headline for attribution.
+async function submitWaitlist(email, meta) { return true; }
+async function joinWaitlist(e) {
+  e.preventDefault();
+  const loc = e.target.closest('.cta-slot').dataset.loc;
+  const email = e.target.querySelector('input').value;
+  if (await submitWaitlist(email, { loc, headline: G.variant, ...UTM })) { G.joined = true; track('waitlist_signup', { loc }); renderSlots(); }
+  return false;
+}
+
+function setHeadline(v) { G.variant = v === 'auto' ? (HL[qs.get('hl')] ? qs.get('hl') : autoVariant) : v; document.getElementById('headline').innerHTML = HL[G.variant]; }
+function setState(s) {
+  G.state = s; document.body.dataset.state = s;
+  document.getElementById('pill-text').textContent = s === 'a' ? 'Early access · iPhone' : 'New · Now on the App Store';
+  const nav = document.getElementById('nav-cta');
+  nav.textContent = s === 'a' ? 'Get early access' : 'Download';
+  nav.href = s === 'a' ? '#join' : APP_STORE_URL;
+  let m = document.querySelector('meta[name="apple-itunes-app"]');
+  if (s === 'b' && !m) { m = document.createElement('meta'); m.name = 'apple-itunes-app'; m.content = 'app-id=' + APP_ID; document.head.appendChild(m); }
+  if (s === 'a' && m) m.remove();
+  renderSlots();
+}
+window.GG = { setState, setHeadline };
+
+document.getElementById('inc-grid').innerHTML = INCLUDED.map(([i, t]) => `<div class="inc"><i data-icon="${i}" aria-hidden="true"></i><span>${t}</span></div>`).join('');
+document.querySelectorAll('.inc i[data-icon]').forEach(el => fetch(`https://unpkg.com/lucide-static@0.460.0/icons/${el.dataset.icon}.svg`).then(r => r.ok ? r.text() : '').then(s => { if (s.includes('<svg')) el.innerHTML = s; }).catch(() => {}));
+document.getElementById('next-list').innerHTML = NEXT.map(n => `<button type="button" class="vote" aria-pressed="false" data-vote="${n}"><span>${n}</span><span class="pick">Want this</span></button>`).join('');
+document.addEventListener('click', e => {
+  const c = e.target.closest('[data-cta]'); if (c && c.tagName === 'A') track('cta_click', { loc: c.dataset.cta });
+  const b = e.target.closest('[data-cta]'); if (b && b.tagName === 'BUTTON') track('cta_click', { loc: b.dataset.cta });
+  const a = e.target.closest('[data-appstore]'); if (a) track('appstore_click', { loc: a.dataset.appstore });
+  const v = e.target.closest('.vote');
+  if (v && G.state === 'a') { document.querySelectorAll('.vote').forEach(x => x.setAttribute('aria-pressed', x === v)); track('next_vote', { feature: v.dataset.vote }); }
+  const d = e.target.closest('details[data-track] summary'); if (d) track('faq_open', { id: d.parentElement.dataset.track });
+});
+window.addEventListener('scroll', () => document.getElementById('navwrap').classList.toggle('scrolled', scrollY > 8), { passive: true });
+setHeadline('auto'); setState('a');
+track('headline_view');
+</script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="marketing/mocks.jsx"></script>
+<script type="text/babel" src="marketing/mocks-budget.jsx"></script>
+<script type="text/babel" src="marketing/hero-moment.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel">
+const M = window.MarketingMocks;
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "launchState": "a",
+  "headline": "auto",
+  "green": "block",
+  "accent": "#1F7A4A"
+}/*EDITMODE-END*/;
+function Portal({ id, children }) {
+  const [el, setEl] = React.useState(null);
+  React.useEffect(() => setEl(document.getElementById(id)), [id]);
+  return el ? ReactDOM.createPortal(children, el) : null;
+}
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  React.useEffect(() => { window.GG.setState(t.launchState); }, [t.launchState]);
+  React.useEffect(() => { window.GG.setHeadline(t.headline); }, [t.headline]);
+  React.useEffect(() => {
+    document.body.dataset.green = t.green;
+    document.documentElement.style.setProperty('--accent', t.accent);
+    document.documentElement.style.setProperty('--accent-pressed', `color-mix(in oklab, ${t.accent} 78%, black)`);
+  }, [t.green, t.accent]);
+  return (
+    <>
+      <Portal id="hero-moment"><M.HeroMoment /></Portal>
+      <Portal id="feat-scan"><M.MockScan /></Portal>
+      <Portal id="feat-alert"><M.MockLockAlert /></Portal>
+      <Portal id="feat-dash"><M.MockDashboard /></Portal>
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Launch state" />
+        <TweakRadio label="State" value={t.launchState} options={[{ value: 'a', label: 'A · Pre-launch' }, { value: 'b', label: 'B · Launch' }]} onChange={x => setTweak('launchState', x)} />
+        <TweakSection label="Hero headline (A/B/C)" />
+        <TweakSelect label="Headline" value={t.headline} options={[{ value: 'auto', label: 'Auto (even split)' }, { value: 'a', label: 'A · Actually buys' }, { value: 'b', label: 'B · One total' }, { value: 'c', label: 'C · Before the month is over' }]} onChange={x => setTweak('headline', x)} />
+        <TweakSection label="Color" />
+        <TweakRadio label="Green use" value={t.green} options={[{ value: 'ink', label: 'Ink' }, { value: 'cta', label: 'CTAs' }, { value: 'block', label: 'CTAs + block' }]} onChange={x => setTweak('green', x)} />
+        <TweakColor label="Accent" value={t.accent} onChange={x => setTweak('accent', x)} />
+      </TweaksPanel>
+    </>
+  );
+}
+ReactDOM.createRoot(document.createElement('div')).render(<App />);
+</script>
+</body>
+</html>

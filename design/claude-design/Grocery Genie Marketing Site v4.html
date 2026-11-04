@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Grocery Genie — Early access</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M74.5 29.4 A32 32 0 1 0 82 50' fill='none' stroke='%231F7A4A' stroke-width='18'/%3E%3Cpath d='M91 50 C80 36 61 36 46 53 C60 65 80 64 91 50 Z' fill='%2334D17A'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Bricolage+Grotesque:opsz,wght@12..96,800&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens-v2.css">
+<style>
+:root{--accent-pressed:#195F3A;--ink:#15140F;--ink-2:#4F4B41;--ink-3:#6E695D;--paper:#F0EEE9;--paper-2:#E6E2D8;--paper-3:#F8F6F1;--rule:rgba(21,20,15,0.12);--rule-strong:rgba(21,20,15,0.28);--accent:#1F7A4A}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+a{color:inherit;text-decoration:none}
+a:hover{color:var(--accent)}
+.serif{font-family:'Instrument Serif',Georgia,serif;font-weight:400}
+.nav-wrap{position:sticky;top:0;z-index:50;background:color-mix(in oklab,var(--paper) 88%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:0.5px solid transparent;transition:border-color .2s}
+.nav-wrap.scrolled{border-bottom-color:var(--rule)}
+.nav{max-width:1200px;margin:0 auto;padding:18px 56px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+.wordmark{display:inline-flex;align-items:center;gap:7px;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:24px;letter-spacing:-0.04em;color:var(--ink)}
+.wordmark:hover{color:var(--ink)}
+.wordmark em{font-style:normal;color:#1F7A4A}
+.wordmark svg{width:26px;height:26px;flex:none;position:relative;top:2px}
+.nav-links{display:flex;gap:28px;font-size:14px;color:var(--ink-2)}
+.nav-cta{padding:10px 16px;background:var(--ink);color:var(--paper);border-radius:4px;font-size:14px;font-weight:500}
+.nav-cta:hover{background:var(--accent);color:#fff}
+.page{max-width:1200px;margin:0 auto;padding:0 56px}
+.hero{padding:64px 0 112px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:56px;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;background:var(--paper-2);border-radius:999px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-2);margin-bottom:28px}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+h1{font-family:'Instrument Serif',serif;font-weight:400;font-size:84px;line-height:0.98;letter-spacing:-0.02em;margin:0 0 24px;text-wrap:balance}
+h1 em{font-style:italic;color:var(--ink-2)}
+.lede{font-size:19px;line-height:1.55;color:var(--ink-2);max-width:500px;margin:0 0 32px;text-wrap:pretty}
+.waitlist{display:flex;gap:8px;max-width:480px}
+.waitlist input{flex:1;min-width:0;padding:15px 16px;border:1px solid var(--rule-strong);border-radius:4px;font-size:16px;background:var(--paper-3);font-family:inherit;outline:none;color:var(--ink)}
+.waitlist input:focus{border-color:var(--ink)}
+.waitlist button{padding:0 22px;background:var(--ink);color:var(--paper);border:none;border-radius:4px;font-size:15px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap}
+.waitlist button:hover{background:var(--accent)}
+.offer{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:16px;font-size:14px;color:var(--ink)}
+.offer span{display:flex;align-items:center;gap:8px}
+.offer span::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.wait-meta{font-size:13px;color:var(--ink-3);margin-top:12px;line-height:1.5}
+.joined{max-width:480px;padding:20px;background:var(--paper-3);border:1px solid var(--rule-strong);border-radius:6px;display:flex;flex-direction:column;gap:16px}
+.joined .pos{font-family:'Instrument Serif',serif;font-size:32px;line-height:1.1}
+.joined .pos em{color:var(--accent)}
+.joined p{margin:0;font-size:14px;line-height:1.5;color:var(--ink-2)}
+.share{display:flex;gap:8px}
+.share input{flex:1;min-width:0;padding:11px 12px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);font:13px ui-monospace,Menlo,monospace;color:var(--ink-2)}
+.share button,.chip{padding:10px 14px;border:1px solid var(--rule-strong);border-radius:4px;background:transparent;font:inherit;font-size:14px;color:var(--ink);cursor:pointer}
+.share button{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border-radius:999px;padding:8px 14px;font-size:13px;min-height:36px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.q-label{font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-3)}
+.hero-visual{position:relative;height:600px}
+.hv-1,.hv-2{position:absolute}
+.hv-1{left:4%;top:10px;transform:rotate(-4deg)}
+.hv-2{right:0;top:70px;transform:rotate(4deg);z-index:2}
+.alert{position:absolute;z-index:3;left:0;bottom:26px;width:300px;padding:14px 16px;background:rgba(255,255,255,0.94);border-radius:16px;box-shadow:0 20px 40px -16px rgba(21,20,15,0.35),0 0 0 0.5px rgba(21,20,15,0.08);font-family:var(--font-sf);display:grid;grid-template-columns:32px 1fr;gap:4px 12px;align-items:start}
+.alert .ic{grid-row:span 2;width:32px;height:32px;border-radius:8px;background:var(--accent)}
+.alert .t{font-size:12px;color:#6b6b70;display:flex;justify-content:space-between}
+.alert .b{font-size:14px;line-height:1.35;color:#111}
+.hero-visual .mock-label{display:none}
+.mock-label{position:absolute;bottom:-34px;left:50%;transform:translateX(-50%);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap}
+.section-head{padding:96px 0 48px;max-width:760px}
+.label{font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:18px}
+h2{font-family:'Instrument Serif',serif;font-weight:400;font-size:56px;line-height:1.05;letter-spacing:-0.015em;margin:0 0 16px;text-wrap:balance}
+h2 em{font-style:italic;color:var(--ink-2)}
+.sub{font-size:18px;line-height:1.55;color:var(--ink-2);max-width:600px;margin:0;text-wrap:pretty}
+.how-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--rule-strong)}
+.step{padding:36px 32px 36px 0;border-right:0.5px solid var(--rule)}
+.step+.step{padding-left:32px}
+.step:last-child{border-right:none}
+.step .num{font-family:'Instrument Serif',serif;font-size:56px;line-height:1;color:var(--accent);margin-bottom:18px}
+.step h3{font-size:19px;font-weight:600;margin:0 0 10px}
+.step p{font-size:15px;line-height:1.55;color:var(--ink-2);margin:0}
+.feature{padding:80px 0;border-top:0.5px solid var(--rule);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:80px;align-items:center}
+.feature.flip>.copy{order:2}
+.feature .meta{font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);margin-bottom:14px;font-weight:500}
+.feature h3{font-family:'Instrument Serif',serif;font-weight:400;font-size:46px;line-height:1.05;letter-spacing:-0.01em;margin:0 0 16px}
+.feature h3 em{font-style:italic}
+.feature p{font-size:17px;line-height:1.6;color:var(--ink-2);margin:0 0 20px;max-width:470px}
+.feature ul{list-style:none;margin:0;padding:0;max-width:470px}
+.feature li{padding:11px 0;border-top:0.5px solid var(--rule);font-size:15px;display:flex;gap:12px}
+.feature li:last-child{border-bottom:0.5px solid var(--rule)}
+.feature li::before{content:"→";color:var(--accent)}
+.feature-visual{display:flex;justify-content:center;align-items:center;min-height:560px}
+.next{padding:72px 0 24px;border-top:0.5px solid var(--rule)}
+.next-head{display:flex;justify-content:space-between;align-items:baseline;gap:24px;flex-wrap:wrap;margin-bottom:28px}
+.next-head h3{font-family:'Instrument Serif',serif;font-weight:400;font-size:36px;margin:0}
+.next-head a{font-size:14px;color:var(--ink-2);border-bottom:1px solid var(--rule-strong)}
+.next-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.next-grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.also{padding:16px 0 80px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.next-card h4{text-wrap:balance}
+.diff{padding:80px 0;border-top:1px solid var(--rule-strong);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:64px;align-items:center}
+.diff h2{font-size:52px}
+.cmp{display:flex;flex-direction:column;gap:12px}
+.cmp-card{background:var(--paper-3);border:0.5px solid var(--rule);border-radius:6px;padding:20px 22px}
+.cmp-card .q-label{margin-bottom:12px}
+.cmp-row{display:flex;justify-content:space-between;gap:16px;font-size:15px;padding:7px 0;font-variant-numeric:tabular-nums}
+.cmp-row+.cmp-row{border-top:0.5px solid var(--rule)}
+.cmp-row.total{font-weight:600;border-top:1px solid var(--rule-strong)}
+.cmp-bank .cmp-row{color:var(--ink-2)}
+.trust-body{display:flex;flex-direction:column;gap:36px}
+.privacy-copy{font-size:20px;line-height:1.55;margin:0;color:var(--ink);text-wrap:pretty}
+.trust-grid.two{grid-template-columns:repeat(2,minmax(0,1fr));gap:28px 40px}
+.also .next-card .meta{font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;font-weight:500}
+.proof{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--rule-strong);border-bottom:1px solid var(--rule-strong)}
+.proof div{padding:28px 24px 28px 0;display:flex;flex-direction:column;gap:6px}
+.proof div+div{padding-left:24px;border-left:0.5px solid var(--rule)}
+.proof strong{font-family:'Instrument Serif',serif;font-weight:400;font-size:40px;line-height:1;color:var(--ink)}
+.proof span{font-size:14px;line-height:1.45;color:var(--ink-2)}
+.next-card{padding:28px;background:var(--paper-3);border:0.5px solid var(--rule);border-radius:6px}
+.tag{display:inline-block;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-2);padding:4px 8px;border:1px solid var(--rule-strong);border-radius:999px;margin-bottom:16px}
+.next-card h4{font-family:'Instrument Serif',serif;font-weight:400;font-size:30px;margin:0 0 10px}
+.next-card p{font-size:15px;line-height:1.55;color:var(--ink-2);margin:0}
+.trust{margin-top:96px;padding:56px 0;border-top:1px solid var(--rule-strong);border-bottom:1px solid var(--rule-strong);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:56px}
+.trust h2{font-size:44px;margin:0}
+.trust-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px}
+.trust-grid h4{font-size:16px;font-weight:600;margin:0 0 8px}
+.trust-grid p{font-size:15px;line-height:1.55;color:var(--ink-2);margin:0}
+.cta-block{margin:96px 0;padding:72px 56px;background:var(--ink);color:var(--paper);border-radius:8px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:56px;align-items:center}
+.cta-block h2{color:var(--paper)}
+.cta-block h2 em{color:#BDB8AC}
+.cta-block .sub{color:#D6D2C8}
+.cta-block .waitlist input{background:rgba(240,238,233,0.08);border-color:rgba(240,238,233,0.3);color:var(--paper)}
+.cta-block .waitlist input::placeholder{color:#A8A398}
+.cta-block .waitlist input:focus{border-color:var(--paper)}
+.cta-block .waitlist button{background:var(--accent);color:#fff}
+.cta-block .waitlist button:hover{background:#fff;color:var(--ink)}
+.cta-block .offer{color:var(--paper)}
+.cta-block .wait-meta{color:#BDB8AC}
+.cta-block .joined{background:rgba(240,238,233,0.06);border-color:rgba(240,238,233,0.25)}
+.cta-block .joined p,.cta-block .q-label{color:#D6D2C8}
+.cta-block .share input{background:transparent;color:#D6D2C8;border-color:rgba(240,238,233,0.25)}
+.cta-block .share button{background:var(--accent);border-color:var(--accent);color:#fff}
+.cta-block .chip{color:var(--paper);border-color:rgba(240,238,233,0.35)}
+.faq{padding:24px 0 96px}
+details{padding:24px 0;border-top:0.5px solid var(--rule)}
+details:last-of-type{border-bottom:0.5px solid var(--rule)}
+details summary{list-style:none;display:flex;justify-content:space-between;align-items:baseline;gap:16px;font-size:19px;font-weight:500;cursor:pointer}
+details summary::-webkit-details-marker{display:none}
+details summary .plus{font-family:'Instrument Serif',serif;font-size:28px;color:var(--ink-3);transition:transform .2s}
+details[open] summary .plus{transform:rotate(45deg)}
+details p{margin:14px 0 0;font-size:16px;line-height:1.6;color:var(--ink-2);max-width:720px}
+footer{padding:40px 0;border-top:0.5px solid var(--rule);display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
+footer p{margin:4px 0 0;font-size:14px;color:var(--ink-2)}
+footer nav{display:flex;gap:24px;font-size:14px;color:var(--ink-2)}
+.legal{padding:20px 0 40px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)}
+body[data-green="cta"] .nav-cta,body[data-green="cta"] .waitlist button,body[data-green="cta"] .share button,body[data-green="block"] .nav-cta,body[data-green="block"] .waitlist button,body[data-green="block"] .share button{background:var(--accent);border-color:var(--accent);color:#fff}
+body[data-green="cta"] .nav-cta:hover,body[data-green="cta"] .waitlist button:hover,body[data-green="block"] .nav-cta:hover,body[data-green="block"] .waitlist button:hover{background:var(--accent-pressed);color:#fff}
+body[data-green="block"] .cta-block{background:var(--accent-pressed)}
+body[data-green="block"] .cta-block h2 em{color:#C9E2D3}
+body[data-green="block"] .cta-block .sub,body[data-green="block"] .cta-block .joined p,body[data-green="block"] .cta-block .q-label{color:#E3EFE7}
+body[data-green="block"] .cta-block .wait-meta,body[data-green="block"] .cta-block .waitlist input::placeholder{color:#C9E2D3}
+body[data-green="block"] .cta-block .waitlist button,body[data-green="block"] .cta-block .share button{background:var(--paper);border-color:var(--paper);color:var(--ink)}
+body[data-green="block"] .cta-block .waitlist button:hover{background:#fff;color:var(--ink)}
+body[data-green="block"] .cta-block .chip[aria-pressed="true"]{background:var(--paper);border-color:var(--paper);color:var(--ink)}
+@media (max-width:960px){
+.nav,.page{padding-left:20px;padding-right:20px}
+.nav-links{display:none}
+.hero,.feature,.cta-block,.trust{grid-template-columns:minmax(0,1fr);gap:40px}
+.hero{padding:32px 0 64px}
+.feature.flip>.copy{order:0}
+h1{font-size:52px}
+h2{font-size:42px}
+.feature h3{font-size:38px}
+.hero-visual{height:520px;max-width:420px;width:100%;margin:0 auto}
+.hv-1{left:0;transform:rotate(-4deg) scale(.82);transform-origin:top left}
+.hv-2{right:0;transform:rotate(4deg) scale(.82);transform-origin:top right}
+.alert{width:270px;bottom:0}
+.how-grid,.trust-grid,.trust-grid.two,.next-grid,.next-grid.three,.also,.diff{grid-template-columns:minmax(0,1fr)}
+.diff{gap:32px;padding:56px 0}
+.diff h2{font-size:40px}
+.proof{grid-template-columns:repeat(2,minmax(0,1fr))}
+.proof div,.proof div+div{padding:20px 16px;border-left:none}
+.proof div:nth-child(even){border-left:0.5px solid var(--rule)}
+.proof div:nth-child(n+3){border-top:0.5px solid var(--rule)}
+.step,.step+.step{padding:28px 0;border-right:none;border-bottom:0.5px solid var(--rule)}
+.cta-block{padding:40px 24px}
+.feature-visual{min-height:auto;padding-bottom:40px}
+.section-head{padding:64px 0 32px}
+}
+@media (max-width:480px){.waitlist{flex-direction:column}.waitlist button{padding:15px}h1{font-size:44px}}
+</style>
+</head>
+<body data-green="block">
+<div class="nav-wrap" id="navwrap">
+<div class="nav">
+<a class="wordmark" href="#top" aria-label="Grocery Genie"><svg viewBox="9 9 82 82" aria-hidden="true"><path d="M74.5 29.4 A32 32 0 1 0 82 50" fill="none" stroke="#1F7A4A" stroke-width="18"></path><path d="M91 50 C80 36 61 36 46 53 C60 65 80 64 91 50 Z" fill="#34D17A"></path></svg><span>grocery<em>genie</em></span></a>
+<nav class="nav-links"><a href="#how">How it works</a><a href="#features">Features</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a></nav>
+<a class="nav-cta" href="#join" data-track="nav_cta">Get early access</a>
+</div>
+</div>
+<div class="page" id="top">
+<section class="hero" data-screen-label="Hero">
+<div>
+<div class="pill"><span class="dot"></span>Private beta · iPhone · Invites go out in waves</div>
+<h1 id="headline">Snap a receipt, watch your grocery budget <em>take shape.</em></h1>
+<p class="lede" id="lede">Scan a grocery receipt and your budget updates itself. No typing, no sorting.</p>
+<div id="join" class="join-slot" data-source="hero">
+<form class="waitlist" onsubmit="return joinWaitlist(event)"><input type="email" placeholder="you@kitchen.com" required="" aria-label="Email address"><button type="submit">Get early access</button></form>
+<div class="offer"><span>Free, no in-app purchases</span><span>iPhone</span></div>
+<div class="wait-meta"><span class="wl-count">2,847</span> people in line · Works with any store's receipt, cash purchases included</div>
+</div>
+</div>
+<div class="hero-visual" aria-hidden="true">
+<div class="hv-1" id="hero-scan"></div>
+<div class="hv-2" id="hero-prices"></div>
+<div class="alert"><div class="ic"></div><div class="t"><span>GROCERY GENIE</span><span>now</span></div><div class="b"><strong>80% of your budget used.</strong> $42 remaining with 9 days left.</div></div>
+</div>
+</section>
+<section class="diff" data-screen-label="Differentiator">
+<div>
+<div class="label">Why receipts</div>
+<h2>Bank apps show <em>“$187 at the store.”</em></h2>
+<p class="sub">Grocery Genie shows what the $187 bought, line by line, including cash purchases.</p>
+</div>
+<div class="cmp" aria-hidden="true">
+<div class="cmp-card cmp-bank"><div class="q-label">Bank app</div><div class="cmp-row"><span>TRADER JOE'S #552</span><span>−$187.00</span></div></div>
+<div class="cmp-card"><div class="q-label">Grocery Genie</div>
+<div class="cmp-row"><span>Groceries</span><span>$121.40</span></div>
+<div class="cmp-row"><span>Household</span><span>$24.97</span></div>
+<div class="cmp-row"><span>Beverages</span><span>$15.96</span></div>
+<div class="cmp-row"><span>Snacks &amp; Treats</span><span>$11.48</span></div>
+<div class="cmp-row"><span>Personal Care</span><span>$7.99</span></div>
+<div class="cmp-row"><span>Pet</span><span>$5.20</span></div>
+<div class="cmp-row total"><span>Total</span><span>$187.00</span></div>
+</div>
+</div>
+</section>
+<section id="how" data-screen-label="How it works">
+<div class="section-head">
+<div class="label">How it works</div>
+<h2>Three steps. <em>No typing.</em></h2>
+</div>
+<div class="how-grid">
+<div class="step"><div class="num">01</div><h3>Scan or import</h3><p>Point your camera at a receipt, or pick a photo or file. AI reads the store, every item, and every price.</p></div>
+<div class="step"><div class="num">02</div><h3>Check and approve</h3><p>Fix anything that looks off, then approve. Nothing lands in your budget until you say so.</p></div>
+<div class="step"><div class="num">03</div><h3>Stay on budget</h3><p>Items are sorted into categories and counted against your budget, with a heads-up before you go over.</p></div>
+</div>
+</section>
+<section id="features" data-screen-label="Features">
+<div class="section-head">
+<div class="label">What you get at launch</div>
+<h2>Every receipt sorted. <em>Every dollar counted.</em></h2>
+</div>
+<div class="feature">
+<div class="copy">
+<div class="meta">01 · Review</div>
+<h3>AI reads it, <em>you approve it.</em></h3>
+<p>It reads the store, date, every item, quantity, price, tax and total in seconds, and highlights anything it isn't sure about. Tap any field to fix it. Nothing saves until you confirm.</p>
+<ul><li>Asks you to double-check items over $100 and receipts over $500</li><li>Warns you about duplicate receipts</li><li>Learns your corrections for next time</li></ul>
+</div>
+<div class="feature-visual" id="feat-review"></div>
+</div>
+<div class="feature flip">
+<div class="copy">
+<div class="meta">02 · Budgets</div>
+<h3>Budgets that <em>keep up.</em></h3>
+<p>A monthly grocery budget, plus optional limits per category. Every receipt you confirm updates it.</p>
+<ul><li>Pace line: “On pace · 5% under” or “Ahead of pace · 12% over”</li><li>The budget month starts on the day you choose</li><li>11 budget currencies</li></ul>
+</div>
+<div class="feature-visual" id="feat-budget"></div>
+</div>
+<div class="feature">
+<div class="copy">
+<div class="meta">03 · Dashboard</div>
+<h3>See where it <em>all went.</em></h3>
+<p>A budget ring, a bar for each category, and a banner when you're over budget. Compare month over month and follow your 3-month trend.</p>
+<ul><li>Your top 10 items by spend</li><li>Search receipt history by store and filter by date</li><li>Edit or delete any saved receipt, and restore it within 30 days</li></ul>
+</div>
+<div class="feature-visual" id="feat-dash"></div>
+</div>
+<div class="also">
+<div class="next-card"><div class="meta">Scan any receipt</div><h4>Clean scans, every time.</h4><p>Apple's document scanner finds the edges and crops the receipt, and blurry or dark photos are caught before upload. Import from Photos or Files, or enter a purchase by hand.</p></div>
+<div class="next-card"><div class="meta">Spending sorts itself</div><h4>8 categories, sorted for you.</h4><p>Groceries, Household, Personal Care, Beverages, Snacks &amp; Treats, Baby &amp; Kids, Pet, and Other. Recategorize in one tap, and the fix also updates past receipts.</p></div>
+<div class="next-card"><div class="meta">Alerts before you overspend</div><h4>A heads-up, not a surprise.</h4><p>Push alerts at 50%, 80% and 100% of a budget, with the amount and days left. Mute any category, and get a weekly summary on the day you choose.</p></div>
+</div>
+<div class="proof">
+<div><strong>8</strong><span>categories, sorted for you</span></div>
+<div><strong>11</strong><span>budget currencies</span></div>
+<div><strong>Offline</strong><span>scans upload when you're back online</span></div>
+<div><strong>You confirm</strong><span>nothing saves until you do</span></div>
+</div>
+<div class="next" id="next" style="margin-top:72px">
+<div class="next-head"><h3>Coming later</h3><a href="Grocery Genie Roadmap.html">See the roadmap</a></div>
+<div class="next-grid three">
+<div class="next-card"><span class="tag">Coming later</span><h4>Know what things cost.</h4><p>Price history for the items you buy, compared across stores.</p></div>
+<div class="next-card"><span class="tag">Coming later</span><h4>Cook from what you have.</h4><p>A virtual pantry built from your receipts, with expiry reminders and recipes.</p></div>
+<div class="next-card"><span class="tag">Coming later</span><h4>Plan the week.</h4><p>Meal plans and shopping lists based on what you already buy.</p></div>
+</div>
+</div>
+</section>
+<section class="trust" id="privacy" data-screen-label="Privacy">
+<h2>Privacy, <em>in plain words.</em></h2>
+<div class="trust-body">
+<p class="privacy-copy">Receipt photos are sent securely to Anthropic's Claude to read them. Anthropic doesn't use them to train its models. We keep the photo with your receipt until you delete it.</p>
+<div class="trust-grid two">
+<div><h4>You decide when AI reads</h4><p>The app asks before AI reads your first receipt, and you can withdraw that at any time.</p></div>
+<div><h4>Delete everything</h4><p>Delete your account and all its data from inside the app.</p></div>
+<div><h4>Simple sign-in</h4><p>Sign in with Apple or email.</p></div>
+<div><h4>Accessible</h4><p>Supports VoiceOver, Dynamic Type, Reduce Motion and Increase Contrast.</p></div>
+</div>
+</div>
+</section>
+<div class="cta-block" data-screen-label="CTA">
+<div>
+<h2>Get in <em>early.</em></h2>
+<p class="sub">Early members get TestFlight access as invites go out, and a say in what ships next.</p>
+</div>
+<div class="join-slot" data-source="footer">
+<form class="waitlist" onsubmit="return joinWaitlist(event)"><input type="email" placeholder="you@kitchen.com" required="" aria-label="Email address"><button type="submit">Get early access</button></form>
+<div class="wait-meta">No spam. Your invite, then launch news.</div>
+</div>
+</div>
+<section id="faq" class="faq" data-screen-label="FAQ">
+<div class="section-head" style="padding:0 0 16px"><div class="label">FAQ</div><h2>Straight answers.</h2></div>
+<details data-track="faq_launch"><summary>When can I use it?<span class="plus">+</span></summary><p>We're in private beta and sending TestFlight invites in waves, earliest sign-ups first.</p></details>
+<details data-track="faq_cost"><summary>What does it cost?<span class="plus">+</span></summary><p>It's free. No paid tiers and no in-app purchases.</p></details>
+<details data-track="faq_privacy"><summary>What happens to my receipt photos?<span class="plus">+</span></summary><p>Receipt photos are sent securely to Anthropic's Claude to read them. Anthropic doesn't use them to train its models. We keep the photo with your receipt until you delete it.</p></details>
+<details data-track="faq_bank"><summary>How is this different from my bank app?<span class="plus">+</span></summary><p>Bank apps show "$187 at the store." Grocery Genie shows what the $187 bought, line by line, including cash purchases.</p></details>
+<details data-track="faq_platform"><summary>Does it work on Android, iPad or the web?<span class="plus">+</span></summary><p>Not at launch. Grocery Genie is iPhone only.</p></details>
+<details data-track="faq_lang"><summary>Which languages and currencies?<span class="plus">+</span></summary><p>It reads receipts in multiple languages. Budgets work in 11 currencies. Receipts in other currencies are kept but don't count toward the budget.</p></details>
+<details data-track="faq_stores"><summary>Which stores does it support?<span class="plus">+</span></summary><p>Any store that gives you a receipt. No receipt? Add the purchase by hand.</p></details>
+</section>
+<footer>
+<div><div class="wordmark" aria-label="Grocery Genie"><svg viewBox="9 9 82 82" aria-hidden="true"><path d="M74.5 29.4 A32 32 0 1 0 82 50" fill="none" stroke="#1F7A4A" stroke-width="18"></path><path d="M91 50 C80 36 61 36 46 53 C60 65 80 64 91 50 Z" fill="#34D17A"></path></svg><span>grocery<em>genie</em></span></div><p>Grocery budgets that start with a receipt. Built by a small team.</p></div>
+<nav><a href="#features">Features</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a><a href="#join">Get early access</a></nav>
+</footer>
+<div class="legal">© 2026 Grocery Genie</div>
+</div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="marketing/mocks.jsx"></script>
+<script type="text/babel" src="marketing/mocks-budget.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script>
+const WAITLIST_COUNT = 2847;
+function track(name, props){ (window.dataLayer = window.dataLayer || []).push({event:name, ...props}); }
+document.querySelectorAll('.wl-count').forEach(el => el.textContent = WAITLIST_COUNT.toLocaleString());
+window.addEventListener('scroll', () => document.getElementById('navwrap').classList.toggle('scrolled', scrollY > 8), {passive:true});
+document.addEventListener('click', e => { const t = e.target.closest('[data-track]'); if (t) track('click', {id: t.dataset.track}); });
+const depths = new Set();
+window.addEventListener('scroll', () => { const p = Math.round((scrollY + innerHeight) / document.body.scrollHeight * 4) * 25; if (!depths.has(p)) { depths.add(p); track('scroll_depth', {pct: p}); } }, {passive:true});
+const STORES = ["Trader Joe's", "Whole Foods", "Safeway", "Costco", "Kroger", "Somewhere else"];
+function joinWaitlist(e){
+  e.preventDefault();
+  const slot = e.target.closest('.join-slot');
+  const email = e.target.querySelector('input').value;
+  const code = Math.random().toString(36).slice(2, 7).toUpperCase();
+  const link = location.href.split(/[?#]/)[0] + '?ref=' + code;
+  const pos = (WAITLIST_COUNT + 1).toLocaleString();
+  track('waitlist_submit', {source: slot.dataset.source, variant: window.__headlineVariant});
+  document.querySelectorAll('.join-slot').forEach(s => {
+    s.innerHTML = `<div class="joined" role="status">
+      <div class="pos">You're <em>#${pos}</em> in line.</div>
+      <p>Share your link. Every friend who joins moves you up the line.</p>
+      <div class="share"><input readonly value="${link}" aria-label="Your referral link"><button type="button" onclick="copyRef(this)">Copy link</button></div>
+      <div class="q-label">Optional · Where do you shop most?</div>
+      <div class="chips">${STORES.map(s => `<button type="button" class="chip" aria-pressed="false" onclick="pickStore(this)">${s}</button>`).join('')}</div>
+    </div>`;
+  });
+  return false;
+}
+function copyRef(btn){ const i = btn.previousElementSibling; i.select(); navigator.clipboard?.writeText(i.value); btn.textContent = 'Copied'; track('ref_copy', {}); }
+function pickStore(b){ const on = b.getAttribute('aria-pressed') !== 'true'; document.querySelectorAll('.chip').forEach(c => { if (c.textContent === b.textContent) c.setAttribute('aria-pressed', on); }); track('store_pick', {store: b.textContent, on}); }
+</script>
+<script type="text/babel">
+const M = window.MarketingMocks;
+const HEADLINES = {
+  tagline: { h: <>Snap a receipt, watch your grocery budget <em>take shape.</em></>, l: "Scan a grocery receipt and your budget updates itself. No typing, no sorting." },
+  where: { h: <>Know where your grocery money <em>goes.</em></>, l: "Scan your receipts and Grocery Genie sorts every item into categories, tracks your budget, and warns you before you overspend." },
+  typing: { h: <>A grocery budget <em>without the typing.</em></>, l: "Snap a receipt, check it, confirm it. Every item is categorized and counted against your budget automatically." }
+};
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "headline": "tagline",
+  "accent": "#1F7A4A",
+  "showNext": true,
+  "green": "block"
+}/*EDITMODE-END*/;
+function Portal({ id, children }) {
+  const [el, setEl] = React.useState(null);
+  React.useEffect(() => setEl(document.getElementById(id)), [id]);
+  return el ? ReactDOM.createPortal(children, el) : null;
+}
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const v = HEADLINES[t.headline] || HEADLINES.tagline;
+  React.useEffect(() => {
+    document.documentElement.style.setProperty('--accent', t.accent);
+    document.getElementById('next').style.display = t.showNext ? '' : 'none';
+    document.body.setAttribute('data-green', t.green);
+    document.documentElement.style.setProperty('--accent-pressed', `color-mix(in oklab, ${t.accent} 78%, black)`);
+    document.getElementById('lede').textContent = v.l;
+    window.__headlineVariant = t.headline;
+  }, [t.accent, t.showNext, t.headline, t.green]);
+  return (
+    <>
+      <Portal id="headline">{v.h}</Portal>
+      <Portal id="hero-scan"><M.MockScan /></Portal>
+      <Portal id="hero-prices"><M.MockBudget /></Portal>
+      <Portal id="feat-review"><M.MockReview /></Portal>
+      <Portal id="feat-budget"><M.MockBudget /></Portal>
+      <Portal id="feat-dash"><M.MockDashboard /></Portal>
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Hero headline (A/B)" />
+        <TweakRadio label="Variant" value={t.headline} options={[{value:'tagline',label:'Tagline'},{value:'where',label:'Where it goes'},{value:'typing',label:'No typing'}]} onChange={x => setTweak('headline', x)} />
+        <TweakSection label="Page" />
+        <TweakToggle label="Show 'Coming after launch'" value={t.showNext} onChange={x => setTweak('showNext', x)} />
+        <TweakRadio label="Green use" value={t.green} options={[{value:'ink',label:'Ink'},{value:'cta',label:'CTAs'},{value:'block',label:'CTAs + block'}]} onChange={x => setTweak('green', x)} />
+        <TweakColor label="Accent" value={t.accent} onChange={x => setTweak('accent', x)} />
+      </TweaksPanel>
+    </>
+  );
+}
+document.getElementById('headline').innerHTML = '';
+ReactDOM.createRoot(document.createElement('div')).render(<App />);
+</script>
+</body>
+</html>
