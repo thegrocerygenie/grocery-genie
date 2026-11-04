@@ -209,7 +209,7 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-06 | 3 | Chosen day, 9 AM local time | Integration | `backend/tests/tasks/test_summary_tasks.py::test_recipients_only_on_users_chosen_day` | Pass |
 | BC-06 | 4 | Links to full dashboard | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "falls back to the dashboard when the route is missing" | Pass |
 
-V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04. `PREM` rows are the Premium tier (V11-P0, decisions D1 and D2: `PHASE_SCOPE.md`), which has no user story ID.
+V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04. `PREM` rows are the Premium tier (V11-P0 and V11-P4, decisions D1 and D2: `PHASE_SCOPE.md`), which has no user story ID, so the AC column names the decision. Data export (V11-P2, NFR Privacy 2) is Premium too: its rows are Story `PREM`, AC `NFR-P2`.
 
 | Story | AC | Criterion | Type | Test | Status |
 |---|---|---|---|---|---|
@@ -398,6 +398,36 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PREM | D2 | Queued photo that hit the cap: upgrade prompt opens the paywall | Component | `mobile/src/__tests__/historyOfflineQueue.test.tsx` "offers Premium for a photo over the monthly quota, and keeps the photo (D2)" | Pass |
 | PREM | D2 | Cap, Premium unblock and free endpoints through the API | E2E | `.agents/skills/verify-grocery-genie/features/premium.md` `premium-quota-free`, `premium-unlimited`, `premium-free-features` | Pass |
 | PREM | D1 | Sandbox purchase and restore on a device | Manual | `docs/DEPLOYMENT.md` 2.9 step 6 (needs the RevenueCat keys and App Store product) | Pending |
+| PREM | NFR-P2 | Export: JSON with receipts, line items, budgets and prices | Integration | `backend/tests/api/test_data_export.py::test_json_export_has_receipts_line_items_budgets_and_prices` | Pass |
+| PREM | NFR-P2 | Export: CSV, a zip with one file per entity | Integration | `backend/tests/api/test_data_export.py::test_csv_export_is_a_zip_of_one_file_per_entity` | Pass |
+| PREM | NFR-P2 | Export: an empty account exports empty lists and CSV headers | Integration | `backend/tests/api/test_data_export.py::test_json_export_of_an_empty_account` | Pass |
+| PREM | NFR-P2 | Export: an empty account exports empty lists and CSV headers | Integration | `backend/tests/api/test_data_export.py::test_csv_export_of_an_empty_account_has_headers` | Pass |
+| PREM | NFR-P2 | Export: only the user's own data, deleted receipts left out | Integration | `backend/tests/api/test_data_export.py::test_json_export_has_receipts_line_items_budgets_and_prices` | Pass |
+| PREM | NFR-P2 | Export: only the user's own data, deleted receipts left out | Integration | `backend/tests/api/test_data_export.py::test_csv_export_is_a_zip_of_one_file_per_entity` | Pass |
+| PREM | NFR-P2 | Export: deleted budgets left out | Integration | `backend/tests/api/test_data_export.py::test_export_leaves_out_a_deleted_budget` | Pass |
+| PREM | NFR-P2 | Export: CSV formula injection escaped | Unit | `backend/tests/api/test_data_export.py::test_csv_text_cells_are_escaped` | Pass |
+| PREM | NFR-P2 | Export: CSV formula injection escaped | Integration | `backend/tests/api/test_data_export.py::test_csv_escapes_store_names_too` | Pass |
+| PREM | NFR-P2 | Export: Premium only (D2), `403 premium_required` | Integration | `backend/tests/api/test_data_export.py::test_export_needs_premium` | Pass |
+| PREM | NFR-P2 | Export: Premium only (D2), `403 premium_required` | Integration | `backend/tests/api/test_data_export.py::test_free_user_refused_export_records_no_event` | Pass |
+| PREM | NFR-P2 | Export: large accounts read in batches (receipts, line items and price observations past one page) | Integration | `backend/tests/api/test_data_export.py::test_export_reads_in_batches` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (streamed, client gone first, analytics error) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_after_streaming` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (streamed, client gone first, analytics error) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_when_client_disconnects_before_streaming` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (streamed, client gone first, analytics error) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_when_analytics_fails` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (a read failing mid-build) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_when_build_fails` | Pass |
+| PREM | NFR-P2 | Export: `data_exported` analytics event | Integration | `backend/tests/api/test_data_export.py::test_export_records_data_exported_event` | Pass |
+| PREM | NFR-P2 | Export: unknown format is a 422; signed out is a 401 | Integration | `backend/tests/api/test_data_export.py::test_export_rejects_unknown_format` | Pass |
+| PREM | NFR-P2 | Export: unknown format is a 422; signed out is a 401 | Integration | `backend/tests/api/test_data_export.py::test_export_needs_sign_in` | Pass |
+| PREM | NFR-P2 | Export (app): download with the session, iOS share sheet, cached copy removed | Unit | `mobile/src/features/settings/__tests__/exportApi.test.ts` "downloads the chosen format with the session token into the cache" | Pass |
+| PREM | NFR-P2 | Export (app): download with the session, iOS share sheet, cached copy removed | Unit | `mobile/src/features/settings/__tests__/exportApi.test.ts` "opens the share sheet with the file, then deletes the cached copy" | Pass |
+| PREM | NFR-P2 | Export (app): a 403 from the download is premium_required | Unit | `mobile/src/features/settings/__tests__/exportApi.test.ts` "a 403 from the download is premium_required (Premium lapsed meanwhile)" | Pass |
+| PREM | NFR-P2 | Export (app): Settings → Export data, JSON or CSV | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "exports JSON by default and opens the share sheet" | Pass |
+| PREM | NFR-P2 | Export (app): Settings → Export data, JSON or CSV | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "exports CSV when CSV is chosen" | Pass |
+| PREM | NFR-P2 | Export (app): Settings → Export data, JSON or CSV | Component | `mobile/src/__tests__/settingsHub.test.tsx` "opens %s in the app" | Pass |
+| PREM | NFR-P2 | Export (app): a free user sees the upgrade prompt, never an error (D2) | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "a free user sees the upgrade prompt, which opens the paywall" | Pass |
+| PREM | NFR-P2 | Export (app): a free user sees the upgrade prompt, never an error (D2) | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "a premium_required answer turns into the upgrade prompt, not an error" | Pass |
+| PREM | NFR-P2 | Export (app): any other failure is inline, with retry | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "any other failure says so inline and can be tried again" | Pass |
+| PREM | NFR-P2 | Export (app): paywall lists data export | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "shows what Premium unlocks and the App Store price" | Pass |
+| PREM | NFR-P2 | Export (app): share sheet on a device (Save to Files, AirDrop) | Manual | Simulator / device check; API-only verify cannot drive the share sheet | Pending |
 | BC-04 | 5 | 12-month dashboard loads within 2 seconds | Integration | `backend/tests/api/test_p95_postgres.py::test_dashboard_12_month_trend_p95_under_2s` (Postgres) | Pass |
 | BC-FR | Trends | 3/12-month toggle on Trend; 3 stays the default | Component | `mobile/src/__tests__/trendMonths.test.tsx` "shows 3 months by default and asks the server for 3" | Pass |
 | BC-FR | Trends | 3/12-month toggle on Trend; 12 months charts every month | Component | `mobile/src/__tests__/trendMonths.test.tsx` "switching to 12 months asks the server for 12 and charts every month" | Pass |

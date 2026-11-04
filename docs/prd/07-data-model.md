@@ -42,6 +42,7 @@ Technology-agnostic entity model. Describes entities, relationships, and access 
 | Rolling average for a price alert | Mean unit_price of PriceObservations by canonical_item_id with the same unit_of_measure and currency, date in the 7 or 30 days up to the receipt date, the confirming receipt left out | Medium (every confirm, per item) | V1.1 |
 | Cross-store price comparison | The user's PriceObservations for a canonical_item_id (receipts not deleted) grouped by store_id: latest and mean unit price, like-for-like unit and currency, stores with at least 2 prices | Medium | V1.1 |
 | Premium check | The signed-in user's premium_active and premium_expires_at (on the user row, already loaded: no extra query) | High (every Premium gate, every scan) | V1.1 |
+| Data export | The user's not-deleted Receipts (with Store) by user_id ordered by date, id in keyset pages of 500, their LineItems by receipt_id; Budgets by user_id not deleted; PriceObservations by user_id joined to not-deleted Receipts, ordered by date, id in keyset pages | Low (Premium, on request) | V1.1 |
 | Household receipts | Receipts by household_id, ordered by date DESC | Medium | V1.5 |
 | Pantry contents | PantryItems by user_id/household_id where status != used/discarded, ordered by estimated_expiry ASC | High (meal planner) | V2.0 |
 | Recipe matching | Recipes where required ingredient_ids overlap with active PantryItem ingredient_ids | Medium | V2.0 |

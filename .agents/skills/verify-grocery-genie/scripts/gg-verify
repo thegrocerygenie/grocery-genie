@@ -8,6 +8,8 @@
 #                                   does; --no-consent leaves it off, so scans get 403.
 #   gg-verify api METHOD PATH [JSON]  call the API as that user (body on stdout)
 #   gg-verify scan [PHOTO]          upload a receipt photo (default: a generated one) to /api/receipts/scan
+#   gg-verify download PATH         GET a file (an export) as that user into the evidence
+#                                   directory; prints its path on stdout
 #   gg-verify sql "SELECT ..."      read the instance's database
 #   gg-verify revenuecat JSON [--secret VALUE]  POST a RevenueCat webhook body with the
 #                                   launch's webhook secret (or VALUE, to prove a wrong one fails)
@@ -195,6 +197,28 @@ cmd_api() {
   [ "$code" -lt 400 ]
 }
 
+# A binary or large body (the data export) does not fit the JSON evidence of
+# `api`: save it raw next to a small JSON of the request, status and headers.
+cmd_download() {
+  [ $# -eq 1 ] || die "usage: gg-verify download PATH"
+  local path="$1" run; run="$(run_dir)"
+  [ -f "$STATE/token" ] || die "no user; run: gg-verify signup"
+  local seq; seq="$(next_seq)"
+  local base="$run/$seq-GET-$(slug "$path")"
+  local code ctype disp
+  code="$(curl -s -o "$base.body" -D "$base.headers" -w '%{http_code}' \
+    -H "Authorization: Bearer $(cat "$STATE/token")" "$BASE$path")"
+  ctype="$(grep -i '^content-type:' "$base.headers" | tail -1 | cut -d' ' -f2- | tr -d '\r' || true)"
+  disp="$(grep -i '^content-disposition:' "$base.headers" | tail -1 | cut -d' ' -f2- | tr -d '\r' || true)"
+  jq -n --arg p "$path" --arg s "$code" --arg t "$ctype" --arg d "$disp" --arg f "$(basename "$base.body")" \
+    --argjson n "$(wc -c < "$base.body")" \
+    '{request:{method:"GET",path:$p},status:($s|tonumber),content_type:$t,content_disposition:$d,bytes:$n,body_file:$f}' > "$base.json"
+  rm -f "$base.headers"
+  echo "GET $path -> $code ($ctype)" >&2
+  echo "$base.body"
+  [ "$code" -lt 400 ]
+}
+
 cmd_revenuecat() {
   [ $# -ge 1 ] || die "usage: gg-verify revenuecat JSON [--secret VALUE]"
   local data="$1" secret run; shift; run="$(run_dir)"
@@ -291,6 +315,6 @@ cmd_cleanup() {
 cmd_last() { ls -1d "$ROOT"/runs/* 2>/dev/null | tail -1; }
 
 case "${1:-}" in
-  launch|doctor|signup|api|scan|sql|revenuecat|cleanup|last) sub="$1"; shift; "cmd_$sub" "$@" ;;
-  *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  launch|doctor|signup|api|download|scan|sql|revenuecat|cleanup|last) sub="$1"; shift; "cmd_$sub" "$@" ;;
+  *) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

@@ -269,6 +269,46 @@ Reads the signed-in user's entitlement from RevenueCat's REST API (`GET /v1/subs
 
 The stored state is stamped with the time of RevenueCat's answer (`request_date_ms`). A webhook applied after that read is newer and is kept; the refresh then returns the stored state unchanged.
 
+### GET /api/users/me/export?format=json|csv
+
+Data export (NFR Privacy 2), Premium (D2). A free user gets `403 premium_required` with `"feature": "data_export"`; an unknown `format` is `422`. `format` defaults to `json`.
+
+**Scope:** the signed-in user's own receipts, line items, budgets and price observations, as every other read (households arrive in V1.5). Deleted receipts and budgets are left out, and so are the line items and prices of a deleted receipt. Receipts of every status are included, with their `status`.
+
+**Response** `200`, as a download (`Content-Disposition: attachment; filename="grocery-genie-export-YYYY-MM-DD.json"` or `.zip`, `Cache-Control: no-store`):
+
+- `json` (`application/json`): one document. Receipts are oldest first, each with its line items in receipt order.
+  ```json
+  {
+    "format_version": 1,
+    "exported_at": "2026-11-03T10:00:00Z",
+    "currency": "USD",
+    "receipts": [
+      { "id": "uuid", "date": "2026-03-01", "store_name": "FreshCo", "store_location": null,
+        "subtotal": 4.88, "tax": 0.0, "total": 4.88, "currency": "USD", "status": "confirmed",
+        "created_at": "2026-03-01T12:00:00Z",
+        "line_items": [
+          { "id": "uuid", "receipt_id": "uuid", "position": 0, "name": "ORG BANANAS",
+            "quantity": 2.0, "unit_price": 0.69, "total_price": 1.38, "unit_of_measure": "lb",
+            "category": "Groceries", "canonical_item_id": "uuid", "canonical_item_name": "ORG BANANAS",
+            "corrected": false } ] } ],
+    "budgets": [
+      { "id": "uuid", "category": null, "category_id": null, "amount": 450.0, "currency": "USD",
+        "period_type": "monthly", "period_start": "2026-03-01", "rollover_enabled": false,
+        "created_at": "2026-03-01T12:00:00Z" } ],
+    "price_observations": [
+      { "id": "uuid", "date": "2026-03-01", "canonical_item_id": "uuid", "item_name": "ORG BANANAS",
+        "store_name": "FreshCo", "unit_price": 0.69, "quantity": 2.0, "unit_of_measure": "lb",
+        "currency": "USD", "receipt_id": "uuid", "line_item_id": "uuid" } ]
+  }
+  ```
+  A budget's `category` is null for the overall budget. `currency` is the budget currency (`currency_preference`).
+- `csv` (`application/zip`): `receipts.csv`, `line_items.csv` (with `receipt_id`), `budgets.csv` and `price_observations.csv`, with the same columns as the JSON. UTF-8 with a byte order mark, so Excel reads accented names; money has two decimals, quantities three. A text cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading `'`, so a spreadsheet does not run it as a formula (CSV injection). JSON values are not escaped.
+
+**Large accounts:** rows are read 500 at a time (keyset pages) into a spooled temporary file, in memory up to 8 MB and on disk past that, which is then streamed with its `Content-Length`. Memory stays bounded however many receipts there are, and the database work is done before the first byte is sent.
+
+Records `data_exported` (12-analytics.md). The 300 reads/minute limit applies.
+
 ## Price Intelligence [V1.1]
 
 Built: PI-01 (price history), PI-02 (item matching), PI-03 (price change alerts, below) and PI-04 (cross-store comparison), backend and app. Every route is the signed-in user's own data; another user's item, alias or suggestion answers 404.

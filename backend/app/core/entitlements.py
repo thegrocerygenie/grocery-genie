@@ -26,6 +26,7 @@ PREMIUM_REQUIRED = "premium_required"
 
 # Feature ids sent in a premium_required error, for the app's upgrade prompt.
 FEATURE_TREND_12_MONTHS = "trend_12_months"
+FEATURE_DATA_EXPORT = "data_export"
 FEATURE_UNLIMITED_RECEIPTS = "unlimited_receipts"
 
 # The free tier's monthly receipt cap. Not premium_required: the scan is not a
