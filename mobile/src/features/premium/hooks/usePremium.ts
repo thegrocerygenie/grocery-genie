@@ -8,7 +8,7 @@ import {
   isPurchasesAvailable,
   purchasePremium,
   restorePremium,
-  type PremiumOffer,
+  type PremiumPlan,
   type PurchaseOutcome,
   type RestoreOutcome,
 } from '@/features/premium/services/purchases';
@@ -63,12 +63,12 @@ export function usePurchasePremium() {
   return useMutation({
     mutationFn: async ({
       userId,
-      offer,
+      plan,
     }: {
       userId: string;
-      offer: PremiumOffer;
+      plan: PremiumPlan;
     }): Promise<PremiumResult<PurchaseOutcome>> => {
-      const outcome = await purchasePremium(userId, offer);
+      const outcome = await purchasePremium(userId, plan);
       if (outcome.kind !== 'purchased') return { outcome, premium: false, checked: false };
       const profile = await syncPremium(qc);
       return { outcome, premium: profile?.is_premium === true, checked: profile !== null };

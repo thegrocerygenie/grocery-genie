@@ -7,6 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
+from app.core.entitlements import (
+    FEATURE_PRICE_ALERT_MUTE,
+    FEATURE_PRICE_COMPARISON,
+    require_premium,
+)
 from app.core.security import get_current_user
 from app.models.database import (
     CanonicalItem,
@@ -305,10 +310,11 @@ async def get_price_history(
 async def compare_prices(
     item_id: uuid.UUID,
     db: AsyncSession = Depends(get_db, scope="function"),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_premium(FEATURE_PRICE_COMPARISON)),
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> PriceComparisonResponse:
-    """Latest and average price of the item at each store (PI-04)."""
+    """Latest and average price of the item at each store (PI-04). Premium
+    (D8, PREM-02 AC 1): a free user gets ``403 premium_required``."""
     item = await _get_item(ItemMatchingService(db), user.id, item_id)
     comparison = await PriceService(db).compare(user.id, item)
     analytics.emit(
@@ -395,10 +401,11 @@ async def split_alias(
 async def mute_item(
     item_id: uuid.UUID,
     db: AsyncSession = Depends(get_db, scope="function"),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_premium(FEATURE_PRICE_ALERT_MUTE)),
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> Response:
-    """No price change alerts for this item (PI-03 AC 4). Idempotent."""
+    """No price change alerts for this item (PI-03 AC 4). Idempotent. Premium
+    (D8, PREM-02 AC 2); unmuting below is open to everyone."""
     item = await _get_item(ItemMatchingService(db), user.id, item_id)
     await PriceAlertService(db).mute_item(user.id, item.id)
     analytics.emit("price_alert_muted", {"scope": "item"}, user.id)

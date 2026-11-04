@@ -1,6 +1,6 @@
 # Store normalization and user store merge (V1.1)
 
-"Loblaws", "LOBLAWS #1234" and "Loblaws - 1234" are one store for everyone: a branch marker at the end and punctuation normalize away, and nothing else, so different stores ("Number 1 Chinese" / "Chinese", "Bar 1802" / "Bar") never share a row. Each receipt keeps its own store name, so another user's name never shows. A different banner ("REAL CANADIAN SUPERSTORE") is joined only by the user's own merge, which groups that user's prices in history, item stats, cross-store comparison, price alerts and store mutes, and nobody else's (EC Price Intelligence 1, decision D3). A merge can be undone. Free, like the rest of price intelligence.
+"Loblaws", "LOBLAWS #1234" and "Loblaws - 1234" are one store for everyone: a branch marker at the end and punctuation normalize away, and nothing else, so different stores ("Number 1 Chinese" / "Chinese", "Bar 1802" / "Bar") never share a row. Each receipt keeps its own store name, so another user's name never shows. A different banner ("REAL CANADIAN SUPERSTORE") is joined only by the user's own merge, which groups that user's prices in history, item stats, cross-store comparison, price alerts and store mutes, and nobody else's (EC Price Intelligence 1, decision D3). A merge can be undone. The store list and merges are free; cross-store comparison and mutes are Premium (decision D8, PREM-02), so the journey makes the user Premium (`$G premium`) right before its first comparison.
 
 ## Sub-features
 
@@ -15,7 +15,7 @@
 - `store.mute-merged`: a muted store merged into another mutes the merged group: a price change at the target sends no alert, and `muted_stores` lists the group once. Unmuting the group unmutes both.
 - `store.alert-name`: a price alert from a merged store names the group's store.
 - `store.unmerge`: `DELETE /api/stores/{id}/merge` splits them again (204, idempotent), and the comparison is back to two stores.
-- `store.free`: every call above answers for a free user (no `premium_required`).
+- `store.free`: the store list, normalization, receipt names and the history filter answer a free user (driven before `$G premium`); merge and unmerge are free too (`backend/tests/api/test_premium_gating.py::test_store_merge_is_free`). Comparison and mutes are Premium (D8).
 
 ## How to get to it (user POV)
 
@@ -45,6 +45,7 @@ lob=$($G api GET /api/stores | jq -r '.stores[] | select(.name=="Loblaws") | .id
 rcss=$($G api GET /api/stores | jq -r '.stores[] | select(.name=="REAL CANADIAN SUPERSTORE") | .id')
 fresh=$($G api GET /api/stores | jq -r '.stores[] | select(.name=="FreshCo") | .id')
 iid=$($G api GET '/api/items?q=limes' | jq -r '.items[0].id')
+$G premium                                    # {"status":"applied"}: comparison and mutes are Premium (D8)
 $G api GET /api/items/$iid/compare | jq -c '[.stores[] | [.store_name, .observation_count]]'   # two stores, 2 prices each
 $G api POST /api/stores/$rcss/merge "{\"into_store_id\":\"$lob\"}" | jq -c '.stores[] | select(.name=="Loblaws")'
 # store.merge: receipt_count 4, merged_stores [{REAL CANADIAN SUPERSTORE}]
@@ -82,7 +83,7 @@ $G api POST /api/stores/00000000-0000-0000-0000-0000000000ff/merge "{\"into_stor
 - The 409 and 404 calls make `$G api` exit non-zero: that is the pass.
 - The price alert cooldown is per item (7 days on the server clock), so the setup's Limes prices stay within 10% of each other (no alert yet), the mute check comes before the alert-name check, and the alert-name step is the first Limes alert. A setup price 10% off the running average alerts at once and uses up the cooldown, and the later checks then see that one alert (seen in run `20261104-045758`).
 - `$G sql` needs the docker shim first on `PATH` in a container without a Docker daemon, as `launch` does.
-- Every user here is free (`signup` makes no Premium user), so a pass also proves `store.free`.
+- The user is free until `$G premium` (`signup` makes no Premium user), so the steps before it prove `store.free`; the merges after it run as Premium, and pytest proves them free.
 - Verified 2026-11-04 against Postgres 16 in debug mode (run `20261104-045939`; again with the end-only branch markers and per-receipt store names, run `20261104-052245`; with saved names and the "No." rule, run `20261104-055037`).
 - The filler stores (Chinese, Bar) buy Kiwis at one price, so they add no price alert.
 - A mute is recorded on the group's store: after `DELETE /api/stores/{id}/merge`, a mute set on the group stays with the group's store, one set before the merge stays with the merged store.

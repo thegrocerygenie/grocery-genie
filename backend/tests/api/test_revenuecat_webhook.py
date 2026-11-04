@@ -19,6 +19,7 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import clock
 from app.core.config import get_settings
 from app.models.database import Receipt, RevenueCatEvent, User
 from app.services.revenuecat_client import PremiumState, get_revenuecat_client
@@ -203,6 +204,186 @@ async def test_uncancellation_restores_premium(client):
 
 
 # -- idempotency and ordering ------------------------------------------------
+
+
+# -- plans and the free trial (PREM-01 AC 5, EC-PREM 1 and 2) ---------------
+
+MONTHLY = "gg_premium_monthly"
+YEARLY = "gg_premium_yearly"
+
+
+async def _product(db: AsyncSession) -> str | None:
+    user = await db.get(User, DEV_USER_ID)
+    assert user is not None
+    await db.refresh(user)
+    return user.premium_product_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("product", "days"), [(MONTHLY, 30), (YEARLY, 365)])
+async def test_either_plan_grants_premium(client, db_session, product, days):
+    """PREM-01 AC 5: the monthly and the yearly product both grant Premium."""
+    expires = datetime.now(UTC) + timedelta(days=days)
+    resp = await _post(
+        client, _event("INITIAL_PURCHASE", expires=expires, product_id=product)
+    )
+    assert resp.json() == {"status": "applied"}
+    assert (await _me(client))["is_premium"] is True
+    assert await _product(db_session) == product
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("product", [MONTHLY, YEARLY])
+async def test_a_trial_is_premium_until_it_ends(client, monkeypatch, product):
+    """EC-PREM 1: a 7-day trial (period_type TRIAL) is Premium for its 7 days,
+    and ends by itself when it does not convert."""
+    now = datetime.now(UTC)
+    trial_end = now + timedelta(days=7)
+    await _post(
+        client,
+        _event(
+            "INITIAL_PURCHASE",
+            expires=trial_end,
+            at=now,
+            product_id=product,
+            period_type="TRIAL",
+        ),
+    )
+    assert (await _me(client))["is_premium"] is True
+
+    monkeypatch.setattr(clock, "now", lambda: trial_end + timedelta(minutes=1))
+    assert (await _me(client))["is_premium"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_trial_cancelled_in_its_7_days_stays_premium_to_its_end(
+    client, monkeypatch
+):
+    """EC-PREM 1: cancelling in the trial keeps Premium to the trial's end."""
+    now = datetime.now(UTC)
+    trial_end = now + timedelta(days=7)
+    await _post(
+        client,
+        _event("INITIAL_PURCHASE", expires=trial_end, at=now, period_type="TRIAL"),
+    )
+    await _post(
+        client,
+        _event(
+            "CANCELLATION",
+            expires=trial_end,
+            at=now + timedelta(days=2),
+            period_type="TRIAL",
+            cancel_reason="UNSUBSCRIBE",
+        ),
+    )
+    monkeypatch.setattr(clock, "now", lambda: now + timedelta(days=6))
+    assert (await _me(client))["is_premium"] is True
+
+    await _post(
+        client,
+        _event("EXPIRATION", expires=trial_end, at=trial_end, period_type="TRIAL"),
+    )
+    assert (await _me(client))["is_premium"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_refund_in_the_trial_ends_premium_now(client):
+    """EC-PREM 1: a refund during the trial ends Premium at once."""
+    now = datetime.now(UTC)
+    await _post(
+        client,
+        _event(
+            "INITIAL_PURCHASE",
+            expires=now + timedelta(days=7),
+            at=now,
+            period_type="TRIAL",
+        ),
+    )
+    await _post(
+        client,
+        _event(
+            "CANCELLATION",
+            expires=now - timedelta(seconds=1),
+            at=now + timedelta(seconds=5),
+            period_type="TRIAL",
+            cancel_reason="CUSTOMER_SUPPORT",
+        ),
+    )
+    assert (await _me(client))["is_premium"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_trial_that_converts_renews_with_no_gap(
+    client, db_session, monkeypatch
+):
+    """PREM-01 AC 5: the trial's end is the first paid period's start."""
+    now = datetime.now(UTC)
+    trial_end = now + timedelta(days=7)
+    await _post(
+        client,
+        _event(
+            "INITIAL_PURCHASE",
+            expires=trial_end,
+            at=now,
+            product_id=YEARLY,
+            period_type="TRIAL",
+        ),
+    )
+    await _post(
+        client,
+        _event(
+            "RENEWAL",
+            expires=trial_end + timedelta(days=365),
+            at=trial_end,
+            product_id=YEARLY,
+            period_type="NORMAL",
+        ),
+    )
+    for moment in (
+        trial_end,
+        trial_end + timedelta(seconds=1),
+        trial_end + timedelta(days=200),
+    ):
+        monkeypatch.setattr(clock, "now", lambda moment=moment: moment)
+        assert (await _me(client))["is_premium"] is True
+    assert await _product(db_session) == YEARLY
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("old", "new"), [(MONTHLY, YEARLY), (YEARLY, MONTHLY)])
+async def test_a_plan_change_keeps_premium_with_no_gap(client, db_session, old, new):
+    """EC-PREM 2: PRODUCT_CHANGE, then a renewal on the new product, keeps
+    Premium throughout, and the new product is recorded once it starts."""
+    now = datetime.now(UTC)
+    period_end = now + timedelta(days=30)
+    await _post(
+        client,
+        _event("INITIAL_PURCHASE", expires=period_end, at=now, product_id=old),
+    )
+    await _post(
+        client,
+        _event(
+            "PRODUCT_CHANGE",
+            expires=period_end,
+            at=now + timedelta(seconds=5),
+            product_id=old,
+            new_product_id=new,
+        ),
+    )
+    assert (await _me(client))["is_premium"] is True
+    assert await _product(db_session) == old
+
+    await _post(
+        client,
+        _event(
+            "RENEWAL",
+            expires=period_end + timedelta(days=365 if new == YEARLY else 30),
+            at=now + timedelta(seconds=10),
+            product_id=new,
+        ),
+    )
+    assert (await _me(client))["is_premium"] is True
+    assert await _product(db_session) == new
 
 
 @pytest.mark.asyncio

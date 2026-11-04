@@ -1,58 +1,50 @@
 /**
- * User-facing strings for Premium (V11-P0): the paywall and the Settings row.
- * Externalized for i18n.
+ * User-facing strings for Premium (V11-P0, PREM-01): the paywall and the
+ * Settings row. Externalized for i18n.
  *
- * The benefit list names only what Premium unlocks today (D2).
+ * The feature list names only what Premium unlocks in this build (PREM-01
+ * AC 4, decisions D2 and D8): add a row when its feature ships.
  */
 export const PREMIUM_STRINGS = {
-  /** The locale these strings are written in; dates on the paywall use it. */
+  /** The locale these strings are written in; dates and prices on the paywall use it. */
   dateLocale: 'en-US',
   screenTitle: 'Premium',
   close: 'Close',
-  title: 'Grocery Genie Premium',
-  subtitle: 'More from every receipt you scan.',
+  title: 'Premium',
+  subtitle: 'Unlock the full power of your receipts.',
   benefits: [
-    {
-      key: 'trend',
-      symbol: 'chart.bar.xaxis',
-      title: '12-month spending trend',
-      detail: 'See how your grocery spending moves across the whole year.',
-    },
-    {
-      key: 'categories',
-      symbol: 'tag.fill',
-      title: 'Your own categories',
-      detail: 'Add up to 10 categories for budgets and corrections, named your way.',
-    },
-    {
-      key: 'rollover',
-      symbol: 'arrow.uturn.forward',
-      title: 'Budget rollover',
-      detail: 'Carry what you didn’t spend this month into next month’s budget.',
-    },
-    {
-      key: 'receipts',
-      symbol: 'infinity',
-      title: 'Unlimited receipts',
-      detail: 'Scan every trip. The free plan stops at 20 receipts a month.',
-    },
-    {
-      key: 'export',
-      symbol: 'square.and.arrow.up',
-      title: 'Export your data',
-      detail: 'Download your receipts, budgets and prices as JSON or CSV.',
-    },
+    { key: 'compare', symbol: 'cart.fill', title: 'Cross-store comparison' },
+    { key: 'categories', symbol: 'tag.fill', title: 'Custom categories' },
+    { key: 'export', symbol: 'square.and.arrow.up', title: 'Data export · CSV/JSON' },
+    { key: 'trend', symbol: 'chart.bar.xaxis', title: '12-month trends' },
+    { key: 'mute', symbol: 'bell.slash.fill', title: 'Per-item & per-store mute' },
+    { key: 'receipts', symbol: 'infinity', title: 'Unlimited receipts' },
+    { key: 'rollover', symbol: 'arrow.uturn.forward', title: 'Budget rollover' },
   ],
-  staysFree: 'Price history, price alerts and store comparison stay free.',
-  perMonth: '/month',
-  /** The price as VoiceOver reads it. */
-  pricePerMonthLabel: (price: string) => `${price} a month`,
-  subscribe: (price: string) => `Subscribe for ${price}/month`,
+  staysFree: 'Price history and price alerts stay free.',
+  plansLabel: 'Plans',
+  yearly: 'Yearly',
+  monthly: 'Monthly',
+  /** Under the yearly price: "/yr · $3.33/mo". */
+  perYearAndMonth: (perMonth: string) => `/yr · ${perMonth}/mo`,
+  perMonthShort: '/mo',
+  save: (percent: number) => `SAVE ${percent}%`,
+  /** A plan as VoiceOver reads it. */
+  yearlyLabel: (price: string, perMonth: string, percent: number | null) =>
+    `Yearly, ${price} a year, ${perMonth} a month${percent ? `, save ${percent}%` : ''}`,
+  monthlyLabel: (price: string) => `Monthly, ${price} a month`,
+  startTrial: (days: number) => `Start ${days}-day free trial`,
+  subscribe: 'Subscribe',
   subscribing: 'Subscribing…',
-  restore: 'Restore Purchases',
+  /** What is billed after the trial (PREM-01 AC 2). */
+  trialTerms: (days: number, price: string, period: 'year' | 'month') =>
+    `${days} days free, then ${price}/${period}.`,
+  billed: (price: string, period: 'year' | 'month') => `Billed ${price} a ${period}.`,
+  cancelAnytime: 'Cancel anytime',
+  restore: 'Restore purchase',
   restoring: 'Restoring…',
-  terms:
-    'Billed monthly to your Apple ID. Renews automatically until you cancel in iOS Settings at least 24 hours before the end of the period.',
+  terms: (period: 'year' | 'month') =>
+    `Charged to your Apple ID ${period === 'year' ? 'yearly' : 'monthly'} when any free trial ends. Renews automatically until you cancel in iOS Settings at least 24 hours before the end of the period.`,
   termsOfUse: 'Terms of Use',
   privacyPolicy: 'Privacy Policy',
   loadingOffer: 'Loading the price…',
@@ -64,7 +56,7 @@ export const PREMIUM_STRINGS = {
   restoreFailed: 'Couldn’t restore purchases. Check your connection and try again.',
   nothingToRestore: 'No Premium subscription was found for this Apple ID.',
   restoreCheckFailed:
-    'Couldn’t check your subscription right now. Try Restore Purchases again in a moment.',
+    'Couldn’t check your subscription right now. Try Restore purchase again in a moment.',
   pending: 'Purchase complete. Premium turns on in a moment.',
   activeTitle: 'You’re on Premium',
   activeUntil: (date: string) => `Renews or ends on ${date}.`,
