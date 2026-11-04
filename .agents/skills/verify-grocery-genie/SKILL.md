@@ -56,6 +56,8 @@ $G waitlist import CSV | backfill | retry   # the waitlist ops commands (docs/DE
                                   # against this instance; see features/waitlist-offer.md
 $G rcstub fail | ok | grants      # with --stub-revenuecat: refuse grants (503), accept them, or
                                   # print the grants the stand-in received
+$G rcstub slow SECONDS | fast     # with --stub-revenuecat: each subscriber read waits SECONDS
+                                  # (a slow RevenueCat), or answers at once; see features/premium.md
 ```
 
 All routes sit under `/api/` except `/health`. Pipe bodies through `jq`, for example `rid=$($G scan | jq -r .receipt_id)`. Use a fresh `signup` per journey so the users never share state.

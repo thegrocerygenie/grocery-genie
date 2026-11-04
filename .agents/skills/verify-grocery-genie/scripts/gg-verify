@@ -21,6 +21,7 @@
 #                                   retry pending RevenueCat grants
 #   gg-verify rcstub fail | ok | grants  make the RevenueCat stub refuse grants (503) or accept
 #                                   them, or print the grants it received
+#   gg-verify rcstub slow SECONDS | fast  delay each subscriber read by SECONDS, or stop
 #   gg-verify cleanup               stop what launch started, drop its database
 #   gg-verify last                  print the newest evidence directory
 set -euo pipefail
@@ -117,7 +118,7 @@ cmd_launch() {
     local stub_port=$((PORT + 100)) stub_key; stub_key="sk_stub_$(openssl rand -hex 8)"
     [ -z "$(lsof -nP -iTCP:"$stub_port" -sTCP:LISTEN -t 2>/dev/null)" ] || die "port $stub_port (RevenueCat stub) is in use"
     nohup "$VENV/python" -I "$REPO/.agents/skills/verify-grocery-genie/scripts/revenuecat-stub.py" \
-      "$stub_port" "$stub_key" "$run/revenuecat-stub.jsonl" "$STATE/revenuecat_fail" \
+      "$stub_port" "$stub_key" "$run/revenuecat-stub.jsonl" "$STATE/revenuecat_fail" "$STATE/revenuecat_slow" \
       > "$run/revenuecat-stub.log" 2>&1 & echo $! > "$STATE/stub_pid"
     export GG_REVENUECAT_API_KEY="$stub_key"
     export GG_REVENUECAT_API_BASE="http://127.0.0.1:$stub_port"
@@ -372,7 +373,11 @@ cmd_rcstub() {
     fail) touch "$STATE/revenuecat_fail"; echo "RevenueCat stub: grants answer 503" >&2 ;;
     ok) rm -f "$STATE/revenuecat_fail"; echo "RevenueCat stub: grants accepted" >&2 ;;
     grants) cat "$run/revenuecat-stub.jsonl" 2>/dev/null || true ;;
-    *) die "usage: gg-verify rcstub fail | ok | grants" ;;
+    slow)
+      [[ "${2:-}" =~ ^[0-9]+(\.[0-9]+)?$ ]] || die "usage: gg-verify rcstub slow SECONDS"
+      echo "$2" > "$STATE/revenuecat_slow"; echo "RevenueCat stub: subscriber reads wait ${2}s" >&2 ;;
+    fast) rm -f "$STATE/revenuecat_slow"; echo "RevenueCat stub: subscriber reads answer at once" >&2 ;;
+    *) die "usage: gg-verify rcstub fail | ok | grants | slow SECONDS | fast" ;;
   esac
 }
 
