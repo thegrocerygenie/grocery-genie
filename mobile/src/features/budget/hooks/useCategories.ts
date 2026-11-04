@@ -3,8 +3,9 @@ import {
   createCategory,
   deleteCategory,
   getCategories,
-  renameCategory,
+  updateCategory,
 } from '../services/budgetApi';
+import type { CategoryInput } from '../types';
 
 export function useCategories() {
   return useQuery({
@@ -14,22 +15,22 @@ export function useCategories() {
   });
 }
 
-/** Add a custom category (Premium). */
+/** Add a custom category (Premium), with its colour and icon. */
 export function useCreateCategory() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => createCategory(name),
+    mutationFn: (input: CategoryInput & { name: string }) => createCategory(input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] }),
   });
 }
 
-/** Rename a custom category (Premium). */
-export function useRenameCategory() {
+/** Rename a custom category or change its colour or icon (Premium). */
+export function useUpdateCategory() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) => renameCategory(id, name),
+    mutationFn: ({ id, ...input }: CategoryInput & { id: string }) => updateCategory(id, input),
     onSuccess: () => {
-      // The name shows in budgets and on the dashboard too.
+      // The name and look show in budgets and on the dashboard too.
       void queryClient.invalidateQueries({ queryKey: ['categories'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },

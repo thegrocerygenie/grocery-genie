@@ -34,6 +34,7 @@ from collections.abc import Iterable
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.category_looks import DEFAULT_COLOR, DEFAULT_ICON
 from app.models.database import (
     Budget,
     BudgetAlertSent,
@@ -127,7 +128,13 @@ class CategoryService:
         )
         return set(result.scalars().all())
 
-    async def create(self, user_id: uuid.UUID, name: str) -> Category:
+    async def create(
+        self,
+        user_id: uuid.UUID,
+        name: str,
+        color: str = DEFAULT_COLOR,
+        icon: str = DEFAULT_ICON,
+    ) -> Category:
         await self._lock_user(user_id)
         custom = await self._custom(user_id)
         if len(custom) >= MAX_CUSTOM_CATEGORIES:
@@ -137,6 +144,8 @@ class CategoryService:
             name=name,
             user_id=user_id,
             is_default=False,
+            color=color,
+            icon=icon,
             sort_order=max([CUSTOM_SORT_START, *(c.sort_order or 0 for c in custom)])
             + 1,
         )
@@ -144,13 +153,28 @@ class CategoryService:
         await self.db.flush()
         return category
 
-    async def rename(
-        self, user_id: uuid.UUID, category_id: uuid.UUID, name: str
+    async def update(
+        self,
+        user_id: uuid.UUID,
+        category_id: uuid.UUID,
+        name: str | None = None,
+        color: str | None = None,
+        icon: str | None = None,
     ) -> Category:
+        """Rename and/or restyle a custom category; ``None`` keeps a field.
+
+        The route has checked ``color`` and ``icon`` against the allowed sets
+        (``app.models.category_looks``).
+        """
         await self._lock_user(user_id)
         category = await self._owned(user_id, category_id)
-        await self._ensure_name_free(user_id, name, exclude=category.id)
-        category.name = name
+        if name is not None:
+            await self._ensure_name_free(user_id, name, exclude=category.id)
+            category.name = name
+        if color is not None:
+            category.color = color
+        if icon is not None:
+            category.icon = icon
         await self.db.flush()
         return category
 

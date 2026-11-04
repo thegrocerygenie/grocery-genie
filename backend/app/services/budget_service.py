@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.core.entitlements import is_premium
 from app.core.retention import restore_cutoff
 from app.events.types import BudgetThresholdBreached
+from app.models.category_looks import DEFAULT_COLOR, DEFAULT_ICON
 from app.models.database import (
     Budget,
     BudgetAlertSent,
@@ -650,6 +651,11 @@ class BudgetService:
         cat_ids = {b.category_id for b in budgets if b.category_id is not None}
         cat_ids.update(cid for cid in spending if cid is not None)
         category_names = await self._get_category_names(cat_ids)
+        looks = await self._get_category_looks(cat_ids)
+
+        def look(cat_id: uuid.UUID) -> dict[str, str]:
+            color, icon = looks.get(cat_id, (DEFAULT_COLOR, DEFAULT_ICON))
+            return {"color": color, "icon": icon}
 
         # Build per-category summaries
         category_summaries: list[BudgetCategorySummary] = []
@@ -672,6 +678,7 @@ class BudgetService:
                     remaining=cat_remaining,
                     percent=round(cat_percent, 1),
                     rolled_over=cat_rolled,
+                    **look(b.category_id),
                 )
             )
             seen_categories.add(b.category_id)
@@ -687,6 +694,7 @@ class BudgetService:
                         spent=cat_spent,
                         remaining=-cat_spent,
                         percent=0.0,
+                        **look(cat_id),
                     )
                 )
 
@@ -1167,3 +1175,16 @@ class BudgetService:
             select(Category).where(Category.id.in_(category_ids))
         )
         return {cat.id: cat.name for cat in result.scalars().all()}
+
+    async def _get_category_looks(
+        self, category_ids: set[uuid.UUID]
+    ) -> dict[uuid.UUID, tuple[str, str]]:
+        """Look up each category's (colour, icon) by ID (BC-05 AC 7)."""
+        if not category_ids:
+            return {}
+        result = await self.db.execute(
+            select(Category.id, Category.color, Category.icon).where(
+                Category.id.in_(category_ids)
+            )
+        )
+        return {row[0]: (row[1], row[2]) for row in result.all()}

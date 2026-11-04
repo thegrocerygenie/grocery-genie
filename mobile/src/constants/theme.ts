@@ -91,6 +91,30 @@ export const colors = {
 };
 
 /**
+ * Category colours by name (BC-05 AC 5, DA-9). The server stores these names,
+ * never a colour value: `backend/app/models/category_looks.py`. The custom
+ * palette (CUSTOM_CATEGORY_COLORS in constants/categories.ts) is every key but
+ * `gray`, which only the built-in "Other" uses.
+ */
+export const categoryPalette = {
+  indigo: system('systemIndigo'),
+  purple: system('systemPurple'),
+  pink: system('systemPink'),
+  red: system('systemRed'),
+  orange: system('systemOrange'),
+  yellow: system('systemYellow'),
+  green: system('systemGreen'),
+  mint: system('systemMint'),
+  teal: system('systemTeal'),
+  cyan: system('systemCyan'),
+  blue: system('systemBlue'),
+  brown: system('systemBrown'),
+  gray: system('systemGray'),
+} as const satisfies Record<string, ColorValue>;
+
+export type CategoryColorName = keyof typeof categoryPalette;
+
+/**
  * The React Navigation theme for an appearance. Native stack headers take
  * their bar, title, and button colors from it; with none they stay light in
  * dark mode. It takes only strings, so it gives the hex of systemGroupedBackground.

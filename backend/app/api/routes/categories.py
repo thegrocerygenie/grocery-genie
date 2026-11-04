@@ -68,7 +68,7 @@ async def create_category(
     """Add a custom category (BC-05 AC 3): Premium, at most 10 per user."""
     service = CategoryService(db)
     try:
-        category = await service.create(user.id, body.name)
+        category = await service.create(user.id, body.name, body.color, body.icon)
     except CategoryLimitError:
         raise HTTPException(
             status_code=409,
@@ -87,22 +87,27 @@ async def create_category(
 
 
 @router.patch("/{category_id}", response_model=CategoryResponse)
-async def rename_category(
+async def update_category(
     category_id: uuid.UUID,
     body: CategoryUpdateRequest,
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(require_premium(FEATURE_CUSTOM_CATEGORIES)),
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> CategoryResponse:
-    """Rename one of the user's custom categories (Premium)."""
+    """Rename one of the user's custom categories, or change its colour or
+    icon (BC-05 AC 5). Premium: after a lapse the look stays but is fixed
+    (AC 8)."""
     service = CategoryService(db)
     try:
-        category = await service.rename(user.id, category_id, body.name)
+        category = await service.update(
+            user.id, category_id, name=body.name, color=body.color, icon=body.icon
+        )
     except CategoryNotFoundError:
         raise _not_found() from None
     except CategoryNameTakenError:
         raise _name_taken() from None
-    await _emit_changed(analytics, service, user, "renamed")
+    if body.name is not None:
+        await _emit_changed(analytics, service, user, "renamed")
     return CategoryResponse.model_validate(category)
 
 

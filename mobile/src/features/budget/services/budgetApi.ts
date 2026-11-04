@@ -3,6 +3,7 @@ import type {
   BudgetCreateRequest,
   BudgetResponse,
   BudgetUpdateRequest,
+  CategoryInput,
   CategoryResponse,
   DashboardData,
 } from '../types';
@@ -59,19 +60,21 @@ export async function getCategories(): Promise<CategoryResponse[]> {
   return apiClient<CategoryResponse[]>('/api/categories');
 }
 
-/** Add a custom category (Premium; at most 10). */
-export async function createCategory(name: string): Promise<CategoryResponse> {
+/** Add a custom category (Premium; at most 10), with its colour and icon. */
+export async function createCategory(
+  input: CategoryInput & { name: string },
+): Promise<CategoryResponse> {
   return apiClient<CategoryResponse>('/api/categories', {
     method: 'POST',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(input),
   });
 }
 
-/** Rename one of the user's custom categories (Premium). */
-export async function renameCategory(id: string, name: string): Promise<CategoryResponse> {
+/** Rename one of the user's custom categories, or change its colour or icon (Premium). */
+export async function updateCategory(id: string, input: CategoryInput): Promise<CategoryResponse> {
   return apiClient<CategoryResponse>(`/api/categories/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(input),
   });
 }
 
