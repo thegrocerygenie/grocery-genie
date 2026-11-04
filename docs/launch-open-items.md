@@ -103,7 +103,11 @@ The site promises waitlist sign-ups "a free year of Premium" when Premium launch
 
 - [ ] **Now: say it in the privacy text.** Before the waitlist grows, the waitlist sign-up and `privacy.ts` must say the waitlist email will be used to find the person's account and apply the offer.
   - [x] `privacy.ts` ("What we collect" → "Our waitlist", and Resend "keeps our waitlist"), updated November 3, 2026. Still a draft until legal sign-off.
-  - [ ] The waitlist sign-up on the marketing site: waits on the redesign.
+  - [x] The waitlist sign-up on the marketing site, done November 3, 2026:
+    - a note under each waitlist form (`marketing/src/components/CtaSlot.astro`): "We'll email you once, at launch. Sign up in the app with this same email and we'll match it to your account for the free Premium year.";
+    - the same line in the default welcome email (`marketing/api/_handler.js`).
+
+    `marketing/tests/page.mjs` and `tests/smoke.mjs` check both. A custom `WAITLIST_WELCOME_TEXT` must keep that line.
 - [ ] **Now: decide the cut-off.** Which sign-ups count? For example, everyone who joined before the site switches to App Store downloads. Resend keeps each contact's `created_at`. Record it in `docs/marketing/decisions.md`.
 - [ ] **Now: decide on unsubscribes.** Does someone who unsubscribed from waitlist emails still get the year? Resend keeps an unsubscribed contact, with a flag.
 - [ ] **Matching rule.** An account qualifies when its email, trimmed and lowercased like the waitlist's, equals a waitlist contact's.
@@ -115,4 +119,4 @@ The site promises waitlist sign-ups "a free year of Premium" when Premium launch
 
   The backend reads the audience through the Resend API, or from a one-off export taken at the cut-off.
 - [ ] **When nothing matches.** Sign in with Apple's Hide My Email gives an `@privaterelay.appleid.com` address, and some people sign up with a different email. Add "Claim your waitlist offer" in Settings: the user enters their waitlist email and taps a confirmation link sent to it (the same pattern as the email-change confirmation).
-- [ ] **Launch email.** Ask waitlist members to sign up with the email they joined with, or to use the claim flow.
+- [ ] **Launch email.** Ask waitlist members to sign up with the email they joined with, or to use the claim flow. The welcome email already asks them to use the same email.
