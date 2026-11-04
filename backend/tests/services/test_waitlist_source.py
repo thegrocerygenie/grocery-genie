@@ -84,6 +84,55 @@ async def test_an_api_error_raises_and_lists_nothing():
         await _client(lambda r: httpx.Response(401, json={})).list_contacts()
 
 
+async def test_lists_a_page_of_contact_ids_for_the_purge():
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "object": "list",
+                "has_more": True,
+                "data": [
+                    {"id": "c1", "email": "a@x.com", "created_at": "2026-11-01"},
+                    {"id": "c2", "email": "b@x.com", "created_at": "2026-11-01"},
+                ],
+            },
+        )
+
+    ids = await _client(handler).list_contact_ids(limit=2)
+
+    assert ids == ["c1", "c2"]
+    assert seen[0].url.path == "/audiences/aud_1/contacts"
+    assert seen[0].url.params["limit"] == "2"
+
+
+async def test_deletes_a_contact_and_treats_404_as_already_gone():
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.path.endswith("/gone"):
+            return httpx.Response(404, json={"name": "not_found"})
+        return httpx.Response(200, json={"object": "contact", "deleted": True})
+
+    client = _client(handler)
+
+    assert await client.delete_contact("c1") is True
+    assert await client.delete_contact("gone") is False
+    assert seen[0].method == "DELETE"
+    assert seen[0].url.path == "/audiences/aud_1/contacts/c1"
+    assert seen[0].headers["authorization"] == "Bearer re_test"
+
+
+async def test_a_failed_delete_raises():
+    client = _client(lambda request: httpx.Response(500))
+
+    with pytest.raises(WaitlistSourceError):
+        await client.delete_contact("c1")
+
+
 def test_parses_a_resend_csv_export():
     text = (
         "id,email,first_name,last_name,created_at,unsubscribed\n"

@@ -7,7 +7,8 @@ copies it into ``waitlist_entries`` either through Resend's API
 the audience taken at the cut-off (``parse_export_csv``, the management
 command). Unsubscribed contacts are kept: they still qualify (decision #10).
 A contact deleted from the audience (a deletion request) leaves the copy on
-the next sync, and with it the offer.
+the next sync, and with it the offer. When the claim window closes, the purge
+deletes the audience's contacts through the same client (decision #11).
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ import io
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from urllib.parse import quote
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -97,6 +99,44 @@ class ResendAudienceClient:
             return await self.http.get(url, headers=headers, params=params)
         async with httpx.AsyncClient(timeout=20.0) as http:
             return await http.get(url, headers=headers, params=params)
+
+    async def list_contact_ids(self, limit: int = PAGE_SIZE) -> list[str]:
+        """The ids of the audience's first ``limit`` contacts: the purge
+        deletes them and asks again, so it needs no cursor."""
+        url = f"{self.base_url}/audiences/{self.audience_id}/contacts"
+        try:
+            resp = await self._get(url, {"limit": limit})
+            resp.raise_for_status()
+            page = _ContactPage.model_validate(resp.json())
+        except (httpx.HTTPError, ValueError, ValidationError) as e:
+            logger.warning("resend audience read failed: %s", type(e).__name__)
+            raise WaitlistSourceError(str(e)) from e
+        return [row.id for row in page.data]
+
+    async def delete_contact(self, contact_id: str) -> bool:
+        """Delete one contact; False when Resend no longer has it (404), so a
+        rerun after a partial purge is safe."""
+        url = (
+            f"{self.base_url}/audiences/{self.audience_id}"
+            f"/contacts/{quote(contact_id, safe='')}"
+        )
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        try:
+            if self.http is not None:
+                resp = await self.http.delete(url, headers=headers)
+            else:
+                async with httpx.AsyncClient(timeout=20.0) as http:
+                    resp = await http.delete(url, headers=headers)
+            if resp.status_code == 404:
+                return False
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            logger.warning("resend contact delete failed: %s", type(e).__name__)
+            raise WaitlistSourceError(str(e)) from e
+        finally:
+            if self.page_delay:
+                await asyncio.sleep(self.page_delay)
+        return True
 
     async def list_contacts(self) -> list[WaitlistContact]:
         url = f"{self.base_url}/audiences/{self.audience_id}/contacts"

@@ -184,3 +184,29 @@ async def test_promotional_grant_errors_raise_unavailable(status):
         await _client(lambda request: httpx.Response(status)).grant_promotional(
             "u", datetime(2028, 1, 10, tzinfo=UTC)
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
+async def test_a_4xx_grant_is_rejected_for_good(status):
+    """A 4xx won't change on retry (a bad key or entitlement id): the waitlist
+    marks the grant failed instead of retrying it forever."""
+    from app.services.revenuecat_client import RevenueCatRejectedError
+
+    with pytest.raises(RevenueCatRejectedError) as raised:
+        await _client(lambda request: httpx.Response(status)).grant_promotional(
+            "u", datetime(2028, 1, 10, tzinfo=UTC)
+        )
+    assert raised.value.status_code == status
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [408, 429, 500, 503])
+async def test_a_retryable_grant_failure_is_not_rejected(status):
+    from app.services.revenuecat_client import RevenueCatRejectedError
+
+    with pytest.raises(RevenueCatUnavailableError) as raised:
+        await _client(lambda request: httpx.Response(status)).grant_promotional(
+            "u", datetime(2028, 1, 10, tzinfo=UTC)
+        )
+    assert not isinstance(raised.value, RevenueCatRejectedError)

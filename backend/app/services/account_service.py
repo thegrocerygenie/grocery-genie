@@ -159,6 +159,8 @@ async def delete_account(
             granted_at=None,
             last_attempt_at=None,
             last_error=None,
+            attempts=None,
+            created_at=None,
         ),
     ]
     if email is not None:

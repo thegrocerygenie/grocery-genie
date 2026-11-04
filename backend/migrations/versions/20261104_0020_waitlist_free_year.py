@@ -7,7 +7,7 @@ unsubscribed flag; it is deleted when the claim window closes.
 waitlist_redemptions is one free year per waitlist email, ever: a salted,
 one-way hash of the waitlist email (unique), the account (unique, null once
 the account is deleted), and the RevenueCat grant's state (pending ->
-granted) for retries.
+granted, or failed) for retries.
 
 users gets the "Claim your waitlist offer" confirmation, like pending_email:
 the waitlist email, its link's token hash and expiry.
@@ -74,16 +74,15 @@ def upgrade() -> None:
         sa.Column("matched_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("grant_expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("granted_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column(
-            "attempts", sa.Integer(), server_default=sa.text("0"), nullable=False
-        ),
+        # attempts and created_at go null with the account (decision #13).
+        sa.Column("attempts", sa.Integer(), server_default=sa.text("0"), nullable=True),
         sa.Column("last_attempt_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_error", sa.String(length=64), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
-            nullable=False,
+            nullable=True,
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),

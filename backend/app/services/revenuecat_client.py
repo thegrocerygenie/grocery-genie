@@ -39,6 +39,19 @@ class RevenueCatUnavailableError(Exception):
     answer). The stored entitlement is left as it was."""
 
 
+class RevenueCatRejectedError(RevenueCatUnavailableError):
+    """RevenueCat refused a grant with a 4xx that a retry won't change (a bad
+    key, entitlement id or body). 408 and 429 are not this: they pass."""
+
+    def __init__(self, message: str, *, status_code: int) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+# 4xx answers worth retrying: a timeout and a rate limit.
+_RETRYABLE_4XX = {408, 429}
+
+
 class RevenueCatClient(Protocol):
     async def get_premium(self, app_user_id: str) -> PremiumState: ...
 
@@ -109,6 +122,12 @@ class HttpRevenueCatClient:
         try:
             resp = await self._post(url, {"end_time_ms": int(end.timestamp() * 1000)})
             resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code
+            logger.warning("revenuecat promotional grant failed: HTTP %d", status)
+            if 400 <= status < 500 and status not in _RETRYABLE_4XX:
+                raise RevenueCatRejectedError(str(e), status_code=status) from e
+            raise RevenueCatUnavailableError(str(e)) from e
         except httpx.HTTPError as e:
             logger.warning("revenuecat promotional grant failed: %s", type(e).__name__)
             raise RevenueCatUnavailableError(str(e)) from e

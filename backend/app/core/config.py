@@ -65,6 +65,11 @@ class Settings(BaseSettings):
     # API, so it has a count of its own: the app calls it only after a
     # purchase or a restore.
     max_premium_refreshes_per_minute: int = 10
+    # "Claim your waitlist offer" (V11-P5) sends an email to an address the
+    # user types: per user an hour (429 past it), and per target email a day
+    # (past it the same 202, and nothing sent), so it can't flood an inbox.
+    max_waitlist_claims_per_hour: int = 5
+    max_waitlist_claims_per_email_per_day: int = 3
 
     # Per-IP cap on unauthenticated /api/auth/* POSTs (sign-up, sign-in, social,
     # forgot/reset password, verify, refresh). 30/min/IP is generous enough for
@@ -119,7 +124,17 @@ class Settings(BaseSettings):
     # grants waitlist_free_months of the Premium entitlement through
     # RevenueCat. The salt keys the one-way hash of each redeemed waitlist
     # email (decision #13); set it once and never change it.
+    # The audience key reads the audience's contacts and, once the window has
+    # closed, deletes them (plan: retention, decision #11). It must be a
+    # full-access Resend key; empty uses GG_RESEND_API_KEY.
+    # A grant inside sign-in, verify-email, email change or the claim link
+    # waits at most waitlist_inline_grant_timeout_seconds for RevenueCat,
+    # then stays pending for the beat retry; the retry gives up (failed)
+    # after waitlist_grant_max_attempts.
     resend_waitlist_audience_id: str = ""
+    resend_audience_api_key: str = ""
+    waitlist_inline_grant_timeout_seconds: float = Field(default=3.0, gt=0)
+    waitlist_grant_max_attempts: int = Field(default=24, ge=1)
     resend_api_base: str = "https://api.resend.com"
     waitlist_cutoff: datetime | None = None
     premium_launched_at: datetime | None = None

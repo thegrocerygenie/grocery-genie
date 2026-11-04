@@ -8,6 +8,7 @@ entitlement, once per waitlist email, ever.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -19,8 +20,13 @@ from app.core import clock
 from app.core.config import get_settings
 from app.core.entitlements import is_premium
 from app.models.database import User, WaitlistEntry, WaitlistRedemption
-from app.services.revenuecat_client import PremiumState, RevenueCatUnavailableError
+from app.services.revenuecat_client import (
+    PremiumState,
+    RevenueCatRejectedError,
+    RevenueCatUnavailableError,
+)
 from app.services.waitlist_service import (
+    FAILED,
     GRANTED,
     PENDING,
     WaitlistService,
@@ -38,15 +44,35 @@ class FakeRevenueCat:
 
     def __init__(self, *, fail_grants: int = 0) -> None:
         self.grants: list[tuple[str, datetime]] = []
+        self.calls = 0
         self.fail_grants = fail_grants
+        # A 4xx RevenueCat answers to every grant (status code), or None.
+        self.reject_with: int | None = None
+        # Seconds each grant / read takes: a slow RevenueCat.
+        self.grant_delay = 0.0
+        self.read_delay = 0.0
+        # Runs inside the grant, before it is recorded.
+        self.during_grant = None
 
     async def grant_promotional(self, app_user_id: str, end_time: datetime) -> None:
+        self.calls += 1
+        if self.during_grant is not None:
+            hook, self.during_grant = self.during_grant, None
+            await hook()
+        if self.grant_delay:
+            await asyncio.sleep(self.grant_delay)
+        if self.reject_with is not None:
+            raise RevenueCatRejectedError(
+                f"{self.reject_with} from RevenueCat", status_code=self.reject_with
+            )
         if self.fail_grants:
             self.fail_grants -= 1
             raise RevenueCatUnavailableError("503 from RevenueCat")
         self.grants.append((app_user_id, end_time))
 
     async def get_premium(self, app_user_id: str) -> PremiumState:
+        if self.read_delay:
+            await asyncio.sleep(self.read_delay)
         ends = [end for uid, end in self.grants if uid == app_user_id]
         if not ends:
             return PremiumState(active=False, read_at=clock.now())
@@ -413,3 +439,119 @@ async def test_user_id_is_unique_per_redemption(db_session, offer):
 
     assert await service.has_redemption(user.id)
     assert uuid.UUID(str(user.id))
+
+
+# -- the retry: stamped, capped, final on a 4xx, closed with the window --------
+
+
+async def _pending(
+    db_session, monkeypatch, *, rc: FakeRevenueCat
+) -> WaitlistRedemption:
+    """A redemption left pending by a failed first grant."""
+    user = await _user(db_session, "member@example.com")
+    await _entry(db_session, "member@example.com")
+    rc.fail_grants = 1
+    redemption = await WaitlistService(db_session, revenuecat=rc).match_account(
+        user, source="verify_email"
+    )
+    assert redemption is not None and redemption.status == PENDING
+    return redemption
+
+
+async def test_pending_row_is_stamped_before_the_first_grant(
+    db_session, db_engine, offer
+):
+    """The row is committed before RevenueCat is called; a beat retry running
+    meanwhile must see a fresh attempt and leave it alone (no double call)."""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    factory = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+    user = await _user(db_session, "member@example.com")
+    await _entry(db_session, "member@example.com")
+    await db_session.commit()
+    rc = FakeRevenueCat()
+    seen: dict = {}
+
+    async def beat_runs_now() -> None:
+        async with factory() as other:
+            row = (await other.execute(select(WaitlistRedemption))).scalar_one()
+            seen["last_attempt_at"] = row.last_attempt_at
+            seen["retried"] = await WaitlistService(
+                other, revenuecat=rc
+            ).retry_pending()
+
+    rc.during_grant = beat_runs_now
+
+    await WaitlistService(db_session, revenuecat=rc).match_account(
+        user, source="verify_email"
+    )
+
+    assert seen["last_attempt_at"] is not None
+    assert seen["retried"] == 0
+    assert rc.calls == 1
+
+
+async def test_retry_gives_up_after_the_attempt_cap(db_session, offer, monkeypatch):
+    monkeypatch.setattr(get_settings(), "waitlist_grant_max_attempts", 3)
+    rc = FakeRevenueCat()
+    redemption = await _pending(db_session, monkeypatch, rc=rc)
+    rc.fail_grants = 100
+    service = WaitlistService(db_session, revenuecat=rc)
+
+    for _ in range(5):
+        await service.retry_pending(older_than=timedelta(0))
+
+    await db_session.refresh(redemption)
+    assert redemption.status == FAILED
+    assert redemption.attempts == 3
+    assert redemption.last_error == "too_many_attempts"
+    assert rc.calls == 3
+
+
+async def test_a_revenuecat_4xx_is_final(db_session, offer, monkeypatch):
+    rc = FakeRevenueCat()
+    redemption = await _pending(db_session, monkeypatch, rc=rc)
+    rc.reject_with = 404
+    service = WaitlistService(db_session, revenuecat=rc)
+
+    assert await service.retry_pending(older_than=timedelta(0)) == 0
+    await service.retry_pending(older_than=timedelta(0))
+
+    await db_session.refresh(redemption)
+    assert redemption.status == FAILED
+    assert redemption.last_error == "revenuecat_rejected_404"
+    assert rc.calls == 2  # the first failed grant, then the 404; no more
+
+
+async def test_a_4xx_on_the_first_grant_is_final_too(db_session, offer):
+    user = await _user(db_session, "member@example.com")
+    await _entry(db_session, "member@example.com")
+    rc = FakeRevenueCat()
+    rc.reject_with = 400
+
+    redemption = await WaitlistService(db_session, revenuecat=rc).match_account(
+        user, source="verify_email"
+    )
+
+    assert redemption is not None and redemption.status == FAILED
+    assert redemption.last_error == "revenuecat_rejected_400"
+
+
+async def test_retry_never_grants_after_the_window_closes(
+    db_session, offer, monkeypatch
+):
+    rc = FakeRevenueCat()
+    redemption = await _pending(db_session, monkeypatch, rc=rc)
+    monkeypatch.setattr(clock, "now", lambda: LAUNCHED + timedelta(days=90))
+
+    assert (
+        await WaitlistService(db_session, revenuecat=rc).retry_pending(
+            older_than=timedelta(0)
+        )
+        == 0
+    )
+
+    await db_session.refresh(redemption)
+    assert redemption.status == FAILED
+    assert redemption.last_error == "window_closed"
+    assert rc.grants == [] and rc.calls == 1

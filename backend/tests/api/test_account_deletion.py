@@ -642,6 +642,9 @@ async def test_redeemed_waitlist_email_outlives_the_account_as_an_unlinked_hash(
         None,
     )
     assert (row.last_attempt_at, row.last_error) == (None, None)
+    # Decision #13 needs only the hash until the window closes (the purge
+    # deletes every unlinked row then), so not even when it was made.
+    assert (row.created_at, row.attempts) == (None, None)
 
     # A new account with the same email, verified, gets no second year.
     _, _ = await _sign_up(api_client, "gone@test.com")

@@ -592,7 +592,7 @@ class WaitlistRedemption(Base):
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), unique=True
     )
-    # pending, granted.
+    # pending, granted, failed (see last_error).
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     # What found the match: social_sign_in, verify_email, email_change,
     # backfill, claim.
@@ -601,12 +601,16 @@ class WaitlistRedemption(Base):
     # The promotional grant's end: matched_at plus waitlist_free_months.
     grant_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     granted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    attempts: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, server_default=text("0")
+    # attempts and created_at are null on an unlinked row: decision #13 keeps
+    # only the hash and the status after account deletion.
+    attempts: Mapped[int | None] = mapped_column(
+        Integer, default=0, server_default=text("0")
     )
     last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # pending -> granted, or failed: a RevenueCat 4xx (revenuecat_rejected_<code>),
+    # too_many_attempts or window_closed; for pending, why the last try failed.
     last_error: Mapped[str | None] = mapped_column(String(64))
-    created_at: Mapped[datetime] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 

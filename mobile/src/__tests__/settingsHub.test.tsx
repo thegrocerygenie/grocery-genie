@@ -8,6 +8,7 @@ import { Stack, router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 
 import SettingsScreen from '../../app/settings/index';
+import { spacing } from '@/constants/theme';
 import type { BudgetResponse } from '@/features/budget/types';
 import type { UserProfile } from '@/features/auth/types';
 
@@ -145,6 +146,27 @@ describe('Settings hub', () => {
     fireEvent.press(row);
     expect(app.getPathname()).toBe('/settings/waitlist-offer');
     mockClaimAvailable = false;
+  });
+
+  it('draws a divider between the Premium row and the waitlist row (V11-P5)', () => {
+    mockClaimAvailable = false;
+    const first = renderSettings();
+    expect(screen.queryByTestId('settings-divider-premium-1')).toBeNull();
+    first.unmount();
+
+    mockClaimAvailable = true;
+    renderSettings();
+    expect(screen.getByTestId('settings-divider-premium-1')).toBeTruthy();
+    mockClaimAvailable = false;
+  });
+
+  it('pads the bottom of the list with a theme token', () => {
+    renderSettings();
+
+    const style = StyleSheet.flatten(
+      screen.getByTestId('settings-scroll').props.contentContainerStyle as ViewStyle,
+    );
+    expect(style.paddingBottom).toBe(spacing.screenBottom);
   });
 
   it('a Premium user sees Premium, from the backend profile', () => {

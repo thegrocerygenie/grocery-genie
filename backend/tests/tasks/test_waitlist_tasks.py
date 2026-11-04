@@ -14,8 +14,9 @@ from app.core import clock
 from app.core.config import get_settings
 from app.models.database import User, WaitlistEntry, WaitlistRedemption
 from app.services.waitlist_service import GRANTED, PENDING, hash_waitlist_email
-from app.services.waitlist_source import WaitlistContact
+from app.services.waitlist_source import WaitlistContact, WaitlistSourceError
 from app.tasks.waitlist_tasks import (
+    deliver_claim_link,
     import_export,
     purge_after_window,
     retry_pending_grants,
@@ -210,3 +211,184 @@ def test_beat_runs_the_waitlist_tasks():
     ):
         assert name in tasks
         assert name in celery_app.tasks
+
+
+# -- the claim link, sent by the worker -----------------------------------------
+
+EARLY = CUTOFF - timedelta(days=1)
+
+
+@pytest.fixture
+def claim_emails(monkeypatch) -> list[dict]:
+    from app.services import email as email_service
+
+    sent: list[dict] = []
+
+    async def _send(**kwargs) -> None:
+        sent.append(kwargs)
+
+    monkeypatch.setattr(email_service, "send_waitlist_claim_email", _send)
+    return sent
+
+
+async def test_the_claim_task_sends_the_link_only_to_a_listed_email(
+    factory, offer, claim_emails
+):
+    user = await _add_user(factory, "relay@privaterelay.appleid.com")
+    async with factory() as db:
+        db.add(WaitlistEntry(email="member@example.com", contact_created_at=EARLY))
+        await db.commit()
+
+    assert await deliver_claim_link(factory, user.id, "member@example.com") is True
+    assert await deliver_claim_link(factory, user.id, "stranger@example.com") is False
+
+    assert [m["to"] for m in claim_emails] == ["member@example.com"]
+    async with factory() as db:
+        stored = await db.get(User, user.id)
+        assert stored.waitlist_claim_email == "member@example.com"
+        assert stored.waitlist_claim_token_hash is not None
+
+
+async def test_the_claim_task_swallows_a_resend_failure(
+    factory, offer, monkeypatch, caplog
+):
+    from app.services import email as email_service
+
+    async def _down(**kwargs) -> None:
+        raise RuntimeError("Resend answered 500")
+
+    monkeypatch.setattr(email_service, "send_waitlist_claim_email", _down)
+    user = await _add_user(factory, "relay@privaterelay.appleid.com")
+    async with factory() as db:
+        db.add(WaitlistEntry(email="member@example.com", contact_created_at=EARLY))
+        await db.commit()
+
+    assert await deliver_claim_link(factory, user.id, "member@example.com") is False
+    assert "member@example.com" not in caplog.text
+
+
+def test_the_claim_task_is_registered():
+    from app.tasks.celery_app import celery_app
+
+    celery_app.loader.import_default_modules()
+    assert "app.tasks.waitlist_tasks.send_waitlist_claim" in celery_app.tasks
+
+
+# -- the Resend audience's contacts, deleted when the window closes (plan 83) ---
+
+
+class FakeAudienceAdmin:
+    """The Resend audience: list a page of contact ids, delete one."""
+
+    def __init__(self, count: int, *, fail_after: int | None = None) -> None:
+        self.contacts = [f"c{i}" for i in range(count)]
+        self.deleted: list[str] = []
+        self.lists = 0
+        self.fail_after = fail_after
+
+    async def list_contact_ids(self, limit: int) -> list[str]:
+        self.lists += 1
+        return self.contacts[:limit]
+
+    async def delete_contact(self, contact_id: str) -> bool:
+        if self.fail_after is not None and len(self.deleted) >= self.fail_after:
+            raise WaitlistSourceError("Resend answered 500")
+        if contact_id not in self.contacts:
+            return False
+        self.contacts.remove(contact_id)
+        self.deleted.append(contact_id)
+        return True
+
+
+async def test_purge_deletes_the_resend_contacts_in_batches_once_closed(
+    factory, offer, monkeypatch, caplog
+):
+    import logging
+
+    caplog.set_level(logging.INFO)
+    audience = FakeAudienceAdmin(250)
+    monkeypatch.setattr(clock, "now", lambda: LAUNCHED + timedelta(days=90))
+
+    result = await purge_after_window(factory, audience, page_size=100)
+
+    assert result.resend_contacts_deleted == 250
+    assert audience.contacts == []
+    assert audience.lists == 4  # three pages, then an empty one
+    # Only counts are logged.
+    assert "c0" not in caplog.text and "@" not in caplog.text
+
+    # Idempotent: a rerun finds nothing left and deletes nothing.
+    again = await purge_after_window(factory, audience, page_size=100)
+    assert again.resend_contacts_deleted == 0
+
+
+async def test_purge_leaves_the_resend_audience_while_the_window_is_open(
+    factory, offer
+):
+    audience = FakeAudienceAdmin(3)
+
+    result = await purge_after_window(factory, audience)
+
+    assert result.resend_contacts_deleted == 0
+    assert audience.lists == 0 and len(audience.contacts) == 3
+
+
+async def test_purge_leaves_the_resend_audience_without_a_launch_date(
+    factory, monkeypatch
+):
+    monkeypatch.setattr(get_settings(), "premium_launched_at", None)
+    monkeypatch.setattr(clock, "now", lambda: NOW + timedelta(days=3650))
+    audience = FakeAudienceAdmin(3)
+
+    result = await purge_after_window(factory, audience)
+
+    assert result.resend_contacts_deleted == 0
+    assert audience.lists == 0
+
+
+async def test_a_failed_resend_delete_stops_the_run_and_a_rerun_finishes(
+    factory, offer, monkeypatch
+):
+    async with factory() as db:
+        db.add(WaitlistEntry(email="a@example.com", contact_created_at=CUTOFF))
+        await db.commit()
+    monkeypatch.setattr(clock, "now", lambda: LAUNCHED + timedelta(days=91))
+    audience = FakeAudienceAdmin(5, fail_after=2)
+
+    first = await purge_after_window(factory, audience)
+
+    # The backend copy is gone even though Resend failed part way.
+    assert first.entries == 1 and first.resend_contacts_deleted == 2
+    assert first.resend_failed is True
+    assert len(audience.contacts) == 3
+
+    audience.fail_after = None
+    second = await purge_after_window(factory, audience)
+    assert second.resend_contacts_deleted == 3 and second.resend_failed is False
+    assert audience.contacts == []
+
+
+async def test_purge_caps_the_deletes_in_one_run(factory, offer, monkeypatch):
+    monkeypatch.setattr(clock, "now", lambda: LAUNCHED + timedelta(days=90))
+    audience = FakeAudienceAdmin(30)
+
+    result = await purge_after_window(factory, audience, page_size=10, max_deletes=20)
+
+    assert result.resend_contacts_deleted == 20
+    assert len(audience.contacts) == 10
+
+
+def test_the_audience_key_falls_back_to_the_sending_key(monkeypatch):
+    from app.tasks.waitlist_tasks import get_audience_source
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "resend_waitlist_audience_id", "aud_1")
+    monkeypatch.setattr(settings, "resend_api_key", "re_send")
+    monkeypatch.setattr(settings, "resend_audience_api_key", "")
+    assert get_audience_source().api_key == "re_send"
+
+    monkeypatch.setattr(settings, "resend_audience_api_key", "re_full")
+    assert get_audience_source().api_key == "re_full"
+
+    monkeypatch.setattr(settings, "resend_api_key", "")
+    assert get_audience_source().api_key == "re_full"

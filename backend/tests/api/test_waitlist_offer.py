@@ -7,6 +7,8 @@ email is not the waitlist one (Hide My Email). RevenueCat is faked.
 
 from __future__ import annotations
 
+import time
+import uuid
 from collections.abc import AsyncGenerator
 from datetime import timedelta
 
@@ -89,7 +91,25 @@ def claim_emails(monkeypatch) -> list[dict]:
 
 
 @pytest.fixture
-async def api(db_session, mock_extractor, rc) -> AsyncGenerator[AsyncClient, None]:
+def claims() -> list[tuple[uuid.UUID, str]]:
+    """Claims the route enqueued (the Celery task, faked): (user id, email)."""
+    return []
+
+
+async def _drain(db_session, claims: list[tuple[uuid.UUID, str]]) -> None:
+    """Run the queued claim tasks, as the Celery worker would."""
+    from app.services.waitlist_service import WaitlistService
+
+    while claims:
+        user_id, email = claims.pop(0)
+        await WaitlistService(db_session).send_claim_link(user_id, email)
+
+
+@pytest.fixture
+async def api(
+    db_session, mock_extractor, rc, claims
+) -> AsyncGenerator[AsyncClient, None]:
+    from app.api.routes.waitlist import get_claim_dispatcher
     from app.core.dependencies import get_db
     from app.llm.provider import get_receipt_extractor
     from main import app
@@ -97,7 +117,11 @@ async def api(db_session, mock_extractor, rc) -> AsyncGenerator[AsyncClient, Non
     async def override_get_db():
         yield db_session
 
+    async def dispatch(user_id: uuid.UUID, email: str) -> None:
+        claims.append((user_id, email))
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_claim_dispatcher] = lambda: dispatch
     app.dependency_overrides[get_receipt_extractor] = lambda: mock_extractor
     app.dependency_overrides[get_revenuecat_client] = lambda: rc
     async with AsyncClient(
@@ -211,7 +235,7 @@ async def test_confirmed_email_change_matches(api, db_session, offer, rc, emails
 
 
 async def test_hide_my_email_claims_through_the_settings_step(
-    api, db_session, offer, rc, apple, claim_emails
+    api, db_session, offer, rc, apple, claim_emails, claims
 ):
     from app.services.apple_auth import AppleIdentity
 
@@ -234,6 +258,7 @@ async def test_hide_my_email_claims_through_the_settings_step(
     )
     assert claim.status_code == 202, claim.text
     assert claim.json() == {"status": "sent"}
+    await _drain(db_session, claims)
     # The link goes to the waitlist inbox, not the account's email.
     assert [m["to"] for m in claim_emails] == ["member@example.com"]
     assert rc.grants == []
@@ -257,7 +282,7 @@ async def test_hide_my_email_claims_through_the_settings_step(
 
 
 async def test_claim_for_an_email_not_on_the_waitlist_sends_nothing(
-    api, db_session, offer, claim_emails, emails
+    api, db_session, offer, claim_emails, emails, claims
 ):
     # The same answer either way: the claim step can't look up the waitlist.
     headers = await _sign_up(api, "someone@example.com")
@@ -270,11 +295,12 @@ async def test_claim_for_an_email_not_on_the_waitlist_sends_nothing(
 
     assert claim.status_code == 202
     assert claim.json() == {"status": "sent"}
+    await _drain(db_session, claims)
     assert claim_emails == []
 
 
 async def test_claim_for_a_contact_after_the_cutoff_sends_nothing(
-    api, db_session, offer, claim_emails
+    api, db_session, offer, claim_emails, claims
 ):
     await _entry(db_session, "late@example.com", created=CUTOFF + timedelta(days=1))
     headers = await _sign_up(api, "someone@example.com")
@@ -286,11 +312,12 @@ async def test_claim_for_a_contact_after_the_cutoff_sends_nothing(
     )
 
     assert claim.status_code == 202
+    await _drain(db_session, claims)
     assert claim_emails == []
 
 
 async def test_claim_of_a_waitlist_email_already_redeemed_is_refused_at_confirm(
-    api, db_session, offer, rc, claim_emails, emails
+    api, db_session, offer, rc, claim_emails, emails, claims
 ):
     await _entry(db_session, "member@example.com")
     claimer = await _sign_up(api, "claimer@example.com")
@@ -299,6 +326,7 @@ async def test_claim_of_a_waitlist_email_already_redeemed_is_refused_at_confirm(
         headers=claimer,
         json={"email": "member@example.com"},
     )
+    await _drain(db_session, claims)
     # Meanwhile the waitlist email's owner signs up with it and verifies.
     await _sign_up(api, "member@example.com")
     await _verify(api, emails, "member@example.com")
@@ -315,7 +343,7 @@ async def test_claim_of_a_waitlist_email_already_redeemed_is_refused_at_confirm(
 
 
 async def test_account_with_a_free_year_cannot_claim_another(
-    api, db_session, offer, claim_emails, emails
+    api, db_session, offer, claim_emails, emails, claims
 ):
     await _entry(db_session, "member@example.com")
     await _entry(db_session, "second@example.com")
@@ -330,11 +358,12 @@ async def test_account_with_a_free_year_cannot_claim_another(
 
     assert claim.status_code == 409
     assert claim.json()["detail"]["code"] == "waitlist_offer_redeemed"
+    assert claims == []
     assert claim_emails == []
 
 
 async def test_no_claim_after_the_window_closes(
-    api, db_session, offer, monkeypatch, claim_emails
+    api, db_session, offer, monkeypatch, claim_emails, claims
 ):
     await _entry(db_session, "member@example.com")
     headers = await _sign_up(api, "someone@example.com")
@@ -350,11 +379,12 @@ async def test_no_claim_after_the_window_closes(
     assert status["window_open"] is False and status["claim_available"] is False
     assert claim.status_code == 409
     assert claim.json()["detail"]["code"] == "waitlist_offer_closed"
+    assert claims == []
     assert claim_emails == []
 
 
 async def test_claim_link_tapped_after_the_window_closes_grants_nothing(
-    api, db_session, offer, rc, monkeypatch, claim_emails
+    api, db_session, offer, rc, monkeypatch, claim_emails, claims
 ):
     await _entry(db_session, "member@example.com")
     headers = await _sign_up(api, "someone@example.com")
@@ -363,6 +393,7 @@ async def test_claim_link_tapped_after_the_window_closes_grants_nothing(
         headers=headers,
         json={"email": "member@example.com"},
     )
+    await _drain(db_session, claims)
     # The window closes an hour later; the link (24 hours) is still live.
     monkeypatch.setattr(
         get_settings(), "premium_launched_at", NOW - timedelta(days=90, hours=-1)
@@ -380,7 +411,7 @@ async def test_claim_link_tapped_after_the_window_closes_grants_nothing(
 
 
 async def test_expired_claim_link_is_refused(
-    api, db_session, offer, monkeypatch, claim_emails
+    api, db_session, offer, monkeypatch, claim_emails, claims
 ):
     await _entry(db_session, "member@example.com")
     headers = await _sign_up(api, "someone@example.com")
@@ -389,6 +420,7 @@ async def test_expired_claim_link_is_refused(
         headers=headers,
         json={"email": "member@example.com"},
     )
+    await _drain(db_session, claims)
     monkeypatch.setattr(clock, "now", lambda: NOW + timedelta(hours=25))
 
     confirm = await api.post(
@@ -448,3 +480,144 @@ async def test_matching_never_trusts_the_client(api, db_session, offer, rc):
     ).scalar_one()
     assert user.email_verified_at is None
     assert rc.grants == []
+
+
+# -- the claim cannot be used to look up the waitlist --------------------------
+
+
+CLAIM = "/api/users/me/waitlist-offer/claim"
+
+
+async def test_listed_and_unlisted_claims_answer_alike_and_only_enqueue(
+    api, db_session, offer, claim_emails, claims
+):
+    """Membership must not show in the answer, its timing or its errors: the
+    route does no waitlist lookup and sends nothing itself. It enqueues one
+    task for any email, and the task does the lookup and the send."""
+    await _entry(db_session, "member@example.com")
+    listed_user = await _sign_up(api, "a@example.com")
+    unlisted_user = await _sign_up(api, "b@example.com")
+
+    listed = await api.post(
+        CLAIM, headers=listed_user, json={"email": "member@example.com"}
+    )
+    unlisted = await api.post(
+        CLAIM, headers=unlisted_user, json={"email": "stranger@example.com"}
+    )
+
+    assert (listed.status_code, listed.json()) == (202, {"status": "sent"})
+    assert (unlisted.status_code, unlisted.json()) == (202, {"status": "sent"})
+    assert listed.content == unlisted.content
+    # Nothing was looked up, stored or sent inside the request.
+    assert claim_emails == []
+    users = (await db_session.execute(select(User))).scalars().all()
+    assert all(u.waitlist_claim_token_hash is None for u in users)
+    assert [email for _, email in claims] == [
+        "member@example.com",
+        "stranger@example.com",
+    ]
+
+    await _drain(db_session, claims)
+    assert [m["to"] for m in claim_emails] == ["member@example.com"]
+
+
+async def test_a_resend_failure_never_reaches_the_client(
+    api, db_session, offer, claims, monkeypatch, caplog
+):
+    from app.services import email as email_service
+
+    async def _down(**kwargs) -> None:
+        raise RuntimeError("Resend answered 500")
+
+    monkeypatch.setattr(email_service, "send_waitlist_claim_email", _down)
+    await _entry(db_session, "member@example.com")
+    headers = await _sign_up(api, "someone@example.com")
+
+    claim = await api.post(CLAIM, headers=headers, json={"email": "member@example.com"})
+
+    assert (claim.status_code, claim.json()) == (202, {"status": "sent"})
+    # The worker logs the failure (never the email) and does not raise.
+    await _drain(db_session, claims)
+    assert "member@example.com" not in caplog.text
+    assert "RuntimeError" in caplog.text
+
+
+async def test_claims_are_limited_per_user(api, offer, claims, monkeypatch):
+    monkeypatch.setattr(get_settings(), "max_waitlist_claims_per_hour", 2)
+    headers = await _sign_up(api, "someone@example.com")
+
+    codes = [
+        (
+            await api.post(CLAIM, headers=headers, json={"email": f"x{i}@example.com"})
+        ).status_code
+        for i in range(3)
+    ]
+
+    assert codes == [202, 202, 429]
+    assert len(claims) == 2
+
+
+async def test_claims_for_one_waitlist_email_are_limited(
+    api, offer, claims, monkeypatch
+):
+    """Several accounts claiming one inbox can't flood it. Past the limit the
+    answer is the same 202, so the limit shows nothing about the waitlist."""
+    monkeypatch.setattr(get_settings(), "max_waitlist_claims_per_email_per_day", 2)
+    answers = []
+    for i, email in enumerate(
+        ["target@example.com", " Target@Example.com", "target@example.com"]
+    ):
+        headers = await _sign_up(api, f"claimer{i}@example.com")
+        resp = await api.post(CLAIM, headers=headers, json={"email": email})
+        answers.append((resp.status_code, resp.json()))
+
+    assert answers == [(202, {"status": "sent"})] * 3
+    assert [email for _, email in claims] == ["target@example.com"] * 2
+
+
+# -- sign-in and verify-email never wait long on RevenueCat --------------------
+
+
+async def test_a_slow_revenuecat_grant_leaves_verify_fast_and_pending(
+    api, db_session, offer, rc, emails, monkeypatch
+):
+    from app.services.waitlist_service import WaitlistService
+
+    monkeypatch.setattr(get_settings(), "waitlist_inline_grant_timeout_seconds", 0.05)
+    rc.grant_delay = 5.0
+    await _entry(db_session, "member@example.com")
+    headers = await _sign_up(api, "member@example.com")
+
+    started = time.monotonic()
+    resp = await _verify(api, emails, "member@example.com")
+
+    assert resp.status_code == 200, resp.text
+    assert time.monotonic() - started < 2
+    status = (await api.get("/api/users/me/waitlist-offer", headers=headers)).json()
+    assert status["redemption"]["status"] == "pending"
+    row = (await db_session.execute(select(WaitlistRedemption))).scalar_one()
+    assert row.last_error == "revenuecat_timeout"
+    assert row.last_attempt_at is not None
+
+    # The beat retry, with no request waiting on it, grants it.
+    rc.grant_delay = 0
+    retried = await WaitlistService(db_session, revenuecat=rc).retry_pending(
+        older_than=timedelta(0)
+    )
+    assert retried == 1
+
+
+async def test_a_slow_read_back_still_answers_granted(
+    api, db_session, offer, rc, monkeypatch, apple
+):
+    monkeypatch.setattr(get_settings(), "waitlist_inline_grant_timeout_seconds", 0.05)
+    rc.read_delay = 5.0
+    await _entry(db_session, "apple_member@example.com")
+
+    started = time.monotonic()
+    headers = await _apple(api, "apple_member")
+
+    assert time.monotonic() - started < 2
+    assert len(rc.grants) == 1
+    status = (await api.get("/api/users/me/waitlist-offer", headers=headers)).json()
+    assert status["redemption"]["status"] == "granted"
