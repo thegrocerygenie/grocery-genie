@@ -5,9 +5,12 @@ It answers the two calls the backend makes: the promotional grant
 waitlist's free year) and the subscriber read (`GET /v1/subscribers/{id}`,
 the Premium refresh). Grants live in memory and are appended, one JSON line
 each, to the log given as the third argument. While the fail-flag file exists,
-grants answer 503, as an unreachable RevenueCat would.
+grants answer 503, as an unreachable RevenueCat would. While the slow-flag file
+exists, each subscriber read waits the seconds it holds before answering, as a
+slow RevenueCat would: the backend makes that read while it holds user row
+locks (a TRANSFER webhook), so the wait opens the window two deliveries race in.
 
-    python revenuecat-stub.py PORT API_KEY LOG FAIL_FLAG
+    python revenuecat-stub.py PORT API_KEY LOG FAIL_FLAG SLOW_FLAG
 """
 
 import json
@@ -18,7 +21,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote
 
-PORT, API_KEY, LOG, FAIL_FLAG = int(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
+PORT, API_KEY, LOG, FAIL_FLAG, SLOW_FLAG = int(sys.argv[1]), *sys.argv[2:6]
 GRANTS: dict[str, dict[str, int]] = {}  # app user id -> entitlement -> end_time_ms
 
 
@@ -61,6 +64,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         parts = self._parts()
         if len(parts) == 3 and parts[:2] == ["v1", "subscribers"]:
+            slow = Path(SLOW_FLAG)
+            if slow.exists():
+                time.sleep(float(slow.read_text().strip() or 0))
             self._send(200, _subscriber(parts[2]))
             return
         self._send(404, {"message": "not found"})
