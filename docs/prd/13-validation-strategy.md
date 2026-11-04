@@ -647,7 +647,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-01 | 8 | Chart: shaded area, month labels, a dot per purchase | Component | Not yet implemented (DA-3) | Pending |
 | PI-01 | 9 | Store rows lead with a coloured square, stable per store | Unit | Not yet implemented (DA-3) | Pending |
 | PI-01 | 10 | Back label names the opener; largest text size holds | Component | Not yet implemented (DA-3) | Pending |
-| PI-03 | 5 | Price alerts list: newest first, This week / Earlier, arrow, signed percent, was/now (drops add "stock-up worth it"), sparkline, tap opens item | Component | Not yet implemented (DA-4) | Pending |
+| PI-03 | 5 | Price alerts list: newest first, This week / Earlier, arrow, signed percent, was/now (drops add "stock-up worth it"), sparkline, tap opens item; opens from Settings → Alerts and the Budget dashboard bell (label "Price alerts") | Component | Not yet implemented (DA-4) | Pending |
 | PI-03 | 6 | Empty Price alerts list says "No price alerts yet" | Component | Not yet implemented (DA-4) | Pending |
 | PI-03 | 7 | Settings group: Threshold and Cooldown rows, footer from the user's settings | Component | Not yet implemented (DA-4) | Pending |
 | PI-03 | 8 | Cooldown user setting 1–30 days (null default, 422 otherwise), used by the alert check | Integration | Not yet implemented (DA-4) | Pending |
