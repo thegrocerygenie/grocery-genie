@@ -620,3 +620,70 @@ async def test_a_price_alert_failure_never_fails_the_confirm(
     assert "price_change" not in types
     sent = (await db_session.execute(select(PriceAlertSent))).scalars().all()
     assert sent == []
+
+
+# --- Analytics (docs/prd/12-analytics.md) -------------------------------------
+
+
+@pytest.fixture
+def analytics_spy(client):
+    from app.services.analytics_service import AnalyticsService, get_analytics_service
+    from main import app
+    from tests.api.test_analytics import SpyBackend
+
+    spy = SpyBackend()
+    app.dependency_overrides[get_analytics_service] = lambda: AnalyticsService(
+        backend=spy
+    )
+    return spy
+
+
+def _sent(spy, name: str) -> list[dict]:
+    return [props for event, props, _ in spy.calls if event == name]
+
+
+async def test_an_alert_emits_price_alert_triggered(
+    client, mock_extractor, test_image_bytes, analytics_spy, pinned_now
+):
+    """12-analytics.md: price_alert_triggered {direction, percent_change}, once
+    per alert sent, and nothing for a change the cooldown holds back."""
+    await _history(client, mock_extractor, test_image_bytes, 2.00, 2.00)
+    assert _sent(analytics_spy, "price_alert_triggered") == []
+
+    await _buy(client, mock_extractor, test_image_bytes, "2026-03-15", 2.25)
+    assert _sent(analytics_spy, "price_alert_triggered") == [
+        {"direction": "up", "percent_change": 12.5}
+    ]
+
+    # Inside the cooldown: no alert, so no event.
+    await _buy(client, mock_extractor, test_image_bytes, "2026-03-16", 3.00)
+    assert len(_sent(analytics_spy, "price_alert_triggered")) == 1
+
+    pinned_now[0] = NOW + timedelta(days=8)
+    await _buy(client, mock_extractor, test_image_bytes, "2026-03-28", 1.00)
+    [_, drop] = _sent(analytics_spy, "price_alert_triggered")
+    assert drop["direction"] == "down"
+    assert drop["percent_change"] < 0
+
+
+async def test_muting_emits_price_alert_muted(
+    client, mock_extractor, test_image_bytes, analytics_spy
+):
+    """12-analytics.md: price_alert_muted {scope: item|store}; unmuting and a
+    404 send nothing."""
+    await _history(client, mock_extractor, test_image_bytes, 1.00)
+    item_id = await _item_id(client, "Organic Bananas")
+    store_id = await _store_id(client)
+
+    assert (await client.post(f"/api/items/{item_id}/mute")).status_code == 204
+    assert (await client.post(f"/api/stores/{store_id}/mute")).status_code == 204
+    assert (await client.delete(f"/api/items/{item_id}/mute")).status_code == 204
+    assert (await client.delete(f"/api/stores/{store_id}/mute")).status_code == 204
+    unknown = uuid.uuid4()
+    assert (await client.post(f"/api/items/{unknown}/mute")).status_code == 404
+    assert (await client.post(f"/api/stores/{unknown}/mute")).status_code == 404
+
+    assert _sent(analytics_spy, "price_alert_muted") == [
+        {"scope": "item"},
+        {"scope": "store"},
+    ]

@@ -79,7 +79,7 @@ Push needs the development build. Expo Go has no remote push.
 - [ ] **Only the current period alerts.** Confirm a receipt dated last month that takes last month past 100%. No push arrives. A receipt dated today that crosses a threshold does push. Near midnight, a receipt dated your local today still alerts. (M5, PR 40)
 - [ ] The weekly summary arrives on the configured day and time. (13 Push)
 - [ ] Tapping a notification opens the right screen. (13 Push)
-- [ ] A threshold turned off in Settings → Notifications doesn't fire. (13 Push)
+- [ ] A threshold turned off in Settings → Alerts doesn't fire. (13 Push)
 
 ## 4. Offline, server errors and quota
 
@@ -120,6 +120,55 @@ The Simulator has no VoiceOver, and Accessibility Inspector doesn't count.
 - [ ] Touch targets: on a small phone, tap Review's category dot, item name and price, and the Cancel, Done and Skip header buttons. Each responds on the first tap. `accessibilitySweep.test.ts` checks the 44pt rule in code; this checks it on glass. (14 Touch targets)
 - [ ] Account deletion: VoiceOver reads the erased list in order, announces "Delete account, button", reads the alert's two choices, and announces the "not deleted" error. (13 Deletion)
 - [ ] The largest Dynamic Type size doesn't break any layout. (13 Accessibility)
+
+## 8. V1.1: Price Intelligence and Premium
+
+Added 2026-11-04 for the V1.1 Definition of Done in [13-validation-strategy.md](prd/13-validation-strategy.md). The Simulator check of 2026-11-03 (`.planning/DEVICE-CHECK-2026-11-03.md`) passed the layouts below on an iPhone SE and a Pro Max, but not VoiceOver focus order, purchases, or real push.
+
+Setup for this section:
+- [ ] A build with `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` set, and the App Store Connect products and a Sandbox Apple Account. Without the key the paywall shows the App Store notice and hides Subscribe and Restore.
+- [ ] The backend has `GG_REVENUECAT_WEBHOOK_SECRET` and `GG_REVENUECAT_API_KEY`, and RevenueCat's webhook points at it.
+- [ ] Test data: an item with prices at two stores (two each), a third price 10% or more from the average, and a "Bananas" line after "Organic Bananas".
+
+**Premium (V11-P0, D1, D2):**
+- [ ] **Sandbox purchase.** As a free user, open the paywall, tap Subscribe and buy with the Sandbox account. Settings → Premium then reads Premium, and the server's profile says `is_premium: true`. (PHASE_SCOPE D1; DEVICE-CHECK D6)
+- [ ] **Restore.** Delete and reinstall the app, sign in, open the paywall and tap Restore Purchases: Premium comes back. (DEVICE-CHECK D5)
+- [ ] **Webhook test event.** In RevenueCat, Project settings → Integrations → Webhooks, tap "Send test event". The backend answers 200. (V11-P0)
+- [ ] **Paywall.** Free user: the title, what Premium unlocks, the App Store price, Subscribe, Restore, and the Terms of Use and Privacy Policy links, each 44 pt. Premium user: "You're on Premium" with the renewal date and Manage Subscription. (DEVICE-CHECK D2, D4)
+- [ ] **Settings → Premium.** Free: "Free plan · Upgrade" opens the paywall. Premium: the row reads Premium. (DEVICE-CHECK D1)
+
+**Price alerts and comparison (PI-03, PI-04):**
+- [ ] **Push tap, foreground.** With the app open, confirm the receipt that moves the price. The banner arrives; tapping it opens the item. (PI-03 AC 2; DEVICE-CHECK C4)
+- [ ] **Push tap, background.** Same, with the app in the background. (PI-03 AC 2)
+- [ ] **Push tap, cold start.** Force-quit the app, then tap the banner. The item opens, and Back returns to Budget. (PI-03 AC 2; BUG-6)
+- [ ] **Item and store mute switches.** On item detail, turn off alerts for the item and for one store. Relaunch: both switches stay off. A new price change at that store sends no push. (PI-03 AC 4; DEVICE-CHECK C2)
+- [ ] **Compare stores.** Item detail lists each store cheapest first, with latest and average, and says how many stores need more prices. (PI-04 AC 4; DEVICE-CHECK C1)
+- [ ] **Threshold picker.** Settings → Alerts: pick 25%, then "10% (default)". Each choice saves, and the line under it says what size of change sends an alert. (PI-03 AC 1; DEVICE-CHECK C3)
+- [ ] **Unmute rows.** The muted item and store are listed in Settings → Alerts. Unmute each: it leaves the list, and the switch on item detail is on again. (PI-03 AC 4; DEVICE-CHECK C3)
+
+**Trend, categories, export, rollover, quota (BC-FR, BC-05 AC 3, NFR Privacy 2):**
+- [ ] **Trend 3/12 toggle.** 3 Months is selected by default. A Premium user's 12 Months shows 12 bars. A free user's 12 Months shows the upgrade prompt, and its button opens the paywall. (BC-FR Trends; DEVICE-CHECK A1–A3, D3)
+- [ ] **Settings → Categories.** Premium: add, rename and delete a category; at 10 the add button is disabled and says why. Free: the upgrade prompt, not an add button. (BC-05 AC 3)
+- [ ] **Data export.** Settings → Export data, as Premium: the share sheet opens with the file, and saving it to Files works. As free: the upgrade prompt. (NFR Privacy 2)
+- [ ] **Rollover.** Budget settings: turn rollover on for a budget and Save. The dashboard ring text says how much rolled over once a period has ended with money left. A free user sees the upgrade prompt instead of the switches. (BC-FR Rollover)
+- [ ] **Receipt quota prompt.** As a free user at the monthly receipt limit, scan: the prompt offers Premium, and nothing uploads. As Premium, the scan goes through. (D2, unlimited receipts)
+
+**Item matching and stores (PI-02, store normalization):**
+- [ ] **Review Matches.** Confirm "Organic Bananas", then "Bananas". Review Matches asks whether they are the same item; neither links on its own. Different keeps two items; Same Item merges their prices. (PI-02 AC 2; BUG-4)
+- [ ] **Settings → Stores.** Branch numbers ("Loblaws" and "Loblaws #1234") show as one store. Merge one name into another (for example "REAL CANADIAN SUPERSTORE" into "Loblaws"): an item bought at both now compares as one store. Unmerge splits them again. Only this account's prices regroup. (11-edge-cases Price Intelligence 1; V11-05, decision D3)
+
+**Device-check bug rechecks (`.planning/DEVICE-CHECK-2026-11-03.md`):**
+- [ ] **BUG-1.** At AX1 and AX5, Trend's bar amounts stay clear of the summary above the chart.
+- [ ] **BUG-2.** At AX5, the month-over-month change wraps under the total, on the SE.
+- [ ] **BUG-3.** At AX5 on the SE, the Prices list and item detail keep names and prices readable; "$4.79" stays on one line.
+- [ ] **BUG-5.** The "Prices" large title is drawn.
+- [ ] **BUG-6.** A price alert tapped from a cold start opens the item with Back to Budget (also above).
+- [ ] **BUG-8.** With VoiceOver on the 12-month Trend, swiping reads the bars in month order.
+- [ ] **BUG-9.** At AX5 on the SE, the 12 month letters stay readable and apart.
+
+**Accessibility on each new screen:**
+- [ ] **VoiceOver** reads, in a logical order: Prices, item detail (chart summary, mute switches, Compare stores), Review Matches, Combine, Settings → Alerts (threshold, muted rows), Settings → Categories, Export data, Budget settings (rollover switches), the paywall, Settings → Premium, and Settings → Stores (merge, unmerge, the store picker). Every control reads as a button or switch with its label and state. (13 Accessibility)
+- [ ] **Dark mode** on each of those screens: text and charts keep their contrast, and nothing is drawn black on black. (13 Accessibility)
 
 ## After the session
 
