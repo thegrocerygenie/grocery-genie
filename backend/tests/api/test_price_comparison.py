@@ -7,6 +7,7 @@ and scans confirmed with PATCH status.
 import uuid
 from datetime import date
 
+import pytest
 from httpx import AsyncClient
 
 from app.models.database import PriceObservation, Store
@@ -270,3 +271,24 @@ async def test_viewing_the_comparison_emits_the_analytics_event(
 
     viewed = [c for c in analytics_spy.calls if c[0] == "price_comparison_viewed"]
     assert viewed[0][1] == {"canonical_item_id": item_id, "store_count": 2}
+
+
+async def test_a_sale_price_is_a_regular_observation(client):
+    """11-edge-cases.md Price Intelligence 3: a promotional price gets no
+    special handling. It is recorded and plotted like any other, and the
+    store's average takes it in."""
+    await _manual(client, "Loblaws", "2026-03-01", "Limes", 1.00)
+    await _manual(client, "Loblaws", "2026-03-08", "Limes", 1.00)
+    await _manual(client, "Loblaws", "2026-03-15", "Limes", 0.40)  # on sale
+    item_id = await _item_id(client, "limes")
+
+    history = (await client.get(f"/api/items/{item_id}/prices")).json()
+    prices = sorted(
+        (o["unit_price"], o["in_timeline"]) for o in history["observations"]
+    )
+    assert prices == [(0.40, True), (1.00, True), (1.00, True)]
+
+    loblaws = _by_store(await _compare(client, item_id))["Loblaws"]
+    assert loblaws["latest_price"] == 0.40
+    assert loblaws["avg_price"] == pytest.approx(0.80)
+    assert loblaws["observation_count"] == 3

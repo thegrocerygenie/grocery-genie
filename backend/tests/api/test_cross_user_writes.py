@@ -6,15 +6,15 @@ the API (client_user_b).
 """
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import Budget, LineItem, Receipt
-from tests.conftest import DEV_USER_ID, ensure_user
+from app.models.database import Budget, LineItem, Receipt, User
+from tests.conftest import DEV_USER_ID, USER_B_ID, ensure_user
 
 
 @pytest.fixture
@@ -194,3 +194,22 @@ async def test_b_does_not_see_as_budgets(client_user_b: AsyncClient, a_budget):
 
     assert all(b["id"] != str(a_budget.id) for b in listed)
     assert deleted == []
+
+
+async def test_b_cannot_turn_on_rollover_for_as_budget(
+    client_user_b: AsyncClient, db_session, a_budget
+):
+    """V1.1 D2: a Premium user B still gets 404 on A's budget, not 403."""
+    user_b = await db_session.get(User, USER_B_ID)
+    user_b.premium_active = True
+    user_b.premium_expires_at = datetime.now(UTC) + timedelta(days=30)
+    await db_session.flush()
+
+    resp = await client_user_b.put(
+        f"/api/budgets/{a_budget.id}/rollover", json={"enabled": True}
+    )
+
+    assert resp.status_code == 404, resp.text
+    await db_session.refresh(a_budget)
+    assert a_budget.rollover_enabled is False
+    assert a_budget.rollover_start is None

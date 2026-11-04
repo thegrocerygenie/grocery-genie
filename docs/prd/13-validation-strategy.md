@@ -220,12 +220,16 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PI-01 | 3 | Unit price (per item, kg, lb) | Integration | `backend/tests/api/test_items.py::test_prices_are_unit_prices` | Pass |
 | PI-01 | 3 | Unit price (per item, kg, lb) | Component | `mobile/src/__tests__/priceHistory.test.tsx` "shows unit prices and the change since the first price (AC 3)" | Pass |
 | PI-01 | 4 | Timeline needs 2 data points | Integration | `backend/tests/api/test_items.py::test_one_price_is_not_yet_a_timeline` | Pass |
+| PI-01 | FR | Filter the history by store and date range | Integration | `backend/tests/api/test_items.py::test_store_and_date_filters` | Pass |
+| PI-01 | EC 3 | A sale price is a regular observation, in the timeline and the average | Integration | `backend/tests/api/test_price_comparison.py::test_a_sale_price_is_a_regular_observation` | Pass |
 | PI-01 | 4 | Timeline needs 2 data points | Component | `mobile/src/__tests__/priceHistory.test.tsx` "waits for a second price before showing a trend (AC 4)" | Pass |
 | PI-01 | 1 | Every recorded price with date and store (app, at AX5: device check BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "stacks each price under its date and store at AX5" | Pass |
 | PI-01 | 1 | Every recorded price with date and store (app, Prices list at AX5: BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "stacks the price under the name at AX5, and lets the name wrap" | Pass |
 | PI-01 | 3 | Unit price (per item, kg, lb) (app, latest price at AX5: BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "keeps the latest price on one line, shrinking it to fit" | Pass |
 | PI-02 | 1 | Hybrid: embedding similarity + fuzzy strings | Integration | `backend/tests/services/test_item_matching.py::test_high_semantic_similarity_auto_links` | Pass |
 | PI-02 | 1 | Hybrid: embedding similarity + fuzzy strings | Integration | `backend/tests/services/test_item_matching.py::test_high_fuzzy_score_auto_links_and_learns_the_alias` | Pass |
+| PI-02 | FR | Matching order: an exact alias links first, at confidence 1.0 | Integration | `backend/tests/services/test_item_matching.py::test_exact_alias_links_to_the_same_item` | Pass |
+| PI-02 | 2 | Thresholds default to 0.85 fuzzy, 0.80 semantic, 0.6 ask | Unit | `backend/tests/services/test_item_matching.py::test_thresholds_default_to_the_prd_values` | Pass |
 | PI-02 | 2 | >= 0.85 auto-link | Integration | `backend/tests/services/test_item_matching.py::test_high_fuzzy_score_auto_links_and_learns_the_alias` | Pass |
 | PI-02 | 2 | 0.6-0.85 asks the user | Integration | `backend/tests/services/test_item_matching.py::test_medium_score_asks_the_user_and_keeps_the_line_separate` | Pass |
 | PI-02 | 2 | 0.6-0.85 asks the user | Component | `mobile/src/__tests__/priceHistory.test.tsx` "asks on the item and merges when the user says Same Item" | Pass |
@@ -251,6 +255,8 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PI-03 | 1 | Configurable threshold | Integration | `backend/tests/api/test_price_alerts.py::test_the_user_can_set_their_own_threshold` | Pass |
 | PI-03 | 1 | Configurable threshold | Integration | `backend/tests/api/test_price_alerts.py::test_the_default_threshold_is_a_setting` | Pass |
 | PI-03 | 2 | Item, store, old average, new price, percent | Integration | `backend/tests/api/test_price_alerts.py::test_the_alert_names_item_store_average_new_price_and_percent` | Pass |
+| PI-03 | FR | The alert dispatches `PriceChangeDetected` | Integration | `backend/tests/api/test_price_alerts.py::test_the_alert_dispatches_price_change_detected` | Pass |
+| PI-03 | FR | Price alert analytics (`price_alert_triggered`: direction, percent_change; once per alert sent) | Integration | `backend/tests/api/test_price_alerts.py::test_an_alert_emits_price_alert_triggered` | Pass |
 | PI-03 | 2 | Item, store, old average, new price, percent | Integration | `backend/tests/tasks/test_push_tasks.py::test_a_price_change_push_opens_its_item` | Pass |
 | PI-03 | 3 | Cooldown, default 7 days per item | Integration | `backend/tests/api/test_price_alerts.py::test_an_item_alerts_once_per_cooldown` | Pass |
 | PI-03 | 3 | Cooldown, default 7 days per item | Integration | `backend/tests/api/test_price_alerts.py::test_the_cooldown_is_per_item` | Pass |
@@ -260,6 +266,7 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PI-03 | 4 | Mutable per store: unmute works after the store's receipts are purged | Integration | `backend/tests/api/test_price_alerts.py::test_a_store_can_be_unmuted_after_its_receipts_are_purged` | Pass |
 | PI-03 | 4 | Mutable per store: unmute removes only the user's own mute | Integration | `backend/tests/api/test_price_alerts.py::test_unmuting_a_store_never_touches_another_users_mute` | Pass |
 | PI-03 | 4 | Mutable per item: another user's item is 404 to mute and unmute | Integration | `backend/tests/api/test_price_alerts.py::test_another_users_item_cannot_be_muted_or_unmuted` | Pass |
+| PI-03 | 4 | Mute analytics (`price_alert_muted`: scope item or store; unmute sends none) | Integration | `backend/tests/api/test_price_alerts.py::test_muting_emits_price_alert_muted` | Pass |
 | PI-03 | FR | Only a confirm alerts; editing a confirmed receipt sends none | Integration | `backend/tests/api/test_price_alerts.py::test_editing_a_confirmed_receipt_never_sends_a_price_alert` | Pass |
 | PI-03 | FR | A price alert failure never fails the confirm or the budget alert | Integration | `backend/tests/api/test_price_alerts.py::test_a_price_alert_failure_never_fails_the_confirm` | Pass |
 | PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "opens the item named in a price change alert (PI-03)" | Pass |
@@ -358,6 +365,7 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | BC-FR | Rollover | Threshold alerts use the limit with rollover (BC-03) | Integration | `backend/tests/api/test_budget_rollover.py::test_threshold_alert_fires_on_the_effective_limit` | Pass |
 | BC-FR | Rollover | Threshold alerts use the limit with rollover (BC-03) | Integration | `backend/tests/api/test_budget_rollover.py::test_late_receipt_in_last_period_shrinks_the_carry_and_alerts` | Pass |
 | BC-FR | Rollover | Rollover toggle analytics (`budget_rollover_toggled`) | Integration | `backend/tests/api/test_budget_rollover.py::test_toggling_rollover_emits_analytics` | Pass |
+| BC-FR | Rollover | Another user's budget is 404 to turn rollover on, even for a Premium user | Integration | `backend/tests/api/test_cross_user_writes.py::test_b_cannot_turn_on_rollover_for_as_budget` | Pass |
 | BC-FR | Rollover | Rollover switch per budget on Budget settings (app) | Component | `mobile/src/__tests__/budgetRollover.test.tsx` "shows a rollover switch for each budget, set as saved" | Pass |
 | BC-FR | Rollover | Rollover switch per budget on Budget settings (app) | Component | `mobile/src/__tests__/budgetRollover.test.tsx` "saves only the switches that changed" | Pass |
 | BC-FR | Rollover | Rollover switch per budget on Budget settings (app) | Component | `mobile/src/__tests__/budgetRollover.test.tsx` "turns rollover on for a budget it creates" | Pass |
@@ -549,6 +557,46 @@ This matrix is the source of truth for completeness. A phase is not done until e
 - [ ] API endpoints require authentication (except health check).
 - [ ] User A cannot access User B's receipts or budgets. `backend/tests/api/test_cross_user_writes.py` (every receipt and budget route answers 404; the rows are unchanged).
 - [ ] Rate limiting enforced (50 submissions/hour, 300 reads/minute).
+
+### V1.1 Definition of Done
+
+V1.1 is Price Intelligence (PI-01 through PI-04) and the Premium tier (`PHASE_SCOPE.md`, decisions D1 and D2). The MVP boxes above still hold; these are the boxes V1.1 adds.
+
+**Functional completeness:**
+- [ ] All V1.1 user stories (PI-01 through PI-04, BC-05 AC 3) and the Premium rows (`PREM`, `BC-FR | Trends`, `BC-FR | Rollover`) have passing tests for every acceptance criterion.
+- [ ] The V1.1 traceability matrix covers every [V1.1] acceptance criterion and every V1.1 edge case, with test locations and pass status. `python3 scripts/check-traceability.py` is clean.
+- [ ] All API endpoints from 08-api-contracts.md tagged V1.1 (items, stores, categories, export, rollover, the 12-month trend, the RevenueCat webhook) are implemented and integration-tested.
+- [ ] `/validate` passes on main (backend on SQLite and on Postgres, `alembic check`, mobile tsc, eslint, jest).
+- [ ] `/verify-grocery-genie` passes on main: its V1.1 journeys drive the API the way the app does.
+- [ ] `verify-budget-alerts` passes: the TLA+ model of budget and price alerts and push delivery checks clean.
+
+**LLM extraction quality:**
+- N/A for V1.1. V1.1 did not change the extraction or category prompts, the extraction logic, or the provider config, so the MVP accuracy boxes carry over unchanged. Custom categories reach a scan only through the user's corrections (V11-P1 decision, above). Any later prompt change runs `validate-extraction` first.
+
+**Edge cases:**
+- [ ] All Price Intelligence edge cases from 11-edge-cases.md are tested: store name variations (store normalization with user merge), unit price ambiguity (only like-for-like compared), and promotional prices recorded as regular observations.
+- [ ] Rollover edge cases (amount change, $0 budget, currency change, delete and restore, Premium lapse) are tested. Rows `BC-FR | Rollover` above.
+
+**Non-functional:**
+- [ ] Dashboard API response ≤2 seconds (p95) includes the 12-month trend query. `backend/tests/api/test_p95_postgres.py::test_dashboard_12_month_trend_p95_under_2s`, run on Postgres by `make backend-test-pg`.
+- [ ] WCAG 2.1 AA on every new screen (price history, comparison, Review Matches, Settings → Alerts, Categories, Stores, Premium, the paywall): VoiceOver and dark mode, manual (below).
+
+**Analytics:**
+- [ ] All V1.1 analytics events from 12-analytics.md are instrumented and tested (price_history_viewed, price_alert_triggered, price_alert_muted, price_comparison_viewed, item_match_resolved, budget_rollover_toggled, premium_status_changed, custom_category_changed, data_exported). Each has a test that checks its properties against 12-analytics.md.
+
+**Data integrity:**
+- [ ] Price observations follow their receipt: confirm records them, edit rebuilds them, delete removes them and restore brings them back.
+- [ ] Entitlements come only from RevenueCat's webhook and REST API, never the client.
+
+**Security:**
+- [ ] User B cannot read or change user A's items, aliases, suggestions, prices, comparisons, mutes, custom categories, export, or budget rollover: every new route answers 404 (`test_items.py::test_items_are_private_to_their_user`, `test_price_alerts.py::test_another_users_item_cannot_be_muted_or_unmuted`, `test_price_comparison.py::test_comparison_is_private_and_unknown_items_are_404`, `test_custom_categories.py::test_another_users_category_cannot_be_renamed_or_deleted`, `test_item_matching.py::test_another_users_suggestion_is_not_found`, `test_cross_user_writes.py::test_b_cannot_turn_on_rollover_for_as_budget`).
+- [ ] The RevenueCat webhook refuses a request without its shared secret.
+
+**Manual (device and human checks):** these cannot be automated and are listed in [device-checklist.md](../device-checklist.md), V1.1 section.
+- [ ] RevenueCat sandbox purchase and restore; the webhook "Send test event" returns 200.
+- [ ] Price alert push tap opens the item from foreground, background and cold start.
+- [ ] The device-check bug rechecks (BUG-1, 2, 3, 5, 6, 8, 9) pass on a device.
+- [ ] VoiceOver and dark mode on each new screen.
 
 ## LLM Validation Harness
 
