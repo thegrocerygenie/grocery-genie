@@ -597,3 +597,32 @@ async def test_export_file_closed_when_analytics_fails(premium_client, monkeypat
 
     [export] = built
     assert export.file.closed
+
+
+@pytest.mark.parametrize("fmt", ["json", "csv"])
+async def test_export_file_closed_when_build_fails(db_session, monkeypatch, fmt):
+    """A read failing mid-write (the database gone): every spooled file is
+    closed before the error reaches the route."""
+    from app.services import export_service
+    from app.services.export_service import ExportFormat, ExportService
+
+    spools: list = []
+    real_spool = export_service._spool
+
+    def tracking_spool():
+        spool = real_spool()
+        spools.append(spool)
+        return spool
+
+    async def failing_budgets(self, user, categories):
+        raise RuntimeError("database gone")
+
+    monkeypatch.setattr(export_service, "_spool", tracking_spool)
+    monkeypatch.setattr(ExportService, "_budgets", failing_budgets)
+    user = User(id=uuid.uuid4(), email="build-fails@example.com")
+
+    with pytest.raises(RuntimeError, match="database gone"):
+        await ExportService(db_session).build(user, ExportFormat(fmt))
+
+    assert spools
+    assert all(spool.closed for spool in spools)
