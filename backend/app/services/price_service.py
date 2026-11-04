@@ -4,6 +4,10 @@ Every confirmed line linked to a canonical item has one PriceObservation.
 sync_receipt rebuilds a receipt's observations whenever the receipt changes,
 so they always match its lines. Reads leave out deleted receipts by joining
 receipts, so a deleted receipt's prices disappear and come back on restore.
+
+Prices group by store as the user sees stores (store_service.groups): every
+branch of one normalized name, and the stores the user merged, are one store
+in store counts, history and comparison (EC Price Intelligence 1).
 """
 
 from __future__ import annotations
@@ -22,8 +26,8 @@ from app.models.database import (
     CanonicalItemAlias,
     PriceObservation,
     Receipt,
-    Store,
 )
+from app.services.store_service import StoreGroup, StoreService
 
 # PI-01 AC 4: a timeline needs at least this many prices.
 MIN_TIMELINE_POINTS = 2
@@ -53,7 +57,16 @@ class ItemSummary:
 @dataclass(frozen=True)
 class PricePoint:
     observation: PriceObservation
-    store_name: str | None
+    # The store as the user groups it; None when the receipt has no store.
+    store: StoreGroup | None
+
+    @property
+    def store_id(self) -> uuid.UUID | None:
+        return self.store.id if self.store else None
+
+    @property
+    def store_name(self) -> str | None:
+        return self.store.name if self.store else None
 
 
 @dataclass(frozen=True)
@@ -210,9 +223,6 @@ class PriceService:
             select(
                 PriceObservation.canonical_item_id.label("item_id"),
                 func.count(PriceObservation.id).label("observation_count"),
-                func.count(func.distinct(PriceObservation.store_id)).label(
-                    "store_count"
-                ),
                 func.max(PriceObservation.date).label("last_date"),
             )
             .join(Receipt, PriceObservation.receipt_id == Receipt.id)
@@ -236,7 +246,7 @@ class PriceService:
             )
 
         base = (
-            select(CanonicalItem, stats.c.observation_count, stats.c.store_count)
+            select(CanonicalItem, stats.c.observation_count)
             .join(stats, stats.c.item_id == CanonicalItem.id)
             .where(*conditions)
         )
@@ -249,17 +259,67 @@ class PriceService:
             )
         ).all()
 
-        latest = await self._latest_by_item(user_id, [row[0].id for row in rows])
+        item_ids = [row[0].id for row in rows]
+        latest = await self._latest_by_item(user_id, item_ids)
+        store_counts = await self._store_counts(user_id, item_ids)
         summaries = [
             ItemSummary(
                 item=item,
                 observation_count=int(count),
-                store_count=int(stores),
+                store_count=store_counts.get(item.id, 0),
                 latest=latest.get(item.id),
             )
-            for item, count, stores in rows
+            for item, count in rows
         ]
         return summaries, int(total or 0)
+
+    async def _store_counts(
+        self, user_id: uuid.UUID, item_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        """How many stores, as the user groups them, each item has prices from."""
+        if not item_ids:
+            return {}
+        pairs = (
+            await self.db.execute(
+                select(PriceObservation.canonical_item_id, PriceObservation.store_id)
+                .join(Receipt, PriceObservation.receipt_id == Receipt.id)
+                .where(
+                    *self._visible(user_id),
+                    PriceObservation.canonical_item_id.in_(item_ids),
+                    PriceObservation.store_id.is_not(None),
+                )
+                .distinct()
+            )
+        ).all()
+        groups = await StoreService(self.db).groups(user_id, {s for _, s in pairs})
+        seen: dict[uuid.UUID, set[uuid.UUID]] = {}
+        for item_id, store_id in pairs:
+            group = groups.get(store_id)
+            if group is not None:
+                seen.setdefault(item_id, set()).add(group.id)
+        return {item_id: len(ids) for item_id, ids in seen.items()}
+
+    async def _observations(
+        self, user_id: uuid.UUID, item_id: uuid.UUID
+    ) -> tuple[list[PriceObservation], dict[uuid.UUID, StoreGroup]]:
+        """The item's visible prices, oldest first, and their stores' groups."""
+        observations = list(
+            (
+                await self.db.execute(
+                    select(PriceObservation)
+                    .join(Receipt, PriceObservation.receipt_id == Receipt.id)
+                    .where(
+                        *self._visible(user_id),
+                        PriceObservation.canonical_item_id == item_id,
+                    )
+                    .order_by(PriceObservation.date, Receipt.created_at)
+                )
+            ).scalars()
+        )
+        groups = await StoreService(self.db).groups(
+            user_id, {o.store_id for o in observations}
+        )
+        return observations, groups
 
     async def _latest_by_item(
         self, user_id: uuid.UUID, item_ids: list[uuid.UUID]
@@ -284,21 +344,17 @@ class PriceService:
         self, user_id: uuid.UUID, item_id: uuid.UUID
     ) -> tuple[int, int, PriceObservation | None]:
         """(observation count, store count, latest observation) for one item."""
-        count, stores = (
-            await self.db.execute(
-                select(
-                    func.count(PriceObservation.id),
-                    func.count(func.distinct(PriceObservation.store_id)),
-                )
-                .join(Receipt, PriceObservation.receipt_id == Receipt.id)
-                .where(
-                    *self._visible(user_id),
-                    PriceObservation.canonical_item_id == item_id,
-                )
+        count = await self.db.scalar(
+            select(func.count(PriceObservation.id))
+            .join(Receipt, PriceObservation.receipt_id == Receipt.id)
+            .where(
+                *self._visible(user_id),
+                PriceObservation.canonical_item_id == item_id,
             )
-        ).one()
+        )
+        stores = (await self._store_counts(user_id, [item_id])).get(item_id, 0)
         latest = (await self._latest_by_item(user_id, [item_id])).get(item_id)
-        return int(count), int(stores), latest
+        return int(count or 0), stores, latest
 
     async def history(
         self,
@@ -309,41 +365,43 @@ class PriceService:
         from_date: date | None = None,
         to_date: date | None = None,
     ) -> PriceHistory:
-        """Every price paid for ``item``, oldest first (PI-01 AC 1)."""
-        conditions = [
-            *self._visible(user_id),
-            PriceObservation.canonical_item_id == item.id,
-        ]
-        all_rows = (
-            await self.db.execute(
-                select(PriceObservation, Store.name)
-                .join(Receipt, PriceObservation.receipt_id == Receipt.id)
-                .outerjoin(Store, PriceObservation.store_id == Store.id)
-                .where(*conditions)
-                .order_by(PriceObservation.date, Receipt.created_at)
-            )
-        ).all()
+        """Every price paid for ``item``, oldest first (PI-01 AC 1).
+
+        Each point names its store's group; filtering by any store of a group
+        gives the whole group.
+        """
+        observations, groups = await self._observations(user_id, item.id)
 
         # The series is the unit and currency most prices are in, over all of
         # the item's prices, so a filter cannot change which one is plotted.
-        if all_rows:
-            unit, currency = _series([obs for obs, _ in all_rows])
+        if observations:
+            unit, currency = _series(observations)
         else:
             unit, currency = item.unit_of_measure, None
 
-        points = [
-            PricePoint(observation=obs, store_name=store_name)
-            for obs, store_name in all_rows
-            if (store_id is None or obs.store_id == store_id)
-            and (from_date is None or obs.date >= from_date)
-            and (to_date is None or obs.date <= to_date)
-        ]
+        wanted: uuid.UUID | None = None
+        if store_id is not None:
+            filter_group = (
+                await StoreService(self.db).groups(user_id, [store_id])
+            ).get(store_id)
+            wanted = filter_group.id if filter_group else store_id
+
+        points: list[PricePoint] = []
+        for obs in observations:
+            group = groups.get(obs.store_id) if obs.store_id else None
+            if wanted is not None and (group is None or group.id != wanted):
+                continue
+            if from_date is not None and obs.date < from_date:
+                continue
+            if to_date is not None and obs.date > to_date:
+                continue
+            points.append(PricePoint(observation=obs, store=group))
         return PriceHistory(
             item=item,
             points=points,
             unit_of_measure=unit,
             currency=currency,
-            store_count=len({p.observation.store_id for p in points}),
+            store_count=len({p.store.id for p in points if p.store is not None}),
         )
 
     async def compare(self, user_id: uuid.UUID, item: CanonicalItem) -> StoreComparison:
@@ -354,30 +412,21 @@ class PriceService:
         price ambiguity), and a store needs MIN_COMPARISON_OBSERVATIONS of
         them (FR).
         """
-        rows = (
-            await self.db.execute(
-                select(PriceObservation, Store.name)
-                .join(Receipt, PriceObservation.receipt_id == Receipt.id)
-                .outerjoin(Store, PriceObservation.store_id == Store.id)
-                .where(
-                    *self._visible(user_id),
-                    PriceObservation.canonical_item_id == item.id,
-                )
-                .order_by(PriceObservation.date, Receipt.created_at)
-            )
-        ).all()
-        if rows:
-            unit, currency = _series([obs for obs, _ in rows])
+        observations, groups = await self._observations(user_id, item.id)
+        if observations:
+            unit, currency = _series(observations)
         else:
             unit, currency = item.unit_of_measure, None
 
+        # Keyed by store group: the user's merged stores are one store.
         by_store: dict[uuid.UUID, tuple[str, list[PriceObservation]]] = {}
-        for obs, store_name in rows:
-            if obs.store_id is None or store_name is None:
+        for obs in observations:
+            group = groups.get(obs.store_id) if obs.store_id else None
+            if group is None:
                 continue
             if obs.unit_of_measure != unit or obs.currency != currency:
                 continue
-            by_store.setdefault(obs.store_id, (store_name, []))[1].append(obs)
+            by_store.setdefault(group.id, (group.name, []))[1].append(obs)
 
         stores: list[StorePrice] = []
         below = 0

@@ -64,6 +64,8 @@ async def thousand_receipts(client, db_session):
                 id=receipt_id,
                 user_id=DEV_USER_ID,
                 store_id=stores[n % 20].id,
+                # As the app saves it: the name on the receipt (V11-05).
+                store_name=stores[n % 20].name,
                 date=TODAY - timedelta(days=rng.randrange(180)),
                 status="confirmed",
                 currency="USD",

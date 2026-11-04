@@ -28,7 +28,6 @@ from app.models.database import (
     LineItem,
     Receipt,
     ReceiptCorrection,
-    Store,
     User,
     UserItemMapping,
 )
@@ -197,6 +196,7 @@ class ReceiptService:
         receipt = Receipt(
             user_id=user_id,
             store_id=store.id if store else None,
+            store_name=extraction.store_name.strip() if store else None,
             date=receipt_date,
             subtotal=extraction.subtotal,
             tax=extraction.tax,
@@ -543,7 +543,7 @@ class ReceiptService:
         # moved. Their periods can cross a threshold too.
         other_changed: set[date] = set()
 
-        current_store_name = receipt.store.name if receipt.store else None
+        current_store_name = receipt.store_name
         if (
             updates.store_name is not None
             and updates.store_name.strip() != current_store_name
@@ -555,7 +555,9 @@ class ReceiptService:
                 current_store_name or "",
                 updates.store_name.strip(),
             )
+            # The receipt keeps the corrected name; the shared row only groups.
             receipt.store = await self.store_service.find_or_create(updates.store_name)
+            receipt.store_name = updates.store_name.strip()
 
         if updates.date is not None and updates.date != receipt.date:
             self._record_correction(
@@ -786,11 +788,10 @@ class ReceiptService:
         count_subquery = select(Receipt.id).where(*conditions)
 
         if store:
-            store_filter = Store.normalized_name.ilike(f"%{store.lower()}%")
-            query = query.join(Receipt.store).where(store_filter)
-            count_subquery = count_subquery.join(
-                Store, Receipt.store_id == Store.id
-            ).where(store_filter)
+            # The names on the user's own receipts, never a shared row's name.
+            store_filter = Receipt.store_name.ilike(f"%{store.strip()}%")
+            query = query.where(store_filter)
+            count_subquery = count_subquery.where(store_filter)
 
         count_query = select(func.count()).select_from(count_subquery.subquery())
 
@@ -887,6 +888,7 @@ class ReceiptService:
         receipt = Receipt(
             user_id=user_id,
             store_id=store.id,
+            store_name=store_name.strip(),
             date=receipt_date,
             subtotal=subtotal,
             tax=tax,

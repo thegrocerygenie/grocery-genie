@@ -31,7 +31,6 @@ from app.models.database import (
     PriceAlertStoreMute,
     PriceObservation,
     Receipt,
-    Store,
     User,
 )
 from app.services.price_service import (
@@ -39,15 +38,12 @@ from app.services.price_service import (
     SHORT_WINDOW_DAYS,
     PriceService,
 )
+from app.services.store_service import StoreGroup, StoreService
 
 NOTIFICATION_TYPE = "price_change"
 
 # Units that are a count, not a measure: "$0.78" rather than "$0.78/each".
 _COUNT_UNITS = {"each", "ea", "unit", "units", "item", "items", "pc", "pcs"}
-
-
-class StoreNotFoundError(Exception):
-    """The user has no receipt from this store."""
 
 
 @dataclass(frozen=True)
@@ -57,7 +53,8 @@ class PriceAlertSettings:
     default_threshold_percent: int
     cooldown_days: int
     muted_items: list[CanonicalItem]
-    muted_stores: list[Store]
+    # One entry per muted store group, as the user's merges group stores.
+    muted_stores: list[StoreGroup]
 
 
 @dataclass(frozen=True)
@@ -102,17 +99,10 @@ class PriceAlertService:
             .scalars()
             .all()
         )
-        muted_stores = (
-            (
-                await self.db.execute(
-                    select(Store)
-                    .join(PriceAlertStoreMute, PriceAlertStoreMute.store_id == Store.id)
-                    .where(PriceAlertStoreMute.user_id == user.id)
-                    .order_by(Store.name)
-                )
-            )
-            .scalars()
-            .all()
+        groups = await self._muted_groups(user.id)
+        muted_stores = sorted(
+            {g.id: g for g in groups.values()}.values(),
+            key=lambda g: (g.name.casefold(), str(g.id)),
         )
         return PriceAlertSettings(
             enabled=user.price_alerts_enabled,
@@ -147,32 +137,59 @@ class PriceAlertService:
             )
         )
 
-    async def _check_store(self, user_id: uuid.UUID, store_id: uuid.UUID) -> None:
-        """Stores are shared: a user may mute only one they have a receipt from."""
-        shopped = await self.db.scalar(
-            select(Receipt.id)
-            .where(Receipt.user_id == user_id, Receipt.store_id == store_id)
-            .limit(1)
+    # A store mute covers the store's whole group as the user sees it (their
+    # merges, and every branch of one normalized name). It is recorded on the
+    # group's root at the time of muting; a mute recorded on a store later
+    # merged into another mutes the merged group. Unmerging leaves each mute
+    # on the store it was recorded on.
+
+    async def _muted_groups(self, user_id: uuid.UUID) -> dict[uuid.UUID, StoreGroup]:
+        """Each of the user's mute rows' store id -> its group, named with the
+        name saved on the mute once the user's receipts there are purged."""
+        saved = dict(
+            (
+                await self.db.execute(
+                    select(
+                        PriceAlertStoreMute.store_id, PriceAlertStoreMute.store_name
+                    ).where(PriceAlertStoreMute.user_id == user_id)
+                )
+            ).all()
         )
-        if shopped is None:
-            raise StoreNotFoundError(store_id)
+        return await StoreService(self.db).groups(user_id, saved, saved)
 
     async def mute_store(self, user_id: uuid.UUID, store_id: uuid.UUID) -> None:
-        await self._check_store(user_id, store_id)
+        """Stores are shared: a user may mute only one they have a receipt from."""
+        stores = StoreService(self.db)
+        await stores.check_shopped(user_id, store_id)
+        group = (await stores.groups(user_id, [store_id]))[store_id]
         await self.db.execute(
             _insert(self.db)(PriceAlertStoreMute)
-            .values(id=uuid.uuid4(), user_id=user_id, store_id=store_id)
+            .values(
+                id=uuid.uuid4(),
+                user_id=user_id,
+                store_id=group.id,
+                # The user's name, kept for when their receipts are purged.
+                store_name=group.name,
+            )
             .on_conflict_do_nothing(index_elements=["user_id", "store_id"])
         )
 
     async def unmute_store(self, user_id: uuid.UUID, store_id: uuid.UUID) -> None:
-        """Delete the user's own mute row, if any. No store check: the mute
-        outlives the user's receipts from the store (deleted, then purged), and
-        settings still lists it, so it must stay removable."""
+        """Delete the user's own mutes on the store's group, if any. No store
+        check: the mute outlives the user's receipts from the store (deleted,
+        then purged), and settings still lists it, so it must stay removable."""
+        target = (await StoreService(self.db).groups(user_id, [store_id])).get(store_id)
+        ids = {store_id}
+        if target is not None:
+            ids |= {
+                muted_id
+                for muted_id, group in (await self._muted_groups(user_id)).items()
+                if group.id == target.id
+            }
         await self.db.execute(
             delete(PriceAlertStoreMute).where(
                 PriceAlertStoreMute.user_id == user_id,
-                PriceAlertStoreMute.store_id == store_id,
+                PriceAlertStoreMute.store_id.in_(ids),
             )
         )
 
@@ -225,7 +242,7 @@ class PriceAlertService:
             grouped[key].append(Decimal(str(obs.unit_price)))
 
         muted = await self._muted_items(user.id, {k[0] for k in grouped})
-        store_name = await self._store_name(receipt.store_id)
+        store_name = await self._store_name(user.id, receipt.store_id)
         prices = PriceService(self.db)
         alerts: list[PriceAlert] = []
         seen_items: set[uuid.UUID] = set()
@@ -349,17 +366,20 @@ class PriceAlertService:
         return set(rows.scalars().all())
 
     async def _store_muted(self, user_id: uuid.UUID, store_id: uuid.UUID) -> bool:
-        return (
-            await self.db.scalar(
-                select(PriceAlertStoreMute.id).where(
-                    PriceAlertStoreMute.user_id == user_id,
-                    PriceAlertStoreMute.store_id == store_id,
-                )
-            )
-        ) is not None
+        """Whether the user muted the store's group (see the mute notes)."""
+        muted = await self._muted_groups(user_id)
+        if not muted:
+            return False
+        group = (await StoreService(self.db).groups(user_id, [store_id])).get(store_id)
+        if group is None:
+            return False
+        return any(g.id == group.id for g in muted.values())
 
-    async def _store_name(self, store_id: uuid.UUID | None) -> str | None:
+    async def _store_name(
+        self, user_id: uuid.UUID, store_id: uuid.UUID | None
+    ) -> str | None:
+        """The store as the user's prices group it (their merges)."""
         if store_id is None:
             return None
-        store = await self.db.get(Store, store_id)
-        return store.name if store else None
+        group = (await StoreService(self.db).groups(user_id, [store_id])).get(store_id)
+        return group.name if group else None
