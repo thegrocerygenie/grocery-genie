@@ -469,6 +469,10 @@ class PriceAlertStoreMute(Base):
     store_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("stores.id", ondelete="CASCADE"), nullable=False
     )
+    # The user's own name for the store when they muted it (V11-05): the
+    # mute outlives its receipts, and the shared row's name may be another
+    # user's.
+    store_name: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -499,6 +503,11 @@ class UserStoreAlias(Base):
     target_store_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("stores.id", ondelete="CASCADE"), nullable=False
     )
+    # The user's own names for both stores when they merged, so the group
+    # keeps the user's name after their receipts there are purged; the shared
+    # row's name may be another user's.
+    store_name: Mapped[str | None] = mapped_column(String(255))
+    target_name: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

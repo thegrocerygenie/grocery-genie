@@ -144,19 +144,18 @@ class PriceAlertService:
     # on the store it was recorded on.
 
     async def _muted_groups(self, user_id: uuid.UUID) -> dict[uuid.UUID, StoreGroup]:
-        """Each of the user's mute rows' store id -> its group."""
-        muted_ids = (
+        """Each of the user's mute rows' store id -> its group, named with the
+        name saved on the mute once the user's receipts there are purged."""
+        saved = dict(
             (
                 await self.db.execute(
-                    select(PriceAlertStoreMute.store_id).where(
-                        PriceAlertStoreMute.user_id == user_id
-                    )
+                    select(
+                        PriceAlertStoreMute.store_id, PriceAlertStoreMute.store_name
+                    ).where(PriceAlertStoreMute.user_id == user_id)
                 )
-            )
-            .scalars()
-            .all()
+            ).all()
         )
-        return await StoreService(self.db).groups(user_id, muted_ids)
+        return await StoreService(self.db).groups(user_id, saved, saved)
 
     async def mute_store(self, user_id: uuid.UUID, store_id: uuid.UUID) -> None:
         """Stores are shared: a user may mute only one they have a receipt from."""
@@ -165,7 +164,13 @@ class PriceAlertService:
         group = (await stores.groups(user_id, [store_id]))[store_id]
         await self.db.execute(
             _insert(self.db)(PriceAlertStoreMute)
-            .values(id=uuid.uuid4(), user_id=user_id, store_id=group.id)
+            .values(
+                id=uuid.uuid4(),
+                user_id=user_id,
+                store_id=group.id,
+                # The user's name, kept for when their receipts are purged.
+                store_name=group.name,
+            )
             .on_conflict_do_nothing(index_elements=["user_id", "store_id"])
         )
 

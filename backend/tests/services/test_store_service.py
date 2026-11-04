@@ -34,6 +34,8 @@ from tests.conftest import DEV_USER_ID, USER_B_ID, ensure_user
         ("Loblaws Store 1234", "loblaws"),
         ("Loblaws Store #0042", "loblaws"),
         ("Loblaws No. 12", "loblaws"),
+        ("Loblaws No #12", "loblaws"),
+        ("Cafe No 5", "cafe no 5"),
         ("Loblaws.", "loblaws"),
         ("LOBLAWS, INC.", "loblaws inc"),
         ("Trader Joe's", "trader joes"),
@@ -77,6 +79,10 @@ def test_normalize_store_name(raw, expected):
         ("Bodega 101", "Bodega"),
         ("Forever 21", "Forever"),
         ("Costco 2", "Costco"),
+        # "No" without its period, and "Number", can be part of a name.
+        ("Cafe No 5", "Cafe"),
+        ("Bodega No 1", "Bodega"),
+        ("Diner Number 9", "Diner"),
     ],
 )
 def test_different_stores_never_normalize_together(a, b):
@@ -112,6 +118,9 @@ def test_the_migration_normalized_existing_stores_the_same_way():
         "Number 1 Chinese",
         "Bar 1802",
         "Loblaws Store #0042",
+        "Cafe No 5",
+        "Loblaws No. 12",
+        "Diner Number 9",
         "x" * 400,
     ]:
         assert module._normalize(raw) == normalize_store_name(raw)

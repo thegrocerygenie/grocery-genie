@@ -393,3 +393,64 @@ async def test_the_history_filter_never_matches_another_users_name(client, db_se
     found = (await client.get("/api/receipts", params={"store": "#3"})).json()
 
     assert found["items"] == []
+
+
+async def _purge_receipts_at(db_session, store_name: str) -> None:
+    """What the purge leaves once these receipts are past restore."""
+    from sqlalchemy import delete
+
+    from app.models.database import LineItem, PriceObservation, Receipt
+    from tests.conftest import DEV_USER_ID
+
+    receipts = select(Receipt.id).where(
+        Receipt.user_id == DEV_USER_ID, Receipt.store_name == store_name
+    )
+    await db_session.execute(
+        delete(PriceObservation).where(PriceObservation.receipt_id.in_(receipts))
+    )
+    await db_session.execute(delete(LineItem).where(LineItem.receipt_id.in_(receipts)))
+    await db_session.execute(
+        delete(Receipt).where(
+            Receipt.user_id == DEV_USER_ID, Receipt.store_name == store_name
+        )
+    )
+    await db_session.flush()
+
+
+async def test_a_merge_target_purged_keeps_the_users_name(client, db_session):
+    """X merged into Y, then Y's receipts purged: X's prices still show the
+    user's name for Y, never the shared row's (another user's)."""
+    await _another_user_shops_at(db_session, "LOBLAWS #5555")
+    await _manual(client, "Loblaws", "2026-03-01", "Limes", 1.0)
+    await _manual(client, "Superstore", "2026-03-02", "Limes", 1.0)
+    await _manual(client, "Superstore", "2026-03-03", "Limes", 1.0)
+    await _merge(
+        client,
+        await _store_id(client, "Superstore"),
+        await _store_id(client, "Loblaws"),
+    )
+
+    await _purge_receipts_at(db_session, "Loblaws")
+
+    item_id = await _item_id(client, "limes")
+    [compared] = (await _compare(client, item_id))["stores"]
+    assert compared["store_name"] == "Loblaws"
+    assert [s["name"] for s in await _stores(client)] == ["Loblaws"]
+    history = (await client.get(f"/api/items/{item_id}/prices")).json()
+    assert {o["store_name"] for o in history["observations"]} == {"Loblaws"}
+    # A price alert from the merged store names the user's store too.
+    await _manual(client, "Superstore", "2026-03-04", "Limes", 2.0)
+    [alert] = await _alerts(db_session)
+    assert " at Loblaws," in alert.body
+
+
+async def test_a_mute_outliving_its_receipts_keeps_the_users_name(client, db_session):
+    await _another_user_shops_at(db_session, "LOBLAWS #5555")
+    await _manual(client, "Loblaws", "2026-03-01", "Limes", 1.0)
+    loblaws = await _store_id(client, "Loblaws")
+    assert (await client.post(f"/api/stores/{loblaws}/mute")).status_code == 204
+
+    await _purge_receipts_at(db_session, "Loblaws")
+
+    settings = (await client.get("/api/items/price-alert-settings")).json()
+    assert settings["muted_stores"] == [{"id": loblaws, "name": "Loblaws"}]

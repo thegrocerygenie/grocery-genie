@@ -518,6 +518,8 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/api/test_store_merge.py::test_correcting_the_store_name_keeps_the_correction` | Pass |
 | EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/api/test_store_merge.py::test_the_history_filter_never_matches_another_users_name` | Pass |
 | EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/services/test_store_service.py::test_a_group_is_named_as_the_users_own_receipts_name_it` | Pass |
+| EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/api/test_store_merge.py::test_a_merge_target_purged_keeps_the_users_name` | Pass |
+| EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/api/test_store_merge.py::test_a_mute_outliving_its_receipts_keeps_the_users_name` | Pass |
 | EC-PI | 1 | Store list: the user's stores as they group | Integration | `backend/tests/api/test_store_merge.py::test_the_store_list_leaves_out_deleted_receipts` | Pass |
 | EC-PI | 1 | User merge: per-user only, shared rows untouched (D3) | Integration | `backend/tests/services/test_store_service.py::test_a_merge_groups_only_that_users_stores` | Pass |
 | EC-PI | 1 | User merge: per-user only, shared rows untouched (D3) | Integration | `backend/tests/api/test_store_merge.py::test_another_users_merge_never_changes_my_grouping` | Pass |

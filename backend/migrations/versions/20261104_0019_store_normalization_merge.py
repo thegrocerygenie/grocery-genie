@@ -2,7 +2,10 @@
 
 user_store_aliases holds each user's own store merges: the user's prices of
 store_id group under target_store_id, and nobody else's. Stores are shared,
-so a merge never renames or joins a shared row.
+so a merge never renames or joins a shared row. It keeps the user's names for
+both stores, and price_alert_store_mutes.store_name the user's name for a
+muted store (backfilled from the user's own receipts), so a group keeps the
+user's name after their receipts there are purged.
 
 receipts.store_name is the store name printed on the receipt, or the user's
 correction of it. Two users' receipts can share one store row (a row keeps
@@ -42,7 +45,8 @@ _END_MARKER = re.compile(
     r"(?<=\S)(?:"
     r"\s*#\s*\d+"
     r"|\s+[-–—]\s*#?\s*\d+"
-    r"|\s+(?:store|str|no|number|branch|location|loc|unit)\.?\s*#?\s*\d+"
+    r"|\s+(?:store|str|branch|location|loc|unit)\.?\s*#?\s*\d+"
+    r"|\s+no(?:\.\s*#?|\s*#)\s*\d+"
     r")\s*$"
 )
 _APOSTROPHES = re.compile(r"['‘’`]")
@@ -76,6 +80,8 @@ def upgrade() -> None:
         sa.Column("user_id", sa.Uuid(), nullable=False),
         sa.Column("store_id", sa.Uuid(), nullable=False),
         sa.Column("target_store_id", sa.Uuid(), nullable=False),
+        sa.Column("store_name", sa.String(255), nullable=True),
+        sa.Column("target_name", sa.String(255), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -109,8 +115,26 @@ def upgrade() -> None:
                 .values(normalized_name=new)
             )
 
+    # A mute keeps the user's own name for its store, for when their receipts
+    # there are purged: from their oldest receipt of the store where they
+    # still have one (after the normalized names above are rewritten).
+    op.add_column(
+        "price_alert_store_mutes",
+        sa.Column("store_name", sa.String(255), nullable=True),
+    )
+    op.execute(
+        "UPDATE price_alert_store_mutes SET store_name = ("
+        "SELECT r.store_name FROM receipts r JOIN stores s ON s.id = r.store_id "
+        "WHERE r.user_id = price_alert_store_mutes.user_id "
+        "AND r.store_name IS NOT NULL "
+        "AND s.normalized_name = (SELECT m.normalized_name FROM stores m "
+        "WHERE m.id = price_alert_store_mutes.store_id) "
+        "ORDER BY r.date, r.created_at, r.id LIMIT 1)"
+    )
+
 
 def downgrade() -> None:
+    op.drop_column("price_alert_store_mutes", "store_name")
     op.drop_column("receipts", "store_name")
     op.drop_table("user_store_aliases")
     op.execute("UPDATE stores SET normalized_name = lower(trim(name))")

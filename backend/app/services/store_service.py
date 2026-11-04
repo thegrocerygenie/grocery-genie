@@ -41,7 +41,10 @@ _END_MARKER = re.compile(
     r"(?<=\S)(?:"
     r"\s*#\s*\d+"
     r"|\s+[-–—]\s*#?\s*\d+"
-    r"|\s+(?:store|str|no|number|branch|location|loc|unit)\.?\s*#?\s*\d+"
+    r"|\s+(?:store|str|branch|location|loc|unit)\.?\s*#?\s*\d+"
+    # "No." only with its period, or "No #12": "Cafe No 5" is a name.
+    # "Number" is never a marker ("Diner Number 9").
+    r"|\s+no(?:\.\s*#?|\s*#)\s*\d+"
     r")\s*$"
 )
 _APOSTROPHES = re.compile(r"['‘’`]")
@@ -100,14 +103,20 @@ class _Resolver:
         roots: dict[str, Store],
         aliases: dict[uuid.UUID, uuid.UUID],
         own_names: dict[str, str],
+        saved_names: dict[str, str],
     ) -> None:
         self.rows = rows
         self.roots = roots
         self.aliases = aliases
         self.own_names = own_names
+        self.saved_names = saved_names
 
     def name(self, store: Store) -> str:
-        return self.own_names.get(store.normalized_name, store.name)
+        """The user's name for the store: their own oldest receipt's, else the
+        name saved on their merge or mute (which outlives purged receipts),
+        and the shared row's name only when they have neither."""
+        key = store.normalized_name
+        return self.own_names.get(key) or self.saved_names.get(key) or store.name
 
     def root(self, store_id: uuid.UUID) -> Store | None:
         row = self.rows.get(store_id)
@@ -150,18 +159,38 @@ class StoreService:
     # --- grouping -------------------------------------------------------------
 
     async def _resolver(
-        self, user_id: uuid.UUID, store_ids: Iterable[uuid.UUID | None]
+        self,
+        user_id: uuid.UUID,
+        store_ids: Iterable[uuid.UUID | None],
+        saved: dict[uuid.UUID, str | None] | None = None,
     ) -> _Resolver:
-        aliases = dict(
-            (
-                await self.db.execute(
-                    select(
-                        UserStoreAlias.store_id, UserStoreAlias.target_store_id
-                    ).where(UserStoreAlias.user_id == user_id)
-                )
-            ).all()
+        """``saved`` maps store ids to names the user saved for them (a
+        mute's); the user's merges add theirs."""
+        aliases: dict[uuid.UUID, uuid.UUID] = {}
+        saved_by_id: dict[uuid.UUID, str] = {
+            k: v for k, v in (saved or {}).items() if v
+        }
+        for source, target, source_name, target_name in (
+            await self.db.execute(
+                select(
+                    UserStoreAlias.store_id,
+                    UserStoreAlias.target_store_id,
+                    UserStoreAlias.store_name,
+                    UserStoreAlias.target_name,
+                ).where(UserStoreAlias.user_id == user_id)
+            )
+        ).all():
+            aliases[source] = target
+            if source_name:
+                saved_by_id.setdefault(source, source_name)
+            if target_name:
+                saved_by_id.setdefault(target, target_name)
+        ids = (
+            {i for i in store_ids if i is not None}
+            | set(aliases)
+            | set(aliases.values())
+            | set(saved_by_id)
         )
-        ids = {i for i in store_ids if i is not None} | set(aliases.values())
         rows: dict[uuid.UUID, Store] = {}
         roots: dict[str, Store] = {}
         own_names: dict[str, str] = {}
@@ -197,14 +226,23 @@ class StoreService:
                 )
             ).all():
                 own_names.setdefault(normalized, own)
-        return _Resolver(rows, roots, aliases, own_names)
+        saved_names: dict[str, str] = {}
+        for store_id, name in saved_by_id.items():
+            row = rows.get(store_id)
+            if row is not None:
+                saved_names.setdefault(row.normalized_name, name)
+        return _Resolver(rows, roots, aliases, own_names, saved_names)
 
     async def groups(
-        self, user_id: uuid.UUID, store_ids: Iterable[uuid.UUID | None]
+        self,
+        user_id: uuid.UUID,
+        store_ids: Iterable[uuid.UUID | None],
+        saved: dict[uuid.UUID, str | None] | None = None,
     ) -> dict[uuid.UUID, StoreGroup]:
-        """Each store's group as this user sees it. Unknown ids are left out."""
+        """Each store's group as this user sees it. Unknown ids are left out.
+        ``saved``: names the user saved for some stores (see ``_resolver``)."""
         ids = {i for i in store_ids if i is not None}
-        resolver = await self._resolver(user_id, ids)
+        resolver = await self._resolver(user_id, ids, saved)
         out: dict[uuid.UUID, StoreGroup] = {}
         for store_id in ids:
             group = resolver.group(store_id)
@@ -307,8 +345,11 @@ class StoreService:
                 UserStoreAlias.user_id == user_id,
                 UserStoreAlias.target_store_id == source.id,
             )
-            .values(target_store_id=target.id)
+            .values(target_store_id=target.id, target_name=target.name)
         )
+        # The user's names for both, kept on the merge: they outlive the
+        # user's receipts there, while the shared rows' names may be others'.
+        source_name = resolver.name(source)
         alias = await self.db.scalar(
             select(UserStoreAlias).where(
                 UserStoreAlias.user_id == user_id,
@@ -318,11 +359,17 @@ class StoreService:
         if alias is None:
             self.db.add(
                 UserStoreAlias(
-                    user_id=user_id, store_id=source.id, target_store_id=target.id
+                    user_id=user_id,
+                    store_id=source.id,
+                    target_store_id=target.id,
+                    store_name=source_name,
+                    target_name=target.name,
                 )
             )
         else:
             alias.target_store_id = target.id
+            alias.store_name = source_name
+            alias.target_name = target.name
         await self.db.flush()
 
     async def _lock_user(self, user_id: uuid.UUID) -> None:
