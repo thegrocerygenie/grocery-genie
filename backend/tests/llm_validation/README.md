@@ -110,7 +110,7 @@ GG_LLM_API_KEY=sk-... .venv/bin/pytest tests/llm_validation/ -v
 GG_LLM_API_KEY=sk-... .venv/bin/python -m tests.llm_validation.run extract --runs 5
 
 # Priority OCR (PREM-03 AC 6): the same set on the Premium extraction model.
-GG_LLM_API_KEY=sk-... GG_LLM_PREMIUM_EXTRACTION_MODEL=anthropic/claude-opus-5-5 \
+GG_LLM_API_KEY=sk-... GG_LLM_PREMIUM_EXTRACTION_MODEL=<the D9 model> \
   .venv/bin/python -m tests.llm_validation.run extract --premium
 ```
 
