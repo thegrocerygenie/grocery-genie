@@ -81,6 +81,7 @@ Set a budget. A user has at most one active budget per category (`null` = overal
 ```json
 { "category_id": "cat-uuid | null", "amount": 500.00, "period_type": "monthly", "period_start": "2026-03-01" }
 ```
+A deleted budget with the same category and `period_start` comes back as a new budget (`201`), with `rollover_enabled` false (V1.1).
 
 ### GET /api/budgets [MVP]
 The user's active budgets, overall first. Response: a list of `{ "id", "category_id", "amount", "period_type", "period_start", "rollover_enabled" }`.
@@ -93,21 +94,29 @@ Edit a budget; takes effect immediately. `period_start` is optional and moves th
 { "amount": 650.00, "period_start": "2026-03-15" }
 ```
 
+### PUT /api/budgets/{id}/rollover [V1.1, Premium]
+Turn rollover on or off for one budget (BC-FR Budget Management; rules in `07-data-model.md`, Budget rollover). Idempotent: turning it on again keeps the run. Returns the budget as in `GET /api/budgets`. A free user gets `403 premium_required` with `feature: "budget_rollover"`; an unknown or deleted budget, 404.
+
+**Request:**
+```json
+{ "enabled": true }
+```
+
 ### DELETE /api/budgets/{id} [MVP] · POST /api/budgets/{id}/restore [MVP]
 Soft-delete, and restore within 30 days. Restore returns 409 when the category already has another active budget.
 
 `category_id` on POST must be a default category or one of the user's own custom categories, or the call returns 400.
 
 ### GET /api/budgets/summary?period=2026-02 [MVP]
-Budget vs. actual for specified period.
+Budget vs. actual for specified period. `budget` is the period's limit: the amount plus `rolled_over`, what rolled over into it (V1.1, Premium rollover; 0 without it, and while Premium lapses). `remaining`, `percent` and threshold alerts use that limit. A future period shows the carry the current period would leave at today's spend.
 
 **Response:**
 ```json
 {
   "period": "2026-02",
-  "overall": { "budget": 500, "spent": 387.42, "remaining": 112.58, "percent": 77.5 },
+  "overall": { "budget": 500, "spent": 387.42, "remaining": 112.58, "percent": 77.5, "rolled_over": 0.0 },
   "categories": [
-    { "category_id": "uuid", "name": "Groceries", "budget": 300, "spent": 245.10, "percent": 81.7 }
+    { "category_id": "uuid", "name": "Groceries", "budget": 300, "spent": 245.10, "remaining": 54.90, "percent": 81.7, "rolled_over": 0.0 }
   ]
 }
 ```

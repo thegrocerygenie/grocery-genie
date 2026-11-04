@@ -144,10 +144,14 @@ class BudgetResponse(BaseModel):
 
 
 class BudgetOverallSummary(BaseModel):
+    # The period's limit: the amount plus what rolled over into it.
     budget: float
     spent: float
     remaining: float
     percent: float
+    # What rolled over from earlier periods (Premium rollover, V11-P3); 0
+    # without rollover. ``budget - rolled_over`` is the budget's own amount.
+    rolled_over: float = 0.0
 
 
 class BudgetUpdateRequest(BaseModel):
@@ -156,13 +160,21 @@ class BudgetUpdateRequest(BaseModel):
     period_start: date | None = None
 
 
+class BudgetRolloverRequest(BaseModel):
+    """PUT /api/budgets/{id}/rollover: carry unspent budget forward (Premium)."""
+
+    enabled: bool
+
+
 class BudgetCategorySummary(BaseModel):
     category_id: uuid.UUID
     name: str
+    # As in BudgetOverallSummary: the amount plus what rolled over.
     budget: float
     spent: float
     remaining: float
     percent: float
+    rolled_over: float = 0.0
 
 
 class BudgetSummaryResponse(BaseModel):

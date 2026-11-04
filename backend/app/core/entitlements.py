@@ -26,6 +26,7 @@ PREMIUM_REQUIRED = "premium_required"
 
 # Feature ids sent in a premium_required error, for the app's upgrade prompt.
 FEATURE_TREND_12_MONTHS = "trend_12_months"
+FEATURE_BUDGET_ROLLOVER = "budget_rollover"
 FEATURE_CUSTOM_CATEGORIES = "custom_categories"
 FEATURE_DATA_EXPORT = "data_export"
 FEATURE_UNLIMITED_RECEIPTS = "unlimited_receipts"

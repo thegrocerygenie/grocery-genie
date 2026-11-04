@@ -323,6 +323,13 @@ class Budget(Base):
     period_start: Mapped[date] = mapped_column(Date, nullable=False)
     period_type: Mapped[str] = mapped_column(String(20), default="monthly")
     rollover_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    # The current rollover run (Premium, V11-P3): a day in its first period,
+    # and what carries into that period. Every later carry is derived from
+    # these, the amount and the receipts (BudgetService.rollover_carry).
+    rollover_start: Mapped[date | None] = mapped_column(Date)
+    rollover_opening: Mapped[float] = mapped_column(
+        Numeric(12, 2), default=0, server_default=text("0"), nullable=False
+    )
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), index=True
     )

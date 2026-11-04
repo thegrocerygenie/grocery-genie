@@ -32,6 +32,17 @@ export async function updateBudget(
   });
 }
 
+/** Turn rollover on or off for one budget. Premium: a free user gets `403 premium_required`. */
+export async function setBudgetRollover(
+  budgetId: string,
+  enabled: boolean,
+): Promise<BudgetResponse> {
+  return apiClient<BudgetResponse>(`/api/budgets/${budgetId}/rollover`, {
+    method: 'PUT',
+    body: JSON.stringify({ enabled }),
+  });
+}
+
 /** How many months the dashboard trend covers (V1.1: 12 is Premium, D2). */
 export type TrendMonths = 3 | 12;
 

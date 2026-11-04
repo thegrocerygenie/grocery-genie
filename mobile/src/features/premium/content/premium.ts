@@ -2,8 +2,7 @@
  * User-facing strings for Premium (V11-P0): the paywall and the Settings row.
  * Externalized for i18n.
  *
- * The benefit list names only what Premium unlocks today (D2). Budget
- * rollover joins it when it ships.
+ * The benefit list names only what Premium unlocks today (D2).
  */
 export const PREMIUM_STRINGS = {
   /** The locale these strings are written in; dates on the paywall use it. */
@@ -24,6 +23,12 @@ export const PREMIUM_STRINGS = {
       symbol: 'tag.fill',
       title: 'Your own categories',
       detail: 'Add up to 10 categories for budgets and corrections, named your way.',
+    },
+    {
+      key: 'rollover',
+      symbol: 'arrow.uturn.forward',
+      title: 'Budget rollover',
+      detail: 'Carry what you didn’t spend this month into next month’s budget.',
     },
     {
       key: 'receipts',
