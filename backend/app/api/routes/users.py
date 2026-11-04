@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+from datetime import date
 from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -15,6 +16,7 @@ from app.core.entitlements import FEATURE_DATA_EXPORT, is_premium, require_premi
 from app.core.security import bearer_scheme, get_current_user
 from app.image.storage import LocalFileStorage
 from app.models.database import User
+from app.models.export import ExportSummary
 from app.models.schemas import (
     AiConsentGrantRequest,
     DeleteAccountRequest,
@@ -29,7 +31,13 @@ from app.services import account_service, ai_consent
 from app.services import auth as auth_service
 from app.services.analytics_service import AnalyticsService, get_analytics_service
 from app.services.budget_service import BudgetService
-from app.services.export_service import ExportFile, ExportFormat, ExportService
+from app.services.export_service import (
+    ExportFile,
+    ExportFormat,
+    ExportOptions,
+    ExportService,
+    parse_includes,
+)
 from app.services.premium_service import PremiumService
 from app.services.push_token_service import PushTokenService
 from app.services.revenuecat_client import (
@@ -304,27 +312,90 @@ async def delete_me(
             await auth_service.revoke_session(credentials.credentials)
 
 
+def _check_range(start: date | None, end: date | None) -> None:
+    if start is not None and end is not None and start > end:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "invalid_range", "message": "from is after to"},
+        )
+
+
+_FROM = Query(
+    default=None,
+    alias="from",
+    description="First day in the range (YYYY-MM-DD). Left out: no lower bound.",
+)
+_TO = Query(
+    default=None,
+    alias="to",
+    description="Last day in the range (YYYY-MM-DD). Left out: no upper bound.",
+)
+
+
+@router.get("/me/export/summary", response_model=ExportSummary)
+async def export_summary(
+    start: date | None = _FROM,
+    end: date | None = _TO,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User = Depends(require_premium(FEATURE_DATA_EXPORT)),
+) -> ExportSummary:
+    """How many receipts an export of the range holds (PREM-04 AC 4)."""
+    _check_range(start, end)
+    options = ExportOptions(start=start, end=end)
+    return ExportSummary(
+        receipt_count=await ExportService(db).count_receipts(user.id, options)
+    )
+
+
 @router.get("/me/export")
 async def export_data(
     fmt: ExportFormat = Query(
         default=ExportFormat.JSON,
         alias="format",
-        description="json: one document. csv: a zip of one CSV file per entity.",
+        description=(
+            "json: one document. csv: a zip of one CSV file per entity. "
+            "pdf: a spend report."
+        ),
+    ),
+    start: date | None = _FROM,
+    end: date | None = _TO,
+    include: str | None = Query(
+        default=None,
+        description=(
+            "Comma-separated sections: receipts, prices, budgets, images. "
+            "Left out: receipts,prices,budgets."
+        ),
     ),
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(require_premium(FEATURE_DATA_EXPORT)),
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> StreamingResponse:
-    """Download receipts, line items, budgets and prices (NFR Privacy 2).
+    """Download receipts, line items, categories, budgets and prices (NFR
+    Privacy 2), for a range and chosen sections (PREM-04).
 
     Premium (D2). The file is built from batched reads into a spooled
     temporary file, then streamed, so a large account stays bounded in memory.
     """
-    export = await ExportService(db).build(user, fmt)
+    _check_range(start, end)
+    try:
+        includes = parse_includes(include)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=422, detail={"code": "invalid_include", "message": str(e)}
+        ) from e
+    options = ExportOptions(fmt=fmt, start=start, end=end, includes=includes)
+    storage = LocalFileStorage(get_settings().storage_path)
+    export = await ExportService(db, storage=storage).build(user, options)
     try:
         analytics.emit(
             "data_exported",
-            {"format": fmt.value, **export.counts.model_dump()},
+            {
+                "format": fmt.value,
+                "from": start.isoformat() if start else None,
+                "to": end.isoformat() if end else None,
+                "includes": options.include_names,
+                **export.counts.model_dump(),
+            },
             user.id,
         )
     except BaseException:

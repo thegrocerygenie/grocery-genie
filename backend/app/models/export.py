@@ -1,4 +1,5 @@
-"""Rows of the data export (NFR Privacy 2, V11-P2): one model per entity.
+"""Rows of the data export (NFR Privacy 2, V11-P2; options PREM-04): one
+model per entity.
 
 The JSON export writes these as they are; the CSV files use the same fields,
 in the same order, one file per entity (line items carry ``receipt_id``).
@@ -44,6 +45,14 @@ class ExportReceiptWithLines(ExportReceipt):
     line_items: list[ExportLineItem]
 
 
+class ExportCategory(BaseModel):
+    """A category the user can use: built-in (``is_default``) or their own."""
+
+    id: uuid.UUID
+    name: str
+    is_default: bool
+
+
 class ExportBudget(BaseModel):
     id: uuid.UUID
     # None: the overall budget.
@@ -77,4 +86,15 @@ class ExportCounts(BaseModel):
     receipt_count: int = 0
     line_item_count: int = 0
     budget_count: int = 0
+    category_count: int = 0
     price_observation_count: int = 0
+    # Receipt images (PREM-04 AC 3): in the zip, and receipts with none
+    # (entered by hand, or the image is no longer stored).
+    image_count: int = 0
+    images_left_out: int = 0
+
+
+class ExportSummary(BaseModel):
+    """``GET /api/users/me/export/summary``: what "Export N receipts" counts."""
+
+    receipt_count: int
