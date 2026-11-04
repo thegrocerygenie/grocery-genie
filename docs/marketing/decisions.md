@@ -12,6 +12,9 @@ Standing decisions for the marketing site. The `marketing-site-brief` skill read
 | 6 | 2026-11-03 | MVP | **Launch date: Q4 2026**, on iPhone. Replaces the old site's "Q3 2026". | Active |
 | 7 | 2026-11-03 | MVP | **Matching waitlist sign-ups to app accounts for the free Premium year (#2) is automatic:** the waitlist email (the Resend audience) against the account's email. The to-do list is in `docs/launch-open-items.md` §6. | Active; build by V1.1 |
 | 8 | 2026-11-03 | MVP | **The privacy line rests on Anthropic's standard Commercial Terms.** We use the regular Anthropic API, so no separate agreement or review with Anthropic is needed. The terms say "Anthropic may not train models on Customer Content from Services". Rerun the check if the provider or the agreement changes. | Active |
+| 9 | 2026-11-04 | V1.1 | **Free Premium year: who counts and when.** (a) Waitlist contacts created before the site switches to the App Store (`PUBLIC_LAUNCH_STATE=b`) qualify; record that date here when it happens. (b) They can claim it for 90 days after Premium launches, by creating or matching an account with the waitlist email, or through the claim step. (c) Each free year runs 12 months from the day that person's account is matched. | Active |
+| 10 | 2026-11-04 | V1.1 | **Unsubscribes keep the free year.** Unsubscribing (Resend's link, or replying "unsubscribe") stops waitlist emails only; the contact stays, flagged, so the account can still be matched. A request to delete the email removes the contact and gives up the offer. The welcome email says both. | Active |
+| 11 | 2026-11-04 | V1.1 | **Waitlist retention:** delete the whole waitlist (the Resend audience) 90 days after Premium launches, when the claim window (#9) closes, or a contact sooner if they ask. The record of who got the free year lives with their account. `privacy.ts` says this under "How long we keep it". | Active |
 
 ## Open
 

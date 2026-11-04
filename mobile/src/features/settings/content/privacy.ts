@@ -23,7 +23,7 @@ export const PRIVACY_POLICY: {
 } = {
   reviewed: false,
   effective: 'October 27, 2026',
-  updated: 'November 3, 2026',
+  updated: 'November 4, 2026',
   sections: [
     {
       heading: 'Who we are',
@@ -38,7 +38,7 @@ export const PRIVACY_POLICY: {
         'Your receipts: the photos and files you scan or import, and what we read from them: store, date, items, quantities, prices, tax, totals and currency. We keep the corrections you make and the categories you choose, so the app can learn your items.',
         'Your settings: budgets, category caps, alert and weekly summary choices, receipt languages, and your device’s notification token. Budget alerts and the weekly summary are on by default; you can turn them off in Settings → Alerts.',
         'Security and app activity: the time, IP address and device details of sign-ins and failed attempts, to protect your account; and basic events about how you use the app (for example, that a scan started or was confirmed), to fix and improve it. These stay with us and our hosting providers.',
-        'Our waitlist: if you joined the waitlist on our website, we keep that email address. When Premium launches, we compare it with the email address on your account to find you and give you the free year of Premium we offered waitlist members.',
+        'Our waitlist: if you joined the waitlist on our website, we keep that email address. When Premium launches, we compare it with the email address on your account to find you and give you the free year of Premium we offered waitlist members. Unsubscribing stops our emails but keeps your address for the offer; if you ask us to delete it, you give up the free year.',
       ],
     },
     {
@@ -70,6 +70,7 @@ export const PRIVACY_POLICY: {
         'Your account and receipts: until you delete them.',
         'Receipts and budgets you delete: you can restore them from Settings → Recently deleted for 30 days. After that they are permanently erased, including receipt images.',
         'Sign-in security records: up to 12 months. App activity events: up to 13 months.',
+        'Waitlist email addresses: until 90 days after Premium launches, when the free-year offer closes, or sooner if you ask us to delete yours.',
         'Server logs: each part of our service keeps about 50 MB of logs, and the oldest lines are deleted as new ones arrive. Logs are never archived, and older log files are deleted after 30 days.',
       ],
     },

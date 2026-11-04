@@ -126,6 +126,10 @@ test('accepts v5 slot sources (mid, final) in welcome email tag', async () => {
     assert(!/brooklyn/i.test(sent.text), 'welcome text must not name a location');
     assert(/same email/i.test(sent.text) && /free year of Premium/i.test(sent.text),
       'welcome text says the waitlist email is matched to the app account for the free Premium year');
+    assert(/stop emailing you/i.test(sent.text) && !/remove you/i.test(sent.text),
+      'unsubscribing stops emails but keeps the free year (decisions #10)');
+    assert(/"delete"/.test(sent.text) && /gives up the free year/i.test(sent.text),
+      'welcome text says how to have the email deleted, and that it gives up the offer');
   }
 });
 
