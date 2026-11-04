@@ -157,7 +157,7 @@ A pass covers the model within its bounds, not the whole system.
 
 ## Coverage record
 
-Sync commit: `d2e32f9`
+Sync commit: `e44b52c`
 
 The verification was last confirmed to describe these files and functions at the sync commit. `run.sh` reads this table and the sync commit.
 
@@ -165,7 +165,7 @@ The verification was last confirmed to describe these files and functions at the
 | --- | --- | --- |
 | `backend/app/core/dependencies.py` | `get_db`, `engine` (no isolation level) | `ConfirmAlerts`: `Commit`, `Abort` |
 | `backend/app/services/receipt_service.py` | `confirm_receipt`, `update_receipt` (date and status branches: the date is set before the status branch, in the same transaction; an already confirmed receipt is not confirmed again and cannot leave `confirmed` (422), an edit to one flushes, then runs `_alert_on_thresholds`, and every edit alerts in the periods `_retroactive_category_update` changed), `create_manual_receipt`, `_after_confirm` and `_alert_on_thresholds` (every alert path shares them); watched, not modeled: `_record_prices` (before the budget check) and `_alert_on_price_changes` (after it; see Scope) | `ConfirmAlerts`: `Flush` |
-| `backend/app/services/budget_service.py` | `check_thresholds` (budget row lock, taken once for every period it checks), `get_spending_by_category`, `_active_thresholds`, `claim_alert`; watched, not modeled: `get_period_containing` (picks the period whose spend `Read` sums; the model holds one period), `save_budget`, `update_budget`, `restore_budget` (they write budget rows the `Read` step locks); rollover (V11-P3): `rollover_carries`, `_carries`, `_spend_by_period` (the limit, read in `_period_breaches` under the lock) and the `earliest_past` branch of `check_thresholds` are modeled; `set_rollover`, `_restart_rollover`, `restart_rollovers`, `_running_budgets` are watched | `ConfirmAlerts`: `Read`, `Claim`, `Limit`, `Checks` |
+| `backend/app/services/budget_service.py` | `check_thresholds` (budget row lock, taken once for every period it checks), `get_spending_by_category`, `_active_thresholds`, `claim_alert`; watched, not modeled: `get_period_containing` (picks the period whose spend `Read` sums; the model holds one period), `save_budget`, `update_budget`, `restore_budget` (they write budget rows the `Read` step locks); rollover (V11-P3): `rollover_carries`, `_carries`, `_spend_by_period` (the limit, read in `_period_breaches` under the lock) and the `earliest_past` branch of `check_thresholds` are modeled; `set_rollover`, `_restart_rollover`, `restart_rollovers`, `_running_budgets`, `_carry_now`, `_rollover_after_restore`, `_today` (the user's local date that picks the period a rollover change restarts in; a plain read, no lock) and the revive branch of `save_budget` (resets the run) are watched | `ConfirmAlerts`: `Read`, `Claim`, `Limit`, `Checks` |
 | `backend/app/services/notification_service.py` | `create_notification` | `ConfirmAlerts`: `Claim` |
 | `backend/app/services/category_service.py` | watched, not modeled: `_lock_user`, `ensure_usable`, `usable_custom` (the user row lock taken before the budget locks), `delete` (locks the category's budgets in id order, then deletes them and their `budget_alerts_sent` rows; see Scope) | none |
 | `backend/app/services/price_alert_service.py` | watched, not modeled: `detect`, `claim` (the second `notifications` writer and its ledger lock order; see Scope) | none |
