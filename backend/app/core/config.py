@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     # Claude Sonnet 5.5 has no dated snapshot ID: "claude-sonnet-5-5" is its
     # full ID. Each receipt records the model that read it (extraction_model).
     llm_model: str = "claude-sonnet-5-5"
+    # Priority OCR (PREM-03): the extraction model for Premium users' scans, as
+    # a LiteLLM model name. "provider/model" is sent as is; a bare name gets
+    # llm_provider, like llm_model. It shares the key, base URL, timeout and
+    # max_tokens above, and is sent no temperature. Empty: Premium scans use
+    # llm_model. The proposed value and its cost are in docs/DEPLOYMENT.md.
+    llm_premium_extraction_model: str = ""
     # Sent only when set. Claude Sonnet 5.5 rejects any non-default value, so
     # leave it unset for that model; set it for a model that accepts it.
     llm_temperature: float | None = None

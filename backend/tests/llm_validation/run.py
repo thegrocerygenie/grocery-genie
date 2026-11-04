@@ -12,6 +12,9 @@ python -m tests.llm_validation.run extract [--runs 5] [--only ID ...]
     Extract every paired receipt (paid API calls), score it, print the
     metrics against the targets and save a JSON report in reports/.
     --runs N repeats each receipt N times to measure consistency.
+    --premium runs the Premium extraction model (Priority OCR, PREM-03:
+    GG_LLM_PREMIUM_EXTRACTION_MODEL) instead of the default one.
+    The report records the mean tokens per scan, for its cost.
     Exits 1 when a target is missed.
 """
 
@@ -78,11 +81,34 @@ def cmd_template(args: argparse.Namespace) -> int:
     return 0
 
 
-async def _extract(args: argparse.Namespace) -> dict:
-    from app.llm.prompts.receipt_extraction import PROMPT_VERSION
+def build_extractor(settings, premium: bool):
+    """The extractor a scan uses: the default model, or the Premium one."""
     from app.llm.provider import LiteLLMReceiptExtractor
 
-    extractor = LiteLLMReceiptExtractor(get_settings())
+    if premium:
+        return LiteLLMReceiptExtractor(
+            settings, model=settings.llm_premium_extraction_model
+        )
+    return LiteLLMReceiptExtractor(settings)
+
+
+def mean_tokens(usages: list[tuple[int | None, int | None] | None]) -> dict:
+    """Mean input and output tokens per call, over the calls that report them."""
+    known = [u for u in usages if u and u[0] is not None and u[1] is not None]
+    if not known:
+        return {"calls": 0, "input": None, "output": None}
+    return {
+        "calls": len(known),
+        "input": round(sum(u[0] for u in known) / len(known)),
+        "output": round(sum(u[1] for u in known) / len(known)),
+    }
+
+
+async def _extract(args: argparse.Namespace) -> dict:
+    from app.llm.prompts.receipt_extraction import PROMPT_VERSION
+
+    extractor = build_extractor(get_settings(), args.premium)
+    usages: list = []
     fixtures = harness.load_test_set().scored
     if args.only:
         fixtures = [f for f in fixtures if f.receipt_id in set(args.only)]
@@ -92,9 +118,11 @@ async def _extract(args: argparse.Namespace) -> dict:
     loose_consistent = 0
     inconsistent: list[str] = []
     for fixture in fixtures:
-        runs = [
-            await harness.extract_fixture(extractor, fixture) for _ in range(args.runs)
-        ]
+        runs = []
+        for _ in range(args.runs):
+            extractor.last_usage = None
+            runs.append(await harness.extract_fixture(extractor, fixture))
+            usages.append(extractor.last_usage)
         # Accuracy uses the first run, as one scan would.
         score = harness.score_extraction(runs[0])
         scores.append(score)
@@ -115,6 +143,9 @@ async def _extract(args: argparse.Namespace) -> dict:
         "run_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "prompt_version": PROMPT_VERSION,
         "model": extractor.model_name,
+        "tier": "priority" if args.premium else "standard",
+        # Price it with the provider's per-token rates (docs/DEPLOYMENT.md).
+        "tokens_per_scan": mean_tokens(usages),
         "runs_per_receipt": args.runs,
         "subset": sorted(args.only) if args.only else None,
         "coverage_gaps": harness.coverage_gaps(harness.load_test_set()),
@@ -176,6 +207,9 @@ def cmd_extract(args: argparse.Namespace) -> int:
     if not get_settings().llm_api_key:
         print("GG_LLM_API_KEY is not set (environment or backend/.env).")
         return 2
+    if args.premium and not get_settings().llm_premium_extraction_model:
+        print("GG_LLM_PREMIUM_EXTRACTION_MODEL is not set (environment or .env).")
+        return 2
     if not harness.load_test_set().scored:
         print("No paired receipts. Run `check` to see what's missing.")
         return 2
@@ -183,6 +217,9 @@ def cmd_extract(args: argparse.Namespace) -> int:
     report = asyncio.run(_extract(args))
     rows = _targets(report)
     print(f"\nPrompt {report['prompt_version']}, model {report['model']}")
+    tokens = report["tokens_per_scan"]
+    if tokens["calls"]:
+        print(f"  tokens per scan: {tokens['input']} in, {tokens['output']} out")
     for name, value, ok in rows:
         print(f"  {'PASS' if ok else 'FAIL'}  {name:<20} {value}")
     for lang, m in report["by_language"].items():
@@ -198,7 +235,9 @@ def cmd_extract(args: argparse.Namespace) -> int:
 
     out: Path = args.out or harness.REPORTS_DIR / (
         datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        + f"_{report['prompt_version']}.json"
+        + f"_{report['prompt_version']}"
+        + ("_premium" if args.premium else "")
+        + ".json"
     )
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
@@ -223,6 +262,9 @@ def main(argv: list[str] | None = None) -> int:
     extract.add_argument("--runs", type=int, default=1)
     extract.add_argument("--only", nargs="+", metavar="ID")
     extract.add_argument("--out", type=Path)
+    extract.add_argument(
+        "--premium", action="store_true", help="use the Premium extraction model"
+    )
     extract.set_defaults(func=cmd_extract)
 
     args = parser.parse_args(argv)
