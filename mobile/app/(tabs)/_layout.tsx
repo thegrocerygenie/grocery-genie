@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, type } from '@/constants/theme';
 import { useReduceTransparency } from '@/hooks/useAccessibilitySetting';
 import { useTimeZoneSync } from '@/hooks/useTimeZoneSync';
+import { useAuthStore } from '@/store/authStore';
 import type { BottomTabBarProps, BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 
 interface TabDef {
@@ -26,6 +27,14 @@ const TABS: TabDef[] = [
 const TAB_LABEL_MAX_FONT_SCALE = 1.3;
 
 export default function TabsLayout() {
+  const signedIn = useAuthStore((s) => !!s.accessToken);
+  // The root layout keeps the tabs under any screen the app starts on, a
+  // signed-out email link included. Render nothing until someone signs in,
+  // so no tab calls the API without a token.
+  return signedIn ? <SignedInTabs /> : null;
+}
+
+function SignedInTabs() {
   // Signed in from here: keep the profile's time zone on the iPhone's (BC-06).
   useTimeZoneSync();
   return (

@@ -2,8 +2,8 @@
  * User-facing strings for Premium (V11-P0): the paywall and the Settings row.
  * Externalized for i18n.
  *
- * The benefit list names only what Premium unlocks today (D2). Data export
- * and budget rollover join it as they ship.
+ * The benefit list names only what Premium unlocks today (D2). Budget
+ * rollover joins it when it ships.
  */
 export const PREMIUM_STRINGS = {
   /** The locale these strings are written in; dates on the paywall use it. */
@@ -30,6 +30,12 @@ export const PREMIUM_STRINGS = {
       symbol: 'infinity',
       title: 'Unlimited receipts',
       detail: 'Scan every trip. The free plan stops at 20 receipts a month.',
+    },
+    {
+      key: 'export',
+      symbol: 'square.and.arrow.up',
+      title: 'Export your data',
+      detail: 'Download your receipts, budgets and prices as JSON or CSV.',
     },
   ],
   staysFree: 'Price history, price alerts and store comparison stay free.',

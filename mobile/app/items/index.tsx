@@ -1,14 +1,24 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { Stack, useRouter } from 'expo-router';
 
 import { LoadErrorState } from '@/components/LoadErrorState';
-import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
+import { colors, fontScale, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { PRICES_COPY } from '@/features/price-intelligence/constants';
 import { useItems } from '@/features/price-intelligence/hooks/useItems';
 import type { ItemSummary } from '@/features/price-intelligence/types';
 import { formatUnitPrice } from '@/features/price-intelligence/utils/priceTrend';
+import { headerBlurFor } from '@/utils/headerBlur';
 
 /**
  * PI-01: every item the user has bought, most recent first, with its latest
@@ -26,7 +36,8 @@ export default function PricesScreen() {
         title: PRICES_COPY.listTitle,
         headerBackTitle: 'Budget',
         headerLargeTitle: true,
-        headerBlurEffect: 'systemChromeMaterial',
+        // iOS 26+ draws its own glass here; a blur on top hides the large title (BUG-5).
+        headerBlurEffect: headerBlurFor(Platform.Version),
         headerSearchBarOptions: {
           placeholder: PRICES_COPY.searchPlaceholder,
           onChangeText: (e) => setQuery(e.nativeEvent.text),
@@ -118,6 +129,14 @@ function ItemRow({ item, first, last, onPress }: ItemRowProps) {
     ? formatUnitPrice(latest.unit_price, latest.currency, latest.unit_of_measure)
     : '';
   const counts = PRICES_COPY.priceCount(item.observation_count, item.store_count);
+  // At accessibility sizes the name, counts and price do not fit side by side:
+  // the price moves under the counts and the name may wrap (BUG-3).
+  const stacked = useWindowDimensions().fontScale >= fontScale.accessibility;
+  const priceText = (
+    <Text style={styles.price} testID={`item-price-${item.id}`}>
+      {price}
+    </Text>
+  );
   return (
     <Pressable
       onPress={onPress}
@@ -131,13 +150,18 @@ function ItemRow({ item, first, last, onPress }: ItemRowProps) {
       accessibilityRole="button"
       accessibilityLabel={`${item.canonical_name}, ${price}, ${counts}`}
     >
-      <View style={styles.rowText}>
-        <Text style={type.body} numberOfLines={1}>
+      <View style={styles.rowText} testID={`item-text-${item.id}`}>
+        <Text
+          style={type.body}
+          numberOfLines={stacked ? undefined : 1}
+          testID={`item-name-${item.id}`}
+        >
           {item.canonical_name}
         </Text>
         <Text style={styles.caption}>{counts}</Text>
+        {stacked ? priceText : null}
       </View>
-      <Text style={styles.price}>{price}</Text>
+      {stacked ? null : priceText}
       <SymbolView name="chevron.right" size={13} tintColor={colors.iosLabel3} />
     </Pressable>
   );

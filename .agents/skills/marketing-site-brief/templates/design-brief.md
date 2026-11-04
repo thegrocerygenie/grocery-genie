@@ -13,6 +13,7 @@ The page has a single goal and one call to action, repeated after the hero, afte
 | Goal | | |
 | Main control | | |
 | Line under the button | {platform · price · incentive} | |
+| Note under the form | {what the email is used for, matching `privacy.ts`; keep any existing disclosure} | |
 | After the action | | |
 | Pill at the top of the page | | |
 

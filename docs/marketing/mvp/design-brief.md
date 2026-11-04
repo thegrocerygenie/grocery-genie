@@ -12,6 +12,7 @@ The page has a single goal and one call to action, repeated after the hero, afte
 | Goal | Waitlist sign-ups | App Store downloads |
 | Main control | Email field + **Get early access** button | Apple's official "Download on the App Store" badge, used unaltered |
 | Line under the button | iPhone · Free · A free year of Premium for early sign-ups | Free on iPhone |
+| Note under the form | "We'll email you once, at launch. Sign up in the app with this same email and we'll match it to your account for the free Premium year." (the privacy disclosure for waitlist matching; keep it) | (none) |
 | After sign-up | "You're in. We'll email you once, at launch." | (none) |
 | Pill at the top of the page | Coming Q4 2026 · iPhone | New · Now on the App Store |
 

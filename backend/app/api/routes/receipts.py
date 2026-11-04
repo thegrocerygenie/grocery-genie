@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.dependencies import get_db
-from app.core.entitlements import is_premium
+from app.core.entitlements import is_premium, receipt_quota_exceeded
 from app.core.money import format_money
 from app.core.retention import days_remaining
 from app.core.security import get_current_user
@@ -114,7 +114,7 @@ async def scan_receipt(
     extractor: ReceiptExtractor = Depends(get_receipt_extractor),
     category_assigner: CategoryAssigner = Depends(get_category_assigner),
     analytics: AnalyticsService = Depends(get_analytics_service),
-) -> ReceiptScanResponse:
+) -> ReceiptScanResponse | Response:
     # An unrecognised source must never block a scan — fall back to "camera".
     scan_source = source if source in SCAN_SOURCES else "camera"
     analytics.emit("receipt_scan_started", {"source": scan_source}, user.id)
@@ -128,14 +128,7 @@ async def scan_receipt(
             user.id, datetime.now(UTC)
         )
         if scanned_this_month >= settings.free_tier_receipts_per_month:
-            limit = settings.free_tier_receipts_per_month
-            raise HTTPException(
-                status_code=429,
-                detail=(
-                    f"Monthly receipt quota exceeded "
-                    f"({limit} receipts/month on Free tier)."
-                ),
-            )
+            return receipt_quota_exceeded(settings.free_tier_receipts_per_month)
 
     # Validate content type
     if file.content_type not in ALLOWED_CONTENT_TYPES:

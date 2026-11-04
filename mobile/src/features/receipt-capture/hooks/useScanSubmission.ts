@@ -13,6 +13,7 @@ import { useReceiptStore } from '@/store/receiptStore';
 import { isRetryableScanError } from '../services/offlineQueue';
 import { persistCapturedImage } from '../services/pendingImageFiles';
 import { scanErrorHint } from '../utils/scanErrorHint';
+import { isQuotaExceededError, showQuotaUpgradePrompt } from '../utils/scanQuota';
 import { useReceiptScan } from './useReceiptScan';
 
 export type ScanFlowState = 'ready' | 'capturing' | 'processing' | 'low-quality' | 'queued';
@@ -128,6 +129,13 @@ export function useScanSubmission({ askingConsent, onConsentRequired }: Options)
             // Show the consent screen in place of the camera.
             setFlowState('ready');
             onConsentRequired();
+          } else if (isQuotaExceededError(error)) {
+            // D2: the cap is an invitation to Premium, not a failed capture.
+            setFlowState('ready');
+            showQuotaUpgradePrompt({
+              onUpgrade: () => router.push('/paywall'),
+              onManualEntry: () => router.push('/manual-entry'),
+            });
           } else if (isRetryableScanError(error)) {
             queuePhoto(uri, mimeType);
           } else {

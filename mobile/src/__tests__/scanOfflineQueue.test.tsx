@@ -3,6 +3,7 @@
  * device, not lost, and uploads later from the sync queue.
  */
 import React from 'react';
+import { Alert } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
@@ -12,6 +13,11 @@ import { useAuthStore } from '@/store/authStore';
 import { persistCapturedImage } from '@/features/receipt-capture/services/pendingImageFiles';
 import { useOfflineStore } from '@/store/offlineStore';
 import { fakeAccessToken } from '@/testing/jwt';
+import {
+  QUOTA_ACTIONS,
+  QUOTA_MESSAGE,
+  QUOTA_TITLE,
+} from '@/features/receipt-capture/utils/scanQuota';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('@/features/ai-consent/hooks/useAiConsent', () =>
@@ -129,18 +135,34 @@ describe('Scan queues receipts it cannot upload', () => {
     expect(useOfflineStore.getState().pendingReceipts).toHaveLength(0);
   });
 
-  it('does not queue a photo over the monthly quota, and says the limit is reached', async () => {
+  it('does not queue a photo over the monthly quota, and invites an upgrade (D2)', async () => {
     online(true);
     mockScanError = new ApiError(429, {
       detail: 'Monthly receipt quota exceeded (20 receipts/month on Free tier).',
+      code: 'receipt_quota_exceeded',
+      feature: 'unlimited_receipts',
+      limit: 20,
     });
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     render(<ScanScreen />);
 
     fireEvent.press(screen.getByLabelText('Capture receipt'));
 
-    await waitFor(() => expect(screen.getByText('Monthly scan limit reached')).toBeTruthy());
+    await waitFor(() => expect(alert).toHaveBeenCalled());
+    const [title, message, buttons] = alert.mock.calls[0];
+    expect(title).toBe(QUOTA_TITLE);
+    expect(message).toBe(QUOTA_MESSAGE);
+    // An invitation, not an error: the camera shows no failure hint.
+    expect(screen.queryByText('Monthly scan limit reached')).toBeNull();
+    expect(screen.queryByText('Couldn’t read that — try again')).toBeNull();
     expect(screen.queryByText('Saved · will upload automatically')).toBeNull();
     expect(useOfflineStore.getState().pendingReceipts).toHaveLength(0);
+
+    buttons!.find((b) => b.text === QUOTA_ACTIONS.upgrade)!.onPress!();
+    expect(mockPush).toHaveBeenCalledWith('/paywall');
+    buttons!.find((b) => b.text === QUOTA_ACTIONS.manual)!.onPress!();
+    expect(mockPush).toHaveBeenCalledWith('/manual-entry');
+    alert.mockRestore();
   });
 
   it('opens review when online and the scan succeeds', async () => {

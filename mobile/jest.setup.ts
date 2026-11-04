@@ -6,6 +6,14 @@ jest.mock('@/hooks/useBudgetCurrency', () => ({
   useBudgetCurrency: jest.fn(() => 'USD'),
 }));
 
+// Premium as the backend profile says (useMe), read by History for a capped
+// queued photo. Same reason as above: screen tests render without a
+// QueryClient, so they get a free user; a test that checks Premium mocks it.
+jest.mock('@/features/premium/hooks/usePremium', () => ({
+  ...jest.requireActual('@/features/premium/hooks/usePremium'),
+  useIsPremium: jest.fn(() => false),
+}));
+
 // Profile writes from a layout; the hook has its own test (jest.unmock there).
 jest.mock('@/hooks/useTimeZoneSync', () => ({ useTimeZoneSync: jest.fn() }));
 

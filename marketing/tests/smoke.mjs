@@ -124,6 +124,8 @@ test('accepts v5 slot sources (mid, final) in welcome email tag', async () => {
     const sent = JSON.parse(email.init.body);
     assert(sent.tags.some((t) => t.name === 'source' && t.value === source), `source tag ${source}`);
     assert(!/brooklyn/i.test(sent.text), 'welcome text must not name a location');
+    assert(/same email/i.test(sent.text) && /free year of Premium/i.test(sent.text),
+      'welcome text says the waitlist email is matched to the app account for the free Premium year');
   }
 });
 

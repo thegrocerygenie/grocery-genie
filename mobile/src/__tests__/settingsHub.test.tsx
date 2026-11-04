@@ -61,6 +61,7 @@ function renderSettings() {
       'settings/privacy': () => null,
       'settings/help': () => null,
       'settings/delete-account': () => null,
+      'settings/export-data': () => null,
       'settings/currency-settings': () => null,
       'settings/categories': () => null,
       paywall: () => null,
@@ -157,6 +158,7 @@ describe('Settings hub', () => {
     ['Privacy', '/settings/privacy'],
     ['Help & feedback', '/settings/help'],
     ['Delete account', '/settings/delete-account'],
+    ['Export data', '/settings/export-data'],
   ])('opens %s in the app', (label, path) => {
     const routerScreen = renderSettings();
 

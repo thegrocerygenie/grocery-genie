@@ -16,6 +16,7 @@ from datetime import UTC
 from typing import Annotated
 
 from fastapi import Depends, HTTPException
+from fastapi.responses import JSONResponse
 
 from app.core import clock
 from app.core.security import get_current_user
@@ -26,6 +27,13 @@ PREMIUM_REQUIRED = "premium_required"
 # Feature ids sent in a premium_required error, for the app's upgrade prompt.
 FEATURE_TREND_12_MONTHS = "trend_12_months"
 FEATURE_CUSTOM_CATEGORIES = "custom_categories"
+FEATURE_DATA_EXPORT = "data_export"
+FEATURE_UNLIMITED_RECEIPTS = "unlimited_receipts"
+
+# The free tier's monthly receipt cap. Not premium_required: the scan is not a
+# Premium feature, the month's allowance is spent. The app still answers it
+# with the upgrade prompt, because Premium lifts the cap.
+RECEIPT_QUOTA_EXCEEDED = "receipt_quota_exceeded"
 
 
 def is_premium(user: User) -> bool:
@@ -75,3 +83,23 @@ def require_premium(feature: str) -> Callable[..., Awaitable[User]]:
         return user
 
     return dependency
+
+
+def receipt_quota_exceeded(limit: int) -> JSONResponse:
+    """The ``429`` for a free user's scan past the monthly cap.
+
+    ``detail`` keeps the string the MVP app already matches on ("quota"), so
+    builds in the field keep treating it as the cap, not as a retryable rate
+    limit; ``code`` and ``feature`` are what newer builds read.
+    """
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": (
+                f"Monthly receipt quota exceeded ({limit} receipts/month on Free tier)."
+            ),
+            "code": RECEIPT_QUOTA_EXCEEDED,
+            "feature": FEATURE_UNLIMITED_RECEIPTS,
+            "limit": limit,
+        },
+    )
