@@ -24,14 +24,3 @@ export function budgetPace(spent: number, cap: number, monthShare: number): Budg
   // A sliver over that rounds to 0% reads as on pace, not "ahead · 0% over".
   return { ahead: ratio > 1 && percent > 0, percent };
 }
-
-/** The share of a "YYYY-MM" period gone by `today`, counting today as gone. */
-export function monthShareElapsed(period: string, today: Date = new Date()): number {
-  const [year, month] = period.split('-').map(Number);
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const current = today.getFullYear() * 12 + today.getMonth();
-  const target = year * 12 + (month - 1);
-  if (target < current) return 1;
-  if (target > current) return 0;
-  return today.getDate() / daysInMonth;
-}

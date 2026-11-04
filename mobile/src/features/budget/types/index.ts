@@ -52,6 +52,12 @@ export interface DashboardCategoryChange {
 
 export interface DashboardData {
   period: string;
+  /**
+   * First and last day of `period` ("YYYY-MM-DD"), from the overall budget's
+   * reset day. Absent from servers older than the reset-day fix.
+   */
+  period_start?: string;
+  period_end?: string;
   overall: {
     budget: number;
     spent: number;
