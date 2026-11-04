@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Grocery Genie · V1 Screens (MVP + V1.1 + V1.5)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens-v2.css" />
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+  .v1-narrative { font-size: 13px; color: var(--ios-label-2); max-width: 720px; line-height: 1.5; padding: 0 4px 8px; }
+  .v1-narrative strong { color: var(--ios-label); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="components-v2/primitives.jsx"></script>
+<script type="text/babel" src="components-v2/patterns.jsx"></script>
+<script type="text/babel" src="components-v2/phone-shell.jsx"></script>
+<script type="text/babel" src="components-v2/roadmap-shell.jsx"></script>
+<script type="text/babel" src="components-v2/mvp-screens.jsx"></script>
+<script type="text/babel" src="components-v2/v1-mvp-gap.jsx"></script>
+<script type="text/babel" src="components-v2/roadmap-v11.jsx"></script>
+<script type="text/babel" src="components-v2/v1-pi-gap.jsx"></script>
+<script type="text/babel" src="components-v2/roadmap-v15.jsx"></script>
+<script type="text/babel" src="components-v2/v15-hh-gap.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const M = window.MVPScreens;
+const G = window.MVPGap;
+const PI = window.PIGap;
+const HH = window.HHGap;
+
+function Note({ children }) { return <div className="v1-narrative">{children}</div>; }
+
+function App() {
+  return (
+    <DesignCanvas>
+      {/* ── MVP ──────────────────────────────────────────────── */}
+      <DCSection id="mvp-onboarding" title="MVP · Onboarding & Auth" subtitle="First-run flow: welcome → sign up → verify → budget → camera">
+        <DCArtboard id="mvp-onb-flow" label="The happy-path first-run flow, left to right" width={1660} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>The full first-run flow in order: <strong>Welcome → Sign up → Verify email → Set first budget → Camera permission</strong>. Tapping <strong>Get Started</strong> on welcome enters sign-up; once verified, the user lands in budget setup, then the camera prompt. Permission denial routes to the recovery state in <strong>MVP · Scan & errors</strong>.</Note>
+            <window.OnboardingFlow />
+          </div>
+        </DCArtboard>
+        <DCArtboard id="mvp-auth-alt" label="Returning users + recovery branches" width={1020} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>Side branches off the welcome screen: <strong>Sign in</strong> for returning users (reached via "I already have an account"), <strong>Forgot password</strong> from the sign-in screen, and the <strong>wrong-password error</strong> state.</Note>
+            <window.AuthAlternates />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="mvp-dashboard" title="MVP · Dashboard" subtitle="The budget ring · empty / on-track / over">
+        <DCArtboard id="mvp-dash" label="Three states of the dashboard" width={1020} height={760}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>Day-zero empty state · mid-month on-track · end-of-month over-budget. The ring colour shifts red and a banner appears once any cap is breached.</Note>
+            <M.SectionDashboard />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="mvp-analyses" title="MVP · Spending insights" subtitle="Top items, trends, category corrections">
+        <DCArtboard id="mvp-analyses" label="Drill-downs from the dashboard" width={1340} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>Tapping <strong>By Category</strong> opens top items. <strong>Trend</strong> is reachable from the toolbar; the per-item sheet lets users reclassify mis-categorised purchases.</Note>
+            <G.SectionMVPGap />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="mvp-scan" title="MVP · Scan & errors" subtitle="Capture · processing · validation · permissions">
+        <DCArtboard id="mvp-scan-flow" label="The capture flow + error states" width={1340} height={760}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>Auto-detect, processing, blurry-image warning, denied-camera recovery. Library / files / manual entry are surfaced via the action sheet.</Note>
+            <M.SectionScan />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="mvp-review" title="MVP · Review & save" subtitle="Validation, edits, manual fallback, high-value confirm">
+        <DCArtboard id="mvp-review" label="From extraction to ledger" width={1340} height={760}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>Default review screen, edit-field sheet, full manual entry (when extraction fails), and high-value confirmation when totals exceed $500 or a single item exceeds $100.</Note>
+            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+              <M.SectionReview />
+            </div>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="mvp-history" title="MVP · History" subtitle="List · empty · receipt detail · offline queue">
+        <DCArtboard id="mvp-history" label="Looking back at receipts" width={1340} height={760}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>Receipts list with sync state, empty-history state, full receipt detail (image + line items), and the offline queue when connectivity drops.</Note>
+            <M.SectionHistory />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="mvp-settings" title="MVP · Settings & notifications" subtitle="Hub · budget · alerts · language · push">
+        <DCArtboard id="mvp-settings" label="Configuration surfaces" width={1700} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>Settings hub anchors the rest. Budget, notifications, and language each get their own screen. Lock-screen previews show how alerts and the weekly summary look in context.</Note>
+            <M.SectionSettings />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      {/* ── V1.1 Price Intelligence ─────────────────────────── */}
+      <DCSection id="v11-core" title="V1.1 · Price Intelligence — core flows" subtitle="Item detail · auto-merge · alerts · cross-store">
+        <DCArtboard id="v11-core" label="Receipts already scanned start tracking prices" width={1340} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note><strong>V1.1 · Price Intelligence.</strong> Hybrid item matching (vector + fuzzy) merges high-confidence silently and asks at medium confidence. Alerts trigger at ≥10% change with a 7-day cooldown.</Note>
+            <window.V11Screens />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="v11-gaps" title="V1.1 · Manual control + Premium" subtitle="Manual link · split · mute · custom cats · export · 12mo · paywall">
+        <DCArtboard id="v11-manual" label="When the auto-matcher gets it wrong, or you want power tools" width={1700} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>Manual link/split tools handle false-negatives and false-positives in matching. Per-item / per-store mute lets users dismiss noisy alerts. Custom categories, exports, and 12-month trends are gated behind the Premium paywall.</Note>
+            <PI.SectionPIGap />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      {/* ── V1.5 Household ──────────────────────────────────── */}
+      <DCSection id="v15-core" title="V1.5 · Household — core flows" subtitle="Invite · members · shared dashboard · attributed history">
+        <DCArtboard id="v15-core" label="One household, attributed receipts, role-based access" width={1340} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note><strong>V1.5 · Household.</strong> Up to 5 members on Family. Three roles control what each can see and do. The dashboard's familiar ring gets a "My / Household" toggle.</Note>
+            <window.V15Screens />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="v15-gaps" title="V1.5 · Membership lifecycle + paywall" subtitle="Accept · viewer state · remove · per-member caps · Family">
+        <DCArtboard id="v15-lifecycle" label="From invite link to leaving the household" width={1700} height={780}>
+          <div style={{ padding: 28, background: 'var(--ios-bg)', height: '100%' }}>
+            <Note>The invitee side of the flow, what a viewer-only member sees, the remove-member confirmation, and the budget split that lets households allocate the shared cap among members. Family is its own paywall on top of Premium.</Note>
+            <HH.SectionHHGap />
+          </div>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

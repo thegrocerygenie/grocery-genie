@@ -1,0 +1,106 @@
+/* Grocery Genie — Design tokens
+   Extends mobile/src/constants/theme.ts into web-visualizable tokens.
+*/
+:root {
+  /* Core neutrals — warm cream + deep ink, softer than pure #FFF/#000 */
+  --gg-cream-50: #FBF8F2;          /* app background */
+  --gg-cream-100: #F5F1E7;
+  --gg-cream-200: #ECE5D3;
+  --gg-paper:    #FFFFFF;           /* card surface */
+  --gg-ink-900:  #171A14;           /* text primary */
+  --gg-ink-700:  #3A3F34;
+  --gg-ink-500:  #6B7261;           /* text secondary */
+  --gg-ink-300:  #A8ADA0;
+  --gg-ink-100:  #E5E2D6;           /* borders */
+  --gg-ink-50:   #F0EDE1;
+
+  /* Primary — grocery green (matches theme.ts primary #2D7A4F) */
+  --gg-leaf-900: #1B4A30;
+  --gg-leaf-700: #2D7A4F;           /* primary */
+  --gg-leaf-500: #4CA677;
+  --gg-leaf-200: #C8E4D3;
+  --gg-leaf-100: #E8F5EE;           /* primaryLight */
+
+  /* Accent — saffron (the "genie" spark, used sparingly) */
+  --gg-saffron-700: #C8870B;
+  --gg-saffron-500: #F2A71F;
+  --gg-saffron-200: #FCE3A7;
+  --gg-saffron-100: #FEF6E0;
+
+  /* Semantic */
+  --gg-success-700: #1F7A3D;
+  --gg-success-500: #34A853;
+  --gg-success-100: #E6F4EA;
+  --gg-warning-700: #B67500;
+  --gg-warning-500: #F9AB00;
+  --gg-warning-100: #FEF7E0;
+  --gg-danger-700:  #B7281C;
+  --gg-danger-500:  #EA4335;
+  --gg-danger-100:  #FCE8E6;
+
+  /* Category palette — OKLCH harmonized, chroma ~0.09, L ~0.72 */
+  --cat-groceries:     oklch(0.72 0.12 148);  /* green */
+  --cat-household:     oklch(0.72 0.09 225);  /* blue */
+  --cat-personal-care: oklch(0.74 0.09 340);  /* rose */
+  --cat-beverages:     oklch(0.72 0.10 255);  /* violet-blue */
+  --cat-snacks:        oklch(0.76 0.11 65);   /* amber */
+  --cat-baby-kids:     oklch(0.78 0.08 30);   /* peach */
+  --cat-pet:           oklch(0.72 0.08 190);  /* teal */
+  --cat-other:         oklch(0.72 0.03 80);   /* neutral */
+
+  /* Spacing — 4pt base (matches theme.ts) */
+  --s-xs: 4px;
+  --s-sm: 8px;
+  --s-md: 12px;
+  --s-base: 16px;
+  --s-lg: 20px;
+  --s-xl: 24px;
+  --s-2xl: 32px;
+  --s-3xl: 48px;
+
+  /* Radius */
+  --r-sm: 6px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-full: 9999px;
+
+  /* Shadows */
+  --sh-card: 0 2px 8px rgba(23, 26, 20, 0.08);
+  --sh-elev: 0 4px 12px rgba(23, 26, 20, 0.12);
+  --sh-modal: 0 12px 32px rgba(23, 26, 20, 0.18);
+
+  /* Type */
+  --font-display: 'Instrument Serif', 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Geist', 'Söhne', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* Touch target (iOS HIG) */
+  --touch-min: 44px;
+}
+
+/* Dark mode — matches theme.ts dark palette */
+:root[data-theme="dark"] {
+  --gg-cream-50: #0F1610;
+  --gg-cream-100: #18201A;
+  --gg-cream-200: #222A24;
+  --gg-paper:    #1C241E;
+  --gg-ink-900:  #F1F5EA;
+  --gg-ink-700:  #C8CFBE;
+  --gg-ink-500:  #8E968A;
+  --gg-ink-300:  #5A6258;
+  --gg-ink-100:  #2A322C;
+  --gg-leaf-700: #4ADE80;
+  --gg-leaf-100: #1A3A2A;
+}
+
+/* Base reset used across all artboards */
+.gg-root {
+  font-family: var(--font-sans);
+  color: var(--gg-ink-900);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'ss01' on, 'cv11' on;
+}
+.gg-root * { box-sizing: border-box; }
+.gg-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.gg-serif { font-family: var(--font-display); letter-spacing: -0.01em; }

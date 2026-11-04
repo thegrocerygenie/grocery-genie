@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Grocery Genie · Product Roadmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens-v2.css" />
+<style>
+  :root {
+    --ink: #15140F;
+    --ink-2: #5A554A;
+    --ink-3: #8C8678;
+    --paper: #F0EEE9;
+    --paper-2: #E6E2D8;
+    --rule: rgba(21,20,15,0.12);
+    --rule-strong: rgba(21,20,15,0.28);
+  }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .serif { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; }
+  a { color: inherit; text-decoration: none; }
+
+  .page { max-width: 1080px; margin: 0 auto; padding: 80px 56px 120px; }
+
+  /* HEADER */
+  .meta-row {
+    display: flex; align-items: baseline; justify-content: space-between;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-3); padding-bottom: 18px;
+    border-bottom: 0.5px solid var(--rule);
+  }
+  .meta-row .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gg-tint); display: inline-block; vertical-align: middle; margin-right: 8px; }
+
+  h1 {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-weight: 400;
+    font-size: 96px;
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+    margin: 56px 0 32px;
+  }
+  h1 em { font-style: italic; color: var(--ink-2); }
+
+  .lede {
+    font-size: 19px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    max-width: 720px;
+    margin: 0 0 12px;
+  }
+  .lede strong { color: var(--ink); font-weight: 500; }
+
+  /* TIMELINE STRIP */
+  .timeline {
+    margin: 80px 0 0;
+    display: grid;
+    grid-template-columns: 80px 1fr 80px 1fr 80px 1fr 80px 1fr;
+    align-items: center;
+    gap: 0;
+  }
+  .tl-node {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    border: 1px solid var(--rule-strong);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Instrument Serif', serif;
+    font-size: 22px;
+    color: var(--ink);
+    background: var(--paper);
+    position: relative; z-index: 2;
+  }
+  .tl-node.shipped { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .tl-rail { height: 1px; background: var(--rule-strong); position: relative; }
+  .tl-rail.dashed { background: none; border-top: 1px dashed var(--rule-strong); }
+
+  .tl-labels {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
+    margin-top: 16px;
+  }
+  .tl-labels > div {
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .tl-labels > div strong { display: block; color: var(--ink); font-size: 13px; letter-spacing: 0; text-transform: none; font-weight: 500; margin-bottom: 4px; font-family: -apple-system, system-ui, sans-serif; }
+
+  /* RELEASE CARDS */
+  .releases { margin-top: 96px; display: flex; flex-direction: column; gap: 0; }
+
+  .release {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 56px;
+    padding: 56px 0;
+    border-top: 0.5px solid var(--rule);
+    align-items: start;
+  }
+  .release.first { border-top: 1px solid var(--rule-strong); }
+
+  .rel-id {
+    font-family: 'Instrument Serif', serif;
+    font-size: 56px;
+    line-height: 1;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+  }
+  .rel-id .v { font-style: italic; color: var(--ink-2); font-size: 28px; display: block; margin-bottom: 6px; letter-spacing: 0; }
+  .rel-eta {
+    margin-top: 16px;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3);
+  }
+  .rel-eta .pill {
+    display: inline-block; padding: 3px 8px; border-radius: 3px;
+    background: var(--paper-2); color: var(--ink-2);
+    margin-left: 6px; letter-spacing: 0.08em;
+  }
+  .rel-eta .pill.shipped { background: var(--ink); color: var(--paper); }
+  .rel-eta .pill.next { background: var(--gg-tint); color: white; }
+
+  .rel-body h2 {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: 38px;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    margin: 0 0 12px;
+  }
+  .rel-thesis {
+    font-size: 15px; line-height: 1.6;
+    color: var(--ink-2);
+    max-width: 580px;
+    margin: 0 0 24px;
+  }
+
+  .rel-features {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px 32px;
+    margin: 0 0 28px; padding: 0; list-style: none;
+    border-top: 0.5px solid var(--rule);
+  }
+  .rel-features li {
+    padding: 10px 0;
+    border-bottom: 0.5px solid var(--rule);
+    font-size: 14px;
+    color: var(--ink);
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  .rel-features li .num {
+    font-family: 'Instrument Serif', serif;
+    color: var(--ink-3);
+    font-size: 13px;
+    min-width: 18px;
+  }
+
+  .rel-cta {
+    display: inline-flex; align-items: center; gap: 12px;
+    padding: 12px 18px;
+    background: var(--ink); color: var(--paper);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    border-radius: 4px;
+    transition: background 0.15s;
+  }
+  .rel-cta:hover { background: var(--gg-tint); }
+  .rel-cta .arrow { font-family: 'Instrument Serif', serif; font-size: 18px; line-height: 1; transform: translateY(-1px); }
+  .rel-cta.disabled { background: var(--paper-2); color: var(--ink-3); cursor: not-allowed; pointer-events: none; }
+
+  /* DEPENDENCIES STRIP */
+  .deps {
+    margin-top: 28px;
+    padding: 14px 18px;
+    background: var(--paper-2);
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--ink-2);
+    line-height: 1.5;
+    max-width: 580px;
+  }
+  .deps strong { color: var(--ink); font-weight: 500; }
+
+  /* SUPPORTING SECTIONS */
+  .support {
+    margin-top: 96px;
+    padding-top: 56px;
+    border-top: 1px solid var(--rule-strong);
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 56px;
+  }
+  .support h3 {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: 28px;
+    margin: 0 0 16px;
+    letter-spacing: -0.01em;
+  }
+  .support p { font-size: 14px; line-height: 1.6; color: var(--ink-2); margin: 0 0 12px; max-width: 580px; }
+  .support .label { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+
+  .doc-links { display: flex; flex-direction: column; gap: 0; margin-top: 8px; max-width: 580px; }
+  .doc-link {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0;
+    border-bottom: 0.5px solid var(--rule);
+    font-size: 14px;
+    transition: padding-left 0.2s;
+  }
+  .doc-link:hover { padding-left: 8px; }
+  .doc-link:first-child { border-top: 0.5px solid var(--rule); }
+  .doc-link .name { font-weight: 500; }
+  .doc-link .desc { color: var(--ink-3); font-size: 12px; margin-top: 2px; }
+  .doc-link .arrow { font-family: 'Instrument Serif', serif; font-size: 22px; color: var(--ink-3); }
+
+  /* FOOTER */
+  footer {
+    margin-top: 120px;
+    padding-top: 32px;
+    border-top: 0.5px solid var(--rule);
+    display: flex; justify-content: space-between;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3);
+  }
+
+  @media (max-width: 760px) {
+    .page { padding: 48px 24px 80px; }
+    h1 { font-size: 56px; }
+    .release, .support { grid-template-columns: 1fr; gap: 24px; }
+    .rel-features { grid-template-columns: 1fr; }
+    .timeline { grid-template-columns: 56px 1fr 56px 1fr 56px 1fr 56px 1fr; }
+    .tl-node { width: 40px; height: 40px; font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="meta-row">
+    <span><span class="dot"></span>Product roadmap · 2025–2026</span>
+    <span>v2 · Apr 2025</span>
+  </div>
+
+  <h1>From <em>receipts</em><br/>to a kitchen<br/>that <em>thinks ahead.</em></h1>
+
+  <p class="lede">
+    Grocery Genie ships in four phases. Each one earns the next: receipts unlock prices, prices unlock pantry, pantry unlocks recipes, recipes unlock taste. We compound, we don't pivot.
+  </p>
+
+  <!-- TIMELINE STRIP -->
+  <div class="timeline">
+    <div class="tl-node shipped">1.0</div>
+    <div class="tl-rail"></div>
+    <div class="tl-node">1.5</div>
+    <div class="tl-rail"></div>
+    <div class="tl-node">2.0</div>
+    <div class="tl-rail dashed"></div>
+    <div class="tl-node">3.0</div>
+  </div>
+  <div class="tl-labels">
+    <div><strong>Capture</strong>Q2 2025</div>
+    <div><strong>Share</strong>Q3 2025</div>
+    <div><strong>Plan</strong>Q4 2025</div>
+    <div><strong>Adapt</strong>Q2 2026</div>
+  </div>
+
+  <!-- RELEASES -->
+  <div class="releases">
+
+    <!-- V1 -->
+    <div class="release first">
+      <div>
+        <div class="rel-id"><span class="v">Release</span>1.0–1.5</div>
+        <div class="rel-eta">
+          <span class="pill shipped">Live</span>
+        </div>
+      </div>
+      <div class="rel-body">
+        <h2>Capture, then share.</h2>
+        <p class="rel-thesis">
+          The MVP turns a phone camera into a structured grocery ledger. Price intelligence (1.1) layers history and store-level alerts on top. Households (1.5) make the data shared without losing personal accountability.
+        </p>
+        <ul class="rel-features">
+          <li><span class="num">01</span>Receipt scan &amp; OCR</li>
+          <li><span class="num">06</span>Price history per item</li>
+          <li><span class="num">02</span>Item ledger &amp; categories</li>
+          <li><span class="num">07</span>Brand &amp; size matching</li>
+          <li><span class="num">03</span>Spend analytics &amp; trends</li>
+          <li><span class="num">08</span>Cross-store comparison</li>
+          <li><span class="num">04</span>Budgets &amp; goals</li>
+          <li><span class="num">09</span>Price-drop alerts</li>
+          <li><span class="num">05</span>Manual entry &amp; offline</li>
+          <li><span class="num">10</span>Household roles &amp; sharing</li>
+        </ul>
+        <a class="rel-cta" href="Grocery Genie V1 Screens.html">View V1 designs <span class="arrow">→</span></a>
+      </div>
+    </div>
+
+    <!-- V2.0 -->
+    <div class="release">
+      <div>
+        <div class="rel-id"><span class="v">Release</span>2.0</div>
+        <div class="rel-eta">
+          <span class="pill next">Next</span>
+          ETA Q4 2025
+        </div>
+      </div>
+      <div class="rel-body">
+        <h2>The pantry knows what's in it.</h2>
+        <p class="rel-thesis">
+          Receipt items become a virtual pantry with shelf-life tracking. Recipes match against what's actually in the kitchen, prioritising items about to expire. The shopping list writes itself from gaps and meal plans.
+        </p>
+        <ul class="rel-features">
+          <li><span class="num">11</span>Auto-pantry from receipts</li>
+          <li><span class="num">15</span>Expiry push notifications</li>
+          <li><span class="num">12</span>Adaptive shelf-life model</li>
+          <li><span class="num">16</span>Smart shopping list</li>
+          <li><span class="num">13</span>Recipe match (have/missing)</li>
+          <li><span class="num">17</span>Diet &amp; allergen filters</li>
+          <li><span class="num">14</span>Weekly meal planner</li>
+          <li><span class="num">18</span>Used / discarded tracking</li>
+        </ul>
+        <div class="deps">
+          <strong>Depends on V1.</strong> Pantry quality is bounded by receipt-OCR accuracy and the brand-matching model from 1.1. We need 12 months of capture before recipe-match is consistently useful.
+        </div>
+        <a class="rel-cta" href="Grocery Genie V2 Screens.html" style="margin-top: 20px;">View V2 designs <span class="arrow">→</span></a>
+      </div>
+    </div>
+
+    <!-- V2.5 -->
+    <div class="release">
+      <div>
+        <div class="rel-id"><span class="v">Release</span>2.5</div>
+        <div class="rel-eta">
+          ETA Q1 2026
+        </div>
+      </div>
+      <div class="rel-body">
+        <h2>Intelligence the data has earned.</h2>
+        <p class="rel-thesis">
+          Once we have a year of baskets and a working pantry, harder questions become answerable. What's the cheapest store for <em>your</em> basket? What's <em>your</em> personal inflation rate? When will you run out of olive oil?
+        </p>
+        <ul class="rel-features">
+          <li><span class="num">19</span>Whole-basket cross-store comparison</li>
+          <li><span class="num">22</span>Restock predictions</li>
+          <li><span class="num">20</span>Personal inflation rate</li>
+          <li><span class="num">23</span>Community price corroboration</li>
+          <li><span class="num">21</span>Item-level inflation drill-down</li>
+          <li><span class="num">24</span>Anomaly detection</li>
+        </ul>
+        <div class="deps">
+          <strong>Depends on V2.0.</strong> Basket comparison needs the pantry's brand-matched item history. Restock predictions need consumption rate, which needs "used / discarded" tracking from 2.0.
+        </div>
+        <a class="rel-cta" href="Grocery Genie V2 Screens.html#v25-core" style="margin-top: 20px;">View V2.5 designs <span class="arrow">→</span></a>
+      </div>
+    </div>
+
+    <!-- V3.0 -->
+    <div class="release">
+      <div>
+        <div class="rel-id"><span class="v">Release</span>3.0</div>
+        <div class="rel-eta">
+          ETA Q2 2026
+        </div>
+      </div>
+      <div class="rel-body">
+        <h2>The kitchen adapts to you.</h2>
+        <p class="rel-thesis">
+          With a year of baskets and a year of cooking, the system has enough signal to personalise. LLMs propose recipe substitutions from your actual pantry. Search becomes semantic. A taste profile ranks future suggestions. Waste becomes a score worth beating.
+        </p>
+        <ul class="rel-features">
+          <li><span class="num">25</span>LLM recipe substitution</li>
+          <li><span class="num">28</span>Food-waste score</li>
+          <li><span class="num">26</span>Substitution feedback loop</li>
+          <li><span class="num">29</span>Taste profile &amp; ranking</li>
+          <li><span class="num">27</span>Semantic purchase search</li>
+          <li><span class="num">30</span>Predictive meal planning</li>
+        </ul>
+        <div class="deps">
+          <strong>Depends on V2.5.</strong> Substitution quality is bounded by pantry accuracy. The taste profile needs cooked-recipe history. Semantic search needs the embedded item catalog from 2.5.
+        </div>
+        <a class="rel-cta" href="Grocery Genie V3 Screens.html" style="margin-top: 20px;">View V3 designs <span class="arrow">→</span></a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SUPPORTING -->
+  <div class="support">
+    <div>
+      <div class="label">Reference</div>
+      <h3>Source materials.</h3>
+    </div>
+    <div>
+      <p>
+        Each release was designed against the same component library and visual system. The system itself ships ahead of the product — it's what every release is built from.
+      </p>
+      <div class="doc-links">
+        <a class="doc-link" href="Grocery Genie Design System v2.html">
+          <div>
+            <div class="name">Design system v2</div>
+            <div class="desc">Tokens, components, motion — the canonical kit</div>
+          </div>
+          <span class="arrow">→</span>
+        </a>
+        <a class="doc-link" href="Grocery Genie MVP Screens.html">
+          <div>
+            <div class="name">MVP screens (V1.0)</div>
+            <div class="desc">Receipt capture, ledger, analytics, budgets</div>
+          </div>
+          <span class="arrow">→</span>
+        </a>
+        <a class="doc-link" href="Grocery Genie V1 Screens.html">
+          <div>
+            <div class="name">V1 screens</div>
+            <div class="desc">MVP + Price Intelligence + Household</div>
+          </div>
+          <span class="arrow">→</span>
+        </a>
+        <a class="doc-link" href="Grocery Genie V2 Screens.html">
+          <div>
+            <div class="name">V2 screens</div>
+            <div class="desc">Meal Planner + Advanced Intelligence</div>
+          </div>
+          <span class="arrow">→</span>
+        </a>
+        <a class="doc-link" href="Grocery Genie V3 Screens.html">
+          <div>
+            <div class="name">V3 screens</div>
+            <div class="desc">LLM remix, semantic search, taste profile</div>
+          </div>
+          <span class="arrow">→</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="support">
+    <div>
+      <div class="label">Principles</div>
+      <h3>How we sequence.</h3>
+    </div>
+    <div>
+      <p>
+        <strong style="color: var(--ink); font-weight: 500;">Capture before opinion.</strong> No release proposes recommendations on top of data the user hasn't yet generated. Every "smart" feature lives behind a thin honest one.
+      </p>
+      <p>
+        <strong style="color: var(--ink); font-weight: 500;">One bet per release.</strong> 1.1 is prices. 1.5 is sharing. 2.0 is pantry. 2.5 is intelligence. 3.0 is taste. We ship the bet, then expand it before moving on.
+      </p>
+      <p>
+        <strong style="color: var(--ink); font-weight: 500;">The graceful empty state is the spec.</strong> Every screen works on day one with zero data, and every screen gets better as data accumulates. If a feature requires a year of history to be useful, it doesn't ship until that history exists.
+      </p>
+    </div>
+  </div>
+
+  <footer>
+    <span>Grocery Genie</span>
+    <span>Internal · Roadmap v2</span>
+  </footer>
+
+</div>
+</body>
+</html>
