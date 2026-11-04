@@ -15,6 +15,7 @@ Standing decisions for the marketing site. The `marketing-site-brief` skill read
 | 9 | 2026-11-04 | V1.1 | **Free Premium year: who counts and when.** (a) Waitlist contacts created before the site switches to the App Store (`PUBLIC_LAUNCH_STATE=b`) qualify; record that date here when it happens. (b) They can claim it for 90 days after Premium launches, by creating or matching an account with the waitlist email, or through the claim step. (c) Each free year runs 12 months from the day that person's account is matched. | Active |
 | 10 | 2026-11-04 | V1.1 | **Unsubscribes keep the free year.** Unsubscribing (Resend's link, or replying "unsubscribe") stops waitlist emails only; the contact stays, flagged, so the account can still be matched. A request to delete the email removes the contact and gives up the offer. The welcome email says both. | Active |
 | 11 | 2026-11-04 | V1.1 | **Waitlist retention:** delete the whole waitlist (the Resend audience) 90 days after Premium launches, when the claim window (#9) closes, or a contact sooner if they ask. The record of who got the free year lives with their account. `privacy.ts` says this under "How long we keep it". | Active |
+| 12 | 2026-11-04 | V1.1 | **The free year is a RevenueCat promotional entitlement:** a 1-year grant of the Premium entitlement through RevenueCat's REST API, so RevenueCat stays the only source of Premium (V1.1 plan D1). Built as V1.1 story V11-P5. | Active |
 
 ## Open
 

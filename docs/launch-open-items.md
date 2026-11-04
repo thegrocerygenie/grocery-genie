@@ -122,6 +122,8 @@ The site promises waitlist sign-ups "a free year of Premium" when Premium launch
 - [ ] **Delete the waitlist when the claim window closes.**
   - Schedule deleting the Resend audience for 90 days after Premium launches.
   - Keep each free-year grant on its account, so "one year per waitlist email" still holds afterwards. Store the matched waitlist email, or a hash of it, with the grant.
+The build items below are V1.1 story **V11-P5** (`.planning/PLAN-2026-11-03-v1.1.md`). The grant is a RevenueCat promotional entitlement ([decisions](marketing/decisions.md) #12, plan D5).
+
 - [ ] **Matching rule.** An account qualifies when its email, trimmed and lowercased like the waitlist's, equals a waitlist contact's.
   - Match only verified emails: email-and-password accounts after `verify-email`; Apple and Google sign-ins carry an email their provider verified.
   - One free year per waitlist email, even if several accounts use that email over time.
