@@ -6,13 +6,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { LoadErrorState } from '@/components/LoadErrorState';
-import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
+import { colors, fontScale, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { PriceAlertControls } from '@/features/price-intelligence/components/PriceAlertControls';
 import { PriceChart } from '@/features/price-intelligence/components/PriceChart';
 import { StoreComparison } from '@/features/price-intelligence/components/StoreComparison';
@@ -51,6 +52,8 @@ export default function ItemDetailScreen() {
   const comparison = usePriceComparison(id);
   const rename = useRenameItem();
   const split = useSplitAlias();
+  // At accessibility sizes a price moves under its date and store (BUG-3).
+  const stacked = useWindowDimensions().fontScale >= fontScale.accessibility;
 
   const name = item.data?.canonical_name ?? history.data?.item.canonical_name ?? '';
   const failed = () => Alert.alert(PRICES_COPY.actionFailed);
@@ -97,7 +100,9 @@ export default function ItemDetailScreen() {
               accessibilityRole="button"
               accessibilityLabel={PRICES_COPY.renamePrompt}
             >
-              <Text style={styles.headerBtn}>{PRICES_COPY.rename}</Text>
+              <Text style={styles.headerBtn} maxFontSizeMultiplier={fontScale.headerButtonMax}>
+                {PRICES_COPY.rename}
+              </Text>
             </Pressable>
           ) : null,
       }}
@@ -191,13 +196,14 @@ export default function ItemDetailScreen() {
                   p.in_timeline ? '' : `, ${PRICES_COPY.otherUnit}`
                 }`}
               >
-                <View style={styles.rowText}>
+                <View style={styles.rowText} testID={`price-row-text-${i}`}>
                   <Text style={type.body}>{formatLongDate(p.date)}</Text>
-                  <Text style={styles.caption} numberOfLines={1}>
+                  <Text style={styles.caption} numberOfLines={stacked ? undefined : 1}>
                     {p.in_timeline ? store : `${store} · ${PRICES_COPY.otherUnit}`}
                   </Text>
+                  {stacked ? <Text style={styles.price}>{price}</Text> : null}
                 </View>
-                <Text style={styles.price}>{price}</Text>
+                {stacked ? null : <Text style={styles.price}>{price}</Text>}
               </View>
             );
           })}
@@ -287,7 +293,10 @@ function LatestCard({ history }: { history: PriceHistory }) {
       accessibilityLabel={[PRICES_COPY.latest, price, changeText, where].filter(Boolean).join(', ')}
     >
       <Text style={styles.caption}>{PRICES_COPY.latest}</Text>
-      <Text style={styles.latestPrice}>{price}</Text>
+      {/* One line, shrunk to fit: at AX5 "$4.79" split as "$4.7" and "9" (BUG-3). */}
+      <Text style={styles.latestPrice} testID="latest-price" numberOfLines={1} adjustsFontSizeToFit>
+        {price}
+      </Text>
       {changeText ? (
         <View style={styles.changeRow}>
           {change && change.percent !== 0 ? (

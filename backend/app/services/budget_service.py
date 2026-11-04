@@ -873,19 +873,29 @@ class BudgetService:
         return changes
 
     async def get_dashboard_data(
-        self, user_id: uuid.UUID, period: str | None = None, months: int = 3
+        self,
+        user_id: uuid.UUID,
+        period: str | None = None,
+        months: int = 3,
+        today: date | None = None,
     ) -> DashboardSpendingResponse:
         """Get complete dashboard data in a single call.
+
+        Without ``period``, the period that holds ``today`` (the user's local
+        date; the server's when not given). With a reset day of 15, October 10
+        is in '2026-09', the period that began September 15.
 
         ``months`` sets the trend length (3, or 12 for Premium) and the prior
         window ``prior_average`` covers; the rest is about ``period`` alone.
         """
         if period is None:
-            today = date.today()
-            period = f"{today.year:04d}-{today.month:02d}"
+            period, period_start, period_end = await self.get_period_containing(
+                user_id, today or clock.today()
+            )
+        else:
+            period_start, period_end = await self.get_period_dates(user_id, period)
 
         summary = await self.get_budget_summary(user_id, period)
-        period_start, period_end = await self.get_period_dates(user_id, period)
         top_items = await self.get_top_items(user_id, period_start, period_end)
         trend = await self.get_spending_trend(user_id, period, months)
         prior_average = await self.get_prior_average(user_id, period, months)
@@ -894,6 +904,8 @@ class BudgetService:
 
         return DashboardSpendingResponse(
             period=period,
+            period_start=period_start,
+            period_end=period_end,
             overall=summary.overall,
             categories=summary.categories,
             top_items=top_items,

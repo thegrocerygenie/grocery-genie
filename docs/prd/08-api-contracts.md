@@ -120,10 +120,14 @@ Budget vs. actual for specified period. `budget` is the period's limit: the amou
 ### GET /api/dashboard/spending?period=2026-03 [MVP]
 Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-month trend (oldest first, ending at `period`), and a month-over-month comparison per category. `category_changes` lists every category with spend in `period` or `previous_period`, largest current spend first; uncategorized spend is left out. `prior_average` is the mean monthly spend over the 3 months before the trend window (0.0 when there was none), for comparing with the trend's own average. `has_receipts` is true when the user has any receipt outside Recently Deleted, in any period; the app shows its first-scan state only when it is false. Each top item carries the category that holds most of its spend (`category_id` and `category_name` are null when uncategorized). Each trend month splits its `spent` into `categories`, largest first; uncategorized spend is kept there (`category_id` null, name "Uncategorized") so the parts add up to `spent`.
 
+**Current period.** Without `period`, the response is about the period that holds today in the user's time zone (`users.timezone`; UTC when unset). Periods reset on the overall budget's start day and are named for the month they start in, so with a start day of 15, October 10 is in `2026-09` (September 15 – October 14). The app sends no `period` and reads it from the response. `period_start` and `period_end` are the period's first and last days, for any `period`; the app takes the day count, days left, and pace from them.
+
 **Response:**
 ```json
 {
   "period": "2026-03",
+  "period_start": "2026-03-01",
+  "period_end": "2026-03-31",
   "overall": { "budget": 500, "spent": 35.0, "remaining": 465.0, "percent": 7.0 },
   "categories": [ "…as in /api/budgets/summary" ],
   "top_items": [ { "name": "Bananas", "total_spent": 5.0, "count": 1, "category_id": "uuid", "category_name": "Groceries" } ],
@@ -220,7 +224,7 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
 
 ## Premium [V1.1]
 
-Premium ($5.99/month, decision D1) is an App Store subscription sold through RevenueCat. The backend trusts only RevenueCat for it: the webhook below and RevenueCat's REST API, never the app. Premium gates only the V1.1 extras (D2): the 12-month trend, custom categories, data export, budget rollover, and unlimited receipts. A free user asking for one gets `403 premium_required` (above).
+Premium ($5.99/month, decision D1) is an App Store subscription sold through RevenueCat. The backend trusts only RevenueCat for it: the webhook below and RevenueCat's REST API, never the app. Premium gates only the V1.1 extras (D2): the 12-month trend, custom categories, data export, budget rollover, and unlimited receipts. A free user asking for the trend, custom categories, export or rollover gets `403 premium_required` (above). The receipt cap is the one exception: a free user past it gets `429 receipt_quota_exceeded` (below), because the scan itself stays free.
 
 The profile (`/api/auth/me`, `/api/users/me`, and every route that returns it) carries the entitlement:
 ```json
@@ -229,7 +233,13 @@ The profile (`/api/auth/me`, `/api/users/me`, and every route that returns it) c
 ```
 `premium_expires_at` is the end of the paid period (null for a free user, or a grant with no end). A user is Premium while the entitlement is active and before that time, so a missed expiration webhook cannot keep anyone Premium. `PATCH /api/users/me` cannot set either field.
 
-**Unlimited receipts.** `POST /api/receipts/scan` refuses a free user's scan past `GG_FREE_TIER_RECEIPTS_PER_MONTH` (20) receipts in the month with `429`; a Premium user has no monthly cap (the hourly rate limit still applies).
+**Unlimited receipts.** `POST /api/receipts/scan` refuses a free user's scan past `GG_FREE_TIER_RECEIPTS_PER_MONTH` (20) receipts in the month with `429`; a Premium user has no monthly cap (the hourly rate limit still applies). Manual entries count toward the 20, but `POST /api/receipts` is never refused by the cap. The body:
+```json
+{ "detail": "Monthly receipt quota exceeded (20 receipts/month on Free tier).", "code": "receipt_quota_exceeded", "feature": "unlimited_receipts", "limit": 20 }
+```
+`code` is the stable test; the hourly rate limit's `429` has none. It is not `403 premium_required`, because the scan itself is a free feature: the month's allowance is spent. `detail` stays a string because app builds from before V1.1 match it ("quota") and must keep treating the cap as final, not retrying it. The app answers it with the upgrade prompt (See Premium opens the paywall, or Enter manually), never an error (D2).
+
+Everything else in price intelligence stays free (D2): price history, item matching, price alerts and cross-store comparison answer a free user `200`.
 
 ### POST /api/webhooks/revenuecat
 
@@ -253,7 +263,8 @@ Called by RevenueCat, not the app. Authenticated by the `Authorization` header, 
 | Event `type` | Effect |
 |---|---|
 | `INITIAL_PURCHASE`, `RENEWAL`, `UNCANCELLATION`, `PRODUCT_CHANGE`, `NON_RENEWING_PURCHASE`, `SUBSCRIPTION_EXTENDED`, `TEMPORARY_ENTITLEMENT_GRANT`, `REFUND_REVERSED` | Premium until `expiration_at_ms` (none: no end). |
-| `CANCELLATION`, `BILLING_ISSUE` | Stays as it is; the expiry moves to `expiration_at_ms`. Auto-renew is off, so Premium lasts to the end of the paid period; a refund's expiry is already past, so it ends now. |
+| `CANCELLATION`, `BILLING_ISSUE` | Stays as it is; the expiry moves to `expiration_at_ms` (none sent: the stored expiry stays). Auto-renew is off, so Premium lasts to the end of the paid period. |
+| `CANCELLATION` with `cancel_reason` `CUSTOMER_SUPPORT` (a refund) | Premium ends now and `premium_expires_at` is cleared, whatever expiry the event or the user row holds, so a late grant from before the refund is `stale`. |
 | `EXPIRATION` | Premium ends. |
 | `TRANSFER` | The purchase moved to another app user id (a restore on another account). Each user in `transferred_from` and `transferred_to` is read back from the REST API; without an API key, the old owners lose Premium and the new owner gets it with its next event or refresh. |
 
@@ -265,6 +276,46 @@ Reads the signed-in user's entitlement from RevenueCat's REST API (`GET /v1/subs
 - `429`: more than 10 refreshes in a minute for this user (`GG_MAX_PREMIUM_REFRESHES_PER_MINUTE`). Each refresh reads RevenueCat, so it has its own count, apart from the 300 requests a minute.
 
 The stored state is stamped with the time of RevenueCat's answer (`request_date_ms`). A webhook applied after that read is newer and is kept; the refresh then returns the stored state unchanged.
+
+### GET /api/users/me/export?format=json|csv
+
+Data export (NFR Privacy 2), Premium (D2). A free user gets `403 premium_required` with `"feature": "data_export"`; an unknown `format` is `422`. `format` defaults to `json`.
+
+**Scope:** the signed-in user's own receipts, line items, budgets and price observations, as every other read (households arrive in V1.5). Deleted receipts and budgets are left out, and so are the line items and prices of a deleted receipt. Receipts of every status are included, with their `status`.
+
+**Response** `200`, as a download (`Content-Disposition: attachment; filename="grocery-genie-export-YYYY-MM-DD.json"` or `.zip`, `Cache-Control: no-store`):
+
+- `json` (`application/json`): one document. Receipts are oldest first, each with its line items in receipt order.
+  ```json
+  {
+    "format_version": 1,
+    "exported_at": "2026-11-03T10:00:00Z",
+    "currency": "USD",
+    "receipts": [
+      { "id": "uuid", "date": "2026-03-01", "store_name": "FreshCo", "store_location": null,
+        "subtotal": 4.88, "tax": 0.0, "total": 4.88, "currency": "USD", "status": "confirmed",
+        "created_at": "2026-03-01T12:00:00Z",
+        "line_items": [
+          { "id": "uuid", "receipt_id": "uuid", "position": 0, "name": "ORG BANANAS",
+            "quantity": 2.0, "unit_price": 0.69, "total_price": 1.38, "unit_of_measure": "lb",
+            "category": "Groceries", "canonical_item_id": "uuid", "canonical_item_name": "ORG BANANAS",
+            "corrected": false } ] } ],
+    "budgets": [
+      { "id": "uuid", "category": null, "category_id": null, "amount": 450.0, "currency": "USD",
+        "period_type": "monthly", "period_start": "2026-03-01", "rollover_enabled": false,
+        "created_at": "2026-03-01T12:00:00Z" } ],
+    "price_observations": [
+      { "id": "uuid", "date": "2026-03-01", "canonical_item_id": "uuid", "item_name": "ORG BANANAS",
+        "store_name": "FreshCo", "unit_price": 0.69, "quantity": 2.0, "unit_of_measure": "lb",
+        "currency": "USD", "receipt_id": "uuid", "line_item_id": "uuid" } ]
+  }
+  ```
+  A budget's `category` is null for the overall budget. `currency` is the budget currency (`currency_preference`).
+- `csv` (`application/zip`): `receipts.csv`, `line_items.csv` (with `receipt_id`), `budgets.csv` and `price_observations.csv`, with the same columns as the JSON. UTF-8 with a byte order mark, so Excel reads accented names; money has two decimals, quantities three. A text cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading `'`, so a spreadsheet does not run it as a formula (CSV injection). JSON values are not escaped.
+
+**Large accounts:** rows are read 500 at a time (keyset pages) into a spooled temporary file, in memory up to 8 MB and on disk past that, which is then streamed with its `Content-Length`. Memory stays bounded however many receipts there are, and the database work is done before the first byte is sent.
+
+Records `data_exported` (12-analytics.md). The 300 reads/minute limit applies.
 
 ## Price Intelligence [V1.1]
 

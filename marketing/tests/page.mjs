@@ -43,6 +43,9 @@ if (state === 'a') {
   check(!/apple-itunes-app/.test(html), 'State A: no App Store smart banner');
   check(/free year of Premium when it launches/.test(text), 'State A: waitlist incentive line (decision #2)');
   check(/launches on iPhone in Q4 2026/.test(text), 'State A: FAQ gives the Q4 2026 launch window (decision #6)');
+  check((html.match(/<p class="cta-note">/g) || []).length === 3, 'State A: a waitlist privacy note under each form');
+  check(/Sign up in the app with this same email and we'll match it to your account for the free Premium year/.test(text),
+    'State A: the note says the waitlist email is matched to the app account (launch-open-items §6)');
 } else {
   check(!/<form class="waitlist"/.test(html), 'State B: no waitlist forms');
   check(/name="apple-itunes-app"/.test(html), 'State B: App Store smart banner meta');

@@ -21,13 +21,21 @@ import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { getCategoryMetaByName } from '@/constants/categories';
 import { ROLLOVER_STRINGS } from '@/features/budget/content/rollover';
 import { capBreachMessage } from '@/features/budget/utils/capBreach';
-import { budgetPace, monthShareElapsed } from '@/features/budget/utils/pace';
+import { budgetPace } from '@/features/budget/utils/pace';
+import {
+  periodBounds,
+  periodDaysLeft,
+  periodHeading,
+  periodName,
+  periodShareElapsed,
+} from '@/features/budget/utils/period';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
 import { useUserRefresh } from '@/hooks/useUserRefresh';
 import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
 import { useBudgetStore } from '@/store/budgetStore';
 import { formatMoney } from '@/utils/money';
+import { today } from '@/utils/today';
 import type { DashboardData as ApiDashboardData } from '@/features/budget/types';
 
 interface CategorySpend {
@@ -43,7 +51,10 @@ type DashboardViewState =
   | { state: 'empty' }
   | {
       state: 'on-track' | 'over';
-      monthLabel: string;
+      /** "November · day 3", or "Oct 15 – Nov 14 · day 20" for another reset day. */
+      periodLabel: string;
+      /** The label without the day count, for the ring when over. */
+      periodName: string;
       spent: number;
       cap: number;
       /** The part of ``cap`` that rolled over from earlier periods (Premium). */
@@ -54,39 +65,7 @@ type DashboardViewState =
       categories: CategorySpend[];
     };
 
-const MONTH_LABELS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
-function buildMonthLabel(period: string): string {
-  const [yearStr, monthStr] = period.split('-');
-  const monthIndex = Number(monthStr) - 1;
-  const today = new Date();
-  const isCurrentPeriod =
-    today.getFullYear() === Number(yearStr) && today.getMonth() === monthIndex;
-  const monthName = MONTH_LABELS[monthIndex] ?? '';
-  return isCurrentPeriod ? `${monthName} · day ${today.getDate()}` : monthName;
-}
-
-function computeDaysLeft(period: string): number {
-  const now = new Date();
-  const [year, month] = period.split('-').map(Number);
-  const lastDay = new Date(year, month, 0).getDate();
-  return Math.max(0, lastDay - now.getDate());
-}
-
-function adaptDashboard(api: ApiDashboardData | undefined, period: string): DashboardViewState {
+function adaptDashboard(api: ApiDashboardData | undefined, now: Date): DashboardViewState {
   if (!api) return { state: 'empty' };
 
   const hasBudget = api.overall.budget > 0;
@@ -113,15 +92,19 @@ function adaptDashboard(api: ApiDashboardData | undefined, period: string): Dash
       };
     });
 
+  // The period the server picked, by its own dates (reset day, not calendar month).
+  const bounds = periodBounds(api);
+
   if (!hasBudget) {
     return {
       state: 'on-track',
-      monthLabel: buildMonthLabel(period),
+      periodLabel: periodHeading(bounds, now),
+      periodName: periodName(bounds),
       spent: api.overall.spent,
       cap: 0,
       rolledOver: 0,
-      daysLeft: computeDaysLeft(period),
-      monthShare: monthShareElapsed(period),
+      daysLeft: periodDaysLeft(bounds, now),
+      monthShare: periodShareElapsed(bounds, now),
       categories,
     };
   }
@@ -129,12 +112,13 @@ function adaptDashboard(api: ApiDashboardData | undefined, period: string): Dash
   const over = api.overall.spent > api.overall.budget;
   return {
     state: over ? 'over' : 'on-track',
-    monthLabel: buildMonthLabel(period),
+    periodLabel: periodHeading(bounds, now),
+    periodName: periodName(bounds),
     spent: api.overall.spent,
     cap: api.overall.budget,
     rolledOver: api.overall.rolled_over ?? 0,
-    daysLeft: computeDaysLeft(period),
-    monthShare: monthShareElapsed(period),
+    daysLeft: periodDaysLeft(bounds, now),
+    monthShare: periodShareElapsed(bounds, now),
     categories,
   };
 }
@@ -145,7 +129,7 @@ export default function DashboardScreen() {
   const { data, isLoading, isError, refetch } = useDashboardSpending(selectedPeriod);
   const pull = useUserRefresh(refetch);
 
-  const view = useMemo(() => adaptDashboard(data, selectedPeriod), [data, selectedPeriod]);
+  const view = useMemo(() => adaptDashboard(data, today()), [data]);
 
   const onScan = () => {
     Haptics.selectionAsync();
@@ -300,7 +284,7 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend, onPrices }: Fille
           <BudgetRing
             progress={progress}
             label={over ? `${Math.round(progress * 100)}%` : whole(remaining)}
-            sub={over ? data.monthLabel.split(' · ')[0] : `left · ${data.daysLeft}d`}
+            sub={over ? data.periodName : `left · ${data.daysLeft}d`}
             accessibilityLabel={
               ringAccessibilityLabel(data.spent, data.cap, data.daysLeft, currency) +
               (data.rolledOver > 0 ? ROLLOVER_STRINGS.rolledOverA11y(whole(data.rolledOver)) : '')
@@ -308,7 +292,7 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend, onPrices }: Fille
           />
         )}
         <View style={{ flex: 1 }}>
-          <Text style={[type.caption1, { color: colors.iosLabel2 }]}>{data.monthLabel}</Text>
+          <Text style={[type.caption1, { color: colors.iosLabel2 }]}>{data.periodLabel}</Text>
           {noBudget ? (
             <>
               <Text style={[type.money, { fontSize: 20, color: colors.iosLabel, marginTop: 2 }]}>

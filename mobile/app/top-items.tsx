@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 
 import { getCategoryMetaByName } from '@/constants/categories';
@@ -8,6 +8,7 @@ import { useDashboardSpending } from '@/features/budget/hooks/useDashboard';
 import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
 import { useBudgetStore } from '@/store/budgetStore';
 import { formatMoney } from '@/utils/money';
+import { headerBlurFor } from '@/utils/headerBlur';
 import { monthName } from '@/utils/period';
 
 export default function TopItemsScreen() {
@@ -36,7 +37,8 @@ export default function TopItemsScreen() {
           // Opened from the Budget tab; otherwise iOS shows the group name "(tabs)".
           headerBackTitle: 'Budget',
           headerLargeTitle: true,
-          headerBlurEffect: 'systemChromeMaterial',
+          // iOS 26+ draws its own glass here; a blur on top hides the large title (BUG-5).
+          headerBlurEffect: headerBlurFor(Platform.Version),
         }}
       />
       <ScrollView
@@ -45,7 +47,7 @@ export default function TopItemsScreen() {
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: 120, gap: spacing.sm }}
       >
         <Text style={styles.intro}>
-          {monthName(data?.period ?? selectedPeriod)} · ranked by total spend
+          {data ? `${monthName(data.period)} · ranked by total spend` : 'Ranked by total spend'}
         </Text>
 
         {isLoading ? (
