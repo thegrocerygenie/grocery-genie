@@ -4,13 +4,19 @@ user_store_aliases holds each user's own store merges: the user's prices of
 store_id group under target_store_id, and nobody else's. Stores are shared,
 so a merge never renames or joins a shared row.
 
-stores.normalized_name moves to the new normalization (branch numbers,
-punctuation and accents drop out: "LOBLAWS #1234" -> "loblaws"), so new
-receipts find the existing row. Existing rows are kept, never merged or
-deleted: receipts and prices keep pointing at the row they were saved with,
-and rows that now share a normalized name group at read time under the
-oldest of them (app/services/store_service.py). The downgrade puts back the
-old lower(trim(name)).
+receipts.store_name is the store name printed on the receipt, or the user's
+correction of it. Two users' receipts can share one store row (a row keeps
+the name its first receipt gave it), so a receipt shows its own name, never
+the row's. It is backfilled from each receipt's store row, the name those
+receipts showed until now.
+
+stores.normalized_name moves to the new normalization (case, accents,
+punctuation and a branch marker at the end drop out: "LOBLAWS #1234" ->
+"loblaws"), so new receipts find the existing row. Existing rows are kept,
+never merged or deleted: receipts and prices keep pointing at the row they
+were saved with, and rows that now share a normalized name group at read time
+under the oldest of them (app/services/store_service.py). The downgrade puts
+back the old lower(trim(name)).
 
 The normalization below is a frozen copy of normalize_store_name as of this
 revision, so a later change to the app cannot change what this migration did.
@@ -32,12 +38,13 @@ down_revision: str | None = "20261104_0018"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-_BRANCH_WORD = re.compile(
-    r"\b(?:store|str|no|number|branch|location|loc|unit)\.?\s*#?\s*\d+\b"
+_END_MARKER = re.compile(
+    r"(?<=\S)(?:"
+    r"\s*#\s*\d+"
+    r"|\s+[-–—]\s*#?\s*\d+"
+    r"|\s+(?:store|str|no|number|branch|location|loc|unit)\.?\s*#?\s*\d+"
+    r")\s*$"
 )
-_HASH_NUMBER = re.compile(r"#\s*\d+")
-_DASH_NUMBER = re.compile(r"\s*[-–—]\s*\d+\s*$")
-_TRAILING_NUMBER = re.compile(r"\s+\d{3,}\s*$")
 _APOSTROPHES = re.compile(r"['‘’`]")
 _NON_WORD = re.compile(r"[\W_]+")
 
@@ -47,13 +54,11 @@ def _normalize(name: str) -> str:
     text = "".join(c for c in text if not unicodedata.combining(c))
     text = text.casefold().strip()
     fallback = text
-    text = _BRANCH_WORD.sub(" ", text)
-    text = _HASH_NUMBER.sub(" ", text)
-    text = _DASH_NUMBER.sub("", text)
-    text = _TRAILING_NUMBER.sub("", text)
+    while (stripped := _END_MARKER.sub("", text)) != text:
+        text = stripped
     text = _APOSTROPHES.sub("", text)
     text = _NON_WORD.sub(" ", text).strip()
-    return (text or fallback)[:255]
+    return (text or fallback)[:255].strip()
 
 
 _stores = sa.table(
@@ -84,6 +89,13 @@ def upgrade() -> None:
         sa.UniqueConstraint("user_id", "store_id", name="uq_user_store_alias"),
     )
 
+    op.add_column("receipts", sa.Column("store_name", sa.String(255), nullable=True))
+    op.execute(
+        "UPDATE receipts SET store_name = "
+        "(SELECT stores.name FROM stores WHERE stores.id = receipts.store_id) "
+        "WHERE store_id IS NOT NULL"
+    )
+
     conn = op.get_bind()
     rows = conn.execute(
         sa.select(_stores.c.id, _stores.c.name, _stores.c.normalized_name)
@@ -99,5 +111,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_column("receipts", "store_name")
     op.drop_table("user_store_aliases")
     op.execute("UPDATE stores SET normalized_name = lower(trim(name))")

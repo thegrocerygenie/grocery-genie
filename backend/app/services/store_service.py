@@ -31,38 +31,41 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import Receipt, Store, User, UserStoreAlias
 
-# "Store 1234", "No. 12", "Branch #7": a word that introduces a branch number.
-_BRANCH_WORD = re.compile(
-    r"\b(?:store|str|no|number|branch|location|loc|unit)\.?\s*#?\s*\d+\b"
+# A branch marker at the very end of the name, after some other text:
+# "LOBLAWS #1234", "Loblaws - 1234", "Loblaws Store #0042", "Loblaws No. 12".
+# Only at the end: "Number 1 Chinese" and "Unit 7 Cafe" are names. A bare
+# trailing number is never stripped ("Bar 1802", "Pizza 1990", "Forever 21"):
+# a store sharing a row with another cannot be split by the user, while a
+# missed group costs only a manual merge, so normalization favours precision.
+_END_MARKER = re.compile(
+    r"(?<=\S)(?:"
+    r"\s*#\s*\d+"
+    r"|\s+[-–—]\s*#?\s*\d+"
+    r"|\s+(?:store|str|no|number|branch|location|loc|unit)\.?\s*#?\s*\d+"
+    r")\s*$"
 )
-# "#1234", "# 1234".
-_HASH_NUMBER = re.compile(r"#\s*\d+")
-# "Loblaws - 1234": a dash and a number at the end.
-_DASH_NUMBER = re.compile(r"\s*[-–—]\s*\d+\s*$")
-# "Loblaws 1234": a bare number of 3+ digits at the end ("Food 4 Less" stays).
-_TRAILING_NUMBER = re.compile(r"\s+\d{3,}\s*$")
 _APOSTROPHES = re.compile(r"['‘’`]")
 _NON_WORD = re.compile(r"[\W_]+")
+# stores.normalized_name is String(255).
+MAX_NORMALIZED_LENGTH = 255
 
 
 def normalize_store_name(name: str) -> str:
     """The name every branch and spelling of one store shares.
 
-    Casefolded, accents dropped, branch numbers dropped, punctuation turned
-    into single spaces. A different banner of the same chain is not this
-    function's job: the user merges it.
+    Casefolded, accents dropped, a branch marker at the end dropped,
+    punctuation turned into single spaces. A different banner of the same
+    chain is not this function's job: the user merges it.
     """
     text = unicodedata.normalize("NFKD", name)
     text = "".join(c for c in text if not unicodedata.combining(c))
     text = text.casefold().strip()
     fallback = text
-    text = _BRANCH_WORD.sub(" ", text)
-    text = _HASH_NUMBER.sub(" ", text)
-    text = _DASH_NUMBER.sub("", text)
-    text = _TRAILING_NUMBER.sub("", text)
+    while (stripped := _END_MARKER.sub("", text)) != text:
+        text = stripped
     text = _APOSTROPHES.sub("", text)
     text = _NON_WORD.sub(" ", text).strip()
-    return text or fallback
+    return (text or fallback)[:MAX_NORMALIZED_LENGTH].strip()
 
 
 class StoreNotFoundError(Exception):
@@ -75,7 +78,9 @@ class StoreAlreadyMergedError(Exception):
 
 @dataclass(frozen=True)
 class StoreGroup:
-    """A store as one user sees it: the group root's id and name."""
+    """A store as one user sees it: the group root's id, and the name on the
+    user's own oldest receipt of it (the shared row's name, which another
+    user's receipt may have given it, only when the user has none)."""
 
     id: uuid.UUID
     name: str
@@ -94,10 +99,15 @@ class _Resolver:
         rows: dict[uuid.UUID, Store],
         roots: dict[str, Store],
         aliases: dict[uuid.UUID, uuid.UUID],
+        own_names: dict[str, str],
     ) -> None:
         self.rows = rows
         self.roots = roots
         self.aliases = aliases
+        self.own_names = own_names
+
+    def name(self, store: Store) -> str:
+        return self.own_names.get(store.normalized_name, store.name)
 
     def root(self, store_id: uuid.UUID) -> Store | None:
         row = self.rows.get(store_id)
@@ -112,7 +122,7 @@ class _Resolver:
             target = self.root(target_id)
             if target is not None:
                 root = target
-        return StoreGroup(id=root.id, name=root.name)
+        return StoreGroup(id=root.id, name=self.name(root))
 
 
 class StoreService:
@@ -154,6 +164,7 @@ class StoreService:
         ids = {i for i in store_ids if i is not None} | set(aliases.values())
         rows: dict[uuid.UUID, Store] = {}
         roots: dict[str, Store] = {}
+        own_names: dict[str, str] = {}
         if ids:
             rows = {
                 s.id: s
@@ -171,7 +182,22 @@ class StoreService:
             ).scalars():
                 roots.setdefault(store.normalized_name, store)
                 rows.setdefault(store.id, store)
-        return _Resolver(rows, roots, aliases)
+            # Shared rows keep their first receipt's name, maybe another
+            # user's: name each store as the user's own oldest receipt does.
+            for normalized, own in (
+                await self.db.execute(
+                    select(Store.normalized_name, Receipt.store_name)
+                    .join(Store, Store.id == Receipt.store_id)
+                    .where(
+                        Receipt.user_id == user_id,
+                        Receipt.store_name.is_not(None),
+                        Store.normalized_name.in_(names),
+                    )
+                    .order_by(Receipt.date, Receipt.created_at, Receipt.id)
+                )
+            ).all():
+                own_names.setdefault(normalized, own)
+        return _Resolver(rows, roots, aliases, own_names)
 
     async def groups(
         self, user_id: uuid.UUID, store_ids: Iterable[uuid.UUID | None]
@@ -190,8 +216,8 @@ class StoreService:
 
     async def check_shopped(self, user_id: uuid.UUID, store_id: uuid.UUID) -> None:
         """Stores are shared: a user may act only on a store they have a
-        receipt from, or another row of the same normalized name (the group
-        root the API hands out)."""
+        receipt from (not deleted), or another row of the same normalized
+        name (the group root the API hands out)."""
         store = await self.db.get(Store, store_id)
         if store is None:
             raise StoreNotFoundError(store_id)
@@ -200,6 +226,7 @@ class StoreService:
             .join(Store, Store.id == Receipt.store_id)
             .where(
                 Receipt.user_id == user_id,
+                Receipt.deleted_at.is_(None),
                 Store.normalized_name == store.normalized_name,
             )
             .limit(1)
@@ -241,7 +268,7 @@ class StoreService:
             if source is None:
                 continue
             merged.setdefault(target_id, []).append(
-                StoreGroup(id=source.id, name=source.name)
+                StoreGroup(id=source.id, name=resolver.name(source))
             )
 
         summaries = [

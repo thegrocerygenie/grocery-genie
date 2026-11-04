@@ -315,3 +315,81 @@ async def test_a_price_alert_names_the_merged_store(client, db_session):
 
     [alert] = await _alerts(db_session)
     assert " at Loblaws," in alert.body
+
+
+# --- names never cross accounts ----------------------------------------------
+
+
+async def _another_user_shops_at(db_session, name: str) -> Store:
+    """User B's receipt saved first, so the shared row carries B's name."""
+    from datetime import date
+
+    from app.models.database import Receipt
+    from app.services.store_service import StoreService
+
+    await ensure_user(db_session, USER_B_ID)
+    store = await StoreService(db_session).find_or_create(name)
+    db_session.add(
+        Receipt(
+            user_id=USER_B_ID,
+            store_id=store.id,
+            store_name=name,
+            date=date(2026, 3, 1),
+            status="confirmed",
+            currency="USD",
+        )
+    )
+    await db_session.flush()
+    return store
+
+
+async def test_a_receipt_shows_its_own_store_name_not_another_users(client, db_session):
+    """Two users share one store row; each receipt keeps the name printed on
+    it, and the user's store views use their own name."""
+    store = await _another_user_shops_at(db_session, "LOBLAWS #1234")
+    receipt = await _manual(client, "Loblaws", "2026-03-02", "Limes", 1.0)
+    await _manual(client, "Loblaws", "2026-03-03", "Limes", 1.0)
+
+    assert receipt["store_name"] == "Loblaws"
+    detail = (await client.get(f"/api/receipts/{receipt['id']}")).json()
+    assert detail["store_name"] == "Loblaws"
+    history = (await client.get("/api/receipts")).json()
+    assert {r["store_name"] for r in history["items"]} == {"Loblaws"}
+    [mine] = await _stores(client)
+    assert (mine["id"], mine["name"]) == (str(store.id), "Loblaws")
+    item_id = await _item_id(client, "limes")
+    [compared] = (await _compare(client, item_id))["stores"]
+    assert compared["store_name"] == "Loblaws"
+    text = str((await client.get(f"/api/items/{item_id}/prices")).json())
+    assert "#1234" not in text
+    # The shared row is untouched.
+    await db_session.refresh(store)
+    assert store.name == "LOBLAWS #1234"
+
+
+async def test_correcting_the_store_name_keeps_the_correction(client, db_session):
+    """A correction to a name of the same store (same normalized row) is kept
+    on the receipt, not dropped for the row's name."""
+    await _another_user_shops_at(db_session, "Loblaws")
+    receipt = await _manual(client, "Loblaws", "2026-03-02", "Limes", 1.0)
+
+    resp = await client.patch(
+        f"/api/receipts/{receipt['id']}", json={"store_name": "LOBLAWS #99"}
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["store_name"] == "LOBLAWS #99"
+    detail = (await client.get(f"/api/receipts/{receipt['id']}")).json()
+    assert detail["store_name"] == "LOBLAWS #99"
+    # The history filter searches the names on the user's own receipts.
+    found = (await client.get("/api/receipts", params={"store": "#99"})).json()
+    assert [r["id"] for r in found["items"]] == [receipt["id"]]
+
+
+async def test_the_history_filter_never_matches_another_users_name(client, db_session):
+    await _another_user_shops_at(db_session, "Unit 7 Cafe #3")
+    await _manual(client, "Unit 7 Cafe", "2026-03-02", "Limes", 1.0)
+
+    found = (await client.get("/api/receipts", params={"store": "#3"})).json()
+
+    assert found["items"] == []

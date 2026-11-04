@@ -512,6 +512,12 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | EC-PI | 1 | Store normalization: branch numbers and punctuation drop out | Integration | `backend/tests/api/test_store_merge.py::test_branch_numbers_normalize_into_one_store` | Pass |
 | EC-PI | 1 | Store normalization: existing rows kept, grouped under the oldest | Integration | `backend/tests/services/test_store_service.py::test_older_rows_that_now_normalize_together_group_together` | Pass |
 | EC-PI | 1 | Store normalization: existing rows kept, grouped under the oldest | Unit | `backend/tests/services/test_store_service.py::test_the_migration_normalized_existing_stores_the_same_way` | Pass |
+| EC-PI | 1 | Store normalization favours precision: no false groups | Unit | `backend/tests/services/test_store_service.py::test_different_stores_never_normalize_together` | Pass |
+| EC-PI | 1 | Store normalization favours precision: no false groups | Unit | `backend/tests/services/test_store_service.py::test_the_normalized_name_fits_the_column` | Pass |
+| EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/api/test_store_merge.py::test_a_receipt_shows_its_own_store_name_not_another_users` | Pass |
+| EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/api/test_store_merge.py::test_correcting_the_store_name_keeps_the_correction` | Pass |
+| EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/api/test_store_merge.py::test_the_history_filter_never_matches_another_users_name` | Pass |
+| EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/services/test_store_service.py::test_a_group_is_named_as_the_users_own_receipts_name_it` | Pass |
 | EC-PI | 1 | Store list: the user's stores as they group | Integration | `backend/tests/api/test_store_merge.py::test_the_store_list_leaves_out_deleted_receipts` | Pass |
 | EC-PI | 1 | User merge: per-user only, shared rows untouched (D3) | Integration | `backend/tests/services/test_store_service.py::test_a_merge_groups_only_that_users_stores` | Pass |
 | EC-PI | 1 | User merge: per-user only, shared rows untouched (D3) | Integration | `backend/tests/api/test_store_merge.py::test_another_users_merge_never_changes_my_grouping` | Pass |
@@ -525,6 +531,7 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | EC-PI | 1 | User merge: only stores the user shopped at | Integration | `backend/tests/services/test_store_service.py::test_a_branch_of_a_shopped_store_counts_as_shopped` | Pass |
 | EC-PI | 1 | User merge: only stores the user shopped at | Integration | `backend/tests/api/test_store_merge.py::test_merging_a_store_the_user_never_shopped_at_is_404` | Pass |
 | EC-PI | 1 | User merge: only stores the user shopped at | Integration | `backend/tests/api/test_store_merge.py::test_merge_needs_a_target` | Pass |
+| EC-PI | 1 | User merge: only stores the user shopped at | Integration | `backend/tests/services/test_store_service.py::test_a_store_on_only_deleted_receipts_is_not_shopped` | Pass |
 | EC-PI | 1 | Unmerge undoes a merge | Integration | `backend/tests/api/test_store_merge.py::test_unmerge_splits_the_stores_again` | Pass |
 | EC-PI | 1 | Store mutes follow the user's grouping (PI-03 AC 4) | Integration | `backend/tests/api/test_store_merge.py::test_a_muted_store_merged_into_another_mutes_the_merged_store` | Pass |
 | EC-PI | 1 | Store mutes follow the user's grouping (PI-03 AC 4) | Integration | `backend/tests/api/test_store_merge.py::test_after_unmerge_a_mute_stays_with_the_store_it_was_set_on` | Pass |
@@ -536,6 +543,7 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | EC-PI | 1 | Merge and unmerge from Settings → Stores (app) | Component | `mobile/src/__tests__/storeMerge.test.tsx` "unmerges a merged store" | Pass |
 | EC-PI | 1 | Merge and unmerge from Settings → Stores (app) | Component | `mobile/src/__tests__/storeMerge.test.tsx` "lists the stores with their receipt counts" | Pass |
 | EC-PI | 1 | Merge and unmerge from Settings → Stores (app) | Component | `mobile/src/__tests__/storeMerge.test.tsx` "says so when a merge fails" | Pass |
+| EC-PI | 1 | Merge and unmerge from Settings → Stores (app) | Component | `mobile/src/__tests__/storeMerge.test.tsx` "scrolls the merge sheet when the user has many stores" | Pass |
 | EC-PI | 1 | Merge and unmerge from Settings → Stores (app) | Component | `mobile/src/__tests__/settingsHub.test.tsx` "opens Stores, where the user merges the same store (V11-05)" | Pass |
 | EC-PI | 1 | Merge and unmerge from Settings → Stores (app) | Manual | Simulator + VoiceOver check of Settings → Stores and its merge sheet; API-only verify cannot drive it | Pending |
 

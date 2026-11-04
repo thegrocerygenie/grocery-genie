@@ -210,6 +210,10 @@ class Receipt(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     household_id: Mapped[uuid.UUID | None] = mapped_column()
     store_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("stores.id"))
+    # The store name printed on this receipt, or the user's correction of it.
+    # The store row is shared and keeps the name its first receipt gave it,
+    # so a receipt shows this, never the row's name (V11-05).
+    store_name: Mapped[str | None] = mapped_column(String(255))
     date: Mapped[date] = mapped_column(Date, nullable=False)
     subtotal: Mapped[float | None] = mapped_column(Numeric(12, 2))
     tax: Mapped[float | None] = mapped_column(Numeric(12, 2))

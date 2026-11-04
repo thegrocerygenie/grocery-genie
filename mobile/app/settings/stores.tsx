@@ -154,10 +154,14 @@ function MergeSheet({ source, targets, onPick, onClose }: MergeSheetProps) {
               {COPY.pickerTitle(source.name)}
             </Text>
           ) : null}
-          <View style={styles.listCard}>
-            {targets.map((t, i) => (
+          {/* A list that scrolls inside the capped sheet: a user can have many stores. */}
+          <FlatList
+            testID="merge-sheet-list"
+            style={[styles.listCard, styles.sheetList]}
+            data={targets}
+            keyExtractor={(t) => t.id}
+            renderItem={({ item: t, index: i }) => (
               <Pressable
-                key={t.id}
                 onPress={() => onPick(t)}
                 style={[styles.row, i > 0 && styles.rowDivider]}
                 accessibilityRole="button"
@@ -167,8 +171,8 @@ function MergeSheet({ source, targets, onPick, onClose }: MergeSheetProps) {
                   {t.name}
                 </Text>
               </Pressable>
-            ))}
-          </View>
+            )}
+          />
           <Pressable
             onPress={onClose}
             style={[styles.listCard, styles.row, styles.cancel]}
@@ -273,10 +277,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
+    maxHeight: '80%',
     padding: spacing.lg,
     paddingBottom: spacing.xxl,
     gap: spacing.sm,
   },
+  // Takes only the room its rows need, and shrinks to scroll in the capped sheet.
+  sheetList: { flexGrow: 0, flexShrink: 1 },
   sheetTitle: {
     ...type.footnote,
     color: colors.iosLabel2,

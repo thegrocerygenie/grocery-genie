@@ -315,7 +315,8 @@ class ExportService:
         return ExportReceipt(
             id=receipt.id,
             date=receipt.date,
-            store_name=store.name if store else None,
+            # The name on the user's own receipt, never the shared row's.
+            store_name=receipt.store_name,
             store_location=store.location if store else None,
             subtotal=_num(receipt.subtotal),
             tax=_num(receipt.tax),

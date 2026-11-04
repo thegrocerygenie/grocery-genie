@@ -31,7 +31,6 @@ from tests.conftest import DEV_USER_ID, USER_B_ID, ensure_user
         ("Loblaws # 1234", "loblaws"),
         ("Loblaws#1234", "loblaws"),
         ("Loblaws - 1234", "loblaws"),
-        ("Loblaws 1234", "loblaws"),
         ("Loblaws Store 1234", "loblaws"),
         ("Loblaws Store #0042", "loblaws"),
         ("Loblaws No. 12", "loblaws"),
@@ -48,12 +47,47 @@ from tests.conftest import DEV_USER_ID, USER_B_ID, ensure_user
         ("Food 4 Less", "food 4 less"),
         # A different banner is not normalization's job: the user merges it.
         ("REAL CANADIAN SUPERSTORE", "real canadian superstore"),
-        # Nothing left after stripping: keep the casefolded text.
-        ("#1234", "#1234"),
+        ("Forever 21", "forever 21"),
+        ("Costco 2", "costco 2"),
+        # Precision first: a bare trailing number may be part of the name
+        # ("Bar 1802"), so it stays; the user merges "LOBLAWS 1234" by hand.
+        ("LOBLAWS 1234", "loblaws 1234"),
+        ("Dollarama 1000", "dollarama 1000"),
+        # A marker with nothing before it is the whole name.
+        ("#1234", "1234"),
+        ("Store 12", "store 12"),
     ],
 )
 def test_normalize_store_name(raw, expected):
     assert normalize_store_name(raw) == expected
+
+
+@pytest.mark.parametrize(
+    ("a", "b"),
+    [
+        # A branch word is stripped only at the end, never inside a name.
+        ("Number 1 Chinese", "Chinese"),
+        ("Unit 7 Cafe", "Loc 8 Cafe"),
+        ("Location 1 Pizza", "Pizza"),
+        ("No. 12 Bakery", "Bakery"),
+        # A bare trailing number is part of the name (years, street numbers).
+        ("Bar 1920", "Bar 1802"),
+        ("Bar 1802", "Bar"),
+        ("Pizza 1990", "Pizza"),
+        ("Bodega 101", "Bodega"),
+        ("Forever 21", "Forever"),
+        ("Costco 2", "Costco"),
+    ],
+)
+def test_different_stores_never_normalize_together(a, b):
+    """A false group cannot be undone by the user (rows are shared); a missed
+    one costs a manual merge. So normalization favours precision."""
+    assert normalize_store_name(a) != normalize_store_name(b)
+
+
+def test_the_normalized_name_fits_the_column():
+    assert len(normalize_store_name("x" * 400)) == 255
+    assert len(normalize_store_name("a " * 300)) <= 255
 
 
 def test_the_migration_normalized_existing_stores_the_same_way():
@@ -69,7 +103,17 @@ def test_the_migration_normalized_existing_stores_the_same_way():
     spec = importlib.util.spec_from_file_location("m0019", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    for raw in ["LOBLAWS #1234", "Loblaws - 1234", "Trader Joe's", "Métro", "#1"]:
+    for raw in [
+        "LOBLAWS #1234",
+        "Loblaws - 1234",
+        "Trader Joe's",
+        "Métro",
+        "#1",
+        "Number 1 Chinese",
+        "Bar 1802",
+        "Loblaws Store #0042",
+        "x" * 400,
+    ]:
         assert module._normalize(raw) == normalize_store_name(raw)
 
 
@@ -114,6 +158,7 @@ async def _shop(db_session, user_id: uuid.UUID, name: str) -> Store:
         Receipt(
             user_id=user_id,
             store_id=store.id,
+            store_name=name,
             date=date(2026, 3, 1),
             status="confirmed",
             currency="USD",
@@ -218,3 +263,33 @@ async def test_a_branch_of_a_shopped_store_counts_as_shopped(db_session):
 
     groups = await service.groups(DEV_USER_ID, [other.id, newer.id])
     assert groups[other.id] == groups[newer.id]
+
+
+async def test_a_store_on_only_deleted_receipts_is_not_shopped(db_session):
+    """A receipt in Recently Deleted is not one the user still has."""
+    from datetime import UTC, datetime
+
+    from app.models.database import Receipt
+
+    kept = await _shop(db_session, DEV_USER_ID, "A Mart")
+    gone = await _shop(db_session, DEV_USER_ID, "B Mart")
+    receipt = await db_session.scalar(
+        select(Receipt).where(Receipt.store_id == gone.id)
+    )
+    receipt.deleted_at = datetime.now(UTC)
+    await db_session.flush()
+
+    with pytest.raises(StoreNotFoundError):
+        await StoreService(db_session).merge(DEV_USER_ID, gone.id, kept.id)
+
+
+async def test_a_group_is_named_as_the_users_own_receipts_name_it(db_session):
+    """The shared row keeps the name its first receipt gave it, which can be
+    another user's: each user sees the name on their own oldest receipt."""
+    theirs = await _shop(db_session, USER_B_ID, "LOBLAWS #1234")
+    mine = await _shop(db_session, DEV_USER_ID, "Loblaws")
+    assert mine.id == theirs.id
+
+    groups = await StoreService(db_session).groups(DEV_USER_ID, [mine.id])
+
+    assert groups[mine.id].name == "Loblaws"

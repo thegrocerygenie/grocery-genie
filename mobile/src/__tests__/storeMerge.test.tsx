@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Alert } from 'react-native';
+import { Alert, FlatList, StyleSheet } from 'react-native';
 import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 
 import StoresScreen from '../../app/settings/stores';
@@ -126,6 +126,31 @@ it('has no merge button with a single store', async () => {
   expect(
     screen.getByText('Once you shop at a second store, you can merge two that are the same.'),
   ).toBeTruthy();
+});
+
+it('scrolls the merge sheet when the user has many stores', async () => {
+  const many: StoreList = {
+    stores: Array.from({ length: 40 }, (_, i) => ({
+      id: `s-${i}`,
+      name: `Store ${String(i).padStart(2, '0')}`,
+      receipt_count: 1,
+      merged_stores: [],
+    })),
+  };
+  mockApi.listStores.mockResolvedValue(many);
+  renderScreen();
+
+  fireEvent.press(await screen.findByLabelText('Merge Store 00 into another store'));
+
+  // A FlatList (a scroll view), capped in height, holds every other store.
+  const sheetList = screen.getByTestId('merge-sheet-list');
+  expect(sheetList.type).toBe('RCTScrollView');
+  const lists = screen.UNSAFE_getAllByType(FlatList);
+  const sheet = lists.find((l) => l.props.testID === 'merge-sheet-list');
+  expect(sheet?.props.data).toHaveLength(39);
+  expect(StyleSheet.flatten(sheet?.props.style)).toEqual(
+    expect.objectContaining({ flexGrow: 0 }),
+  );
 });
 
 it('shows an empty state with no stores', async () => {

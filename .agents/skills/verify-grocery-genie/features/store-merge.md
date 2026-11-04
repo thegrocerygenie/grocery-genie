@@ -1,10 +1,12 @@
 # Store normalization and user store merge (V1.1)
 
-"Loblaws", "LOBLAWS #1234" and "Loblaws - 1234" are one store for everyone: branch numbers and punctuation normalize away. A different banner ("REAL CANADIAN SUPERSTORE") is joined only by the user's own merge, which groups that user's prices in history, item stats, cross-store comparison, price alerts and store mutes, and nobody else's (EC Price Intelligence 1, decision D3). A merge can be undone. Free, like the rest of price intelligence.
+"Loblaws", "LOBLAWS #1234" and "Loblaws - 1234" are one store for everyone: a branch marker at the end and punctuation normalize away, and nothing else, so different stores ("Number 1 Chinese" / "Chinese", "Bar 1802" / "Bar") never share a row. Each receipt keeps its own store name, so another user's name never shows. A different banner ("REAL CANADIAN SUPERSTORE") is joined only by the user's own merge, which groups that user's prices in history, item stats, cross-store comparison, price alerts and store mutes, and nobody else's (EC Price Intelligence 1, decision D3). A merge can be undone. Free, like the rest of price intelligence.
 
 ## Sub-features
 
 - `store.normalize`: receipts at "Loblaws", "LOBLAWS #1234" and "Loblaws - 1234" share one `stores` row; `GET /api/stores` lists one "Loblaws" with all their receipts.
+- `store.no-false-group`: "Number 1 Chinese" and "Chinese", "Bar 1802" and "Bar" stay four stores.
+- `store.own-name`: the other user's receipt created the shared Loblaws row as "LOBLAWS #5555"; this user's receipt, store list and comparison say "Loblaws", a `PATCH` to "LOBLAWS #99" is kept on the receipt, and the history `store` filter finds "#99" but never "#5555".
 - `store.list`: `GET /api/stores` lists the user's stores by name with `receipt_count` and `merged_stores`.
 - `store.merge`: `POST /api/stores/{id}/merge` groups the Superstore under Loblaws: `/compare` shows one store with all four prices, `stores_below_minimum` counts groups, `/prices` names Loblaws on every point with `store_count` 1, and the `store` filter by either id returns the whole group.
 - `store.merge-refused`: merging into its own group is 409; a store the user never shopped at is 404.
@@ -22,15 +24,22 @@ Settings → Stores (`mobile/app/settings/stores.tsx`): the user's stores with t
 
 ```bash
 lime() { $G api POST /api/receipts "{\"store_name\":\"$1\",\"date\":\"$2\",\"total\":$3,\"items\":[{\"name\":\"${4:-Limes}\",\"quantity\":1,\"unit_price\":$3,\"total_price\":$3}]}"; }
-$G signup store-other                         # another user shops at both banners
-lime "Loblaws" 2026-03-01 1.00 > /dev/null; lime "REAL CANADIAN SUPERSTORE" 2026-03-02 0.80 > /dev/null
+$G signup store-other                         # another user shops at both banners, first
+lime "LOBLAWS #5555" 2026-03-01 1.00 > /dev/null; lime "REAL CANADIAN SUPERSTORE" 2026-03-02 0.80 > /dev/null
 $G signup store-merge
-lime "Loblaws" 2026-03-01 1.00 > /dev/null; lime "LOBLAWS #1234" 2026-03-08 1.05 > /dev/null
+lob1=$(lime "Loblaws" 2026-03-01 1.00 | jq -r .id); lob2=$(lime "LOBLAWS #1234" 2026-03-08 1.05 | jq -r .id)
 lime "REAL CANADIAN SUPERSTORE" 2026-03-03 0.98 > /dev/null; lime "Real Canadian Superstore - 1520" 2026-03-10 1.02 > /dev/null
 lime "FreshCo" 2026-03-04 1.00 Kiwis > /dev/null
+for s in "Number 1 Chinese" "Chinese" "Bar 1802" "Bar"; do lime "$s" 2026-03-05 1.00 Kiwis > /dev/null; done
 $G api GET /api/stores | jq -c '[.stores[] | [.name, .receipt_count, (.merged_stores | length)]]'
-# store.normalize + store.list: [["FreshCo",1,0],["Loblaws",2,0],["REAL CANADIAN SUPERSTORE",2,0]]
-$G sql "SELECT name, normalized_name FROM stores ORDER BY name"   # one row per normalized name
+# store.normalize + store.list + store.no-false-group + store.own-name:
+# [["Bar",1,0],["Bar 1802",1,0],["Chinese",1,0],["FreshCo",1,0],["Loblaws",2,0],["Number 1 Chinese",1,0],["REAL CANADIAN SUPERSTORE",2,0]]
+$G sql "SELECT name, normalized_name FROM stores ORDER BY name"   # one row per normalized name; the Loblaws row is "LOBLAWS #5555"
+# store.own-name: the receipt keeps its own name; a correction to the same store is kept; the filter sees only own names
+$G api GET /api/receipts/$lob1 | jq -r .store_name                                   # Loblaws
+$G api PATCH /api/receipts/$lob2 '{"store_name":"LOBLAWS #99"}' | jq -r .store_name  # LOBLAWS #99
+$G api GET '/api/receipts?store=%2399' | jq -c '[.items[].id] == ["'$lob2'"]'        # true
+$G api GET '/api/receipts?store=%235555' | jq '.total'                               # 0
 lob=$($G api GET /api/stores | jq -r '.stores[] | select(.name=="Loblaws") | .id')
 rcss=$($G api GET /api/stores | jq -r '.stores[] | select(.name=="REAL CANADIAN SUPERSTORE") | .id')
 fresh=$($G api GET /api/stores | jq -r '.stores[] | select(.name=="FreshCo") | .id')
@@ -72,5 +81,6 @@ $G api POST /api/stores/00000000-0000-0000-0000-0000000000ff/merge "{\"into_stor
 - The price alert cooldown is per item (7 days on the server clock), so the setup's Limes prices stay within 10% of each other (no alert yet), the mute check comes before the alert-name check, and the alert-name step is the first Limes alert. A setup price 10% off the running average alerts at once and uses up the cooldown, and the later checks then see that one alert (seen in run `20261104-045758`).
 - `$G sql` needs the docker shim first on `PATH` in a container without a Docker daemon, as `launch` does.
 - Every user here is free (`signup` makes no Premium user), so a pass also proves `store.free`.
-- Verified 2026-11-04 against Postgres 16 in debug mode (run `20261104-045939`).
+- Verified 2026-11-04 against Postgres 16 in debug mode (run `20261104-045939`; again with the end-only branch markers and per-receipt store names, run `20261104-052245`).
+- The filler stores (Chinese, Bar) buy Kiwis at one price, so they add no price alert.
 - A mute is recorded on the group's store: after `DELETE /api/stores/{id}/merge`, a mute set on the group stays with the group's store, one set before the merge stays with the merged store.

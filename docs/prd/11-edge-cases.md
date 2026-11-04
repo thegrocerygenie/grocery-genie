@@ -18,7 +18,7 @@
 
 ## Price Intelligence
 
-1. **Store name variations:** "Loblaws" vs. "Loblaws #1234" vs. "REAL CANADIAN SUPERSTORE" — store normalization with user merge. **Built in V1.1 (V11-05, decision D3):** branch numbers and punctuation normalize away for everyone; a user's merge (Settings → Stores) groups only that user's prices and never renames a shared store, and can be undone. Contract: `08-api-contracts.md`, "Stores: normalization and merge".
+1. **Store name variations:** "Loblaws" vs. "Loblaws #1234" vs. "REAL CANADIAN SUPERSTORE" — store normalization with user merge. **Built in V1.1 (V11-05, decision D3):** a branch marker at the end ("#1234", "- 1234", "Store 12") and punctuation normalize away for everyone, favouring precision (a bare trailing number or a branch word inside a name stays); a user's merge (Settings → Stores) groups only that user's prices and never renames a shared store, and can be undone. Contract: `08-api-contracts.md`, "Stores: normalization and merge".
 2. **Unit price ambiguity:** Per-kg vs. per-unit tracked via unit_of_measure. Only like-for-like compared.
 3. **Promotional/sale prices:** No special handling. Recorded as regular observations. Averages naturally account for promotions.
 
