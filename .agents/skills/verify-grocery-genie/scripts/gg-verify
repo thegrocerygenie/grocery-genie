@@ -143,6 +143,19 @@ cmd_launch() {
   done
   curl -sf "$BASE/health" > /dev/null || { tail -20 "$run/server.log" >&2; die "no answer on $BASE/health after 30s"; }
 
+  # A Celery worker on this run's Redis DB, for tasks the API enqueues (the
+  # waitlist claim link, V11-P5). No beat: scheduled tasks run only when a
+  # journey asks (gg-verify waitlist ...). --purge drops a crashed run's queue.
+  echo "== starting the Celery worker (log: worker.log)" >&2
+  (cd "$BACKEND" || exit 1; nohup "$VENV/celery" -A app.tasks worker --pool=solo --purge \
+    --loglevel=info --hostname "gg-verify-$PORT@%h" > "$run/worker.log" 2>&1 & echo $! > "$STATE/worker_pid")
+  for i in $(seq 1 30); do
+    grep -q " ready\." "$run/worker.log" 2>/dev/null && break
+    kill -0 "$(cat "$STATE/worker_pid")" 2>/dev/null || { tail -20 "$run/worker.log" >&2; die "the Celery worker exited during startup"; }
+    sleep 1
+  done
+  grep -q " ready\." "$run/worker.log" || { tail -20 "$run/worker.log" >&2; die "the Celery worker is not ready after 30s"; }
+
   # Ready means usable: a sign-up writes to the migrated database and the token authenticates.
   cmd_signup probe > /dev/null
   cmd_api GET /api/users/me > /dev/null || die "probe user could not read /api/users/me"
@@ -157,6 +170,7 @@ cmd_launch() {
     echo "base_url: $BASE"
     echo "database: $DB"
     echo "pid: $pid"
+    echo "worker_pid: $(cat "$STATE/worker_pid")"
     echo "git_head: $(git -C "$REPO" rev-parse --short HEAD)"
     echo "code_fingerprint: $(code_fingerprint)"
     echo "alembic: $(psql_db "$DB" -c 'SELECT version_num FROM alembic_version')"
@@ -179,6 +193,7 @@ cmd_doctor() {
   if [ -n "$head" ] && [ "$head" = "$current" ]; then ok "database $DB is at migration head $head"; else bad "database $DB is at '$current', head is '$head'"; fi
   local launched; launched="$(sed -n 's/^code_fingerprint: //p' "$STATE/launch.txt" 2>/dev/null)"
   if [ "$launched" = "$(code_fingerprint)" ]; then ok "backend code unchanged since launch"; else bad "backend code changed since launch; cleanup and launch again to drive the current code"; fi
+  if [ -f "$STATE/worker_pid" ] && kill -0 "$(cat "$STATE/worker_pid")" 2>/dev/null; then ok "Celery worker $(cat "$STATE/worker_pid") is alive"; else bad "the Celery worker is gone (claim links will not be sent)"; fi
   if [ -f "$STATE/token" ]; then
     local code; code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(cat "$STATE/token")" "$BASE/api/users/me")"
     if [ "$code" = "200" ]; then ok "stored token authenticates ($(cat "$STATE/email"))"; else bad "stored token gets $code from /api/users/me; run signup again"; fi
@@ -365,6 +380,15 @@ cmd_cleanup() {
   guard_db
   local run=""
   [ -f "$STATE/run_id" ] && run="$ROOT/runs/$(cat "$STATE/run_id")"
+  if [ -f "$STATE/worker_pid" ]; then
+    local wpid; wpid="$(cat "$STATE/worker_pid")"
+    if kill -0 "$wpid" 2>/dev/null && ps -p "$wpid" -o command= | grep -q "gg-verify-$PORT@"; then
+      kill "$wpid"
+      local j; for j in $(seq 1 10); do kill -0 "$wpid" 2>/dev/null || break; sleep 1; done
+      kill -0 "$wpid" 2>/dev/null && kill -9 "$wpid"
+      echo "stopped Celery worker pid $wpid" >&2
+    fi
+  fi
   if [ -f "$STATE/stub_pid" ]; then
     local spid; spid="$(cat "$STATE/stub_pid")"
     if kill -0 "$spid" 2>/dev/null && ps -p "$spid" -o command= | grep -q "revenuecat-stub.py"; then

@@ -206,10 +206,13 @@ GG_REVENUECAT_API_KEY=sk_...
 # GG_PREMIUM_LAUNCHED_AT=2026-12-01T17:00:00Z
 # GG_WAITLIST_EMAIL_HASH_SALT=<random, 64 hex characters>
 # The marketing site's Resend audience (its RESEND_AUDIENCE_ID). The daily
-# task copies it while the window is open, with GG_RESEND_API_KEY above (a
-# full-access key: a sending-only key can't read contacts). Leave it empty to
-# load a one-off CSV export instead (2.10).
+# task copies it while the window is open, and beat deletes its contacts
+# once the window has closed (2.10). Leave it empty to load a one-off CSV
+# export instead (the contacts are then deleted by hand).
 # GG_RESEND_WAITLIST_AUDIENCE_ID=
+# The key for that audience: it reads and deletes contacts, so it must be a
+# full-access key (a sending-only key can't). Empty: GG_RESEND_API_KEY above.
+# GG_RESEND_AUDIENCE_API_KEY=re_...
 # The day the site switched to App Store downloads (PUBLIC_LAUNCH_STATE=b,
 # decisions #9). Only contacts created before it qualify; unset, all do.
 # GG_WAITLIST_CUTOFF=2026-12-01
@@ -564,7 +567,9 @@ email. Accounts whose email differs (Apple's Hide My Email) use Settings →
 1. **The switch to App Store downloads:** record the date in decisions #9 and
    set `GG_WAITLIST_CUTOFF` to it.
 2. **The waitlist source:** set `GG_RESEND_WAITLIST_AUDIENCE_ID` to the site's
-   `RESEND_AUDIENCE_ID` (the API key must be able to read contacts), or take a
+   `RESEND_AUDIENCE_ID`, and `GG_RESEND_AUDIENCE_API_KEY` to a full-access
+   Resend key if `GG_RESEND_API_KEY` is sending-only (the audience key reads
+   the contacts now and deletes them when the window closes), or take a
    CSV export of the audience at the cut-off (Resend → Audience → Export) and
    load it on the server:
    `docker compose exec api python -m app.tasks.waitlist_tasks import-csv /app/storage/audience.csv`.
@@ -575,14 +580,38 @@ email. Accounts whose email differs (Apple's Hide My Email) use Settings →
    `docker compose exec api python -m app.tasks.waitlist_tasks backfill`.
    From then on, sign-in with Apple or Google, `verify-email` and a confirmed
    email change match as they happen, and beat reruns the sync and match daily.
-4. **Grants RevenueCat refused** stay pending and beat retries them every 15
-   minutes. Pending rows: `SELECT count(*) FROM waitlist_redemptions WHERE
-   status = 'pending'` (`last_error` says why).
-5. **When the window closes** (90 days after launch), beat deletes the
-   `waitlist_entries` copy and the unlinked hashes left by deleted accounts.
-   **Deleting the Resend audience itself is a manual step** (decision #11):
-   put it in the calendar for that day, then delete the audience in Resend.
-   The code never deletes it.
+4. **Grants RevenueCat could not take.** Inside sign-in, `verify-email`,
+   an email change or the claim link, a grant waits at most
+   `GG_WAITLIST_INLINE_GRANT_TIMEOUT_SECONDS` (3 s) for RevenueCat; past it,
+   or on a 5xx, 408 or 429, it stays `pending` and beat retries it every 15
+   minutes. A row becomes `failed` and is never retried on a RevenueCat 4xx
+   (`last_error` `revenuecat_rejected_<code>`: check the secret key and the
+   entitlement id), after `GG_WAITLIST_GRANT_MAX_ATTEMPTS` (24) attempts
+   (`too_many_attempts`), or when the window closes first (`window_closed`).
+   The app shows a failed row as pending. Watch them:
+   `SELECT status, last_error, count(*) FROM waitlist_redemptions GROUP BY 1, 2`.
+   After fixing the cause, inside the window, set a failed row back with
+   `UPDATE waitlist_redemptions SET status = 'pending', attempts = 0 WHERE
+   status = 'failed' AND last_error LIKE 'revenuecat_rejected_%'`.
+5. **The claim step** ("Claim your waitlist offer") answers `202` at once for
+   any email and enqueues a Celery task that looks the email up and sends
+   the link, so the **worker must be running**. A failed Resend send is
+   logged by the worker (`waitlist claim email not sent`), never shown to the
+   user. Limits: 5 claims an hour per account (`429`), and 3 links a day per
+   waitlist email (past it, the same `202` and nothing sent).
+6. **When the window closes** (90 days after launch), beat (05:45 UTC daily)
+   deletes the `waitlist_entries` copy, the unlinked hashes left by deleted
+   accounts, unconfirmed claims and, with `GG_RESEND_WAITLIST_AUDIENCE_ID`
+   set, **the Resend audience's contacts** (decision #11; plan: retention):
+   a page of 100 at a time, at most 2,000 a run, so a large audience takes a
+   few daily runs. It does nothing before the window closes or while
+   `GG_PREMIUM_LAUNCHED_AT` is unset, and a rerun deletes only what is left.
+   Its log line `waitlist purged: …` has counts only, such as
+   `resend_contacts_deleted` and `resend_failed`; `resend_failed=True` means
+   Resend refused part way and the next run continues. Once a run reports
+   `resend_contacts_deleted=0` with no failure, the audience is empty: delete
+   the empty audience in Resend, and stop the site adding to it. With a CSV
+   import and no audience id, delete the contacts in Resend by hand that day.
 
 ---
 

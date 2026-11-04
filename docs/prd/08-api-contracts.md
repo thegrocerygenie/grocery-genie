@@ -320,7 +320,7 @@ Matching runs, with nothing extra from the app, inside:
 - `POST /api/users/me/email-change/confirm`;
 - the launch backfill and a daily rerun (`app.tasks.waitlist_tasks`).
 
-Those routes answer exactly as before. A match is committed as `pending` before RevenueCat is called; if RevenueCat fails or no API key is set, it stays `pending` and a beat task retries it every 15 minutes with the same end date.
+Those routes answer exactly as before, and never wait long on RevenueCat: a match is committed as `pending` (stamped as an attempt) before RevenueCat is called, and the request waits at most `GG_WAITLIST_INLINE_GRANT_TIMEOUT_SECONDS` (3 s) for the grant and the read-back together. If RevenueCat is slow, fails with a 5xx, 408 or 429, or no API key is set, the match stays `pending` and a beat task retries it every 15 minutes with the same end date. It stops for good (`failed`, reason kept) on a RevenueCat 4xx, after `GG_WAITLIST_GRANT_MAX_ATTEMPTS` (24) attempts, or once the window has closed; the API shows a failed match as `pending`, since an operator must act on it.
 
 #### GET /api/users/me/waitlist-offer
 ```json
@@ -338,7 +338,7 @@ For an account whose email is not the waitlist one (Apple's Hide My Email, anoth
 ```json
 { "email": "member@example.com" }
 ```
-**Response** `202 {"status": "sent"}`, whether or not the email is on the waitlist, so the step cannot be used to look up who is: the link goes only to a qualifying, unredeemed waitlist email. Errors, which depend only on the account: `409 waitlist_offer_closed` (window not open), `409 waitlist_offer_redeemed` (this account already has its free year), `422 invalid_email`.
+**Response** `202 {"status": "sent"}` at once, for any email. The route never looks at the waitlist: it enqueues one Celery task, which looks the email up and sends the link only to a qualifying, unredeemed waitlist email. So the answer, its timing and its errors are the same whether or not the email is on the waitlist, and a Resend failure is only logged by the worker. Errors, which depend only on the account: `409 waitlist_offer_closed` (window not open), `409 waitlist_offer_redeemed` (this account already has its free year), `422 invalid_email`, `429` (more than `GG_MAX_WAITLIST_CLAIMS_PER_HOUR`, 5, claims an hour from this account). Past `GG_MAX_WAITLIST_CLAIMS_PER_EMAIL_PER_DAY` (3) claims for one waitlist email from any accounts, the answer is the same `202` and no link is sent.
 
 #### POST /api/users/me/waitlist-offer/confirm
 No session needed: the token from the link is the proof that the user holds the waitlist email.
