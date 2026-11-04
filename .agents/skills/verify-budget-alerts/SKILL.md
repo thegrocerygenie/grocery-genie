@@ -157,7 +157,7 @@ A pass covers the model within its bounds, not the whole system.
 
 ## Coverage record
 
-Sync commit: `e44b52c`
+Sync commit: `0930f49`
 
 The verification was last confirmed to describe these files and functions at the sync commit. `run.sh` reads this table and the sync commit.
 
@@ -168,7 +168,7 @@ The verification was last confirmed to describe these files and functions at the
 | `backend/app/services/budget_service.py` | `check_thresholds` (budget row lock, taken once for every period it checks), `get_spending_by_category`, `_active_thresholds`, `claim_alert`; watched, not modeled: `get_period_containing` (picks the period whose spend `Read` sums; the model holds one period), `save_budget`, `update_budget`, `restore_budget` (they write budget rows the `Read` step locks); rollover (V11-P3): `rollover_carries`, `_carries`, `_spend_by_period` (the limit, read in `_period_breaches` under the lock) and the `earliest_past` branch of `check_thresholds` are modeled; `set_rollover`, `_restart_rollover`, `restart_rollovers`, `_running_budgets`, `_carry_now`, `_rollover_after_restore`, `_today` (the user's local date that picks the period a rollover change restarts in; a plain read, no lock) and the revive branch of `save_budget` (resets the run) are watched | `ConfirmAlerts`: `Read`, `Claim`, `Limit`, `Checks` |
 | `backend/app/services/notification_service.py` | `create_notification` | `ConfirmAlerts`: `Claim` |
 | `backend/app/services/category_service.py` | watched, not modeled: `_lock_user`, `ensure_usable`, `usable_custom` (the user row lock taken before the budget locks), `delete` (locks the category's budgets in id order, then deletes them and their `budget_alerts_sent` rows; see Scope) | none |
-| `backend/app/services/price_alert_service.py` | watched, not modeled: `detect`, `claim` (the second `notifications` writer and its ledger lock order; see Scope) | none |
+| `backend/app/services/price_alert_service.py` | watched, not modeled: `detect`, `claim` (the second `notifications` writer and its ledger lock order; see Scope). Since V11-05, `detect`'s store mute check (`_store_muted`, `_muted_groups`) and store name (`_store_name`) read the user's store groups through `StoreService.groups`: plain reads, no lock, no write, the same branch as before | none |
 | `backend/app/models/database.py` | `BudgetAlertSent` unique key, `Notification.push_status`, `ix_notifications_push_pending`, `ix_notifications_push_sending`; watched: `PriceAlertSent` unique key, `Budget.rollover_enabled`, `rollover_start`, `rollover_opening`, the `User.premium_*` columns | `UniqueLedger`, `PushDelivery` statuses, `Rollover` |
 | `backend/app/core/entitlements.py` | watched, not modeled: `is_premium` (whether a rollover carry applies to the limit) | `Rollover` |
 | `backend/app/tasks/push_tasks.py` | `deliver_pending_pushes`, `BATCH_SIZE`; `push_data` builds each message's payload (a price alert carries its item's url), not modeled: the model is the same for any payload | `PushDelivery`: `Expire`, `Select`, `Claim`, `Record`, `Finish`, `Crash` |
