@@ -235,6 +235,8 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Integration | `backend/tests/services/test_item_matching.py::test_bananas_is_asked_about_not_linked_to_organic_bananas` | Pass |
 | PI-02 | 2 | Same product written differently still auto-links | Integration | `backend/tests/services/test_item_matching.py::test_the_same_product_still_auto_links` | Pass |
 | PI-02 | 2 | Same product written differently still auto-links | Integration | `backend/tests/services/test_item_matching.py::test_a_name_links_to_the_item_with_its_qualifiers` | Pass |
+| PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Unit | `backend/tests/services/test_item_matching.py::test_french_qualifiers_read_as_their_english_meaning` | Pass |
+| PI-02 | 2 | Same product written differently still auto-links | Unit | `backend/tests/services/test_item_matching.py::test_common_french_product_words_carry_no_qualifier` | Pass |
 | PI-02 | 3 | Manually link items | Integration | `backend/tests/api/test_items.py::test_merge_and_split_through_the_api` | Pass |
 | PI-02 | 3 | Manually link items | Component | `mobile/src/__tests__/priceHistory.test.tsx` "combines the item into another one and opens the result" | Pass |
 | PI-02 | 3 | Manually unlink items | Integration | `backend/tests/services/test_item_matching.py::test_split_moves_one_alias_with_its_lines_and_prices` | Pass |

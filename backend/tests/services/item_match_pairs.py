@@ -3,7 +3,7 @@
 Each pair is (the name already in the registry, the name on the next
 receipt). The names come from real receipt formats: the receipt test set
 (`tests/llm_validation/ground_truth/en_us_01.json`), the 2026-11-03 device
-check probe receipt, and common store abbreviations.
+check probe receipt, common store abbreviations, and French (Quebec) receipt names.
 
 - SAME_PRODUCT: one product written two ways (abbreviation, word order,
   plural, spacing). Matching should auto-link these.
@@ -46,6 +46,11 @@ SAME_PRODUCT: list[tuple[str, str]] = [
     ("Skim Milk", "NONFAT MILK"),
     ("Frozen Peas", "FRZN PEAS"),
     ("Unsalted Butter", "BUTTER UNSALTED"),
+    ("Whole Wheat Bread", "WHL WHT BREAD"),
+    # French
+    ("Bananes biologiques", "BANANES BIO"),
+    ("Lait écrémé", "LAIT ECREME"),
+    ("Yogourt vanille", "YOGOURT VANILLÉ"),
 ]
 
 QUALIFIER_DIFFERS: list[tuple[str, str]] = [
@@ -92,6 +97,14 @@ QUALIFIER_DIFFERS: list[tuple[str, str]] = [
     ("Decaf Coffee", "Coffee"),
     ("Gluten Free Bread", "Bread"),
     ("Cage Free Eggs Dz", "Eggs Dz"),
+    # French
+    ("Bananes bio", "Bananes"),
+    ("Lait entier", "Lait écrémé"),
+    ("Lait 2 %", "Lait entier"),
+    ("Yogourt nature", "Yogourt vanille"),
+    ("Yogourt aux fraises", "Yogourt"),
+    ("Pain sans gluten", "Pain"),
+    ("Pain de blé entier", "Pain blanc"),
 ]
 
 DIFFERENT_PRODUCT: list[tuple[str, str]] = [

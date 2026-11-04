@@ -31,7 +31,7 @@ from app.services.item_matching_service import (
     normalize_item_name,
     numbers_compatible,
 )
-from app.services.item_qualifiers import qualifiers_compatible
+from app.services.item_qualifiers import qualifiers_compatible, read_qualifiers
 from tests.conftest import ensure_user
 from tests.services.item_match_pairs import QUALIFIER_DIFFERS, SAME_PRODUCT
 
@@ -314,6 +314,51 @@ def test_qualifier_abbreviations_score_as_the_full_word():
     assert fuzzy_similarity("org bananas", "organic bananas") == 1.0
     assert fuzzy_similarity("dark choc bar", "dark chocolate bar") == 1.0
     assert fuzzy_similarity("nonfat milk", "skim milk") == 1.0
+
+
+@pytest.mark.parametrize(
+    ("french", "english"),
+    [
+        ("Lait entier", "Whole Milk"),
+        ("Lait écrémé", "Skim Milk"),
+        ("Lait 2 %", "Reduced Fat Milk"),
+        ("Lait partiellement écrémé", "Reduced Fat Milk"),
+        ("Bananes biologiques", "Organic Bananas"),
+        ("Pain sans gluten", "Gluten Free Bread"),
+        ("Pain de blé entier", "Whole Wheat Bread"),
+        ("Yogourt nature", "Plain Yogurt"),
+        ("Yogourt à la vanille", "Vanilla Yogurt"),
+        ("Yogourt aux fraises", "Strawberry Yogurt"),
+    ],
+)
+def test_french_qualifiers_read_as_their_english_meaning(french, english):
+    """Accents are ignored: "ecreme" on a receipt is "écrémé"."""
+    found = read_qualifiers(normalize_item_name(french))[1]
+    assert found
+    assert found == read_qualifiers(normalize_item_name(english))[1]
+    assert found == read_qualifiers(normalize_item_name(french.upper()))[1]
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Orge perlé",
+        "Pain de mie",
+        "Biscuits",
+        "Yogourt naturel",
+        "Framboises",
+        "Fraisier",
+        "Saumon fumé",
+        "Jus d'orange",
+        "Beurre d'arachide",
+        "Céréales",
+        "Fromage cheddar fort",
+        "Lait 12 %",
+    ],
+)
+def test_common_french_product_words_carry_no_qualifier(name):
+    """Only whole words match: "biscuits" is not bio, "naturel" not nature."""
+    assert read_qualifiers(normalize_item_name(name))[1] == frozenset()
 
 
 async def test_a_name_links_to_the_item_with_its_qualifiers(db_session):

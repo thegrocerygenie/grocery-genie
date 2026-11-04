@@ -7,6 +7,7 @@ Confirming a receipt links each line to a canonical item (PI-02) and records its
 - `pi.match-on-confirm`: a scan confirmed through `PATCH status=confirmed`, and a manual entry, give every line a `canonical_item_id`.
 - `pi.auto-link`: a receipt abbreviation of a known item ("WHL MILK 1 GAL" after "Whole Milk 1 Gal", "ORG BANANAS" after "Organic Bananas") links to it (`match_method` fuzzy or semantic).
 - `pi.qualifier`: a name that differs in a qualifier never auto-links (BUG-4). "Bananas" after "Organic Bananas" scores about 0.86 semantic, above the 0.80 link bar, yet becomes its own item (`match_method` new) with a pending suggestion, and Organic Bananas keeps only organic prices.
+- `pi.abbrev-french`: "WHL WHT BREAD" after "Whole Wheat Bread" links (fuzzy 1.0); "Lait écrémé 2 L" after "Lait entier 2 L" (semantic about 0.83, above the link bar) asks, because French qualifiers read as English ones (écrémé nonfat, entier whole).
 - `pi.suggest`: a medium match ("Chicken Breast" after "CHKN BRST", about 0.77 fuzzy) creates a pending suggestion, counted in `pending_suggestions`.
 - `pi.accept`: accepting merges the two items and their prices.
 - `pi.reject`: rejecting keeps both; the suggestion row ends `rejected`, and the next scan of that name links to its own item by alias, with no new question.
@@ -42,6 +43,10 @@ $G api PATCH /api/items/$mid '{"canonical_name":"Bananas (organic)"}'       # pi
 $G sql "SELECT status, method FROM item_match_suggestions"                  # the rejected one; an accepted one is merged away
 $G sql "SELECT match_method, count(*) FROM line_items GROUP BY 1"
 $G sql "SELECT count(*) FROM canonical_item_aliases WHERE embedding IS NULL"  # 0 with the model available
+$G signup french
+$G api POST /api/receipts '{"store_name":"IGA","date":"2026-03-20","total":8.98,"items":[{"name":"Whole Wheat Bread","quantity":1,"unit_price":3.49,"total_price":3.49},{"name":"Lait entier 2 L","quantity":1,"unit_price":5.49,"total_price":5.49}]}'
+$G api POST /api/receipts '{"store_name":"IGA","date":"2026-03-27","total":8.78,"items":[{"name":"WHL WHT BREAD","quantity":1,"unit_price":3.29,"total_price":3.29},{"name":"Lait écrémé 2 L","quantity":1,"unit_price":5.49,"total_price":5.49}]}'
+$G api GET /api/items | jq '{pending_suggestions, items: [.items[] | {canonical_name, observation_count}]}'  # pi.abbrev-french: Whole Wheat Bread 2, each milk 1, pending 1
 $G signup other && $G api GET /api/items/$mid/prices                        # pi.isolation: 404
 ```
 
@@ -50,5 +55,5 @@ $G signup other && $G api GET /api/items/$mid/prices                        # pi
 - Debug mode mocks only the LLM extractor. Matching runs the real local embedding model (`GG_EMBEDDING_MODEL`), which loads on the first confirm (a few seconds, and a download on a host that has never fetched it). `GG_EMBEDDINGS_ENABLED=false` matches on aliases and fuzzy similarity only, and aliases keep a null embedding.
 - Manual entries carry no `unit_of_measure`, so their history's `unit_of_measure` is null and prices show without a unit. A scan's extraction supplies it.
 - Exact confidences depend on the model version; the journey checks which pairs link, ask, or stay apart, not the score.
-- Qualifier words and their receipt abbreviations are listed in `backend/app/services/item_qualifiers.py`. If an abbreviation is missing there, a true match asks instead of linking. This journey found "WHL" (whole) missing at first.
-- Verified 2026-11-03 against Postgres 16 with pgvector 0.6 (run `20261103-053414`), and with the qualifier steps the same day (run `20261103-220037`).
+- Qualifier words and their receipt abbreviations are listed in `backend/app/services/item_qualifiers.py`. If an abbreviation is missing there, a true match asks instead of linking. This journey found "WHL" (whole) missing at first, and the device check "WHL WHT" (whole wheat). French words match without accents ("ECREME" is écrémé).
+- Verified 2026-11-03 against Postgres 16 with pgvector 0.6 (run `20261103-053414`), and with the qualifier steps the same day (run `20261103-220037`). The WHL WHT and French steps verified 2026-11-04 (run `20261104-040224`).
