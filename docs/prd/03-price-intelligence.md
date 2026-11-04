@@ -6,6 +6,8 @@ Longitudinal price tracking that accumulates passively from receipts already bei
 
 **Design alignment (decisions D6–D10, 2026-11-04).** The ACs marked "DA-n" were added for the V1.1 design alignment (`design/claude-design/components-v2/roadmap-v11.jsx`, `v1-pi-gap.jsx`; plan `.planning/PLAN-2026-11-04-v1.1-design-alignment.md`). The look and copy follow the design (D6) unless an earlier AC requires otherwise; where they differ, the AC says which one wins. Each AC id (story + number) is stable: tasks and the V1.1 matrix in `13-validation-strategy.md` cite it.
 
+**User answers (2026-11-04), recorded in the ACs below:** mute durations are Forever, 1 week, 1 month and 3 months (PI-03 AC 10); the 7-day trial applies to both plans (PREM-01 AC 2); a price-drop alert shows "was $X avg, now $Y" and also the design's "stock-up worth it" line, and a rise keeps "was/now" (PI-03 AC 5); export starts on Last 12 months with All time as an option, and its intro line no longer says it exports everything (PREM-04 AC 1, 8); the PDF report is a spend summary: monthly spend by category, top items and a receipt list (PREM-04 AC 5).
+
 ## User Stories
 
 ### PI-01: Price History [V1.1]
@@ -51,15 +53,15 @@ Longitudinal price tracking that accumulates passively from receipts already bei
 2. Specifies item, store, old average, new price, percent change.
 3. Cooldown period (default: 7 days per item) to avoid notification fatigue.
 4. Mutable per item or per store. Muting is Premium from D8 (PREM-02); unmuting is open to everyone.
-5. [V1.1] (DA-4) An in-app "Price alerts" list: the user's price change notifications, newest first, grouped "This week" and "Earlier". A row has an arrow on red (rise) or green (fall), the item name, the signed percent in the same colour, "<Store> · was $X avg, now $Y" (for a fall too: AC 2 keeps the old average and new price where the design writes "stock-up worth it"), and a sparkline of the item's recent prices. Tapping a row opens the item. The list opens from Settings → Alerts and from the Budget dashboard.
+5. [V1.1] (DA-4) An in-app "Price alerts" list: the user's price change notifications, newest first, grouped "This week" and "Earlier". A row has an arrow on red (rise) or green (fall), the item name, the signed percent in the same colour, "<Store> · was $X avg, now $Y" (a fall shows it too, AC 2, with the design's "stock-up worth it" on a line under it), and a sparkline of the item's recent prices. Tapping a row opens the item. The list opens from Settings → Alerts and from the Budget dashboard.
 6. [V1.1] (DA-4) With no price alerts, the list says "No price alerts yet" and that one comes when a regular buy moves by the threshold or more.
 7. [V1.1] (DA-4) The list ends with a "Settings" group: Threshold (the existing setting) and Cooldown rows, with the footer "Cooldown: N days · alerts at ≥T% change" from the user's settings.
 8. [V1.1] (DA-4) Cooldown is a user setting (AC 3's default stays 7 days, `GG_PRICE_ALERT_COOLDOWN_DAYS`): 1, 3, 7, 14 or 30 days. `PUT /api/items/price-alert-settings` takes `cooldown_days` (1–30; `null` back to the default; 422 otherwise), `GET` returns it with `default_cooldown_days`, and the alert check uses the user's value. A migration adds the user column.
 9. [V1.1] (DA-4) Alert copy follows the design: the title "<Item> up N%" or "<Item> down N%", and the body "<Item> at <Store>: was $X avg, now $Y" with "/lb" after a measured price; push and in-app read the same, and still name item, store, old average, new price and percent (AC 2).
-10. [V1.1] (DA-7) A "Mute until" choice on item and store mutes: Forever (first), 1 week, 1 month, 3 months.
+10. [V1.1] (DA-7) A "Mute until" choice on item and store mutes: Forever (first), 1 week, 1 month, 3 months (the user's choice; the design shows only Forever).
 11. [V1.1] (DA-7) `POST /api/items/{id}/mute` and `POST /api/stores/{id}/mute` take an optional `{ "until": "<ISO 8601 time>" }`; none or `null` is forever, a time not in the future is 422, and muting again replaces the time. Item detail and the alert settings carry each mute's `muted_until`. A migration adds it to both mute tables.
 12. [V1.1] (DA-7) A timed mute ends by itself: a confirm at or after `until` alerts as if unmuted, nothing is sent afterwards for prices confirmed during the mute, and an ended mute is no longer listed. The `verify-budget-alerts` model is rechecked for the change to `_alert_on_price_changes`.
-13. [V1.1] (DA-7) Item detail follows the design: a "Mute price alerts" switch "For <item> across all stores", a "Per store" group with a switch per store, a line that a store mute covers every item bought there, and the footer "You'll still see price changes in the item detail — just no notifications."
+13. [V1.1] (DA-7) The mutes move to their own "Alerts" screen, as in the design: item detail has an "Alerts" row (reading "On", "Muted" or "Muted until <date>") that pushes it, and its back button names the item. Every switch on it means alerts on, the iOS convention: an "Item-level" group with the switch "Price alerts", "For <item> across all stores" (on: alerts for the item; off: muted, with the "Mute until" row under it), and a "Per store" group with a switch per store (on: alerts at that store; turning one off asks "Mute until"), with a line that a store mute covers every item bought there. The footer reads "You'll still see price changes in the item detail — just no notifications." The design's item switch is labelled "Mute price alerts" and drawn on when muted; this AC turns it the other way so both groups read the same.
 14. [V1.1] (DA-7) Settings → Alerts lists each mute with "Until <date>" or "Forever" and Unmute; a failed unmute keeps the row and says so inline, and can be tried again.
 
 ### PI-04: Cross-Store Comparison [V1.1]
@@ -102,12 +104,12 @@ Premium launched in V1.1 through RevenueCat (decision D1). It has no epic of its
 
 **Acceptance Criteria (DA-1, decision D7):**
 1. [V1.1] The paywall shows the RevenueCat offering's Yearly and Monthly packages, priced from the App Store, never hard-coded (US: $39.99 a year and $4.99 a month). Yearly comes first and is selected, with "/yr · $3.33/mo" and a "SAVE 33%" badge; the per-month price and the percent come from the two prices (the percent rounded down).
-2. [V1.1] When the App Store says the user can take the introductory offer, the button reads "Start 7-day free trial" and the terms say what is billed after it ("7 days free, then $39.99/year"); otherwise it reads "Subscribe". The billing terms, Terms of Use and Privacy Policy links stay.
+2. [V1.1] Both plans carry the 7-day free trial (the user's choice). When the App Store says the user can take it, the button reads "Start 7-day free trial" for whichever plan is selected, and the terms say what is billed after it ("7 days free, then $39.99/year" or "then $4.99/month"); otherwise it reads "Subscribe". The billing terms, Terms of Use and Privacy Policy links stay.
 3. [V1.1] The paywall looks like the design: a round × close button at the top right (accessibility label "Close"), the star badge, the title "Premium", "Unlock the full power of your receipts.", a feature list with an icon per row, and "Cancel anytime · Restore purchase" under the button, where Restore works as before.
 4. [V1.1] The feature list names only what Premium unlocks in the build: Cross-store comparison, Custom categories, Data export (with "CSV/JSON/PDF" once PREM-04 ships), 12-month trends, Per-item & per-store mute, Priority OCR processing (once PREM-03 ships), and also Unlimited receipts and Budget rollover, which Premium includes though the design leaves them out (D6 keeps them). The "stay free" line becomes "Price history and price alerts stay free."
 5. [V1.1] Either product grants Premium. A trial (RevenueCat `period_type` `TRIAL`) is Premium until it ends; a trial cancelled during the 7 days stays Premium until then and then ends; a trial that converts renews with no gap; a switch between monthly and yearly keeps Premium with no gap. `premium_product_id` records the product.
 6. [V1.1] The existing states hold: the offering cannot load (retry), Expo Go (needs the App Store build), and a Premium user (the plan and Manage Subscription, not a purchase button).
-7. [V1.1] `docs/DEPLOYMENT.md` lists the product ids (`gg_premium_monthly` $4.99, `gg_premium_yearly` $39.99), the 7-day introductory offer, the subscription group, and the RevenueCat offering and its packages, as the steps the user follows in App Store Connect and RevenueCat; the tests mock the offering. `08-api-contracts.md` gives the new prices.
+7. [V1.1] `docs/DEPLOYMENT.md` lists the product ids (`gg_premium_monthly` $4.99, `gg_premium_yearly` $39.99), the 7-day introductory offer on both, the subscription group, and the RevenueCat offering and its packages, as the steps the user follows in App Store Connect and RevenueCat; the tests mock the offering. `08-api-contracts.md` gives the new prices.
 
 ### PREM-02: Premium price intelligence [V1.1]
 **As a** Premium user, **I want** cross-store comparison and alert mutes, **so that** I can shop where it's cheapest and hear only the alerts I want.
@@ -120,6 +122,7 @@ Premium launched in V1.1 through RevenueCat (decision D1). It has no epic of its
 5. [V1.1] In the app, item detail shows a free user an upgrade prompt where the comparison was, which opens the paywall, never an error. A free user turning a mute switch on gets the upgrade prompt and the switch stays off; a lapsed user's mute switch still turns off.
 6. [V1.1] A 403 `premium_required` from either route (Premium lapsed meanwhile) shows the same upgrade prompt.
 7. [V1.1] `price_comparison_viewed` fires only for a comparison shown, and `price_alert_muted` only for a mute saved.
+8. [V1.1] DA-1 updates the docs and journeys that say comparison and mutes are free: `08-api-contracts.md` (Premium, compare, mutes), and the `verify-grocery-genie` Premium journey (`.agents/skills/verify-grocery-genie/features/premium.md`): `premium-free-features` expects `403 premium_required` for compare and for both mute POSTs, `204` for unmute, and `200` for the rest, and a Premium user's compare and mute succeed.
 
 ### PREM-03: Priority OCR [V1.1]
 **As a** Premium user, **I want** my receipts read by a stronger model, **so that** I correct fewer of them.
@@ -136,10 +139,12 @@ Premium launched in V1.1 through RevenueCat (decision D1). It has no epic of its
 **As a** Premium user, **I want to** choose what to export, for which dates and in which format, **so that** I get a file I can use.
 
 **Acceptance Criteria (DA-8, decision D10):**
-1. [V1.1] A "Range" group: Period (All time, Last 12 months, This year, Custom) with From and To months, Last 12 months first (design). The export holds the receipts dated in the range, their line items and the prices they recorded.
+1. [V1.1] A "Range" group: Period (Last 12 months, All time, This year, Custom) with From and To months; Last 12 months is selected first (design and the user's choice), and All time is always an option. The export holds the receipts dated in the range, their line items and the prices they recorded.
 2. [V1.1] A "Format" group: CSV ("Spreadsheet-ready", a zip of one file per entity, as before) first, JSON ("For developers") and PDF report ("Formatted summary").
 3. [V1.1] An "Includes" group of switches: Receipts & line items, Price history, Categories & budgets (on) and Receipt images (off). At least one stays on. With Receipt images on, the download is a zip of the export and an `images/` folder with each scanned receipt's image; manual receipts and purged images have none.
 4. [V1.1] The button reads "Export N receipts", N being the receipts in the range from the server; with none it is disabled and says "No receipts in this range".
-5. [V1.1] The PDF report covers the range: spending by month and by category, the budgets, and a list of receipts (date, store, total), and only the sections switched on.
+5. [V1.1] The PDF report is a spend summary of the range (the user's choice): monthly spend by category, the top items, and a list of receipts (date, store, total), leaving out a section whose switch is off.
 6. [V1.1] `GET /api/users/me/export` takes `format=json|csv|pdf`, `from`, `to` and `include`, and `GET /api/users/me/export/summary?from=&to=` gives the receipt count. Both are Premium (`403 premium_required`); a bad range, format or include is 422. `data_exported` carries the format, the range and the includes.
 7. [V1.1] All time with every switch on still exports all the user's data (NFR Privacy 2).
+8. [V1.1] The screen opens with the design's intro card (icon and line), reworded because the default range is not everything: "Export your receipts, prices and budgets for the dates you choose. Yours forever."
+

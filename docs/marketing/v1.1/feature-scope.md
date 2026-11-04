@@ -107,7 +107,7 @@ Every MVP feature in [../mvp/feature-scope.md](../mvp/feature-scope.md) §2 is s
 Settled (see [decisions](../decisions.md)):
 1. **#14:** version 1.1.0.
 2. **#15:** two states: waitlist now, App Store downloads at launch.
-3. **#16:** a Free vs Premium table in State B only, at $5.99/month, once the App Store product is live.
+3. **#16:** a Free vs Premium table in State B only, once the App Store product is live (its $5.99/month is replaced by #18).
 4. **#17:** no item-matching figures.
    - **#18–#20:** Premium at $4.99/month or $39.99/year with a 7-day trial; store comparison and mutes are Premium, never "price intelligence is free"; Priority OCR named only once built, with no accuracy claim.
 5. **Still in force from the MVP:** #2–#13, including the free Premium year, "Free" in the hero, no on-device claims, no speed or accuracy figures, and Q4 2026.

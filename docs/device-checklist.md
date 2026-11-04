@@ -136,6 +136,8 @@ Setup for this section:
 - [ ] **Webhook test event.** In RevenueCat, Project settings → Integrations → Webhooks, tap "Send test event". The backend answers 200. (V11-P0)
 - [ ] **Paywall.** Free user: the title, what Premium unlocks, the App Store price, Subscribe, Restore, and the Terms of Use and Privacy Policy links, each 44 pt. Premium user: "You're on Premium" with the renewal date and Manage Subscription. (DEVICE-CHECK D2, D4)
 - [ ] **Settings → Premium.** Free: "Free plan · Upgrade" opens the paywall. Premium: the row reads Premium. (DEVICE-CHECK D1)
+- [ ] **Free trial (after DA-1).** With a Sandbox account that has never subscribed, the paywall reads "Start 7-day free trial" for Yearly and for Monthly, with the price billed after it. Start the trial on one: Premium turns on, and the server's profile says `is_premium: true`. Cancel it in the Sandbox settings: Premium stays until the trial ends. A Sandbox account that has used its trial sees "Subscribe". (PREM-01 AC 2, 5; 11-edge-cases Premium 1)
+- [ ] **Plan switch (after DA-1).** As a monthly subscriber, switch to Yearly in iOS Settings → Subscriptions (or back). Premium never drops, and `premium_product_id` on the server becomes the new product once it starts. (PREM-01 AC 5; 11-edge-cases Premium 2)
 
 **Price alerts and comparison (PI-03, PI-04):**
 - [ ] **Push tap, foreground.** With the app open, confirm the receipt that moves the price. The banner arrives; tapping it opens the item. (PI-03 AC 2; DEVICE-CHECK C4)

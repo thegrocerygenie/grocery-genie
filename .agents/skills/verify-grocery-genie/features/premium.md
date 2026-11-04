@@ -1,6 +1,6 @@
 # Premium through RevenueCat
 
-Premium ($5.99/month, V1.1 decision D1) is an App Store subscription sold through RevenueCat. The backend never believes the app about it: RevenueCat's webhook (`POST /api/webhooks/revenuecat`, authenticated by a shared secret) and its REST API set the entitlement on the user row, the profile shows it as `is_premium`, and every Premium gate reads it. Premium unlocks the 12-month trend, custom categories ([custom-categories.md](./custom-categories.md)), unlimited receipts, data export ([data-export.md](./data-export.md)) and budget rollover ([budget-rollover.md](./budget-rollover.md)) today (D2); a free user asking for any of them gets `403 premium_required` or the monthly `429 receipt_quota_exceeded`. Price history, matching, price alerts and comparison stay free.
+Premium ($5.99/month in V1.1 decision D1; changing in DA-1 to $4.99/month or $39.99/year with a 7-day trial, decision D7) is an App Store subscription sold through RevenueCat. The backend never believes the app about it: RevenueCat's webhook (`POST /api/webhooks/revenuecat`, authenticated by a shared secret) and its REST API set the entitlement on the user row, the profile shows it as `is_premium`, and every Premium gate reads it. Premium unlocks the 12-month trend, custom categories ([custom-categories.md](./custom-categories.md)), unlimited receipts, data export ([data-export.md](./data-export.md)) and budget rollover ([budget-rollover.md](./budget-rollover.md)) today (D2); a free user asking for any of them gets `403 premium_required` or the monthly `429 receipt_quota_exceeded`. Price history, matching, price alerts and comparison stay free. **Changing in DA-1 (decision D8, PRD PREM-02):** comparison and muting become Premium; DA-1 updates this journey (PREM-02 AC 8).
 
 ## Sub-features
 
@@ -20,7 +20,7 @@ Premium ($5.99/month, V1.1 decision D1) is an App Store subscription sold throug
 - `premium-transfer-race` with a slow RevenueCat, two transfers between the same two users in opposite directions, delivered together, both answer `200`: no deadlock (#111).
 - `premium-unlimited` a Premium user's 21st scan of the month succeeds (a free user's is `429`).
 - `premium-quota-free` a free user with 20 receipts this month: the next scan is `429` with `code` `receipt_quota_exceeded`, `feature` `unlimited_receipts`, `limit` 20 and the old `detail` string; a manual entry still answers `201`.
-- `premium-free-features` the same free user gets `200` (`204` for a mute) on price history, comparison, item list and suggestions, price alert settings, mute and unmute, and notifications; the 3-month trend is `200`, 12 months `403 premium_required`.
+- `premium-free-features` the same free user gets `200` (`204` for a mute) on price history, comparison, item list and suggestions, price alert settings, mute and unmute, and notifications; the 3-month trend is `200`, 12 months `403 premium_required`. Changing in DA-1 (D8): compare and both mute POSTs become `403 premium_required`; unmute stays `204`.
 - `premium-delete` deleting the account deletes its `revenuecat_events` rows.
 
 ## How to get to it (user POV)

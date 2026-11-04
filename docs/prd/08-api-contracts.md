@@ -257,7 +257,7 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
 
 ## Premium [V1.1]
 
-Premium ($5.99/month, decision D1) is an App Store subscription sold through RevenueCat. The backend trusts only RevenueCat for it: the webhook below and RevenueCat's REST API, never the app. Premium gates only the V1.1 extras (D2): the 12-month trend, custom categories, data export, budget rollover, and unlimited receipts. A free user asking for the trend, custom categories, export or rollover gets `403 premium_required` (above). The receipt cap is the one exception: a free user past it gets `429 receipt_quota_exceeded` (below), because the scan itself stays free. Custom categories: [Categories](#categories-v11).
+Premium ($4.99/month or $39.99/year, each with a 7-day free trial: decision D7, 2026-11-04, replacing D1's $5.99; the yearly product and the trial arrive with DA-1, PREM-01) is an App Store subscription sold through RevenueCat. The backend trusts only RevenueCat for it: the webhook below and RevenueCat's REST API, never the app. Premium gates the V1.1 extras (D2): the 12-month trend, custom categories, data export, budget rollover, and unlimited receipts. From DA-1 (decision D8, PREM-02) it also gates cross-store comparison and muting price alerts (below). A free user asking for the trend, custom categories, export or rollover gets `403 premium_required` (above). The receipt cap is the one exception: a free user past it gets `429 receipt_quota_exceeded` (below), because the scan itself stays free. Custom categories: [Categories](#categories-v11).
 
 The profile (`/api/auth/me`, `/api/users/me`, and every route that returns it) carries the entitlement:
 ```json
@@ -272,7 +272,7 @@ The profile (`/api/auth/me`, `/api/users/me`, and every route that returns it) c
 ```
 `code` is the stable test; the hourly rate limit's `429` has none. It is not `403 premium_required`, because the scan itself is a free feature: the month's allowance is spent. `detail` stays a string because app builds from before V1.1 match it ("quota") and must keep treating the cap as final, not retrying it. The app answers it with the upgrade prompt (See Premium opens the paywall, or Enter manually), never an error (D2).
 
-Everything else in price intelligence stays free (D2): price history, item matching, price alerts and cross-store comparison answer a free user `200`.
+Price history, item matching and price alerts stay free (D2, D8) and answer a free user `200`. **Changing in DA-1 (D8, PREM-02):** today cross-store comparison and the mute routes also answer a free user (`200`, `204`); from DA-1, `GET /api/items/{canonical_id}/compare`, `POST /api/items/{canonical_id}/mute` and `POST /api/stores/{store_id}/mute` answer a free user `403 premium_required`, while both mute `DELETE`s stay open to everyone, and a mute made while Premium keeps working after a lapse.
 
 ### POST /api/webhooks/revenuecat
 
@@ -493,10 +493,10 @@ Only a confirm alerts: editing a confirmed receipt later sends none. A failure i
 **Request:** `{ "enabled": false }`, `{ "threshold_percent": 15 }`, or both. A field left out stays as it is; `"threshold_percent": null` goes back to the default. `threshold_percent` is 1–100 (422 otherwise). Returns the settings above.
 
 ### POST /api/items/{canonical_id}/mute · DELETE /api/items/{canonical_id}/mute
-204. No price alerts for the item, or alerts again. Both are idempotent; another user's item is 404. Item detail (`GET /api/items/{canonical_id}`) carries `alerts_muted: bool`. Merging a muted item into another mutes the other.
+From DA-1 (D8) the `POST` is Premium: a free user gets `403 premium_required`; the `DELETE` stays open to everyone. 204. No price alerts for the item, or alerts again. Both are idempotent; another user's item is 404. Item detail (`GET /api/items/{canonical_id}`) carries `alerts_muted: bool`. Merging a muted item into another mutes the other.
 
 ### POST /api/stores/{store_id}/mute · DELETE /api/stores/{store_id}/mute
-204. No price alerts for prices paid at the store, or alerts again. Idempotent. Muting a store the user has no receipt from is 404 (stores are shared across users); unmuting removes only the user's own mute and is never 404, so a mute whose receipts were since deleted and purged can still be undone. Store ids come from `GET /api/items/{canonical_id}/prices` (`observations[].store_id`), `/compare` or `GET /api/stores`.
+From DA-1 (D8) the `POST` is Premium: a free user gets `403 premium_required`; the `DELETE` stays open to everyone. 204. No price alerts for prices paid at the store, or alerts again. Idempotent. Muting a store the user has no receipt from is 404 (stores are shared across users); unmuting removes only the user's own mute and is never 404, so a mute whose receipts were since deleted and purged can still be undone. Store ids come from `GET /api/items/{canonical_id}/prices` (`observations[].store_id`), `/compare` or `GET /api/stores`.
 
 **Mutes and merged stores (V11-05).** A mute covers the store as the user groups it ([Stores](#stores-normalization-and-merge-v11)): muting any store of a group mutes the whole group, and the mute is recorded on the group's store (`muted_stores` lists it once, with the group's id and name). A muted store merged into another mutes the merged group. Unmuting a group removes every one of the user's mutes inside it. Unmerging leaves each mute on the store it was recorded on: a mute set on a store before it was merged stays with that store, and one set on the group stays with the group's store.
 
@@ -529,7 +529,7 @@ The user's stores, as their prices group them, by name. Only stores on receipts 
 204. Undo the merge of this store (an id from `merged_stores`): its prices group on their own again. Stores merged into it before it was merged moved to the target then, and stay there. Idempotent, and never 404: it removes only the user's own merge. Records `store_unmerged`.
 
 ### GET /api/items/{canonical_id}/compare
-Cross-store comparison (PI-04): the item's latest and average unit price at each store the user has bought it from, cheapest first.
+Cross-store comparison (PI-04): the item's latest and average unit price at each store the user has bought it from, cheapest first. Premium from DA-1 (D8, PREM-02 AC 1): a free user gets `403 premium_required`.
 
 **Response:**
 ```json

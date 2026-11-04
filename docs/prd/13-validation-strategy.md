@@ -621,7 +621,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | EC-PI | 2 | Unit price ambiguity: per-kg and per-unit prices compare only like-for-like (alert average) | Integration | `backend/tests/services/test_price_alert_service.py::test_the_average_is_like_for_like_and_skips_deleted_receipts` | Pass |
 | EC-PI | 3 | A sale price is a regular observation, in the timeline and the average | Integration | `backend/tests/api/test_price_comparison.py::test_a_sale_price_is_a_regular_observation` | Pass |
 | PREM-01 | 1 | Yearly and Monthly from the RevenueCat offering, App Store prices, Yearly first with /mo and SAVE % | Component | Not yet implemented (DA-1) | Pending |
-| PREM-01 | 2 | "Start 7-day free trial" only when eligible, with the after-trial price; else Subscribe | Component | Not yet implemented (DA-1) | Pending |
+| PREM-01 | 2 | Trial on both plans: "Start 7-day free trial" only when eligible, with the after-trial price; else Subscribe | Component | Not yet implemented (DA-1) | Pending |
 | PREM-01 | 3 | Paywall look: × close, title "Premium", subtitle, feature icons, "Cancel anytime · Restore purchase" | Component | Not yet implemented (DA-1) | Pending |
 | PREM-01 | 4 | Feature list names only what is built, keeps unlimited receipts and rollover; new stay-free line | Component | Not yet implemented (DA-1) | Pending |
 | PREM-01 | 5 | Either product, trial, trial cancel, conversion and plan switch keep Premium right | Integration | Not yet implemented (DA-1) | Pending |
@@ -634,6 +634,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PREM-02 | 5 | App: comparison and mute upgrade prompts open the paywall; lapsed user can unmute | Component | Not yet implemented (DA-1) | Pending |
 | PREM-02 | 6 | App: a 403 premium_required from compare or mute shows the upgrade prompt | Component | Not yet implemented (DA-1) | Pending |
 | PREM-02 | 7 | price_comparison_viewed and price_alert_muted only on success | Integration | Not yet implemented (DA-1) | Pending |
+| PREM-02 | 8 | 08-api-contracts and the verify-grocery-genie Premium journey say compare and mute POST are 403 for a free user | E2E | Not yet implemented (DA-1) | Pending |
 | PREM-03 | 1 | GG_LLM_PREMIUM_EXTRACTION_MODEL setting; unset uses the default; no provider in code | Unit | Not yet implemented (DA-2) | Pending |
 | PREM-03 | 2 | Premium scan uses the Premium model, free the default; Premium read server-side | Integration | Not yet implemented (DA-2) | Pending |
 | PREM-03 | 3 | Through provider.py, no temperature, same validation and confidence scoring | Unit | Not yet implemented (DA-2) | Pending |
@@ -646,7 +647,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-01 | 8 | Chart: shaded area, month labels, a dot per purchase | Component | Not yet implemented (DA-3) | Pending |
 | PI-01 | 9 | Store rows lead with a coloured square, stable per store | Unit | Not yet implemented (DA-3) | Pending |
 | PI-01 | 10 | Back label names the opener; largest text size holds | Component | Not yet implemented (DA-3) | Pending |
-| PI-03 | 5 | Price alerts list: newest first, This week / Earlier, arrow, signed percent, was/now, sparkline, tap opens item | Component | Not yet implemented (DA-4) | Pending |
+| PI-03 | 5 | Price alerts list: newest first, This week / Earlier, arrow, signed percent, was/now (drops add "stock-up worth it"), sparkline, tap opens item | Component | Not yet implemented (DA-4) | Pending |
 | PI-03 | 6 | Empty Price alerts list says "No price alerts yet" | Component | Not yet implemented (DA-4) | Pending |
 | PI-03 | 7 | Settings group: Threshold and Cooldown rows, footer from the user's settings | Component | Not yet implemented (DA-4) | Pending |
 | PI-03 | 8 | Cooldown user setting 1–30 days (null default, 422 otherwise), used by the alert check | Integration | Not yet implemented (DA-4) | Pending |
@@ -666,15 +667,16 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | Not yet implemented (DA-7) | Pending |
 | PI-03 | 12 | A timed mute ends by itself; nothing sent for prices during it; ended mute not listed | Integration | Not yet implemented (DA-7) | Pending |
 | PI-03 | 12 | verify-budget-alerts rechecked for the expiry in _alert_on_price_changes | Formal | Not yet implemented (DA-7) | Pending |
-| PI-03 | 13 | Item detail mute switches and copy per design; store mute covers every item | Component | Not yet implemented (DA-7) | Pending |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | Not yet implemented (DA-7) | Pending |
 | PI-03 | 14 | Settings lists mutes with Until/Forever; failed unmute keeps the row and says so | Component | Not yet implemented (DA-7) | Pending |
-| PREM-04 | 1 | Range: Period presets and From/To months; export holds receipts in range | Integration | Not yet implemented (DA-8) | Pending |
+| PREM-04 | 1 | Range: Last 12 months first, All time and other presets, From/To months; export holds receipts in range | Integration | Not yet implemented (DA-8) | Pending |
 | PREM-04 | 2 | Format: CSV first, JSON, PDF report | Component | Not yet implemented (DA-8) | Pending |
 | PREM-04 | 3 | Includes switches; receipt images as a zip with images/ | Integration | Not yet implemented (DA-8) | Pending |
 | PREM-04 | 4 | "Export N receipts" from the server count; none disables it | Component | Not yet implemented (DA-8) | Pending |
-| PREM-04 | 5 | PDF report: spending by month and category, budgets, receipt list, chosen sections | Integration | Not yet implemented (DA-8) | Pending |
+| PREM-04 | 5 | PDF report: monthly spend by category, top items, receipt list, chosen sections | Integration | Not yet implemented (DA-8) | Pending |
 | PREM-04 | 6 | Export and summary routes: params, Premium 403, 422, data_exported properties | Integration | Not yet implemented (DA-8) | Pending |
 | PREM-04 | 7 | All time with every include still exports all data (NFR Privacy 2) | Integration | Not yet implemented (DA-8) | Pending |
+| PREM-04 | 8 | Intro card: "Export your receipts, prices and budgets for the dates you choose. Yours forever." | Component | Not yet implemented (DA-8) | Pending |
 | BC-05 | 5 | Colour and icon per category; API returns and validates them; migration | Integration | Not yet implemented (DA-9) | Pending |
 | BC-05 | 6 | Categories screen: Built-in first, Custom, New category row, footer, Edit button | Component | Not yet implemented (DA-9) | Pending |
 | BC-05 | 7 | Colour and icon in Categories, the picker and dashboard bars | Component | Not yet implemented (DA-9) | Pending |
