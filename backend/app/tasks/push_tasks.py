@@ -14,6 +14,7 @@ be lost, but never shown twice.
 
 import json
 import logging
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -122,15 +123,15 @@ def deliver_pending_pushes(
         ).scalars():
             tokens_by_user.setdefault(token.user_id, []).append(token.token)
 
-    claimed: list[Notification] = []
-    targets: list[tuple[Notification, str, PushMessage]] = []
+    claimed: set[uuid.UUID] = set()  # ids of the notifications marked sending
+    targets: list[tuple[uuid.UUID, str, PushMessage]] = []
     for n in pending:
         tokens = tokens_by_user.get(n.user_id, [])
         if not tokens:
             n.push_status = "no_device"
             continue
         n.push_status = "sending"
-        claimed.append(n)
+        claimed.add(n.id)
         for token in tokens:
             message = PushMessage(
                 to=token,
@@ -138,8 +139,10 @@ def deliver_pending_pushes(
                 body=n.body,
                 data=push_data(n),
             )
-            targets.append((n, token, message))
-    # The claim: commit `sending` before the first POST.
+            targets.append((n.id, token, message))
+    # The claim: commit `sending` before the first POST. After it, write by id
+    # and never read the ORM rows: the commit expires them, and an account
+    # deleted meanwhile (DELETE /api/users/me) takes its rows with it.
     db.commit()
 
     delivered: set = set()  # notification ids with an ok ticket
@@ -152,9 +155,9 @@ def deliver_pending_pushes(
         except httpx.HTTPError as error:
             rejected = expo_rejected(error)
             unsent = targets[start:] if rejected else targets[start + len(chunk) :]
-            retry.update(n.id for n, _, _ in unsent)
+            retry.update(nid for nid, _, _ in unsent)
             if not rejected:
-                unknown.update(n.id for n, _, _ in chunk)
+                unknown.update(nid for nid, _, _ in chunk)
             logger.warning(
                 "Expo push send failed (%s); %d messages left for the next run",
                 "rejected" if rejected else "outcome unknown",
@@ -163,29 +166,39 @@ def deliver_pending_pushes(
             )
             break
 
+        sent: set = set()
         dead_tokens: set[str] = set()
-        for (n, token, _), ticket in zip(chunk, tickets, strict=True):
+        for (nid, token, _), ticket in zip(chunk, tickets, strict=True):
             if ticket.status == "ok":
-                delivered.add(n.id)
-                n.push_status = "sent"
+                sent.add(nid)
             elif ticket.error_code == "DeviceNotRegistered":
                 dead_tokens.add(token)
             else:
                 logger.warning(
                     "Expo push ticket error %s for notification %s",
                     ticket.error_code or ticket.message,
-                    n.id,
+                    nid,
                 )
+        delivered |= sent
+        _set_push_status(db, sent, "sent")
         if dead_tokens:
             db.execute(delete(PushToken).where(PushToken.token.in_(dead_tokens)))
         # Record this request before the next, so a later failure cannot lose it.
         db.commit()
 
-    for n in claimed:
-        if n.id in delivered:
-            continue
-        if n.id in retry and n.id not in unknown:
-            n.push_status = None
-        else:
-            n.push_status = "failed"
+    unsettled = claimed - delivered
+    retry_ids = (unsettled & retry) - unknown
+    _set_push_status(db, retry_ids, None)
+    _set_push_status(db, unsettled - retry_ids, "failed")
     db.commit()
+
+
+def _set_push_status(db, ids: set, status: str | None) -> None:
+    """Set push_status on these rows. A row that is gone matches nothing."""
+    if ids:
+        db.execute(
+            update(Notification)
+            .where(Notification.id.in_(ids))
+            .values(push_status=status)
+            .execution_options(synchronize_session=False)
+        )
