@@ -18,7 +18,7 @@ Longitudinal price tracking that accumulates passively from receipts already bei
 
 **Acceptance Criteria:**
 1. Hybrid matching: vector embedding similarity + fuzzy string matching (Levenshtein, Jaro-Winkler).
-2. High-confidence (≥0.85) auto-link; medium (0.6–0.85) prompt user confirmation; low (<0.6) treat as distinct.
+2. High-confidence (≥0.85) auto-link; medium (0.6–0.85) prompt user confirmation; low (<0.6) treat as distinct. Exception: names whose qualifiers differ (organic, fat, size, flavour, store brand, colour, form, diet, e.g. "Bananas" / "Organic Bananas") never auto-link; even at ≥0.85 they prompt user confirmation.
 3. User can manually link or unlink items.
 4. Confirmed matches create canonical item name with aliases.
 

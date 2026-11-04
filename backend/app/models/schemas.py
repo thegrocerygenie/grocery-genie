@@ -273,6 +273,33 @@ class CategoryResponse(BaseModel):
     sort_order: int
 
 
+# Longest custom category name; it has to fit a budget row and a chart legend.
+CATEGORY_NAME_MAX = 40
+
+
+def _category_name(value: str) -> str:
+    name = " ".join(value.split())
+    if not name:
+        raise ValueError("name must not be blank")
+    if len(name) > CATEGORY_NAME_MAX:
+        raise ValueError(f"name must be at most {CATEGORY_NAME_MAX} characters")
+    return name
+
+
+class CategoryCreateRequest(BaseModel):
+    """A custom category (BC-05 AC 3, Premium). Whitespace is collapsed."""
+
+    name: str
+
+    _check_name = field_validator("name")(_category_name)
+
+
+class CategoryUpdateRequest(BaseModel):
+    name: str
+
+    _check_name = field_validator("name")(_category_name)
+
+
 # --- Common ---
 
 

@@ -8,6 +8,7 @@ import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { AiConsentSettingsSection } from '@/features/ai-consent/components/AiConsentSettingsSection';
 import { useMe, useSignOut } from '@/features/auth/hooks/useAuth';
 import { useBudgets } from '@/features/budget/hooks/useBudget';
+import { CATEGORY_STRINGS } from '@/features/budget/content/categories';
 import { PREMIUM_STRINGS } from '@/features/premium/content/premium';
 import { EXPORT_STRINGS } from '@/features/settings/content/export';
 import { alertsSummary, budgetsSummary } from '@/features/settings/utils/settingsSummary';
@@ -67,6 +68,17 @@ export default function SettingsScreen() {
         weekly: prefs?.weekly_summary.enabled ?? localAlerts.weeklySummaryEnabled,
       }),
       href: '/settings/notification-settings',
+    },
+    {
+      key: 'categories',
+      symbol: 'tag.fill',
+      iconBg: colors.indigo,
+      title: CATEGORY_STRINGS.settingsRow,
+      detail:
+        profile?.is_premium === true
+          ? CATEGORY_STRINGS.settingsDetailPremium
+          : CATEGORY_STRINGS.settingsDetailFree,
+      href: '/settings/categories',
     },
     {
       key: 'currency',

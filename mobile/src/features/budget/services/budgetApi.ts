@@ -58,3 +58,24 @@ export async function getDashboardSpending(
 export async function getCategories(): Promise<CategoryResponse[]> {
   return apiClient<CategoryResponse[]>('/api/categories');
 }
+
+/** Add a custom category (Premium; at most 10). */
+export async function createCategory(name: string): Promise<CategoryResponse> {
+  return apiClient<CategoryResponse>('/api/categories', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+/** Rename one of the user's custom categories (Premium). */
+export async function renameCategory(id: string, name: string): Promise<CategoryResponse> {
+  return apiClient<CategoryResponse>(`/api/categories/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  });
+}
+
+/** Delete a custom category: its items move to Other, its budget goes. */
+export async function deleteCategory(id: string): Promise<void> {
+  await apiClient<void>(`/api/categories/${id}`, { method: 'DELETE' });
+}

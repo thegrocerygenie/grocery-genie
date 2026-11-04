@@ -31,6 +31,7 @@ from app.models.schemas import (
     DashboardTrendCategory,
     DashboardTrendMonth,
 )
+from app.services.category_service import CategoryService, UnknownCategoryError
 
 
 class BudgetConflictError(ValueError):
@@ -126,12 +127,12 @@ class BudgetService:
         back, because the unique constraint still holds its key.
         Returns the budget and whether it is new to the user.
         """
-        if request.category_id is not None:
-            result = await self.db.execute(
-                select(Category).where(Category.id == request.category_id)
-            )
-            if result.scalar_one_or_none() is None:
-                raise ValueError(f"Category {request.category_id} not found")
+        # A default or the user's own custom category, never another's; a
+        # custom one cannot be deleted before this budget commits.
+        try:
+            await CategoryService(self.db).ensure_usable(user_id, [request.category_id])
+        except UnknownCategoryError:
+            raise ValueError(f"Category {request.category_id} not found") from None
 
         period_start = date.fromisoformat(request.period_start)
 

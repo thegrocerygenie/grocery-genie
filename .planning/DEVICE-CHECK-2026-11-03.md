@@ -67,7 +67,7 @@ Screenshots and trees are in `.verification/device/`. File names start with `se-
 
 ## Bugs
 
-Fix status (2026-11-04): BUG-1, 2, 3, 5, 6, 7, 8 and 9 are fixed in code by V11-D1 (BUG-6 also by #99); BUG-4 is V11-D2. A Simulator recheck of BUG-1, 2, 3, 5, 6, 8 and 9 is still due (BUG-7 is covered by its test).
+Fix status (2026-11-04): BUG-1, 2, 3, 5, 6, 7, 8 and 9 are fixed in code by V11-D1 (BUG-6 also by #99); BUG-4 is fixed by V11-D2 (qualifier differences ask instead of auto-linking; PI-02 AC 2 amended). A Simulator recheck of BUG-1, 2, 3, 5, 6, 8 and 9 is still due (BUG-7 is covered by its test).
 
 ### BUG-1. Trend bar amounts overlap the summary at accessibility text sizes
 

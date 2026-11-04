@@ -65,6 +65,7 @@ Submit user corrections. Accepts partial updates; send only the fields the user 
 - `date` later than today + 1 day returns 422. `quantity` must be > 0 and `total_price` >= 0, or 422.
 - A quantity edit keeps `total_price` (what was paid) and recomputes `unit_price`.
 - Subtotal and total are not editable. A `total_price` correction moves both by the same amount; tax is kept as extracted.
+- An item's `category_id` must be a default category or one of the user's own custom categories ([Categories](#categories-v11)); any other id returns 400 and nothing is saved.
 
 ### GET /api/receipts?page=1&per_page=20&store=...&from=...&to=... [MVP]
 Paginated receipt history with optional filters.
@@ -103,6 +104,8 @@ Turn rollover on or off for one budget (BC-FR Budget Management; rules in `07-da
 
 ### DELETE /api/budgets/{id} [MVP] · POST /api/budgets/{id}/restore [MVP]
 Soft-delete, and restore within 30 days. Restore returns 409 when the category already has another active budget.
+
+`category_id` on POST must be a default category or one of the user's own custom categories, or the call returns 400.
 
 ### GET /api/budgets/summary?period=2026-02 [MVP]
 Budget vs. actual for specified period. `budget` is the period's limit: the amount plus `rolled_over`, what rolled over into it (V1.1, Premium rollover; 0 without it, and while Premium lapses). `remaining`, `percent` and threshold alerts use that limit. A future period shows the carry the current period would leave at today's spend.
@@ -173,6 +176,35 @@ Each takes an optional `currency_preference`: the iPhone region's currency, used
 
 ### POST /api/receipts (manual) [MVP]
 `currency` is optional and defaults to the user's `currency_preference`; it must be a 3-letter code.
+An item's `category_id`, when given, must be a default category or one of the user's own; any other id returns 400.
+
+## Categories [V1.1]
+
+The eight default categories, plus up to 10 custom categories per user (BC-05 AC 3). A custom category belongs to one user (Category has no household in the data model). Custom categories work everywhere a default does: correcting an item (and the item mapping it teaches the next scan, BC-05 AC 4), budgets, the budget summary and the dashboard. **Known limitation (decided in V11-P1):** the LLM category prompt lists only the eight defaults, so a scan never assigns a custom category by itself. A custom category reaches a new scan only through the user's corrections: correcting an item teaches its item mapping, and the next scan of that item lands there (BC-05 AC 4). Teaching the prompt the user's custom names would change extraction and need the `validate-extraction` harness, so it is left for later.
+
+Creating and renaming are Premium (decision D2): a free user gets `403 premium_required` with `feature: "custom_categories"`. **When Premium lapses** the user's categories stay: they list, keep their items, still take corrections and budgets, and can be deleted; only create and rename return 403 until Premium is back.
+
+### GET /api/categories
+Defaults first (by `sort_order`), then the user's own in the order they were made. Each: `{ "id", "name", "is_default", "sort_order" }`. Another user's categories never list.
+
+### POST /api/categories
+Request `{ "name": "Garden" }`; whitespace is collapsed, and the name must be 1–40 characters (422 otherwise). Returns `201` with the category.
+- `409 { "detail": { "code": "category_limit_reached", "limit": 10, "message": … } }` when the user already has 10.
+- `409 { "detail": { "code": "category_name_taken", "message": … } }` when a default or one of the user's own categories has the name, ignoring case. Two users may use the same name.
+
+### PATCH /api/categories/{id}
+Rename: `{ "name": "Yard" }`, same rules and errors as POST. Premium. A default category or another user's returns 404.
+
+### DELETE /api/categories/{id}
+Returns `204`. Not Premium-gated, so a lapsed user can still remove what they made. The spending it held is kept:
+- its line items move to the default "Other" category, so totals and history don't change;
+- item mappings that pointed at it lose their category, so the next scan of those items is assigned afresh;
+- its budgets (active or in Recently Deleted) are removed, with the alerts sent for them;
+- it leaves `muted_alert_categories`.
+
+A default category or another user's returns 404. Deleting sends no budget alert; spend that moved into "Other" counts toward its budget from the next receipt on.
+
+**Concurrent requests.** Creates, renames and deletes of one user's categories take turns, so two creates at once cannot pass the cap of 10 or the name check together (the loser gets the 409). A request that puts a custom category on a row (a correction, a budget, a manual receipt, a scan applying an item mapping) takes turns with its delete: if it is first, the delete then moves or removes what it wrote, as above; if the delete is first, a correction, budget or manual receipt gets `400` (unknown category) and a scan leaves that item to be assigned afresh. Neither side gets a 500.
 
 ## Onboarding
 
@@ -225,7 +257,7 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
 
 ## Premium [V1.1]
 
-Premium ($5.99/month, decision D1) is an App Store subscription sold through RevenueCat. The backend trusts only RevenueCat for it: the webhook below and RevenueCat's REST API, never the app. Premium gates only the V1.1 extras (D2): the 12-month trend, custom categories, data export, budget rollover, and unlimited receipts. A free user asking for the trend, custom categories, export or rollover gets `403 premium_required` (above). The receipt cap is the one exception: a free user past it gets `429 receipt_quota_exceeded` (below), because the scan itself stays free.
+Premium ($5.99/month, decision D1) is an App Store subscription sold through RevenueCat. The backend trusts only RevenueCat for it: the webhook below and RevenueCat's REST API, never the app. Premium gates only the V1.1 extras (D2): the 12-month trend, custom categories, data export, budget rollover, and unlimited receipts. A free user asking for the trend, custom categories, export or rollover gets `403 premium_required` (above). The receipt cap is the one exception: a free user past it gets `429 receipt_quota_exceeded` (below), because the scan itself stays free. Custom categories: [Categories](#categories-v11).
 
 The profile (`/api/auth/me`, `/api/users/me`, and every route that returns it) carries the entitlement:
 ```json
@@ -322,7 +354,7 @@ Records `data_exported` (12-analytics.md). The 300 reads/minute limit applies.
 
 Built: PI-01 (price history), PI-02 (item matching), PI-03 (price change alerts, below) and PI-04 (cross-store comparison), backend and app. Every route is the signed-in user's own data; another user's item, alias or suggestion answers 404.
 
-Confirming a receipt (scan + `PATCH status=confirmed`, or a manual entry) links each line to a canonical item and records its price. `LineItemResponse` carries `canonical_item_id`. Matching: exact alias → fuzzy (mean of Jaro-Winkler and Levenshtein on word-sorted names, ≥0.85 links) → semantic (embedding cosine, ≥0.80 links) → new item, with a suggestion for the user when the best candidate scored ≥0.6. Names whose numbers differ ("milk 1%" / "milk 2%") never match by similarity.
+Confirming a receipt (scan + `PATCH status=confirmed`, or a manual entry) links each line to a canonical item and records its price. `LineItemResponse` carries `canonical_item_id`. Matching: exact alias → fuzzy (mean of Jaro-Winkler and Levenshtein on word-sorted names, ≥0.85 links) → semantic (embedding cosine, ≥0.80 links) → new item, with a suggestion for the user when the best candidate scored ≥0.6. Names whose numbers differ ("milk 1%" / "milk 2%") never match by similarity. Names whose qualifiers differ (organic, fat, size, flavour, store brand, colour, form, diet: "Bananas" / "Organic Bananas") never auto-link, however high they score: the line gets its own item and, at ≥0.6, a suggestion. Fuzzy scoring reads qualifier abbreviations as the word ("ORG" is organic, "WHL" whole, "WHL WHT" whole wheat). Common French qualifier words read as their English meaning, accents ignored ("biologique" / "bio" organic, "écrémé" nonfat, "sans gluten" gluten free). The list is `backend/app/services/item_qualifiers.py`.
 
 ### GET /api/items?q=&page=&per_page=
 Items with at least one price, most recently bought first. `q` searches names and aliases.

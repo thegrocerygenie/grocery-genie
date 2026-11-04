@@ -45,6 +45,7 @@ from app.models.schemas import (
 )
 from app.services.ai_consent import require_ai_consent
 from app.services.analytics_service import AnalyticsService, get_analytics_service
+from app.services.category_service import UnknownCategoryError
 from app.services.receipt_service import (
     NotAReceiptError,
     ReceiptAlreadyConfirmedError,
@@ -369,16 +370,19 @@ async def create_manual_receipt(
 ) -> ReceiptResponse:
     """Manual receipt entry — fallback for failed extraction."""
     service = ReceiptService(db=db, analytics=analytics, embedder=embedder)
-    receipt = await service.create_manual_receipt(
-        user_id=user.id,
-        store_name=body.store_name,
-        receipt_date=body.date,
-        total=body.total,
-        subtotal=body.subtotal,
-        tax=body.tax,
-        currency=body.currency,
-        items=[item.model_dump() for item in body.items],
-    )
+    try:
+        receipt = await service.create_manual_receipt(
+            user_id=user.id,
+            store_name=body.store_name,
+            receipt_date=body.date,
+            total=body.total,
+            subtotal=body.subtotal,
+            tax=body.tax,
+            currency=body.currency,
+            items=[item.model_dump() for item in body.items],
+        )
+    except UnknownCategoryError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     analytics.emit("receipt_manual_created", {"item_count": len(body.items)}, user.id)
     return _receipt_to_response(receipt)
 

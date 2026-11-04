@@ -200,7 +200,7 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-04 | 5 | Dashboard loads within 2 seconds | Integration | `backend/tests/api/test_p95_postgres.py::test_dashboard_p95_under_2s` (Postgres: `make backend-test-pg`) | Pass |
 | BC-05 | 1 | Tap item to reassign category | E2E | `backend/tests/e2e/test_user_journeys.py::test_journey_item_correction` | Pass |
 | BC-05 | 2 | Correction applied retroactively to history | Integration | `backend/tests/api/test_budget_alerts.py::test_category_correction_alerts_in_every_period_it_moves_spend` | Pass (indirect, through alerts) |
-| BC-05 | 3 | Up to 10 custom categories (premium) | — | none | Gap: premium only; MVP has no premium tier (V1.1) |
+| BC-05 | 3 | Up to 10 custom categories (premium) | — | see the V1.1 matrix | Moved to V1.1 (V11-P1): MVP had no premium tier |
 | BC-05 | 4 | Corrections feed per-user mapping | Integration | `backend/tests/api/test_receipts.py::test_category_only_correction_applies_on_next_scan` | Pass |
 | BC-06 | 1 | Push with total, top category, budget status | Integration | `backend/tests/tasks/test_summary_tasks.py::test_summary_gives_the_budget_status` | Pass |
 | BC-06 | 1 | Push with total, top category, budget status | Integration | `backend/tests/tasks/test_summary_tasks.py::test_summary_includes_top_category` | Pass |
@@ -209,7 +209,7 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-06 | 3 | Chosen day, 9 AM local time | Integration | `backend/tests/tasks/test_summary_tasks.py::test_recipients_only_on_users_chosen_day` | Pass |
 | BC-06 | 4 | Links to full dashboard | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "falls back to the dashboard when the route is missing" | Pass |
 
-V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04. `PREM` rows are the Premium tier (V11-P0 and V11-P4, decisions D1 and D2: `PHASE_SCOPE.md`), which has no user story ID, so the AC column names the decision. Data export (V11-P2, NFR Privacy 2) is Premium too: its rows are Story `PREM`, AC `NFR-P2`. `BC-FR | Rollover` rows are the Premium rollover toggle (V11-P3).
+V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04. BC-05 AC 3 (custom categories, Premium) with V11-P1. Decision recorded with V11-P1: the LLM assigns only the eight default categories, so a custom category reaches a new scan only through the user's corrections (the item mapping, BC-05 AC 4; row "Custom category in a correction teaches the next scan"). Changing the category prompt to know custom names needs `validate-extraction` and is out of V11-P1's scope (`08-api-contracts.md`, Categories). `PREM` rows are the Premium tier (V11-P0 and V11-P4, decisions D1 and D2: `PHASE_SCOPE.md`), which has no user story ID, so the AC column names the decision. Data export (V11-P2, NFR Privacy 2) is Premium too: its rows are Story `PREM`, AC `NFR-P2`. `BC-FR | Rollover` rows are the Premium rollover toggle (V11-P3).
 
 | Story | AC | Criterion | Type | Test | Status |
 |---|---|---|---|---|---|
@@ -230,6 +230,13 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PI-02 | 2 | 0.6-0.85 asks the user | Integration | `backend/tests/services/test_item_matching.py::test_medium_score_asks_the_user_and_keeps_the_line_separate` | Pass |
 | PI-02 | 2 | 0.6-0.85 asks the user | Component | `mobile/src/__tests__/priceHistory.test.tsx` "asks on the item and merges when the user says Same Item" | Pass |
 | PI-02 | 2 | < 0.6 distinct | Integration | `backend/tests/services/test_item_matching.py::test_low_score_is_a_distinct_item_with_no_question` | Pass |
+| PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Unit | `backend/tests/services/test_item_matching.py::test_a_qualifier_difference_is_detected` | Pass |
+| PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Integration | `backend/tests/services/test_item_matching.py::test_a_qualifier_difference_asks_instead_of_auto_linking` | Pass |
+| PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Integration | `backend/tests/services/test_item_matching.py::test_bananas_is_asked_about_not_linked_to_organic_bananas` | Pass |
+| PI-02 | 2 | Same product written differently still auto-links | Integration | `backend/tests/services/test_item_matching.py::test_the_same_product_still_auto_links` | Pass |
+| PI-02 | 2 | Same product written differently still auto-links | Integration | `backend/tests/services/test_item_matching.py::test_a_name_links_to_the_item_with_its_qualifiers` | Pass |
+| PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Unit | `backend/tests/services/test_item_matching.py::test_french_qualifiers_read_as_their_english_meaning` | Pass |
+| PI-02 | 2 | Same product written differently still auto-links | Unit | `backend/tests/services/test_item_matching.py::test_common_french_product_words_carry_no_qualifier` | Pass |
 | PI-02 | 3 | Manually link items | Integration | `backend/tests/api/test_items.py::test_merge_and_split_through_the_api` | Pass |
 | PI-02 | 3 | Manually link items | Component | `mobile/src/__tests__/priceHistory.test.tsx` "combines the item into another one and opens the result" | Pass |
 | PI-02 | 3 | Manually unlink items | Integration | `backend/tests/services/test_item_matching.py::test_split_moves_one_alias_with_its_lines_and_prices` | Pass |
@@ -284,6 +291,35 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PI-04 | 4 | From item detail or a comparison screen | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "shows the latest and average price at each store, cheapest first (AC 4)" | Pass |
 | PI-04 | 4 | From item detail or a comparison screen | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "says how many stores need more prices before they compare" | Pass |
 | PI-04 | 4 | From item detail or a comparison screen | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "explains an empty comparison when no store has enough prices yet" | Pass |
+| BC-05 | 3 | Up to 10 custom categories, Premium: created | Integration | `backend/tests/api/test_custom_categories.py::test_premium_user_creates_a_category` | Pass |
+| BC-05 | 3 | Up to 10 custom categories: the 11th is refused | Integration | `backend/tests/api/test_custom_categories.py::test_premium_user_can_create_ten_and_the_eleventh_is_refused` | Pass |
+| BC-05 | 3 | Up to 10 custom categories: deleting frees a slot | Integration | `backend/tests/api/test_custom_categories.py::test_deleting_one_frees_a_slot` | Pass |
+| BC-05 | 3 | Up to 10 custom categories: the cap is per user | Integration | `backend/tests/api/test_custom_categories.py::test_the_cap_is_per_user` | Pass |
+| BC-05 | 3 | Premium only: a free user gets `403 premium_required` | Integration | `backend/tests/api/test_custom_categories.py::test_free_user_cannot_create_a_category` | Pass |
+| BC-05 | 3 | Premium lapses: categories stay, deletable, not renamed or added | Integration | `backend/tests/api/test_custom_categories.py::test_after_premium_lapses_categories_stay_and_can_be_deleted_not_changed` | Pass |
+| BC-05 | 3 | Names: 1-40 characters, unique among defaults and own | Integration | `backend/tests/api/test_custom_categories.py::test_name_must_not_repeat_a_default_or_own_category` | Pass |
+| BC-05 | 3 | Rename a custom category | Integration | `backend/tests/api/test_custom_categories.py::test_premium_user_renames_a_category` | Pass |
+| BC-05 | 3 | Defaults and other users' categories cannot be changed | Integration | `backend/tests/api/test_custom_categories.py::test_another_users_category_cannot_be_renamed_or_deleted` | Pass |
+| BC-05 | 3 | Custom category in a correction teaches the next scan (AC 2, 4) | Integration | `backend/tests/api/test_custom_categories.py::test_custom_category_in_a_correction_teaches_the_next_scan` | Pass |
+| BC-05 | 3 | Custom category in a budget, the summary and the dashboard | Integration | `backend/tests/api/test_custom_categories.py::test_custom_category_budget_and_dashboard_spending` | Pass |
+| BC-05 | 3 | Another user's category is refused in corrections and budgets | Integration | `backend/tests/api/test_custom_categories.py::test_correction_refuses_another_users_category` | Pass |
+| BC-05 | 3 | Another user's category is refused in corrections and budgets | Integration | `backend/tests/api/test_custom_categories.py::test_budget_refuses_another_users_category` | Pass |
+| BC-05 | 3 | Delete: items move to Other, mappings clear, budgets go | Integration | `backend/tests/api/test_custom_categories.py::test_delete_moves_items_to_other_and_removes_its_budget` | Pass |
+| BC-05 | 3 | Concurrent creates stop at 10; the rest get 409 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_concurrent_creates_stop_at_the_cap` | Pass |
+| BC-05 | 3 | Concurrent creates of one name (any case) make one | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_concurrent_creates_of_one_name_make_one` | Pass |
+| BC-05 | 3 | Delete racing a budget, correction or scan: no 500 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_budget_saved_while_its_category_is_deleted_gets_a_clean_400` | Pass |
+| BC-05 | 3 | Delete racing a budget, correction or scan: no 500 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_category_deleted_while_a_budget_is_saved_takes_the_budget` | Pass |
+| BC-05 | 3 | Delete racing a budget, correction or scan: no 500 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_correction_to_a_category_being_deleted_gets_a_clean_400` | Pass |
+| BC-05 | 3 | Delete racing a budget, correction or scan: no 500 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_category_deleted_during_a_correction_moves_the_item_to_other` | Pass |
+| BC-05 | 3 | Delete racing a budget, correction or scan: no 500 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_scan_applying_a_mapping_to_a_category_being_deleted_skips_it` | Pass |
+| BC-05 | 3 | Delete racing a budget, correction or scan: no 500 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_category_deleted_during_a_scan_moves_the_mapped_item_to_other` | Pass |
+| BC-05 | 3 | App: a free user sees the upgrade prompt, never an error | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a free user sees the upgrade prompt that opens the paywall, not an add button" | Pass |
+| BC-05 | 3 | App: a refused create shows the upgrade prompt | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a refused create (Premium lapsed) shows the upgrade prompt, not an error" | Pass |
+| BC-05 | 3 | App: add, rename, delete | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a Premium user adds a category by name" | Pass |
+| BC-05 | 3 | App: add, rename, delete | Component | `mobile/src/__tests__/categorySettings.test.tsx` "renames a custom category" | Pass |
+| BC-05 | 3 | App: add, rename, delete | Component | `mobile/src/__tests__/categorySettings.test.tsx` "deletes a custom category after confirming" | Pass |
+| BC-05 | 3 | App: at 10 the add button is disabled | Component | `mobile/src/__tests__/categorySettings.test.tsx` "at 10 the add button is disabled and says why" | Pass |
+| BC-05 | 3 | App: the paywall lists custom categories | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "shows what Premium unlocks and the App Store price" | Pass |
 | BC-FR | Trends | 12-month trend (V1.1), Premium per D2 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_for_premium` | Pass |
 | BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_premium_user_still_gets_3_months_by_default` | Pass |
 | BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_trend_is_3_months_with_months_3` | Pass |
