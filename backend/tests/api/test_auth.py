@@ -296,6 +296,50 @@ async def test_refresh_rotates_pair(auth_client):
     assert new_pair["needs_onboarding"] is False
 
 
+@pytest.mark.asyncio
+async def test_replayed_refresh_is_rejected_and_logged_for_its_user(
+    auth_client, db_session, monkeypatch
+):
+    from sqlalchemy import select
+
+    from app.models.database import AuthEvent, User
+    from app.services import auth as auth_service
+
+    denied: set[str] = set()
+
+    async def _add_jti(jti, _ttl):
+        denied.add(jti)
+
+    async def _is_denylisted(jti):
+        return jti in denied
+
+    monkeypatch.setattr(auth_service, "add_jti_async", _add_jti)
+    monkeypatch.setattr(auth_service, "is_jti_denylisted_async", _is_denylisted)
+    sign_up = await auth_client.post(
+        "/api/auth/sign-up",
+        json={"email": "replay@test.com", "password": "TestPass1234!"},
+    )
+    old_refresh = sign_up.json()["refresh_token"]
+    rotation = await auth_client.post(
+        "/api/auth/refresh", json={"refresh_token": old_refresh}
+    )
+    assert rotation.status_code == 200, rotation.text
+
+    replay = await auth_client.post(
+        "/api/auth/refresh", json={"refresh_token": old_refresh}
+    )
+
+    assert replay.status_code == 400, replay.text
+    assert replay.json()["detail"]["code"] == "invalid_token"
+    user_id = (
+        await db_session.execute(select(User.id).where(User.email == "replay@test.com"))
+    ).scalar_one()
+    events = await db_session.execute(
+        select(AuthEvent.user_id).where(AuthEvent.event_type == "token_reuse_detected")
+    )
+    assert events.scalars().all() == [user_id]
+
+
 # ── PATCH /api/users/me ─────────────────────────────────────────
 
 
