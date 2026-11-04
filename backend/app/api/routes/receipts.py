@@ -87,7 +87,7 @@ def _receipt_to_response(receipt) -> ReceiptResponse:
     return ReceiptResponse(
         id=receipt.id,
         user_id=receipt.user_id,
-        store_name=receipt.store.name if receipt.store else None,
+        store_name=receipt.store_name,
         date=receipt.date,
         subtotal=float(receipt.subtotal) if receipt.subtotal else None,
         tax=float(receipt.tax) if receipt.tax else None,
@@ -309,7 +309,7 @@ async def recently_deleted(
         if deleted_at.tzinfo is None:
             deleted_at = deleted_at.replace(tzinfo=UTC)
         days_left = days_remaining(deleted_at, now)
-        store_label = r.store.name if r.store else "Receipt"
+        store_label = r.store_name or "Receipt"
         total_label = format_money(float(r.total), r.currency) if r.total else ""
         out.append(
             DeletedItemResponse(

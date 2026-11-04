@@ -9,6 +9,7 @@ import { AiConsentSettingsSection } from '@/features/ai-consent/components/AiCon
 import { useMe, useSignOut } from '@/features/auth/hooks/useAuth';
 import { useBudgets } from '@/features/budget/hooks/useBudget';
 import { CATEGORY_STRINGS } from '@/features/budget/content/categories';
+import { STORE_MERGE_COPY } from '@/features/price-intelligence/constants';
 import { PREMIUM_STRINGS } from '@/features/premium/content/premium';
 import { EXPORT_STRINGS } from '@/features/settings/content/export';
 import { alertsSummary, budgetsSummary } from '@/features/settings/utils/settingsSummary';
@@ -79,6 +80,14 @@ export default function SettingsScreen() {
           ? CATEGORY_STRINGS.settingsDetailPremium
           : CATEGORY_STRINGS.settingsDetailFree,
       href: '/settings/categories',
+    },
+    {
+      key: 'stores',
+      symbol: 'storefront.fill',
+      iconBg: colors.teal,
+      title: STORE_MERGE_COPY.settingsRow,
+      detail: STORE_MERGE_COPY.settingsDetail,
+      href: '/settings/stores',
     },
     {
       key: 'currency',

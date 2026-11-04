@@ -209,7 +209,7 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-06 | 3 | Chosen day, 9 AM local time | Integration | `backend/tests/tasks/test_summary_tasks.py::test_recipients_only_on_users_chosen_day` | Pass |
 | BC-06 | 4 | Links to full dashboard | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "falls back to the dashboard when the route is missing" | Pass |
 
-V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04. BC-05 AC 3 (custom categories, Premium) with V11-P1. Decision recorded with V11-P1: the LLM assigns only the eight default categories, so a custom category reaches a new scan only through the user's corrections (the item mapping, BC-05 AC 4; row "Custom category in a correction teaches the next scan"). Changing the category prompt to know custom names needs `validate-extraction` and is out of V11-P1's scope (`08-api-contracts.md`, Categories). `PREM` rows are the Premium tier (V11-P0 and V11-P4, decisions D1 and D2: `PHASE_SCOPE.md`), which has no user story ID, so the AC column names the decision. Data export (V11-P2, NFR Privacy 2) is Premium too: its rows are Story `PREM`, AC `NFR-P2`. `BC-FR | Rollover` rows are the Premium rollover toggle (V11-P3).
+V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04. BC-05 AC 3 (custom categories, Premium) with V11-P1. Decision recorded with V11-P1: the LLM assigns only the eight default categories, so a custom category reaches a new scan only through the user's corrections (the item mapping, BC-05 AC 4; row "Custom category in a correction teaches the next scan"). Changing the category prompt to know custom names needs `validate-extraction` and is out of V11-P1's scope (`08-api-contracts.md`, Categories). `PREM` rows are the Premium tier (V11-P0 and V11-P4, decisions D1 and D2: `PHASE_SCOPE.md`), which has no user story ID, so the AC column names the decision. Data export (V11-P2, NFR Privacy 2) is Premium too: its rows are Story `PREM`, AC `NFR-P2`. `BC-FR | Rollover` rows are the Premium rollover toggle (V11-P3). `EC-PI | 1` rows are `11-edge-cases.md` Price Intelligence edge case 1, store normalization with user merge (V11-05, decision D3), which has no user story ID; it is free, like the rest of price intelligence.
 
 | Story | AC | Criterion | Type | Test | Status |
 |---|---|---|---|---|---|
@@ -507,6 +507,47 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | BC-FR | Trends | Free user sees an upgrade prompt, not an error (D2) | Component | `mobile/src/__tests__/trendMonths.test.tsx` "switching back to 3 months after the upgrade prompt shows the 3-month chart" | Pass |
 | BC-FR | Trends | Free user sees an upgrade prompt, not an error (D2) | Component | `mobile/src/components/__tests__/PremiumUpgradePrompt.test.tsx` "calls onUpgrade when the upgrade button is tapped (the V11-P0 paywall seam)" | Pass |
 | BC-FR | Trends | Another 12-month load failure offers a retry | Component | `mobile/src/__tests__/trendMonths.test.tsx` "another failure loading 12 months offers a retry" | Pass |
+| EC-PI | 1 | Store normalization: branch numbers and punctuation drop out | Unit | `backend/tests/services/test_store_service.py::test_normalize_store_name` | Pass |
+| EC-PI | 1 | Store normalization: branch numbers and punctuation drop out | Integration | `backend/tests/services/test_store_service.py::test_branch_numbers_and_punctuation_find_one_store` | Pass |
+| EC-PI | 1 | Store normalization: branch numbers and punctuation drop out | Integration | `backend/tests/api/test_store_merge.py::test_branch_numbers_normalize_into_one_store` | Pass |
+| EC-PI | 1 | Store normalization: existing rows kept, grouped under the oldest | Integration | `backend/tests/services/test_store_service.py::test_older_rows_that_now_normalize_together_group_together` | Pass |
+| EC-PI | 1 | Store normalization: existing rows kept, grouped under the oldest | Unit | `backend/tests/services/test_store_service.py::test_the_migration_normalized_existing_stores_the_same_way` | Pass |
+| EC-PI | 1 | Store normalization favours precision: no false groups | Unit | `backend/tests/services/test_store_service.py::test_different_stores_never_normalize_together` | Pass |
+| EC-PI | 1 | Store normalization favours precision: no false groups | Unit | `backend/tests/services/test_store_service.py::test_the_normalized_name_fits_the_column` | Pass |
+| EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/api/test_store_merge.py::test_a_receipt_shows_its_own_store_name_not_another_users` | Pass |
+| EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/api/test_store_merge.py::test_correcting_the_store_name_keeps_the_correction` | Pass |
+| EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/api/test_store_merge.py::test_the_history_filter_never_matches_another_users_name` | Pass |
+| EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/services/test_store_service.py::test_a_group_is_named_as_the_users_own_receipts_name_it` | Pass |
+| EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/api/test_store_merge.py::test_a_merge_target_purged_keeps_the_users_name` | Pass |
+| EC-PI | 1 | Store names never cross accounts | Integration | `backend/tests/api/test_store_merge.py::test_a_mute_outliving_its_receipts_keeps_the_users_name` | Pass |
+| EC-PI | 1 | Store list: the user's stores as they group | Integration | `backend/tests/api/test_store_merge.py::test_the_store_list_leaves_out_deleted_receipts` | Pass |
+| EC-PI | 1 | User merge: per-user only, shared rows untouched (D3) | Integration | `backend/tests/services/test_store_service.py::test_a_merge_groups_only_that_users_stores` | Pass |
+| EC-PI | 1 | User merge: per-user only, shared rows untouched (D3) | Integration | `backend/tests/api/test_store_merge.py::test_another_users_merge_never_changes_my_grouping` | Pass |
+| EC-PI | 1 | User merge: comparison groups merged stores (PI-04) | Integration | `backend/tests/api/test_store_merge.py::test_a_merged_store_compares_as_one_store` | Pass |
+| EC-PI | 1 | User merge: comparison groups merged stores (PI-04) | Integration | `backend/tests/api/test_store_merge.py::test_a_merge_can_lift_stores_over_the_comparison_minimum` | Pass |
+| EC-PI | 1 | User merge: price history and item stats group merged stores (PI-01) | Integration | `backend/tests/api/test_store_merge.py::test_price_history_and_stats_group_merged_stores` | Pass |
+| EC-PI | 1 | User merge: groups one level deep; merging into its own group is refused | Integration | `backend/tests/services/test_store_service.py::test_merging_a_group_moves_its_merged_stores_too` | Pass |
+| EC-PI | 1 | User merge: groups one level deep; merging into its own group is refused | Integration | `backend/tests/services/test_store_service.py::test_a_store_cannot_be_merged_into_its_own_group` | Pass |
+| EC-PI | 1 | User merge: groups one level deep; merging into its own group is refused | Integration | `backend/tests/api/test_store_merge.py::test_merging_into_the_same_store_is_409` | Pass |
+| EC-PI | 1 | User merge: only stores the user shopped at | Integration | `backend/tests/services/test_store_service.py::test_only_stores_the_user_shopped_at_can_be_merged` | Pass |
+| EC-PI | 1 | User merge: only stores the user shopped at | Integration | `backend/tests/services/test_store_service.py::test_a_branch_of_a_shopped_store_counts_as_shopped` | Pass |
+| EC-PI | 1 | User merge: only stores the user shopped at | Integration | `backend/tests/api/test_store_merge.py::test_merging_a_store_the_user_never_shopped_at_is_404` | Pass |
+| EC-PI | 1 | User merge: only stores the user shopped at | Integration | `backend/tests/api/test_store_merge.py::test_merge_needs_a_target` | Pass |
+| EC-PI | 1 | User merge: only stores the user shopped at | Integration | `backend/tests/services/test_store_service.py::test_a_store_on_only_deleted_receipts_is_not_shopped` | Pass |
+| EC-PI | 1 | Unmerge undoes a merge | Integration | `backend/tests/api/test_store_merge.py::test_unmerge_splits_the_stores_again` | Pass |
+| EC-PI | 1 | Store mutes follow the user's grouping (PI-03 AC 4) | Integration | `backend/tests/api/test_store_merge.py::test_a_muted_store_merged_into_another_mutes_the_merged_store` | Pass |
+| EC-PI | 1 | Store mutes follow the user's grouping (PI-03 AC 4) | Integration | `backend/tests/api/test_store_merge.py::test_after_unmerge_a_mute_stays_with_the_store_it_was_set_on` | Pass |
+| EC-PI | 1 | Store mutes follow the user's grouping (PI-03 AC 4) | Integration | `backend/tests/api/test_store_merge.py::test_muting_a_merged_group_quiets_the_merged_store` | Pass |
+| EC-PI | 1 | A price alert names the merged store (PI-03) | Integration | `backend/tests/api/test_store_merge.py::test_a_price_alert_names_the_merged_store` | Pass |
+| EC-PI | 1 | Data export prices use the user's grouping | Integration | `backend/tests/api/test_data_export.py::test_export_prices_use_the_users_store_grouping` | Pass |
+| EC-PI | 1 | Account deletion erases the user's store merges | Integration | `backend/tests/api/test_account_deletion.py::test_delete_account_erases_every_row_and_image` | Pass |
+| EC-PI | 1 | Merge and unmerge from Settings → Stores (app) | Component | `mobile/src/__tests__/storeMerge.test.tsx` "merges one store into another the user picks" | Pass |
+| EC-PI | 1 | Merge and unmerge from Settings → Stores (app) | Component | `mobile/src/__tests__/storeMerge.test.tsx` "unmerges a merged store" | Pass |
+| EC-PI | 1 | Merge and unmerge from Settings → Stores (app) | Component | `mobile/src/__tests__/storeMerge.test.tsx` "lists the stores with their receipt counts" | Pass |
+| EC-PI | 1 | Merge and unmerge from Settings → Stores (app) | Component | `mobile/src/__tests__/storeMerge.test.tsx` "says so when a merge fails" | Pass |
+| EC-PI | 1 | Merge and unmerge from Settings → Stores (app) | Component | `mobile/src/__tests__/storeMerge.test.tsx` "scrolls the merge sheet when the user has many stores" | Pass |
+| EC-PI | 1 | Merge and unmerge from Settings → Stores (app) | Component | `mobile/src/__tests__/settingsHub.test.tsx` "opens Stores, where the user merges the same store (V11-05)" | Pass |
+| EC-PI | 1 | Merge and unmerge from Settings → Stores (app) | Manual | Simulator + VoiceOver check of Settings → Stores and its merge sheet; API-only verify cannot drive it | Pending |
 
 This matrix is the source of truth for completeness. A phase is not done until every row has a passing test.
 
