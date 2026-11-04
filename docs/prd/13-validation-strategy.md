@@ -221,7 +221,7 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PI-01 | 3 | Unit price (per item, kg, lb) | Component | `mobile/src/__tests__/priceHistory.test.tsx` "shows unit prices and the change since the first price (AC 3)" | Pass |
 | PI-01 | 4 | Timeline needs 2 data points | Integration | `backend/tests/api/test_items.py::test_one_price_is_not_yet_a_timeline` | Pass |
 | PI-01 | FR | Filter the history by store and date range | Integration | `backend/tests/api/test_items.py::test_store_and_date_filters` | Pass |
-| PI-01 | EC 3 | A sale price is a regular observation, in the timeline and the average | Integration | `backend/tests/api/test_price_comparison.py::test_a_sale_price_is_a_regular_observation` | Pass |
+| EC-PI | 3 | A sale price is a regular observation, in the timeline and the average | Integration | `backend/tests/api/test_price_comparison.py::test_a_sale_price_is_a_regular_observation` | Pass |
 | PI-01 | 4 | Timeline needs 2 data points | Component | `mobile/src/__tests__/priceHistory.test.tsx` "waits for a second price before showing a trend (AC 4)" | Pass |
 | PI-01 | 1 | Every recorded price with date and store (app, at AX5: device check BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "stacks each price under its date and store at AX5" | Pass |
 | PI-01 | 1 | Every recorded price with date and store (app, Prices list at AX5: BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "stacks the price under the name at AX5, and lets the name wrap" | Pass |
@@ -606,7 +606,7 @@ V1.1 is Price Intelligence (PI-01 through PI-04) and the Premium tier (`PHASE_SC
 **Functional completeness:**
 - [ ] All V1.1 user stories (PI-01 through PI-04, BC-05 AC 3) and the Premium rows (`PREM`, `BC-FR | Trends`, `BC-FR | Rollover`) have passing tests for every acceptance criterion.
 - [ ] The V1.1 traceability matrix covers every [V1.1] acceptance criterion and every V1.1 edge case, with test locations and pass status. `python3 scripts/check-traceability.py` is clean.
-- [ ] All API endpoints from 08-api-contracts.md tagged V1.1 (items, stores, categories, export, rollover, the 12-month trend, the RevenueCat webhook) are implemented and integration-tested.
+- [ ] All API endpoints from 08-api-contracts.md tagged V1.1 (items, stores and store merge, categories, export, rollover, the 12-month trend, the RevenueCat webhook) are implemented and integration-tested.
 - [ ] `/validate` passes on main (backend on SQLite and on Postgres, `alembic check`, mobile tsc, eslint, jest).
 - [ ] `/verify-grocery-genie` passes on main: its V1.1 journeys drive the API the way the app does.
 - [ ] `verify-budget-alerts` passes: the TLA+ model of budget and price alerts and push delivery checks clean.
@@ -615,7 +615,7 @@ V1.1 is Price Intelligence (PI-01 through PI-04) and the Premium tier (`PHASE_SC
 - N/A for V1.1. V1.1 did not change the extraction or category prompts, the extraction logic, or the provider config, so the MVP accuracy boxes carry over unchanged. Custom categories reach a scan only through the user's corrections (V11-P1 decision, above). Any later prompt change runs `validate-extraction` first.
 
 **Edge cases:**
-- [ ] All Price Intelligence edge cases from 11-edge-cases.md are tested: store name variations (store normalization with user merge), unit price ambiguity (only like-for-like compared), and promotional prices recorded as regular observations.
+- [ ] All Price Intelligence edge cases from 11-edge-cases.md are tested: store name variations (store normalization with user merge, rows `EC-PI | 1`), unit price ambiguity (only like-for-like compared), and promotional prices recorded as regular observations (row `EC-PI | 3`).
 - [ ] Rollover edge cases (amount change, $0 budget, currency change, delete and restore, Premium lapse) are tested. Rows `BC-FR | Rollover` above.
 
 **Non-functional:**
@@ -630,7 +630,7 @@ V1.1 is Price Intelligence (PI-01 through PI-04) and the Premium tier (`PHASE_SC
 - [ ] Entitlements come only from RevenueCat's webhook and REST API, never the client.
 
 **Security:**
-- [ ] User B cannot read or change user A's items, aliases, suggestions, prices, comparisons, mutes, custom categories, export, or budget rollover: every new route answers 404 (`test_items.py::test_items_are_private_to_their_user`, `test_price_alerts.py::test_another_users_item_cannot_be_muted_or_unmuted`, `test_price_comparison.py::test_comparison_is_private_and_unknown_items_are_404`, `test_custom_categories.py::test_another_users_category_cannot_be_renamed_or_deleted`, `test_item_matching.py::test_another_users_suggestion_is_not_found`, `test_cross_user_writes.py::test_b_cannot_turn_on_rollover_for_as_budget`).
+- [ ] User B cannot read or change user A's items, aliases, suggestions, prices, comparisons, mutes, store merges, custom categories, export, or budget rollover: every new route answers 404 or leaves the other user's data alone (`test_items.py::test_items_are_private_to_their_user`, `test_price_alerts.py::test_another_users_item_cannot_be_muted_or_unmuted`, `test_price_comparison.py::test_comparison_is_private_and_unknown_items_are_404`, `test_custom_categories.py::test_another_users_category_cannot_be_renamed_or_deleted`, `test_item_matching.py::test_another_users_suggestion_is_not_found`, `test_store_merge.py::test_merging_a_store_the_user_never_shopped_at_is_404`, `test_store_merge.py::test_another_users_merge_never_changes_my_grouping`, `test_cross_user_writes.py::test_b_cannot_turn_on_rollover_for_as_budget`).
 - [ ] The RevenueCat webhook refuses a request without its shared secret.
 
 **Manual (device and human checks):** these cannot be automated and are listed in [device-checklist.md](../device-checklist.md), V1.1 section.

@@ -155,7 +155,7 @@ Setup for this section:
 
 **Item matching and stores (PI-02, store normalization):**
 - [ ] **Review Matches.** Confirm "Organic Bananas", then "Bananas". Review Matches asks whether they are the same item; neither links on its own. Not the Same keeps two items; Same Item merges their prices. (PI-02 AC 2; BUG-4)
-- [ ] **Settings → Stores.** Once V11-05 (store normalization) is merged: the stores list, merging two spellings of one store, and the muted stores. (11-edge-cases Price Intelligence 1)
+- [ ] **Settings → Stores.** Branch numbers ("Loblaws" and "Loblaws #1234") show as one store. Merge one name into another (for example "REAL CANADIAN SUPERSTORE" into "Loblaws"): an item bought at both now compares as one store. Unmerge splits them again. Only this account's prices regroup. (11-edge-cases Price Intelligence 1; V11-05, decision D3)
 
 **Device-check bug rechecks (`.planning/DEVICE-CHECK-2026-11-03.md`):**
 - [ ] **BUG-1.** At AX1 and AX5, Trend's bar amounts stay clear of the summary above the chart.
@@ -167,7 +167,7 @@ Setup for this section:
 - [ ] **BUG-9.** At AX5 on the SE, the 12 month letters stay readable and apart.
 
 **Accessibility on each new screen:**
-- [ ] **VoiceOver** reads, in a logical order: Prices, item detail (chart summary, mute switches, Compare stores), Review Matches, Combine, Settings → Alerts (threshold, muted rows), Settings → Categories, Export data, Budget settings (rollover switches), the paywall, Settings → Premium, and Settings → Stores once merged. Every control reads as a button or switch with its label and state. (13 Accessibility)
+- [ ] **VoiceOver** reads, in a logical order: Prices, item detail (chart summary, mute switches, Compare stores), Review Matches, Combine, Settings → Alerts (threshold, muted rows), Settings → Categories, Export data, Budget settings (rollover switches), the paywall, Settings → Premium, and Settings → Stores (merge, unmerge, the store picker). Every control reads as a button or switch with its label and state. (13 Accessibility)
 - [ ] **Dark mode** on each of those screens: text and charts keep their contrast, and nothing is drawn black on black. (13 Accessibility)
 
 ## After the session
