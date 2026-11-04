@@ -6,6 +6,8 @@
 import React from 'react';
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 
+import { useAuthStore } from '@/store/authStore';
+
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('@/features/ai-consent/hooks/useAiConsent', () =>
   jest.requireActual('@/testing/aiConsentHooksMock'),
@@ -59,6 +61,8 @@ const TABS_DIR = 'app/(tabs)';
 
 beforeEach(() => {
   mockGranted = true;
+  // The tabs render only for a signed-in user.
+  useAuthStore.setState({ hydrated: true, accessToken: 't', refreshToken: 't' });
 });
 
 describe('Scan tab bar', () => {

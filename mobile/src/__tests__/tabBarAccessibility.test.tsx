@@ -9,6 +9,7 @@ import { renderRouter, screen } from 'expo-router/testing-library';
 
 import TabsLayout from '../../app/(tabs)/_layout';
 import { colors } from '@/constants/theme';
+import { useAuthStore } from '@/store/authStore';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('expo-haptics', () => ({ selectionAsync: jest.fn() }));
@@ -43,6 +44,8 @@ function renderTabs() {
 
 beforeEach(() => {
   mockReduceTransparency = false;
+  // The tabs render only for a signed-in user.
+  useAuthStore.setState({ hydrated: true, accessToken: 't', refreshToken: 't' });
 });
 
 describe('Tab bar accessibility', () => {
