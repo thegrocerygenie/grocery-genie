@@ -36,9 +36,9 @@ function withSpend(spent: number, budget = 400) {
 
 // Half the month gone. renderRouter resets fake timers, so the share is mocked
 // rather than the clock; budgetPace itself is the real one.
-jest.mock('@/features/budget/utils/pace', () => ({
-  ...jest.requireActual('@/features/budget/utils/pace'),
-  monthShareElapsed: () => 0.5,
+jest.mock('@/features/budget/utils/period', () => ({
+  ...jest.requireActual('@/features/budget/utils/period'),
+  periodShareElapsed: () => 0.5,
 }));
 
 function renderDashboard() {

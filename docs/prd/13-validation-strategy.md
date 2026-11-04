@@ -178,6 +178,9 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-02 | 2 | Per-category budgets configurable | E2E | `backend/tests/e2e/test_user_journeys.py::test_journey_per_category_budget` | Pass |
 | BC-02 | 3 | Calendar months default; custom start | Integration | `backend/tests/services/test_budget_service.py::test_get_period_dates_custom_start` | Pass |
 | BC-02 | 3 | Calendar months default; custom start | Integration | `backend/tests/services/test_budget_service.py::test_get_period_dates_default` | Pass |
+| BC-02 | 3 | Calendar months default; custom start | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_default_period_follows_the_reset_day` | Pass |
+| BC-02 | 3 | Calendar months default; custom start | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_default_period_uses_the_users_local_date` | Pass |
+| BC-02 | 3 | Calendar months default; custom start | Component | `mobile/src/__tests__/dashboardResetDay.test.tsx` "labels the period by its dates and counts days within it" | Pass |
 | BC-02 | 4 | Edits apply immediately to current period | Integration | `backend/tests/api/test_edge_cases.py::test_mid_month_budget_change` | Pass |
 | BC-02 | 4 | Edits apply immediately to current period | Component | `mobile/src/__tests__/budgetSettings.test.tsx` "updates a changed limit instead of creating another budget" | Pass |
 | BC-03 | 1 | Push at 80% (50/80/100 configurable) | Integration | `backend/tests/services/test_budget_service.py::test_check_thresholds_at_80` | Pass |
@@ -206,7 +209,7 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-06 | 3 | Chosen day, 9 AM local time | Integration | `backend/tests/tasks/test_summary_tasks.py::test_recipients_only_on_users_chosen_day` | Pass |
 | BC-06 | 4 | Links to full dashboard | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "falls back to the dashboard when the route is missing" | Pass |
 
-V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04. `PREM` rows are the Premium tier (V11-P0, decisions D1 and D2: `PHASE_SCOPE.md`), which has no user story ID.
+V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI-02; PI-03 (price change alerts) backend added the same day, and its app screens (alert tap, mute switches, threshold setting) with V11-02. PI-04 (cross-store comparison): backend, then its section on item detail (AC 4) with V11-04. `PREM` rows are the Premium tier (V11-P0 and V11-P4, decisions D1 and D2: `PHASE_SCOPE.md`), which has no user story ID, so the AC column names the decision. Data export (V11-P2, NFR Privacy 2) is Premium too: its rows are Story `PREM`, AC `NFR-P2`.
 
 | Story | AC | Criterion | Type | Test | Status |
 |---|---|---|---|---|---|
@@ -218,6 +221,9 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PI-01 | 3 | Unit price (per item, kg, lb) | Component | `mobile/src/__tests__/priceHistory.test.tsx` "shows unit prices and the change since the first price (AC 3)" | Pass |
 | PI-01 | 4 | Timeline needs 2 data points | Integration | `backend/tests/api/test_items.py::test_one_price_is_not_yet_a_timeline` | Pass |
 | PI-01 | 4 | Timeline needs 2 data points | Component | `mobile/src/__tests__/priceHistory.test.tsx` "waits for a second price before showing a trend (AC 4)" | Pass |
+| PI-01 | 1 | Every recorded price with date and store (app, at AX5: device check BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "stacks each price under its date and store at AX5" | Pass |
+| PI-01 | 1 | Every recorded price with date and store (app, Prices list at AX5: BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "stacks the price under the name at AX5, and lets the name wrap" | Pass |
+| PI-01 | 3 | Unit price (per item, kg, lb) (app, latest price at AX5: BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "keeps the latest price on one line, shrinking it to fit" | Pass |
 | PI-02 | 1 | Hybrid: embedding similarity + fuzzy strings | Integration | `backend/tests/services/test_item_matching.py::test_high_semantic_similarity_auto_links` | Pass |
 | PI-02 | 1 | Hybrid: embedding similarity + fuzzy strings | Integration | `backend/tests/services/test_item_matching.py::test_high_fuzzy_score_auto_links_and_learns_the_alias` | Pass |
 | PI-02 | 2 | >= 0.85 auto-link | Integration | `backend/tests/services/test_item_matching.py::test_high_fuzzy_score_auto_links_and_learns_the_alias` | Pass |
@@ -257,6 +263,10 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "opens the item named in a price change alert (PI-03)" | Pass |
 | PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "opens a price change item from its id even when the url says otherwise" | Pass |
 | PI-03 | 2 | Tapping the alert opens the item | Unit | `mobile/src/features/notifications/__tests__/notificationTap.test.ts` "never builds a route from a malformed price change item id" | Pass |
+| PI-03 | 2 | Tapping the alert opens the item, with Back to Budget (cold start: BUG-6) | Component | `mobile/src/__tests__/pushTapColdStart.test.tsx` "opens the tapped item on top of the tabs when the tap launched the app" | Pass |
+| PI-03 | 2 | Tapping the alert opens the item, with Back to Budget (cold start: BUG-6) | Component | `mobile/src/__tests__/priceAlertColdStart.test.tsx` "routes a tap that is waiting on the first frame, once the root navigator is ready" | Pass |
+| PI-03 | 2 | Tapping the alert opens the item, with Back to Budget (cold start: BUG-6) | Component | `mobile/src/__tests__/priceAlertColdStart.test.tsx` "asks for the tabs under the item, in case the tap lands before the stack is built" | Pass |
+| PI-03 | 2 | Tapping the alert opens the item, with Back to Budget (cold start: BUG-6) | Component | `mobile/src/__tests__/priceAlertColdStart.test.tsx` "puts the tabs under an item opened by a deep link on launch" | Pass |
 | PI-03 | 4 | Mutable per item (app) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "mutes price alerts for the item" | Pass |
 | PI-03 | 4 | Mutable per item (app) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "unmutes an item whose price alerts are muted" | Pass |
 | PI-03 | 4 | Mutable per item (app): a failed save puts the switch back | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "puts the switch back and says so when a mute fails" | Pass |
@@ -284,6 +294,12 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_trend_is_3_months_with_months_3` | Pass |
 | BC-FR | Trends | `months` other than 3 or 12 is a 422 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_rejects_months_other_than_3_or_12` | Pass |
 | BC-FR | Trends | Free user asking for 12 months gets `403 premium_required` | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_needs_premium` | Pass |
+| BC-FR | Trends | Trend bar amounts in the budget currency (BUG-7) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "labels each bar in euros when the budget is in euros" | Pass |
+| BC-FR | Trends | Trend readable at accessibility text sizes (BUG-1) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "lets the chart grow down with the text, not up over the summary (BUG-1)" | Pass |
+| BC-FR | Trends | Trend readable at accessibility text sizes (BUG-2) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "wraps the month-over-month change under the total instead of off the screen (BUG-2)" | Pass |
+| BC-FR | Trends | Trend readable at accessibility text sizes | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "keeps each bar amount on one line, shrinking to fit its column" | Pass |
+| BC-FR | Trends | 12-month trend readable at accessibility text sizes (BUG-9) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "keeps the 12 one-letter labels to one line and a size that fits a narrow bar (BUG-9)" | Pass |
+| BC-FR | Trends | VoiceOver reads the bars in month order (BUG-8) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "gives every month column the same height, so VoiceOver reads them left to right" | Pass |
 | PREM | D1 | Premium: entitlement from RevenueCat only, checked with its expiry | Unit | `backend/tests/core/test_entitlements.py::test_a_user_with_no_entitlement_is_free` | Pass |
 | PREM | D1 | Premium: entitlement from RevenueCat only, checked with its expiry | Unit | `backend/tests/core/test_entitlements.py::test_an_active_entitlement_before_its_expiry_is_premium` | Pass |
 | PREM | D1 | Premium: entitlement from RevenueCat only, checked with its expiry | Unit | `backend/tests/core/test_entitlements.py::test_an_entitlement_past_its_expiry_is_free` | Pass |
@@ -387,6 +403,36 @@ V1.1 matrix (Price Intelligence + Premium), started 2026-11-03 with PI-01 and PI
 | PREM | D2 | Queued photo that hit the cap: upgrade prompt opens the paywall | Component | `mobile/src/__tests__/historyOfflineQueue.test.tsx` "offers Premium for a photo over the monthly quota, and keeps the photo (D2)" | Pass |
 | PREM | D2 | Cap, Premium unblock and free endpoints through the API | E2E | `.agents/skills/verify-grocery-genie/features/premium.md` `premium-quota-free`, `premium-unlimited`, `premium-free-features` | Pass |
 | PREM | D1 | Sandbox purchase and restore on a device | Manual | `docs/DEPLOYMENT.md` 2.9 step 6 (needs the RevenueCat keys and App Store product) | Pending |
+| PREM | NFR-P2 | Export: JSON with receipts, line items, budgets and prices | Integration | `backend/tests/api/test_data_export.py::test_json_export_has_receipts_line_items_budgets_and_prices` | Pass |
+| PREM | NFR-P2 | Export: CSV, a zip with one file per entity | Integration | `backend/tests/api/test_data_export.py::test_csv_export_is_a_zip_of_one_file_per_entity` | Pass |
+| PREM | NFR-P2 | Export: an empty account exports empty lists and CSV headers | Integration | `backend/tests/api/test_data_export.py::test_json_export_of_an_empty_account` | Pass |
+| PREM | NFR-P2 | Export: an empty account exports empty lists and CSV headers | Integration | `backend/tests/api/test_data_export.py::test_csv_export_of_an_empty_account_has_headers` | Pass |
+| PREM | NFR-P2 | Export: only the user's own data, deleted receipts left out | Integration | `backend/tests/api/test_data_export.py::test_json_export_has_receipts_line_items_budgets_and_prices` | Pass |
+| PREM | NFR-P2 | Export: only the user's own data, deleted receipts left out | Integration | `backend/tests/api/test_data_export.py::test_csv_export_is_a_zip_of_one_file_per_entity` | Pass |
+| PREM | NFR-P2 | Export: deleted budgets left out | Integration | `backend/tests/api/test_data_export.py::test_export_leaves_out_a_deleted_budget` | Pass |
+| PREM | NFR-P2 | Export: CSV formula injection escaped | Unit | `backend/tests/api/test_data_export.py::test_csv_text_cells_are_escaped` | Pass |
+| PREM | NFR-P2 | Export: CSV formula injection escaped | Integration | `backend/tests/api/test_data_export.py::test_csv_escapes_store_names_too` | Pass |
+| PREM | NFR-P2 | Export: Premium only (D2), `403 premium_required` | Integration | `backend/tests/api/test_data_export.py::test_export_needs_premium` | Pass |
+| PREM | NFR-P2 | Export: Premium only (D2), `403 premium_required` | Integration | `backend/tests/api/test_data_export.py::test_free_user_refused_export_records_no_event` | Pass |
+| PREM | NFR-P2 | Export: large accounts read in batches (receipts, line items and price observations past one page) | Integration | `backend/tests/api/test_data_export.py::test_export_reads_in_batches` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (streamed, client gone first, analytics error) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_after_streaming` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (streamed, client gone first, analytics error) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_when_client_disconnects_before_streaming` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (streamed, client gone first, analytics error) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_when_analytics_fails` | Pass |
+| PREM | NFR-P2 | Export: the spooled file is closed on every path (a read failing mid-build) | Integration | `backend/tests/api/test_data_export.py::test_export_file_closed_when_build_fails` | Pass |
+| PREM | NFR-P2 | Export: `data_exported` analytics event | Integration | `backend/tests/api/test_data_export.py::test_export_records_data_exported_event` | Pass |
+| PREM | NFR-P2 | Export: unknown format is a 422; signed out is a 401 | Integration | `backend/tests/api/test_data_export.py::test_export_rejects_unknown_format` | Pass |
+| PREM | NFR-P2 | Export: unknown format is a 422; signed out is a 401 | Integration | `backend/tests/api/test_data_export.py::test_export_needs_sign_in` | Pass |
+| PREM | NFR-P2 | Export (app): download with the session, iOS share sheet, cached copy removed | Unit | `mobile/src/features/settings/__tests__/exportApi.test.ts` "downloads the chosen format with the session token into the cache" | Pass |
+| PREM | NFR-P2 | Export (app): download with the session, iOS share sheet, cached copy removed | Unit | `mobile/src/features/settings/__tests__/exportApi.test.ts` "opens the share sheet with the file, then deletes the cached copy" | Pass |
+| PREM | NFR-P2 | Export (app): a 403 from the download is premium_required | Unit | `mobile/src/features/settings/__tests__/exportApi.test.ts` "a 403 from the download is premium_required (Premium lapsed meanwhile)" | Pass |
+| PREM | NFR-P2 | Export (app): Settings → Export data, JSON or CSV | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "exports JSON by default and opens the share sheet" | Pass |
+| PREM | NFR-P2 | Export (app): Settings → Export data, JSON or CSV | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "exports CSV when CSV is chosen" | Pass |
+| PREM | NFR-P2 | Export (app): Settings → Export data, JSON or CSV | Component | `mobile/src/__tests__/settingsHub.test.tsx` "opens %s in the app" | Pass |
+| PREM | NFR-P2 | Export (app): a free user sees the upgrade prompt, never an error (D2) | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "a free user sees the upgrade prompt, which opens the paywall" | Pass |
+| PREM | NFR-P2 | Export (app): a free user sees the upgrade prompt, never an error (D2) | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "a premium_required answer turns into the upgrade prompt, not an error" | Pass |
+| PREM | NFR-P2 | Export (app): any other failure is inline, with retry | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "any other failure says so inline and can be tried again" | Pass |
+| PREM | NFR-P2 | Export (app): paywall lists data export | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "shows what Premium unlocks and the App Store price" | Pass |
+| PREM | NFR-P2 | Export (app): share sheet on a device (Save to Files, AirDrop) | Manual | Simulator / device check; API-only verify cannot drive the share sheet | Pending |
 | BC-04 | 5 | 12-month dashboard loads within 2 seconds | Integration | `backend/tests/api/test_p95_postgres.py::test_dashboard_12_month_trend_p95_under_2s` (Postgres) | Pass |
 | BC-FR | Trends | 3/12-month toggle on Trend; 3 stays the default | Component | `mobile/src/__tests__/trendMonths.test.tsx` "shows 3 months by default and asks the server for 3" | Pass |
 | BC-FR | Trends | 3/12-month toggle on Trend; 12 months charts every month | Component | `mobile/src/__tests__/trendMonths.test.tsx` "switching to 12 months asks the server for 12 and charts every month" | Pass |

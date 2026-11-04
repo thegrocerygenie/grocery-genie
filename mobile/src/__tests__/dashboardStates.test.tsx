@@ -20,6 +20,9 @@ jest.mock('@/features/budget/hooks/useDashboard', () => ({
   }),
 }));
 
+// April 19, 2026: inside the April period the mock dashboard returns.
+jest.mock('@/utils/today', () => ({ today: () => new Date(2026, 3, 19) }));
+
 function category(name: string, spent: number, budget = 0): BudgetCategorySummary {
   return {
     category_id: name,
@@ -61,8 +64,7 @@ describe('Dashboard first-scan state (L7)', () => {
     renderDashboard();
 
     expect(screen.queryByText('Scan your first receipt')).toBeNull();
-    // The current month's label, for example "October · day 28".
-    expect(screen.getByText(/ · day \d+$/)).toBeTruthy();
+    expect(screen.getByText('April · day 19')).toBeTruthy();
   });
 });
 

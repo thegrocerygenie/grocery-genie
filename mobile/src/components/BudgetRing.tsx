@@ -110,6 +110,9 @@ export function BudgetRing({
         {sub ? (
           <Text
             maxFontSizeMultiplier={CENTER_MAX_FONT_SCALE}
+            // A date range ("Oct 15 – Nov 14") shrinks to fit the ring.
+            numberOfLines={1}
+            adjustsFontSizeToFit
             style={[styles.sub, over && styles.subOver]}
           >
             {sub}

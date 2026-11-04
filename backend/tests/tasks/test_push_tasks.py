@@ -7,8 +7,8 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, delete, select
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.models.database import Base, Notification, PushToken, User
 from app.services.push_service import ExpoPushClient, PushMessage, PushTicket
@@ -40,15 +40,22 @@ class FakePushClient:
 
 
 @pytest.fixture
-def db():
-    engine = create_engine("sqlite://", echo=False)
+def engine(tmp_path):
+    # A file, not :memory:, so another session runs its own transaction.
+    engine = create_engine(f"sqlite:///{tmp_path / 'push.db'}", echo=False)
     Base.metadata.create_all(engine)
-    factory = sessionmaker(engine, expire_on_commit=False)
+    yield engine
+    engine.dispose()
+
+
+@pytest.fixture
+def db(engine):
+    # Same session settings as get_sync_session_factory: expire on commit.
+    factory = sessionmaker(engine)
     with factory() as session:
         session.add(User(id=USER_ID, email="u@test.com", name="U"))
         session.commit()
         yield session
-    engine.dispose()
 
 
 def _notify(db, created_at=None) -> Notification:
@@ -301,6 +308,60 @@ def test_refused_request_is_retried_next_run(db):
     assert accepted == {(str(n.id), TOKEN_A): 1}
     db.refresh(n)
     assert n.push_status == "sent"
+
+
+# --- An account deleted mid-run (DELETE /api/users/me) ---
+# The run commits its claim, then a user deletes the account while Expo is
+# called: that user's rows are gone when the run records the outcome.
+
+OTHER_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
+
+
+class DeletesOtherAccountFirst:
+    """Deletes OTHER_ID's account in its own transaction, then sends."""
+
+    def __init__(self, engine, client):
+        self.engine = engine
+        self.client = client
+
+    def send(self, messages: list[PushMessage]) -> list[PushTicket]:
+        with Session(self.engine) as other:
+            for model in (Notification, PushToken):
+                other.execute(delete(model).where(model.user_id == OTHER_ID))
+            other.execute(delete(User).where(User.id == OTHER_ID))
+            other.commit()
+        return self.client.send(messages)
+
+
+@pytest.mark.parametrize(
+    ("raises", "status"),
+    [
+        (None, "sent"),
+        (httpx.ReadTimeout("response lost"), "failed"),
+        (httpx.ConnectError("down"), None),
+    ],
+    ids=["sent", "outcome-unknown", "refused"],
+)
+def test_account_deleted_mid_run_does_not_stop_other_users_pushes(
+    db, engine, raises, status
+):
+    _devices(db, TOKEN_A)
+    n = _notify(db)
+    db.add(User(id=OTHER_ID, email="other@test.com", name="O"))
+    db.add(PushToken(user_id=OTHER_ID, token="ExponentPushToken[other]"))
+    db.add(
+        Notification(
+            user_id=OTHER_ID, type="budget_threshold", title="Budget alert", body="b"
+        )
+    )
+    db.commit()
+    client = DeletesOtherAccountFirst(engine, FakePushClient(raises=raises))
+
+    deliver_pending_pushes(db, client, now=_now())
+
+    db.refresh(n)
+    assert n.push_status == status
+    assert db.execute(select(Notification.user_id)).scalars().all() == [USER_ID]
 
 
 def test_beat_runs_push_delivery_every_minute():

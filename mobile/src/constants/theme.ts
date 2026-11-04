@@ -162,3 +162,17 @@ export const touchTarget = {
   minHeight: 44,
   minWidth: 44,
 } as const;
+
+/**
+ * Dynamic Type thresholds, as React Native's iOS font scale (1 at the default
+ * size, about 1.7 at AX1 and 3.6 at AX5). `accessibility` is where rows stack
+ * instead of sitting side by side. The caps stop text that must fit a fixed
+ * space from growing further; VoiceOver still reads it in full.
+ */
+export const fontScale = {
+  accessibility: 1.7,
+  // Native header bar buttons stop growing about here, as UIKit's do.
+  headerButtonMax: 1.3,
+  // One letter under each of 12 bars on an iPhone SE (about 22pt a column).
+  compactChartLabelMax: 1.5,
+} as const;

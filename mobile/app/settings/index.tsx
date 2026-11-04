@@ -9,6 +9,7 @@ import { AiConsentSettingsSection } from '@/features/ai-consent/components/AiCon
 import { useMe, useSignOut } from '@/features/auth/hooks/useAuth';
 import { useBudgets } from '@/features/budget/hooks/useBudget';
 import { PREMIUM_STRINGS } from '@/features/premium/content/premium';
+import { EXPORT_STRINGS } from '@/features/settings/content/export';
 import { alertsSummary, budgetsSummary } from '@/features/settings/utils/settingsSummary';
 import { useNotificationStore } from '@/store/notificationStore';
 
@@ -168,6 +169,11 @@ export default function SettingsScreen() {
           <SettingsLinkRow
             title="Recently deleted"
             onPress={() => router.push('/recently-deleted')}
+          />
+          <SettingsLinkRow
+            title={EXPORT_STRINGS.settingsRow}
+            detail={isPremium ? undefined : PREMIUM_STRINGS.planPremium}
+            onPress={() => router.push('/settings/export-data')}
           />
           <SettingsLinkRow title="Change email" onPress={() => router.push('/email-change')} />
           <SettingsLinkRow title="Privacy" onPress={() => router.push('/settings/privacy')} />
