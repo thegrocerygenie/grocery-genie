@@ -14,9 +14,8 @@ import { usePushNotifications } from '@/features/notifications/hooks/usePushNoti
 import { useSyncQueue } from '@/hooks/useSyncQueue';
 import { useAuthStore } from '@/store/authStore';
 
-// A screen opened straight from outside the app (a push tapped on a cold start,
-// a deep link) gets the tabs under it, so Back returns to Budget (BUG-6).
-// Without this the root stack holds only that screen: no Back, no tab bar.
+// A push tap or link that launches the app opens its screen (an item, a
+// receipt) with the tabs under it, so Back always leads into the app.
 export const unstable_settings = {
   initialRouteName: '(tabs)',
 };
@@ -78,7 +77,6 @@ export default function RootLayout() {
       <ThemeProvider value={navigationTheme(scheme)}>
         <QueryClientProvider client={queryClient}>
           <SyncQueueProvider />
-          <PushNotificationsProvider />
           <OnboardingGate>
             <Stack>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -121,11 +119,11 @@ export default function RootLayout() {
                 name="recently-deleted"
                 options={{ title: 'Recently Deleted', presentation: 'modal' }}
               />
-              <Stack.Screen
-                name="paywall"
-                options={{ title: 'Premium', presentation: 'modal' }}
-              />
+              <Stack.Screen name="paywall" options={{ title: 'Premium', presentation: 'modal' }} />
             </Stack>
+            {/* After the Stack: a tap that launched the app is routed on the first
+                run, and it must land on the mounted Stack, over the tabs. */}
+            <PushNotificationsProvider />
           </OnboardingGate>
         </QueryClientProvider>
       </ThemeProvider>

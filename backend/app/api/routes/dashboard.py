@@ -3,6 +3,7 @@ from enum import IntEnum
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import clock
 from app.core.dependencies import get_db
 from app.core.entitlements import (
     FEATURE_TREND_12_MONTHS,
@@ -28,7 +29,10 @@ class TrendMonths(IntEnum):
 async def dashboard_spending(
     period: str | None = Query(
         default=None,
-        description="Budget period, e.g. 2026-03. Defaults to current month.",
+        description=(
+            "Budget period, e.g. 2026-03. Defaults to the period that holds "
+            "today in the user's time zone."
+        ),
     ),
     months: TrendMonths = Query(
         default=TrendMonths.THREE,
@@ -41,4 +45,6 @@ async def dashboard_spending(
     if months is TrendMonths.TWELVE and not premium:
         raise premium_required(FEATURE_TREND_12_MONTHS)
     service = BudgetService(db)
-    return await service.get_dashboard_data(user.id, period, months=int(months))
+    return await service.get_dashboard_data(
+        user.id, period, months=int(months), today=clock.today_in(user.timezone)
+    )

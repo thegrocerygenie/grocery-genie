@@ -127,7 +127,7 @@ export default function TrendScreen() {
   const hasData = (data?.trend ?? []).length > 0;
 
   // BC-04 AC 2: this month vs last month, for the total and per category.
-  const period = data?.period ?? selectedPeriod;
+  const period = data?.period ?? '';
   const previousPeriod = data?.previous_period ?? '';
   const spentIn = (p: string) => data?.trend.find((m) => m.period === p)?.spent ?? 0;
   const current = spentIn(period);
