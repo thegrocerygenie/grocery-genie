@@ -46,6 +46,9 @@ if (state === 'a') {
   check((html.match(/<p class="cta-note">/g) || []).length === 3, 'State A: a waitlist privacy note under each form');
   check(/Sign up in the app with this same email and we'll match it to your account for the free Premium year/.test(text),
     'State A: the note says the waitlist email is matched to the app account (launch-open-items §6)');
+  check(/How does the free year of Premium work\?/.test(text), 'State A: FAQ entry for the free-year offer terms (decisions #9)');
+  check(/joined the waitlist before Grocery Genie is on the App Store/.test(text) && /within 90 days of Premium launching/.test(text) && /12 months from the day/.test(text),
+    'State A: the FAQ gives who qualifies, the 90-day claim window and the 12 months (decisions #9)');
 } else {
   check(!/<form class="waitlist"/.test(html), 'State B: no waitlist forms');
   check(/name="apple-itunes-app"/.test(html), 'State B: App Store smart banner meta');

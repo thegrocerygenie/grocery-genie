@@ -130,6 +130,7 @@ test('accepts v5 slot sources (mid, final) in welcome email tag', async () => {
       'unsubscribing stops emails but keeps the free year (decisions #10)');
     assert(/"delete"/.test(sent.text) && /gives up the free year/i.test(sent.text),
       'welcome text says how to have the email deleted, and that it gives up the offer');
+    assert(/within 90 days of Premium launching/.test(sent.text), 'welcome text gives the 90-day claim window (decisions #9)');
   }
 });
 

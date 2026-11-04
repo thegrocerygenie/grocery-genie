@@ -81,6 +81,7 @@ Import photos and PDFs · Works offline · Manual entry · Duplicate-receipt war
 
 ## 8. FAQ
 - **Is it free?** Yes. Grocery Genie is free on iPhone. You can scan up to 20 receipts a month (about five a week) and add as many as you like by hand. *(State A only: Join the waitlist and get a free year of Premium, our upcoming paid plan, when it launches.)*
+- **How does the free year of Premium work?** *(State A only.)* Waitlist members who joined before the App Store launch get a free year. They sign up with the same email within 90 days of Premium launching, or claim it in Settings. It runs 12 months from the day it's added. Unsubscribing keeps it; deletion gives it up. The site has the full wording.
 - **What if it reads my receipt wrong?** You check every receipt before it's saved. Anything the AI isn't sure about is flagged, every field is editable, and it remembers your fixes.
 - **Is my data private?** Use the privacy line from section 6, then add: "You decide before AI reads your first receipt, and you can delete your account and all its data from inside the app."
 - **Which receipts work?** Printed grocery receipts from any store, plus photos and PDFs you already have.

@@ -85,6 +85,10 @@ The default welcome email matches the page's promise ("We'll email you once, at 
 
    Until those files exist, State B shows a dashed "Official App Store badge" placeholder instead of a broken image.
 3. Build with `PUBLIC_LAUNCH_STATE=b` and check that the QR code and smart banner open the listing.
+4. **Record the switch date.** It's the waitlist cut-off for the free year of Premium. Sign-ups before it qualify; later ones don't.
+   - Write the date into `docs/marketing/decisions.md` #9.
+   - Set `GG_WAITLIST_CUTOFF` on the backend to the same date (V1.1 story V11-P5).
+   - Tick "Record the switch date" in `docs/launch-open-items.md` §6.
 
 ## Analytics
 
