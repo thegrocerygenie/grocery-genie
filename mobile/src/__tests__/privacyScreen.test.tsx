@@ -89,6 +89,16 @@ describe('Privacy policy', () => {
     expect(text()).toMatch(/Resend sends account emails[^.]*and keeps our waitlist/);
   });
 
+  // docs/marketing/decisions.md #10 and #11: unsubscribing keeps the offer,
+  // deleting gives it up, and the waitlist is deleted when the claim window closes.
+  it('says unsubscribing keeps the offer and how long waitlist emails are kept', () => {
+    expect(text()).toMatch(/Unsubscribing stops our emails but keeps your address for the offer/);
+    expect(text()).toMatch(/ask us to delete it, you give up the free year/i);
+    expect(text()).toMatch(
+      /Waitlist email addresses: until 90 days after Premium launches, when the free-year offer closes/,
+    );
+  });
+
   // docker/docker-compose.yml rotates logs by size (5 × 10 MB per service), and
   // a host job deletes rotated files after 30 days (docs/DEPLOYMENT.md 1.9).
   // A quiet service's current file can hold older lines, so the text must not

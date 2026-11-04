@@ -55,21 +55,40 @@ export function periodBounds(
   return { start: new Date(year, month - 1, 1), end: new Date(year, month, 0) };
 }
 
-/** "November" for a period that starts on the 1st, else "Oct 15 – Nov 14". */
-export function periodName({ start, end }: PeriodBounds): string {
-  if (start.getDate() === 1) {
-    const period = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
-    return monthName(period);
-  }
-  const short = (d: Date) => `${MONTH_SHORT[d.getMonth()]} ${d.getDate()}`;
-  return `${short(start)} – ${short(end)}`;
+// A no-break space. The heading wraps at the largest text sizes; inside a date
+// or the day count it must not ("Nov" on one line and "14" on the next).
+const NBSP = '\u00a0';
+
+/** "Nov 15", kept on one line. */
+function shortDate(d: Date): string {
+  return `${MONTH_SHORT[d.getMonth()]}${NBSP}${d.getDate()}`;
 }
 
-/** The period's name, with "· day N" while `today` is in it. */
+function startsOnFirst({ start }: PeriodBounds): boolean {
+  return start.getDate() === 1;
+}
+
+function monthOf({ start }: PeriodBounds): string {
+  return monthName(`${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`);
+}
+
+/** "November" for a period that starts on the 1st, else "Oct 15 – Nov 14". */
+export function periodName(bounds: PeriodBounds): string {
+  if (startsOnFirst(bounds)) return monthOf(bounds);
+  return `${shortDate(bounds.start)} – ${shortDate(bounds.end)}`;
+}
+
+/** For the budget ring, which has room for about ten characters: "November" or "to Nov 14". */
+export function periodRingName(bounds: PeriodBounds): string {
+  if (startsOnFirst(bounds)) return monthOf(bounds);
+  return `to ${shortDate(bounds.end)}`;
+}
+
+/** The period's name, with "· day N" while `today` is in it. Wraps only before the "·" or around the dash. */
 export function periodHeading(bounds: PeriodBounds, today: Date): string {
   const day = daysBetween(bounds.start, today) + 1;
   const inPeriod = day >= 1 && daysBetween(today, bounds.end) >= 0;
-  return inPeriod ? `${periodName(bounds)} · day ${day}` : periodName(bounds);
+  return inPeriod ? `${periodName(bounds)} ·${NBSP}day${NBSP}${day}` : periodName(bounds);
 }
 
 /** Days after `today` up to the period's last day; 0 once it ends. */
