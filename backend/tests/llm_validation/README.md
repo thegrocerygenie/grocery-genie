@@ -108,10 +108,16 @@ GG_LLM_API_KEY=sk-... .venv/bin/pytest tests/llm_validation/ -v
 # The full report: per receipt, per language, against every target.
 # --runs 5 adds consistency (5x the calls). Exits 1 when a target is missed.
 GG_LLM_API_KEY=sk-... .venv/bin/python -m tests.llm_validation.run extract --runs 5
+
+# Priority OCR (PREM-03 AC 6): the same set on the Premium extraction model.
+GG_LLM_API_KEY=sk-... GG_LLM_PREMIUM_EXTRACTION_MODEL=anthropic/claude-opus-5-5 \
+  .venv/bin/python -m tests.llm_validation.run extract --premium
 ```
 
-`extract` saves a JSON report to `reports/<UTC time>_<prompt version>.json` with
-the model, the prompt version, every metric and each receipt's misses. Commit the
+`extract` saves a JSON report to `reports/<UTC time>_<prompt version>.json`
+(`..._premium.json` with `--premium`) with the model, its tier, the mean tokens
+per scan (`tokens_per_scan`, for the cost per scan in `docs/DEPLOYMENT.md`
+Part 3), the prompt version, every metric and each receipt's misses. Commit the
 report with the prompt change it measured: it is the run log `validate-extraction`
 asks for. Until `check` shows no gaps, the report says its numbers don't count for
 the Definition of Done.

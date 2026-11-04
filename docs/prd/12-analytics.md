@@ -17,7 +17,7 @@ MVP notes on the table below:
 | Event | Properties | Purpose |
 |-------|-----------|---------|
 | `receipt_scan_started` | source (camera/library/pdf) | Scan initiation rate and source mix |
-| `receipt_extraction_completed` | duration_ms, item_count, confidence_avg, language_detected | Extraction performance and accuracy |
+| `receipt_extraction_completed` | duration_ms, item_count, confidence_avg, language_detected, extraction_tier (priority/standard) | Extraction performance and accuracy. `extraction_tier` (V1.1, PREM-03 Priority OCR) is `priority` when the Premium extraction model read the scan, `standard` when the default model did: a free user, no Premium model configured, or a Premium model that failed and handed the scan to the default. `duration_ms` then covers both attempts |
 | `receipt_correction_made` | field (name/qty/price/category) | Identify systematic failures for prompt improvement. The original and corrected values are in `receipt_corrections`, not in the event. |
 | `receipt_confirmed` | item_count, correction_count | Scan-to-confirmed conversion rate |
 | `receipt_abandoned` | stage (capture/review/confirmation), reason (optional) | Drop-off point identification |

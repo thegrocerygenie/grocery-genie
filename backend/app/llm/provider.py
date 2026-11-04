@@ -40,10 +40,25 @@ class ReceiptExtractor(Protocol):
     ) -> ReceiptExtractionResult: ...
 
 
-def _call_options(settings: Settings) -> dict:
-    """LiteLLM options every call sends, built from settings."""
+# Which model read a scan (PREM-03): the Premium extraction model, or the
+# default one. Sent as extraction_tier on receipt_extraction_completed.
+EXTRACTION_TIER_PRIORITY = "priority"
+EXTRACTION_TIER_STANDARD = "standard"
+
+
+def _litellm_model_name(settings: Settings, model: str) -> str:
+    """A "provider/model" name as is; a bare model name under llm_provider."""
+    return model if "/" in model else f"{settings.llm_provider}/{model}"
+
+
+def _call_options(settings: Settings, model: str | None = None) -> dict:
+    """LiteLLM options every call sends, built from settings.
+
+    ``model`` replaces the default model (Priority OCR's Premium model). It is
+    sent no temperature: the default's sampling setting is for the default.
+    """
     options: dict = {
-        "model": f"{settings.llm_provider}/{settings.llm_model}",
+        "model": _litellm_model_name(settings, model or settings.llm_model),
         "max_tokens": settings.llm_max_tokens,
         "api_key": settings.llm_api_key or None,
         "api_base": settings.llm_api_base or None,
@@ -52,7 +67,7 @@ def _call_options(settings: Settings) -> dict:
     }
     # Only when set: LiteLLM refuses any temperature but 1 for a model without
     # sampling settings, such as Claude Sonnet 5.5.
-    if settings.llm_temperature is not None:
+    if settings.llm_temperature is not None and model is None:
         options["temperature"] = settings.llm_temperature
     return options
 
@@ -62,9 +77,11 @@ class LiteLLMReceiptExtractor:
 
     prompt_version = PROMPT_VERSION
 
-    def __init__(self, settings: Settings) -> None:
-        self.options = _call_options(settings)
+    def __init__(self, settings: Settings, model: str | None = None) -> None:
+        self.options = _call_options(settings, model)
         self.model_name = self.options["model"]
+        # (input, output) tokens of the last call, for the harness's cost.
+        self.last_usage: tuple[int | None, int | None] | None = None
 
     async def extract(
         self, image_data: bytes, content_type: str
@@ -119,10 +136,14 @@ class LiteLLMReceiptExtractor:
 
         raw_content = response.choices[0].message.content
         usage = response.usage
+        self.last_usage = (
+            (usage.prompt_tokens, usage.completion_tokens) if usage else None
+        )
 
         logger.info(
             "LLM extraction completed",
             extra={
+                "model": self.model_name,
                 "prompt_version": PROMPT_VERSION,
                 "latency_seconds": round(latency, 2),
                 "input_tokens": usage.prompt_tokens if usage else None,
@@ -137,10 +158,10 @@ class LiteLLMReceiptExtractor:
 class MockReceiptExtractor:
     """Test/development implementation returning deterministic results."""
 
-    model_name = "mock"
     prompt_version = PROMPT_VERSION
 
-    def __init__(self) -> None:
+    def __init__(self, model_name: str = "mock") -> None:
+        self.model_name = model_name
         self._result: ReceiptExtractionResult | None = None
 
     async def extract(
@@ -361,6 +382,29 @@ def get_receipt_extractor(
     if settings.debug:
         return MockReceiptExtractor()
     return LiteLLMReceiptExtractor(settings)
+
+
+def premium_receipt_extractor(settings: Settings) -> ReceiptExtractor | None:
+    """The extractor for Premium users' scans (PREM-03), or None when no
+    Premium model is configured (Premium scans then use the default).
+
+    In debug mode it is the mock under the configured name, so a stubbed run
+    can still tell which model a scan was routed to.
+    """
+    model = settings.llm_premium_extraction_model.strip()
+    if not model:
+        return None
+    if settings.debug:
+        return MockReceiptExtractor(model_name=f"mock:{model}")
+    return LiteLLMReceiptExtractor(settings, model=model)
+
+
+def get_premium_receipt_extractor() -> ReceiptExtractor | None:
+    """FastAPI dependency for ``premium_receipt_extractor``.
+
+    No parameters: FastAPI would read a ``settings`` parameter as request body.
+    """
+    return premium_receipt_extractor(get_settings())
 
 
 def get_category_assigner(

@@ -635,12 +635,27 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PREM-02 | 6 | App: a 403 premium_required from compare or mute shows the upgrade prompt | Component | Not yet implemented (DA-1) | Pending |
 | PREM-02 | 7 | price_comparison_viewed and price_alert_muted only on success | Integration | Not yet implemented (DA-1) | Pending |
 | PREM-02 | 8 | 08-api-contracts and the verify-grocery-genie Premium journey say compare and mute POST are 403 for a free user | E2E | Not yet implemented (DA-1) | Pending |
-| PREM-03 | 1 | GG_LLM_PREMIUM_EXTRACTION_MODEL setting; unset uses the default; no provider in code | Unit | Not yet implemented (DA-2) | Pending |
-| PREM-03 | 2 | Premium scan uses the Premium model, free the default; Premium read server-side | Integration | Not yet implemented (DA-2) | Pending |
-| PREM-03 | 3 | Through provider.py, no temperature, same validation and confidence scoring | Unit | Not yet implemented (DA-2) | Pending |
-| PREM-03 | 4 | Premium model failure falls back to the default, then rule-based; the scan never fails | Integration | Not yet implemented (DA-2) | Pending |
-| PREM-03 | 5 | receipt_extraction_completed carries extraction_tier | Integration | Not yet implemented (DA-2) | Pending |
-| PREM-03 | 6 | validate-extraction on the Premium model: accuracy not below default, cost recorded, user approval | LLM harness | Not yet implemented (DA-2) | Pending |
+| PREM-03 | 1 | GG_LLM_PREMIUM_EXTRACTION_MODEL setting; unset uses the default; no provider in code | Unit | `backend/tests/llm/test_priority_ocr_provider.py::test_the_premium_model_setting_is_unset_by_default` | Pass |
+| PREM-03 | 1 | GG_LLM_PREMIUM_EXTRACTION_MODEL setting; unset uses the default; no provider in code | Unit | `backend/tests/llm/test_priority_ocr_provider.py::test_the_premium_model_is_read_from_the_environment` | Pass |
+| PREM-03 | 1 | GG_LLM_PREMIUM_EXTRACTION_MODEL setting; unset uses the default; no provider in code | Unit | `backend/tests/llm/test_priority_ocr_provider.py::test_unset_there_is_no_premium_extractor` | Pass |
+| PREM-03 | 1 | GG_LLM_PREMIUM_EXTRACTION_MODEL setting; unset uses the default; no provider in code | Unit | `backend/tests/llm/test_priority_ocr_provider.py::test_a_full_litellm_name_is_sent_as_is` | Pass |
+| PREM-03 | 1 | GG_LLM_PREMIUM_EXTRACTION_MODEL setting; unset uses the default; no provider in code | Unit | `backend/tests/llm/test_priority_ocr_provider.py::test_a_bare_model_name_uses_the_configured_provider_and_gateway` | Pass |
+| PREM-03 | 1 | GG_LLM_PREMIUM_EXTRACTION_MODEL setting; unset uses the default; no provider in code | Unit | `backend/tests/llm/test_priority_ocr_provider.py::test_no_model_is_named_outside_the_config` | Pass |
+| PREM-03 | 1 | GG_LLM_PREMIUM_EXTRACTION_MODEL setting; unset uses the default; no provider in code | Unit | `backend/tests/api/test_priority_ocr.py::test_without_a_premium_model_premium_scans_use_the_default` | Pass |
+| PREM-03 | 2 | Premium scan uses the Premium model, free the default; Premium read server-side | Integration | `backend/tests/api/test_priority_ocr.py::test_a_premium_scan_is_read_by_the_premium_model` | Pass |
+| PREM-03 | 2 | Premium scan uses the Premium model, free the default; Premium read server-side | Integration | `backend/tests/api/test_priority_ocr.py::test_a_free_scan_is_read_by_the_default_model` | Pass |
+| PREM-03 | 2 | Premium scan uses the Premium model, free the default; Premium read server-side | Integration | `backend/tests/api/test_priority_ocr.py::test_the_app_cannot_ask_for_the_premium_model` | Pass |
+| PREM-03 | 2 | Premium scan uses the Premium model, free the default; Premium read server-side | Integration | `backend/tests/api/test_priority_ocr.py::test_premium_is_read_when_each_extraction_starts` | Pass |
+| PREM-03 | 3 | Through provider.py, no temperature, same validation and confidence scoring | Unit | `backend/tests/llm/test_priority_ocr_provider.py::test_the_premium_call_sends_no_temperature` | Pass |
+| PREM-03 | 3 | Through provider.py, no temperature, same validation and confidence scoring | Unit | `backend/tests/llm/test_priority_ocr_provider.py::test_the_premium_call_sends_the_same_prompt_as_the_default` | Pass |
+| PREM-03 | 3 | Through provider.py, no temperature, same validation and confidence scoring | Unit | `backend/tests/llm/test_priority_ocr_provider.py::test_premium_output_passes_the_same_validation` | Pass |
+| PREM-03 | 3 | Through provider.py, no temperature, same validation and confidence scoring | Unit | `backend/tests/llm/test_priority_ocr_provider.py::test_category_assignment_keeps_the_default_model` | Pass |
+| PREM-03 | 4 | Premium model failure falls back to the default, then the usual failed-scan path; the scan never fails because of it | Integration | `backend/tests/api/test_priority_ocr.py::test_a_failed_premium_model_hands_the_scan_to_the_default` | Pass |
+| PREM-03 | 4 | Premium model failure falls back to the default, then the usual failed-scan path; the scan never fails because of it | Integration | `backend/tests/api/test_priority_ocr.py::test_when_both_models_fail_the_scan_fails_as_any_scan_does` | Pass |
+| PREM-03 | 5 | receipt_extraction_completed carries extraction_tier | Integration | `backend/tests/api/test_priority_ocr.py::test_extraction_completed_carries_the_tier` | Pass |
+| PREM-03 | 6 | validate-extraction on the Premium model: accuracy not below default, cost recorded, user approval | LLM harness | `backend/tests/llm_validation/test_harness.py::test_premium_runs_score_the_premium_model` | Gap: `run extract --premium` needs GG_LLM_API_KEY and the receipt test set's images (audit rank 1); then the user approves the model and cost |
+| PREM-03 | 6 | validate-extraction on the Premium model: accuracy not below default, cost recorded, user approval | LLM harness | `backend/tests/llm_validation/test_harness.py::test_extract_premium_without_a_premium_model_makes_no_calls` | Gap: `run extract --premium` needs GG_LLM_API_KEY and the receipt test set's images (audit rank 1); then the user approves the model and cost |
+| PREM-03 | 6 | validate-extraction on the Premium model: accuracy not below default, cost recorded, user approval | LLM harness | `backend/tests/llm_validation/test_harness.py::test_the_report_records_mean_tokens_per_scan` | Gap: `run extract --premium` needs GG_LLM_API_KEY and the receipt test set's images (audit rank 1); then the user approves the model and cost |
 | PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Component | Not yet implemented (DA-3) | Pending |
 | PI-01 | 6 | Fewer than 2 plotted prices in a range: "Not enough prices in this range", no chart | Component | Not yet implemented (DA-3) | Pending |
 | PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Unit | Not yet implemented (DA-3) | Pending |
@@ -700,7 +715,9 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | EC-PI | 11 | Price alerts list after a merge or split | Component | Not yet implemented (DA-4) | Pending |
 | EC-PREM | 1 | Free trial eligibility, cancel and refund in the trial | Integration | Not yet implemented (DA-1) | Pending |
 | EC-PREM | 2 | Plan change monthly ↔ yearly | Integration | Not yet implemented (DA-1) | Pending |
-| EC-PREM | 3 | Priority OCR model chosen at extraction start; fallback | Integration | Not yet implemented (DA-2) | Pending |
+| EC-PREM | 3 | Priority OCR model chosen at extraction start; fallback | Integration | `backend/tests/api/test_priority_ocr.py::test_premium_is_read_when_each_extraction_starts` | Pass |
+| EC-PREM | 3 | Priority OCR model chosen at extraction start; fallback | Integration | `backend/tests/api/test_priority_ocr.py::test_a_lapsed_premium_scan_uses_the_default_model` | Pass |
+| EC-PREM | 3 | Priority OCR model chosen at extraction start; fallback | Integration | `backend/tests/api/test_priority_ocr.py::test_a_failed_premium_model_hands_the_scan_to_the_default` | Pass |
 | EC-PREM | 4 | Export: empty range, From after To, images left out | Integration | Not yet implemented (DA-8) | Pending |
 | EC-PREM | 5 | Category colour and icon after a lapse | Integration | Not yet implemented (DA-9) | Pending |
 
