@@ -178,6 +178,9 @@ MVP matrix, filled 2026-11-02. `python3 scripts/check-traceability.py` checks th
 | BC-02 | 2 | Per-category budgets configurable | E2E | `backend/tests/e2e/test_user_journeys.py::test_journey_per_category_budget` | Pass |
 | BC-02 | 3 | Calendar months default; custom start | Integration | `backend/tests/services/test_budget_service.py::test_get_period_dates_custom_start` | Pass |
 | BC-02 | 3 | Calendar months default; custom start | Integration | `backend/tests/services/test_budget_service.py::test_get_period_dates_default` | Pass |
+| BC-02 | 3 | Calendar months default; custom start | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_default_period_follows_the_reset_day` | Pass |
+| BC-02 | 3 | Calendar months default; custom start | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_default_period_uses_the_users_local_date` | Pass |
+| BC-02 | 3 | Calendar months default; custom start | Component | `mobile/src/__tests__/dashboardResetDay.test.tsx` "labels the period by its dates and counts days within it" | Pass |
 | BC-02 | 4 | Edits apply immediately to current period | Integration | `backend/tests/api/test_edge_cases.py::test_mid_month_budget_change` | Pass |
 | BC-02 | 4 | Edits apply immediately to current period | Component | `mobile/src/__tests__/budgetSettings.test.tsx` "updates a changed limit instead of creating another budget" | Pass |
 | BC-03 | 1 | Push at 80% (50/80/100 configurable) | Integration | `backend/tests/services/test_budget_service.py::test_check_thresholds_at_80` | Pass |
