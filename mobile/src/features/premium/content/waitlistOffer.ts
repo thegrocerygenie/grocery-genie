@@ -27,6 +27,12 @@ export const WAITLIST_OFFER_STRINGS = {
   grantedBody: (date: string) => `Premium is yours until ${date}.`,
   pendingTitle: 'Your free year is on its way',
   pendingBody: 'We matched your waitlist email. Premium will turn on shortly.',
+  grantFailedTitle: 'Your free year needs a hand',
+  grantFailedBody: 'We couldn’t apply your free year. Contact support.',
+  contactSupport: 'Contact support',
+  contactSupportHint: (email: string) => `Opens an email to ${email}`,
+  supportSubject: 'My waitlist free year',
+  supportFallback: (email: string) => `Email us at ${email}.`,
   loadFailed: 'Couldn’t load the offer. Check your connection and try again.',
   retry: 'Try Again',
   // The claim link screen (onboarding/confirm-waitlist-claim).

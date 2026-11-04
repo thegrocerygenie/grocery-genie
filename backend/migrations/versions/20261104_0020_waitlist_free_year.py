@@ -90,8 +90,17 @@ def upgrade() -> None:
         sa.UniqueConstraint("user_id"),
     )
 
+    # One row once the Resend audience's contacts are all deleted (#11).
+    op.create_table(
+        "waitlist_audience_purges",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("completed_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
 
 def downgrade() -> None:
+    op.drop_table("waitlist_audience_purges")
     op.drop_table("waitlist_redemptions")
     op.drop_table("waitlist_entries")
     op.drop_column("users", "waitlist_claim_expires_at")

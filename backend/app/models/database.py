@@ -608,10 +608,24 @@ class WaitlistRedemption(Base):
     )
     last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # pending -> granted, or failed: a RevenueCat 4xx (revenuecat_rejected_<code>),
-    # too_many_attempts or window_closed; for pending, why the last try failed.
+    # gave_up_after_<n>_days or grant_end_passed; for pending, why the last try failed.
     last_error: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class WaitlistAudiencePurge(Base):
+    """The Resend audience's contacts were deleted after the claim window
+    closed (V11-P5, decision #11): one row, written when a purge run finds
+    the audience empty. The daily purge then stops calling Resend, so
+    contacts the site adds later are not deleted as the waitlist."""
+
+    __tablename__ = "waitlist_audience_purges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    completed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
     )
 
 

@@ -42,8 +42,14 @@ from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from app.core import clock
 from app.core.config import get_settings
-from app.models.database import User, WaitlistEntry, WaitlistRedemption
+from app.models.database import (
+    User,
+    WaitlistAudiencePurge,
+    WaitlistEntry,
+    WaitlistRedemption,
+)
 from app.services.analytics_service import (
     AnalyticsService,
     AnalyticsWriter,
@@ -53,7 +59,6 @@ from app.services.analytics_service import (
 )
 from app.services.revenuecat_client import RevenueCatClient, get_revenuecat_client
 from app.services.waitlist_service import (
-    RETRY_AFTER,
     WaitlistService,
     window_has_closed,
     window_is_open,
@@ -105,6 +110,9 @@ class PurgeResult:
     claims: int = 0
     resend_contacts_deleted: int = 0
     resend_failed: bool = False
+    # The audience was found empty (now or on an earlier run): Resend is
+    # no longer called.
+    resend_purge_complete: bool = False
 
 
 def get_audience_source() -> ResendAudienceClient | None:
@@ -164,7 +172,7 @@ async def sync_and_match(
 async def retry_pending_grants(
     factory: SessionFactory,
     revenuecat: RevenueCatClient | None,
-    older_than: timedelta = RETRY_AFTER,
+    older_than: timedelta | None = None,
 ) -> int:
     backend = BufferedAnalyticsBackend(device_type=None, app_version=None)
     try:
@@ -210,7 +218,17 @@ async def purge_after_window(
         ).rowcount or 0
         await db.commit()
     if audience is not None:
-        await _delete_audience_contacts(audience, result, page_size, max_deletes)
+        async with factory() as db:
+            done = await db.get(WaitlistAudiencePurge, 1)
+            if done is not None:
+                result.resend_purge_complete = True
+            elif await _delete_audience_contacts(
+                audience, result, page_size, max_deletes
+            ):
+                db.add(WaitlistAudiencePurge(id=1, completed_at=clock.now()))
+                await db.commit()
+                result.resend_purge_complete = True
+                logger.info("resend audience purge complete; it stops here")
     if (
         result.entries
         or result.unlinked_redemptions
@@ -233,21 +251,21 @@ async def purge_after_window(
 
 async def _delete_audience_contacts(
     audience: AudienceAdmin, result: PurgeResult, page_size: int, max_deletes: int
-) -> None:
+) -> bool:
     """Delete the first page of contacts, then ask again, until none are
-    left or ``max_deletes`` is reached. A contact that keeps coming back
-    (Resend still lists it after a delete) ends the run instead of looping."""
+    left or ``max_deletes`` is reached. True when Resend listed none: the
+    audience is empty. A contact that keeps coming back (Resend still lists
+    it after a delete) ends the run instead of looping."""
     tried: set[str] = set()
     try:
         while result.resend_contacts_deleted < max_deletes:
             limit = min(page_size, max_deletes - result.resend_contacts_deleted)
-            fresh = [
-                cid
-                for cid in await audience.list_contact_ids(limit)
-                if cid not in tried
-            ]
+            listed = await audience.list_contact_ids(limit)
+            if not listed:
+                return True
+            fresh = [cid for cid in listed if cid not in tried]
             if not fresh:
-                return
+                return False
             for contact_id in fresh:
                 tried.add(contact_id)
                 if await audience.delete_contact(contact_id):
@@ -258,6 +276,7 @@ async def _delete_audience_contacts(
             "resend audience purge stopped after %d deletes; the next run continues",
             result.resend_contacts_deleted,
         )
+    return False
 
 
 async def deliver_claim_link(
@@ -340,7 +359,12 @@ def main(argv: list[str] | None = None) -> int:
     imp.add_argument("path", type=Path)
     commands.add_parser("backfill", help="sync the audience and match every account")
     retry = commands.add_parser("retry", help="retry pending RevenueCat grants")
-    retry.add_argument("--older-than-minutes", type=float, default=5.0)
+    retry.add_argument(
+        "--older-than-minutes",
+        type=float,
+        default=None,
+        help="retry rows whose last attempt is this old (default: the backoff)",
+    )
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO)
     if args.command == "import-csv":
@@ -348,7 +372,11 @@ def main(argv: list[str] | None = None) -> int:
         imported = asyncio.run(_with_own_engine(lambda f: import_export(f, text)))
         print(f"waitlist import: {imported}")
     elif args.command == "retry":
-        older = timedelta(minutes=args.older_than_minutes)
+        older = (
+            None
+            if args.older_than_minutes is None
+            else timedelta(minutes=args.older_than_minutes)
+        )
         granted = asyncio.run(
             _with_own_engine(
                 lambda f: retry_pending_grants(f, get_revenuecat_client(), older)

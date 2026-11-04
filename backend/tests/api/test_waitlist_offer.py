@@ -557,22 +557,51 @@ async def test_claims_are_limited_per_user(api, offer, claims, monkeypatch):
     assert len(claims) == 2
 
 
-async def test_claims_for_one_waitlist_email_are_limited(
+async def test_claims_for_one_waitlist_email_are_limited_per_account(
     api, offer, claims, monkeypatch
 ):
-    """Several accounts claiming one inbox can't flood it. Past the limit the
-    answer is the same 202, so the limit shows nothing about the waitlist."""
+    """One account can't flood an inbox: past the limit the answer is the
+    same 202, so it shows nothing about the waitlist, and nothing is sent."""
     monkeypatch.setattr(get_settings(), "max_waitlist_claims_per_email_per_day", 2)
+    headers = await _sign_up(api, "claimer@example.com")
     answers = []
-    for i, email in enumerate(
-        ["target@example.com", " Target@Example.com", "target@example.com"]
-    ):
-        headers = await _sign_up(api, f"claimer{i}@example.com")
+    for email in ["target@example.com", " Target@Example.com", "target@example.com"]:
         resp = await api.post(CLAIM, headers=headers, json={"email": email})
         answers.append((resp.status_code, resp.json()))
 
     assert answers == [(202, {"status": "sent"})] * 3
     assert [email for _, email in claims] == ["target@example.com"] * 2
+
+
+async def test_another_accounts_claims_cannot_lock_out_the_member(
+    api, offer, claims, monkeypatch
+):
+    """Someone who knows a member's waitlist email can't use up its claims."""
+    monkeypatch.setattr(get_settings(), "max_waitlist_claims_per_email_per_day", 2)
+    attacker = await _sign_up(api, "attacker@example.com")
+    for _ in range(3):
+        await api.post(CLAIM, headers=attacker, json={"email": "member@example.com"})
+    claims.clear()
+
+    member = await _sign_up(api, "relay@privaterelay.appleid.com")
+    resp = await api.post(CLAIM, headers=member, json={"email": "member@example.com"})
+
+    assert resp.status_code == 202
+    assert len(claims) == 1
+
+
+async def test_a_failed_grant_shows_as_failed(api, db_session, offer, rc, emails):
+    """A grant RevenueCat refused for good is not shown as on its way: the app
+    tells the member to contact support."""
+    rc.reject_with = 404
+    await _entry(db_session, "member@example.com")
+    headers = await _sign_up(api, "member@example.com")
+    await _verify(api, emails, "member@example.com")
+
+    status = (await api.get("/api/users/me/waitlist-offer", headers=headers)).json()
+
+    assert status["redemption"]["status"] == "failed"
+    assert status["claim_available"] is False
 
 
 # -- sign-in and verify-email never wait long on RevenueCat --------------------

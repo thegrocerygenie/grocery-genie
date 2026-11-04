@@ -583,22 +583,33 @@ email. Accounts whose email differs (Apple's Hide My Email) use Settings →
 4. **Grants RevenueCat could not take.** Inside sign-in, `verify-email`,
    an email change or the claim link, a grant waits at most
    `GG_WAITLIST_INLINE_GRANT_TIMEOUT_SECONDS` (3 s) for RevenueCat; past it,
-   or on a 5xx, 408 or 429, it stays `pending` and beat retries it every 15
-   minutes. A row becomes `failed` and is never retried on a RevenueCat 4xx
-   (`last_error` `revenuecat_rejected_<code>`: check the secret key and the
-   entitlement id), after `GG_WAITLIST_GRANT_MAX_ATTEMPTS` (24) attempts
-   (`too_many_attempts`), or when the window closes first (`window_closed`).
-   The app shows a failed row as pending. Watch them:
+   or on a 5xx, 408 or 429, it stays `pending` and beat (every 15 minutes)
+   retries it with backoff: 15 minutes after the first attempt, doubling, at
+   most 6 hours apart. A member matched inside the window is owed the year
+   (decision #9), so retries **go on after the window closes**, and every
+   attempt sends the same end time, 12 months from the match. A row becomes
+   `failed`, never retried, on a RevenueCat 4xx (`last_error`
+   `revenuecat_rejected_<code>`: check the secret key and the entitlement
+   id), after `GG_WAITLIST_GRANT_RETRY_DAYS` (14) days from the match
+   (`gave_up_after_14_days`: RevenueCat was down that long), or if the end
+   time has already passed (`grant_end_passed`). Each is logged at **error**
+   level (`waitlist grant failed for good for user …`): alert on it. The app
+   shows a failed row as "We couldn't apply your free year. Contact support."
+   Watch them:
    `SELECT status, last_error, count(*) FROM waitlist_redemptions GROUP BY 1, 2`.
-   After fixing the cause, inside the window, set a failed row back with
-   `UPDATE waitlist_redemptions SET status = 'pending', attempts = 0 WHERE
-   status = 'failed' AND last_error LIKE 'revenuecat_rejected_%'`.
+   After fixing the cause, set a failed row back so beat retries it (it
+   keeps its end time):
+   `UPDATE waitlist_redemptions SET status = 'pending', attempts = 0,
+   matched_at = now() WHERE status = 'failed' AND last_error LIKE
+   'revenuecat_rejected_%'` (`matched_at` restarts the 14 days only; the
+   end time stays in `grant_expires_at`).
 5. **The claim step** ("Claim your waitlist offer") answers `202` at once for
    any email and enqueues a Celery task that looks the email up and sends
    the link, so the **worker must be running**. A failed Resend send is
    logged by the worker (`waitlist claim email not sent`), never shown to the
    user. Limits: 5 claims an hour per account (`429`), and 3 links a day per
-   waitlist email (past it, the same `202` and nothing sent).
+   account and waitlist email (past it, the same `202` and nothing sent;
+   keyed per account, so nobody can use up a member's claims).
 6. **When the window closes** (90 days after launch), beat (05:45 UTC daily)
    deletes the `waitlist_entries` copy, the unlinked hashes left by deleted
    accounts, unconfirmed claims and, with `GG_RESEND_WAITLIST_AUDIENCE_ID`
@@ -608,10 +619,14 @@ email. Accounts whose email differs (Apple's Hide My Email) use Settings →
    `GG_PREMIUM_LAUNCHED_AT` is unset, and a rerun deletes only what is left.
    Its log line `waitlist purged: …` has counts only, such as
    `resend_contacts_deleted` and `resend_failed`; `resend_failed=True` means
-   Resend refused part way and the next run continues. Once a run reports
-   `resend_contacts_deleted=0` with no failure, the audience is empty: delete
-   the empty audience in Resend, and stop the site adding to it. With a CSV
-   import and no audience id, delete the contacts in Resend by hand that day.
+   Resend refused part way and the next run continues. The first run that
+   finds the audience empty records it (`waitlist_audience_purges`, log
+   `resend audience purge complete`), and **from then on the purge never
+   calls Resend again**, so later sign-ups to that audience are left alone.
+   The daily run still deletes the backend copy and new unlinked hashes.
+   Then delete the empty audience in Resend, or point the site at a new one.
+   With a CSV import and no audience id, delete the contacts in Resend by
+   hand that day.
 
 ---
 

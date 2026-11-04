@@ -28,7 +28,7 @@ from app.models.schemas import (
 )
 from app.services.analytics_service import AnalyticsService, get_analytics_service
 from app.services.revenuecat_client import RevenueCatClient, get_revenuecat_client
-from app.services.waitlist_service import GRANTED, WaitlistError, WaitlistService
+from app.services.waitlist_service import WaitlistError, WaitlistService
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +60,8 @@ def _public(redemption: WaitlistRedemption | None) -> WaitlistRedemptionPublic |
     if redemption is None:
         return None
     return WaitlistRedemptionPublic(
-        # A failed grant needs an operator (docs/DEPLOYMENT.md 2.10); to the
-        # app it is still being set up.
-        status="granted" if redemption.status == GRANTED else "pending",
+        # failed: the app asks the member to contact support (DEPLOYMENT 2.10).
+        status=redemption.status,  # type: ignore[arg-type]
         expires_at=redemption.grant_expires_at,
     )
 
@@ -97,9 +96,11 @@ async def request_claim(
         email = await WaitlistService(db, analytics).check_claim(user, body.email)
     except WaitlistError as e:
         _raise(e)
+    # Per account and target email: one account can't flood an inbox, and
+    # nobody can use up a member's claims by claiming their email.
     digest = hashlib.sha256(email.encode()).hexdigest()
     if await rate_limit.allow(
-        f"waitlist-claim-email:{digest}",
+        f"waitlist-claim-email:{user.id}:{digest}",
         window=86400.0,
         limit=get_settings().max_waitlist_claims_per_email_per_day,
     ):

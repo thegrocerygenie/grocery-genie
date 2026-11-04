@@ -440,7 +440,8 @@ class WaitlistClaimConfirmRequest(BaseModel):
 
 class WaitlistRedemptionPublic(BaseModel):
     # pending: matched, the RevenueCat grant is being retried. granted: done.
-    status: Literal["pending", "granted"]
+    # failed: it could not be applied; the app says to contact support.
+    status: Literal["pending", "granted", "failed"]
     # When the free year ends: 12 months from the match.
     expires_at: datetime | None
 

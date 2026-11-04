@@ -1,8 +1,8 @@
 import { apiClient } from '@/services/api';
 
-/** A matched free year: pending while the RevenueCat grant is retried. */
+/** A matched free year: pending while the RevenueCat grant is retried; failed when it could not be applied (contact support). */
 export interface WaitlistRedemption {
-  status: 'pending' | 'granted';
+  status: 'pending' | 'granted' | 'failed';
   expires_at: string | null;
 }
 

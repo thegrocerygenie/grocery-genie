@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +14,7 @@ import {
 import { Stack } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
+import { SUPPORT_EMAIL } from '@/constants/links';
 import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { WAITLIST_OFFER_STRINGS as S } from '@/features/premium/content/waitlistOffer';
 import {
@@ -43,6 +46,16 @@ export default function WaitlistOfferScreen() {
     request.mutate(to, { onSuccess: () => setSentTo(to) });
   };
 
+  const onContactSupport = async () => {
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(S.supportSubject)}`;
+    // No Mail account on the device (or the simulator): show the address.
+    if (await Linking.canOpenURL(url)) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert(S.contactSupport, S.supportFallback(SUPPORT_EMAIL));
+    }
+  };
+
   const data = offer.data;
   let body: React.ReactNode;
   if (offer.isLoading) {
@@ -62,6 +75,26 @@ export default function WaitlistOfferScreen() {
           <Text style={styles.secondaryLabel}>{S.retry}</Text>
         </Pressable>
       </View>
+    );
+  } else if (data.redemption?.status === 'failed') {
+    // RevenueCat refused for good (DEPLOYMENT 2.10): a person must fix it.
+    body = (
+      <>
+        <Hero
+          symbol="exclamationmark.triangle.fill"
+          title={S.grantFailedTitle}
+          message={S.grantFailedBody}
+        />
+        <Pressable
+          onPress={onContactSupport}
+          style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryPressed]}
+          accessibilityRole="button"
+          accessibilityLabel={S.contactSupport}
+          accessibilityHint={S.contactSupportHint(SUPPORT_EMAIL)}
+        >
+          <Text style={styles.secondaryLabel}>{S.contactSupport}</Text>
+        </Pressable>
+      </>
     );
   } else if (data.redemption) {
     const granted = data.redemption.status === 'granted';
@@ -147,6 +180,7 @@ export default function WaitlistOfferScreen() {
       <KeyboardAvoidingView behavior="padding" style={styles.root}>
         <ScrollView
           contentInsetAdjustmentBehavior="automatic"
+          testID="waitlist-offer-scroll"
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
@@ -177,7 +211,7 @@ function Hero({ symbol, title, message }: { symbol: string; title: string; messa
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
-  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: 80 },
+  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.screenBottom },
   loading: { marginTop: spacing.xl },
   hero: { alignItems: 'center', gap: spacing.sm },
   iconWrap: {

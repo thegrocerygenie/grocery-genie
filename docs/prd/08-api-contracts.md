@@ -320,7 +320,7 @@ Matching runs, with nothing extra from the app, inside:
 - `POST /api/users/me/email-change/confirm`;
 - the launch backfill and a daily rerun (`app.tasks.waitlist_tasks`).
 
-Those routes answer exactly as before, and never wait long on RevenueCat: a match is committed as `pending` (stamped as an attempt) before RevenueCat is called, and the request waits at most `GG_WAITLIST_INLINE_GRANT_TIMEOUT_SECONDS` (3 s) for the grant and the read-back together. If RevenueCat is slow, fails with a 5xx, 408 or 429, or no API key is set, the match stays `pending` and a beat task retries it every 15 minutes with the same end date. It stops for good (`failed`, reason kept) on a RevenueCat 4xx, after `GG_WAITLIST_GRANT_MAX_ATTEMPTS` (24) attempts, or once the window has closed; the API shows a failed match as `pending`, since an operator must act on it.
+Those routes answer exactly as before, and never wait long on RevenueCat: a match is committed as `pending` (stamped as an attempt) before RevenueCat is called, and the request waits at most `GG_WAITLIST_INLINE_GRANT_TIMEOUT_SECONDS` (3 s) for the grant and the read-back together. If RevenueCat is slow, fails with a 5xx, 408 or 429, or no API key is set, the match stays `pending` and a beat task retries it with the same end date, backing off from 15 minutes to 6 hours between attempts. The window is checked only at the match (decision #9): retries go on after it closes. It stops for good (`failed`, reason kept, logged at error level) on a RevenueCat 4xx, `GG_WAITLIST_GRANT_RETRY_DAYS` (14) days after the match, or if the end time has passed.
 
 #### GET /api/users/me/waitlist-offer
 ```json
@@ -331,21 +331,21 @@ Those routes answer exactly as before, and never wait long on RevenueCat: a matc
   "redemption": { "status": "granted", "expires_at": "2028-01-10T12:00:00Z" }
 }
 ```
-`claim_available`: the window is open and the account has no free year; the app shows Settings → "Claim your waitlist offer" only then. `redemption` is null until a match; `status` is `pending` (the grant is being retried) or `granted`; `expires_at` is when the free year ends. `closes_at` is null while no launch date is set.
+`claim_available`: the window is open and the account has no free year; the app shows Settings → "Claim your waitlist offer" only then. `redemption` is null until a match; `status` is `pending` (the grant is being retried), `granted`, or `failed` (it could not be applied; the app says to contact support); `expires_at` is when the free year ends. `closes_at` is null while no launch date is set.
 
 #### POST /api/users/me/waitlist-offer/claim
 For an account whose email is not the waitlist one (Apple's Hide My Email, another address). The email-change pattern: the server sends a confirmation link to the waitlist email (`grocerygenie://onboarding/confirm-waitlist-claim?token=…`, valid 24 hours).
 ```json
 { "email": "member@example.com" }
 ```
-**Response** `202 {"status": "sent"}` at once, for any email. The route never looks at the waitlist: it enqueues one Celery task, which looks the email up and sends the link only to a qualifying, unredeemed waitlist email. So the answer, its timing and its errors are the same whether or not the email is on the waitlist, and a Resend failure is only logged by the worker. Errors, which depend only on the account: `409 waitlist_offer_closed` (window not open), `409 waitlist_offer_redeemed` (this account already has its free year), `422 invalid_email`, `429` (more than `GG_MAX_WAITLIST_CLAIMS_PER_HOUR`, 5, claims an hour from this account). Past `GG_MAX_WAITLIST_CLAIMS_PER_EMAIL_PER_DAY` (3) claims for one waitlist email from any accounts, the answer is the same `202` and no link is sent.
+**Response** `202 {"status": "sent"}` at once, for any email. The route never looks at the waitlist: it enqueues one Celery task, which looks the email up and sends the link only to a qualifying, unredeemed waitlist email. So the answer, its timing and its errors are the same whether or not the email is on the waitlist, and a Resend failure is only logged by the worker. Errors, which depend only on the account: `409 waitlist_offer_closed` (window not open), `409 waitlist_offer_redeemed` (this account already has its free year), `422 invalid_email`, `429` (more than `GG_MAX_WAITLIST_CLAIMS_PER_HOUR`, 5, claims an hour from this account). Past `GG_MAX_WAITLIST_CLAIMS_PER_EMAIL_PER_DAY` (3) claims a day from this account for one waitlist email, the answer is the same `202` and no link is sent; the count is per account, so another account can't use up a member's claims.
 
 #### POST /api/users/me/waitlist-offer/confirm
 No session needed: the token from the link is the proof that the user holds the waitlist email.
 ```json
 { "token": "…" }
 ```
-**Response** `200` with the redemption (`{"status": "granted" | "pending", "expires_at": "…"}`). Errors: `400 invalid_token` (unknown, used or expired link), `409 waitlist_offer_closed`, `409 waitlist_offer_redeemed` (the account, or the waitlist email, already has its free year), `409 waitlist_not_eligible` (the contact left the waitlist since the link was sent).
+**Response** `200` with the redemption (`{"status": "granted" | "pending" | "failed", "expires_at": "…"}`). Errors: `400 invalid_token` (unknown, used or expired link), `409 waitlist_offer_closed`, `409 waitlist_offer_redeemed` (the account, or the waitlist email, already has its free year), `409 waitlist_not_eligible` (the contact left the waitlist since the link was sent).
 
 ### GET /api/users/me/export?format=json|csv
 

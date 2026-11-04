@@ -491,21 +491,54 @@ async def test_pending_row_is_stamped_before_the_first_grant(
     assert rc.calls == 1
 
 
-async def test_retry_gives_up_after_the_attempt_cap(db_session, offer, monkeypatch):
-    monkeypatch.setattr(get_settings(), "waitlist_grant_max_attempts", 3)
+async def test_retry_backs_off_and_gives_up_only_after_14_days(
+    db_session, offer, monkeypatch
+):
+    """A RevenueCat outage must not cost a member matched in time the year:
+    retries back off (15 min, doubling, at most 6 h apart) for 14 days from
+    the match, far past 24 attempts, and only then stop."""
     rc = FakeRevenueCat()
-    redemption = await _pending(db_session, monkeypatch, rc=rc)
-    rc.fail_grants = 100
+    redemption = await _pending(db_session, monkeypatch, rc=rc)  # attempt 1 at NOW
+    rc.fail_grants = 10_000
     service = WaitlistService(db_session, revenuecat=rc)
 
-    for _ in range(5):
-        await service.retry_pending(older_than=timedelta(0))
+    async def retry_at(delta: timedelta) -> None:
+        monkeypatch.setattr(clock, "now", lambda: NOW + delta)
+        await service.retry_pending()
 
+    await retry_at(timedelta(minutes=10))  # 15 min after attempt 1: not yet
+    assert rc.calls == 1
+    await retry_at(timedelta(minutes=16))
+    assert rc.calls == 2
+    await retry_at(timedelta(minutes=40))  # 30 min after attempt 2: not yet
+    assert rc.calls == 2
+    await retry_at(timedelta(minutes=47))
+    assert rc.calls == 3
+
+    # Every 6 hours at most once the backoff is long: well past 24 attempts.
+    for hour in range(6, 13 * 24, 6):
+        await retry_at(timedelta(hours=hour, minutes=1))
+    await db_session.refresh(redemption)
+    assert redemption.status == PENDING
+    assert redemption.attempts > 24
+
+    await retry_at(timedelta(days=14))
     await db_session.refresh(redemption)
     assert redemption.status == FAILED
-    assert redemption.attempts == 3
-    assert redemption.last_error == "too_many_attempts"
-    assert rc.calls == 3
+    assert redemption.last_error == "gave_up_after_14_days"
+
+
+async def test_a_long_backoff_is_capped_at_six_hours(db_session, offer, monkeypatch):
+    rc = FakeRevenueCat()
+    redemption = await _pending(db_session, monkeypatch, rc=rc)
+    redemption.attempts = 20
+    await db_session.commit()
+    service = WaitlistService(db_session, revenuecat=rc)
+
+    monkeypatch.setattr(clock, "now", lambda: NOW + timedelta(hours=5, minutes=59))
+    assert await service.retry_pending() == 0
+    monkeypatch.setattr(clock, "now", lambda: NOW + timedelta(hours=6, minutes=1))
+    assert await service.retry_pending() == 1
 
 
 async def test_a_revenuecat_4xx_is_final(db_session, offer, monkeypatch):
@@ -537,21 +570,57 @@ async def test_a_4xx_on_the_first_grant_is_final_too(db_session, offer):
     assert redemption.last_error == "revenuecat_rejected_400"
 
 
-async def test_retry_never_grants_after_the_window_closes(
+async def test_retry_keeps_going_after_the_window_closes(
+    db_session, offer, monkeypatch
+):
+    """Decision #9: a member matched inside the window is owed the year. The
+    window is checked at the match only; the retry grants after it closes,
+    with the end time set at the match."""
+    matched = LAUNCHED + timedelta(days=89)
+    monkeypatch.setattr(clock, "now", lambda: matched)
+    rc = FakeRevenueCat()
+    redemption = await _pending(db_session, monkeypatch, rc=rc)
+    monkeypatch.setattr(clock, "now", lambda: LAUNCHED + timedelta(days=91))
+
+    granted = await WaitlistService(db_session, revenuecat=rc).retry_pending()
+
+    assert granted == 1
+    await db_session.refresh(redemption)
+    assert redemption.status == GRANTED
+    assert rc.grants == [(str(redemption.user_id), add_months(matched, 12))]
+
+
+async def test_a_grant_whose_end_time_has_passed_is_recorded_not_sent(
     db_session, offer, monkeypatch
 ):
     rc = FakeRevenueCat()
     redemption = await _pending(db_session, monkeypatch, rc=rc)
-    monkeypatch.setattr(clock, "now", lambda: LAUNCHED + timedelta(days=90))
+    redemption.grant_expires_at = NOW - timedelta(minutes=1)
+    await db_session.commit()
 
-    assert (
-        await WaitlistService(db_session, revenuecat=rc).retry_pending(
-            older_than=timedelta(0)
-        )
-        == 0
+    await WaitlistService(db_session, revenuecat=rc).retry_pending(
+        older_than=timedelta(0)
     )
 
     await db_session.refresh(redemption)
     assert redemption.status == FAILED
-    assert redemption.last_error == "window_closed"
-    assert rc.grants == [] and rc.calls == 1
+    assert redemption.last_error == "grant_end_passed"
+    assert rc.calls == 1  # only the first, failed attempt
+
+
+async def test_a_final_failure_is_logged_at_error_level(
+    db_session, offer, monkeypatch, caplog
+):
+    import logging
+
+    rc = FakeRevenueCat()
+    await _pending(db_session, monkeypatch, rc=rc)
+    rc.reject_with = 403
+    caplog.set_level(logging.WARNING)
+
+    await WaitlistService(db_session, revenuecat=rc).retry_pending(
+        older_than=timedelta(0)
+    )
+
+    errors = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert errors and "revenuecat_rejected_403" in errors[0].getMessage()

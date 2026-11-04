@@ -24,9 +24,13 @@ it launches (decision #2). The rules (decisions #7, #9-#13, plan D5):
 - **Never slow, never final by accident:** inside a request (sign-in,
   verify-email, email change, the claim link) a grant waits at most
   ``waitlist_inline_grant_timeout_seconds`` for RevenueCat, then stays
-  pending for the beat retry. The retry stops for good (``failed``, with the
-  reason in ``last_error``) on a RevenueCat 4xx, after
-  ``waitlist_grant_max_attempts``, or once the window has closed.
+  pending for the beat retry. The window is checked at the match only: a
+  member matched in time is owed the year (#9), so retries go on after the
+  window closes, backing off from 15 minutes to 6 hours, for
+  ``waitlist_grant_retry_days`` from the match. The grant always ends 12
+  months from the match. It stops for good (``failed``, the reason in
+  ``last_error``, logged at error level) on a RevenueCat 4xx, when the 14
+  days run out, or if that end time has already passed.
 - **The claim step can't look up the waitlist:** the route checks only the
   account's own state and enqueues ``send_claim_link`` for any email; the
   worker does the lookup and the send.
@@ -79,9 +83,16 @@ SOURCE_CLAIM = "claim"
 # A claim link is sent to the waitlist inbox, which the user may not have on
 # the phone: a day to tap it.
 CLAIM_TOKEN_TTL = timedelta(hours=24)
-# A pending grant is retried once its last attempt is this old, so the beat
-# retry does not race the request that just tried.
-RETRY_AFTER = timedelta(minutes=5)
+# The beat retry's backoff: 15 minutes after the first attempt, doubling,
+# at most 6 hours apart. The first delay also keeps the retry from racing
+# the request that just tried.
+RETRY_FIRST = timedelta(minutes=15)
+RETRY_MAX = timedelta(hours=6)
+
+
+def retry_delay(attempts: int) -> timedelta:
+    """How long after its last attempt a pending grant is retried."""
+    return min(RETRY_FIRST * 2 ** min(max(attempts - 1, 0), 10), RETRY_MAX)
 
 
 class Analytics(Protocol):
@@ -386,10 +397,13 @@ class WaitlistService:
             redemption.last_error = "account_deleted"
             await self.db.flush()
             return False
-        if window_has_closed(now):
-            return await self._fail(redemption, "window_closed")
-        if (redemption.attempts or 0) >= get_settings().waitlist_grant_max_attempts:
-            return await self._fail(redemption, "too_many_attempts")
+        # No window check here: the match was made inside it (decision #9).
+        if expires <= now:
+            return await self._fail(redemption, "grant_end_passed")
+        days = get_settings().waitlist_grant_retry_days
+        matched = _utc(redemption.matched_at)
+        if matched is not None and now - matched >= timedelta(days=days):
+            return await self._fail(redemption, f"gave_up_after_{days}_days")
         redemption.attempts = (redemption.attempts or 0) + 1
         redemption.last_attempt_at = now
         if self.revenuecat is None:
@@ -444,36 +458,44 @@ class WaitlistService:
         redemption.status = FAILED
         redemption.last_error = reason
         await self.db.flush()
-        logger.warning(
+        # Error level: ops alerting must see a member who won't get the year.
+        logger.error(
             "waitlist grant failed for good for user %s: %s",
             redemption.user_id,
             reason,
         )
         return False
 
-    async def retry_pending(self, older_than: timedelta = RETRY_AFTER) -> int:
-        """Retry pending grants whose last attempt is at least ``older_than``
-        old. Each row is locked (skipping one another worker holds) and
-        committed on its own. Returns how many were granted."""
-        cutoff = clock.now() - older_than
-        ids = (
-            (
-                await self.db.execute(
-                    select(WaitlistRedemption.id)
-                    .where(
-                        WaitlistRedemption.status == PENDING,
-                        WaitlistRedemption.user_id.is_not(None),
-                        (WaitlistRedemption.last_attempt_at.is_(None))
-                        | (WaitlistRedemption.last_attempt_at <= cutoff),
-                    )
-                    .order_by(WaitlistRedemption.created_at)
+    async def retry_pending(self, older_than: timedelta | None = None) -> int:
+        """Retry the pending grants that are due: ``retry_delay`` after their
+        last attempt, or ``older_than`` when given (the ops command). Each row
+        is locked (skipping one another worker holds) and committed on its
+        own. Returns how many were granted."""
+        now = clock.now()
+        rows = (
+            await self.db.execute(
+                select(
+                    WaitlistRedemption.id,
+                    WaitlistRedemption.attempts,
+                    WaitlistRedemption.last_attempt_at,
                 )
+                .where(
+                    WaitlistRedemption.status == PENDING,
+                    WaitlistRedemption.user_id.is_not(None),
+                )
+                .order_by(WaitlistRedemption.created_at)
             )
-            .scalars()
-            .all()
-        )
+        ).all()
+        due = [
+            row.id
+            for row in rows
+            if row.last_attempt_at is None
+            or _utc(row.last_attempt_at)
+            + (retry_delay(row.attempts or 0) if older_than is None else older_than)
+            <= now
+        ]
         granted = 0
-        for redemption_id in ids:
+        for redemption_id in due:
             redemption = (
                 await self.db.execute(
                     select(WaitlistRedemption)

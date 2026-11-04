@@ -317,9 +317,52 @@ async def test_purge_deletes_the_resend_contacts_in_batches_once_closed(
     # Only counts are logged.
     assert "c0" not in caplog.text and "@" not in caplog.text
 
-    # Idempotent: a rerun finds nothing left and deletes nothing.
+    # The run ended on an empty page: the purge is recorded as done, and a
+    # later run no longer calls Resend at all.
+    assert result.resend_purge_complete is True
     again = await purge_after_window(factory, audience, page_size=100)
     assert again.resend_contacts_deleted == 0
+    assert audience.lists == 4
+    # Contacts the site adds afterwards are not the waitlist: left alone.
+    audience.contacts.append("late-sign-up")
+    await purge_after_window(factory, audience, page_size=100)
+    assert audience.contacts == ["late-sign-up"]
+
+
+async def test_the_resend_purge_is_not_done_until_a_run_finds_it_empty(
+    factory, offer, monkeypatch
+):
+    monkeypatch.setattr(clock, "now", lambda: LAUNCHED + timedelta(days=90))
+    audience = FakeAudienceAdmin(30)
+
+    capped = await purge_after_window(factory, audience, page_size=10, max_deletes=20)
+    assert capped.resend_purge_complete is False
+
+    audience.fail_after = 21
+    failed = await purge_after_window(factory, audience, page_size=10, max_deletes=20)
+    assert failed.resend_failed and failed.resend_purge_complete is False
+
+    audience.fail_after = None
+    done = await purge_after_window(factory, audience, page_size=10, max_deletes=20)
+    assert done.resend_purge_complete is True and audience.contacts == []
+
+
+async def test_the_backend_copy_is_still_purged_after_the_resend_purge_is_done(
+    factory, offer, monkeypatch
+):
+    """A redemption unlinked by an account deleted after the window closed
+    still goes the next day."""
+    monkeypatch.setattr(clock, "now", lambda: LAUNCHED + timedelta(days=90))
+    audience = FakeAudienceAdmin(0)
+    await purge_after_window(factory, audience)
+    async with factory() as db:
+        db.add(WaitlistRedemption(email_hash="h-late", user_id=None, status=GRANTED))
+        await db.commit()
+
+    result = await purge_after_window(factory, audience)
+
+    assert result.unlinked_redemptions == 1
+    assert audience.lists == 1
 
 
 async def test_purge_leaves_the_resend_audience_while_the_window_is_open(

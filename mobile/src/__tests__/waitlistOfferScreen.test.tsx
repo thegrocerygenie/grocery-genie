@@ -9,6 +9,9 @@ import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-li
 
 import WaitlistOfferScreen from '../../app/settings/waitlist-offer';
 import ConfirmWaitlistClaimScreen from '../../app/onboarding/confirm-waitlist-claim';
+import { Linking, StyleSheet, type ViewStyle } from 'react-native';
+import { spacing } from '@/constants/theme';
+import { SUPPORT_EMAIL } from '@/constants/links';
 import { WAITLIST_OFFER_STRINGS as S } from '@/features/premium/content/waitlistOffer';
 import { ApiError } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
@@ -110,6 +113,35 @@ describe('Claim your waitlist offer', () => {
     expect(await screen.findByText(S.grantedTitle)).toBeTruthy();
     expect(screen.queryByLabelText(S.emailLabel)).toBeNull();
   });
+
+  it('pads the bottom of the screen with a theme token', async () => {
+    renderAt('/settings/waitlist-offer');
+
+    const scroll = await screen.findByTestId('waitlist-offer-scroll');
+    const style = StyleSheet.flatten(scroll.props.contentContainerStyle as ViewStyle);
+    expect(style.paddingBottom).toBe(spacing.screenBottom);
+  });
+
+  it('says a failed free year needs support, and emails support', async () => {
+    const canOpen = jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
+    const openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    mockOffer.mockResolvedValue({
+      ...open,
+      claim_available: false,
+      redemption: { status: 'failed', expires_at: null },
+    });
+    renderAt('/settings/waitlist-offer');
+
+    expect(await screen.findByText(S.grantFailedBody)).toBeTruthy();
+    expect(screen.queryByText(S.pendingTitle)).toBeNull();
+    fireEvent.press(screen.getByLabelText(S.contactSupport));
+
+    await waitFor(() =>
+      expect(openUrl).toHaveBeenCalledWith(expect.stringContaining(`mailto:${SUPPORT_EMAIL}`)),
+    );
+    canOpen.mockRestore();
+    openUrl.mockRestore();
+  });
 });
 
 describe('the claim link', () => {
@@ -119,6 +151,14 @@ describe('the claim link', () => {
 
     expect(await screen.findByText(S.confirmedTitle)).toBeTruthy();
     expect(mockConfirm).toHaveBeenCalledWith('tok');
+  });
+
+  it('says to contact support when the free year could not be applied', async () => {
+    mockConfirm.mockResolvedValue({ status: 'failed', expires_at: null });
+    renderAt('/onboarding/confirm-waitlist-claim?token=abc');
+
+    expect(await screen.findByText(S.grantFailedBody)).toBeTruthy();
+    expect(screen.queryByText(S.confirmedTitle)).toBeNull();
   });
 
   it('explains a refused link', async () => {

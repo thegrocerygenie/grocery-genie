@@ -36,10 +36,15 @@ export default function ConfirmWaitlistClaimScreen() {
     confirm
       .mutateAsync(token)
       .then((r) =>
-        setStatus({
-          kind: 'claimed',
-          message: r.status === 'granted' ? S.grantedBody(offerDate(r.expires_at)) : S.pendingBody,
-        }),
+        setStatus(
+          r.status === 'failed'
+            ? { kind: 'failed', message: S.grantFailedBody }
+            : {
+                kind: 'claimed',
+                message:
+                  r.status === 'granted' ? S.grantedBody(offerDate(r.expires_at)) : S.pendingBody,
+              },
+        ),
       )
       .catch((e: unknown) => setStatus({ kind: 'failed', message: claimErrorMessage(e) }));
   }, [token, confirm]);
