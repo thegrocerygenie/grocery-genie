@@ -170,8 +170,13 @@ async def test_shortening_the_cooldown_never_resends_a_held_back_alert(
     pinned_now[0] = NOW + timedelta(days=2, hours=1)
     await _buy(client, mock_extractor, test_image_bytes, "2026-03-17", 1.70)
     alerts = await _list(client)
-    assert len(alerts) == 2
-    assert "now $1.70/lb" in alerts[0]["body"]
+    # The held-back $1.60 is never sent; the next change ($1.70) is. (Not by
+    # position: on Postgres the test's one transaction gives both the same
+    # created_at.)
+    bodies = sorted(a["body"] for a in alerts)
+    assert len(bodies) == 2
+    assert any("now $1.70/lb" in b for b in bodies)
+    assert not any("now $1.60/lb" in b for b in bodies)
 
 
 # --- AC 9: alert copy per design --------------------------------------------
