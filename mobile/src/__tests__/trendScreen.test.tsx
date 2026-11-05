@@ -178,13 +178,14 @@ describe('Trend Highlights (BC-04 AC 8)', () => {
 
     expect(screen.getByText('Highlights')).toBeTruthy();
     expect(screen.getByLabelText('Highest: March, $35')).toBeTruthy();
-    expect(screen.getByLabelText('Lowest: January, $0')).toBeTruthy();
+    // January spent nothing, so the lowest is February.
+    expect(screen.getByLabelText('Lowest: February, $30')).toBeTruthy();
     expect(screen.getByLabelText('Trend: falling, down 13 percent')).toBeTruthy();
     expect(screen.getByText('Falling')).toBeTruthy();
     expect(screen.getByText('−13%')).toBeTruthy();
   });
 
-  it('marks the lowest month in progress when it is the current month', () => {
+  it('skips the current month, still in progress, for the lowest', () => {
     mockDashboard.data = dashboard({
       current_period: '2026-03',
       trend: [
@@ -195,8 +196,30 @@ describe('Trend Highlights (BC-04 AC 8)', () => {
     });
     renderTrend();
 
-    expect(screen.getByLabelText('Lowest: March, in progress, $12')).toBeTruthy();
-    expect(screen.getByText('March · in progress')).toBeTruthy();
+    expect(screen.getByLabelText('Lowest: February, $30')).toBeTruthy();
+    expect(screen.queryByLabelText(/^Lowest: March/)).toBeNull();
+  });
+
+  it('says so when no finished month had spending to be the lowest', () => {
+    mockDashboard.data = dashboard({ current_period: '2026-03', prior_average: 25 });
+    mockDashboard.data.trend[1].spent = 0;
+    renderTrend();
+
+    expect(screen.getByLabelText('Lowest: no finished month with spending yet')).toBeTruthy();
+    expect(screen.getByText('No finished month with spending yet')).toBeTruthy();
+  });
+
+  it('shows no trend percent when the months before had no spending, like the headline', () => {
+    // 3M: January 10, February 30, March 35. The halves would read +250%; the
+    // headline has no months before to compare with, so neither does Trend.
+    mockDashboard.data = dashboard({ prior_average: 0, current_period: '2026-09' });
+    mockDashboard.data.trend[0].spent = 10;
+    renderTrend();
+
+    expect(screen.queryByText('+250%')).toBeNull();
+
+    expect(screen.queryByText(/vs prior/)).toBeNull();
+    expect(screen.getByLabelText('Trend: Not enough history yet')).toBeTruthy();
   });
 
   it('calls a small change steady', () => {

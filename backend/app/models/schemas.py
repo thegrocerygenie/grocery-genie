@@ -254,7 +254,7 @@ class DashboardSpendingResponse(BaseModel):
     # period. The app's "Scan your first receipt" state is for new accounts.
     has_receipts: bool = False
     # The period holding today in the user's time zone, whichever ``period``
-    # was asked for: the Trend screen marks it "in progress" (BC-04 AC 8).
+    # was asked for: Trend tints it and leaves it out of Lowest (BC-04 AC 8).
     current_period: str
 
 

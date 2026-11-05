@@ -83,7 +83,11 @@ export default function TrendScreen() {
   // AC 9: the current month is tinted; an older server sends no current_period,
   // and then the period being viewed (the last bar) is.
   const currentPeriod = data?.current_period ?? data?.period ?? '';
-  const highlights = buildTrendHighlights(months, { change: priorChange, currentPeriod });
+  const highlights = buildTrendHighlights(months, {
+    change: priorChange,
+    currentPeriod,
+    halves: range === 'all',
+  });
   const hasData = (data?.trend ?? []).length > 0;
 
   // BC-04 AC 2: this month vs last month, for the total and per category.
@@ -273,7 +277,7 @@ export default function TrendScreen() {
             </View>
 
             {/* AC 8: Highlights, for a range on screen. */}
-            {!locked && !failed && chartData && highlights.highest && highlights.lowest ? (
+            {!locked && !failed && chartData && highlights.highest ? (
               <>
                 <Text style={styles.sectionLabel} accessibilityRole="header">
                   {TREND_STRINGS.highlightsHeader}
@@ -296,16 +300,19 @@ export default function TrendScreen() {
                     iconColor={colors.green}
                     title={TREND_STRINGS.lowest}
                     detail={
-                      highlights.lowest.inProgress
-                        ? TREND_STRINGS.inProgress(monthLong(highlights.lowest.period))
-                        : monthLong(highlights.lowest.period)
+                      highlights.lowest
+                        ? monthLong(highlights.lowest.period)
+                        : TREND_STRINGS.noLowest
                     }
-                    value={money(highlights.lowest.total)}
-                    label={TREND_STRINGS.lowestLabel(
-                      monthLong(highlights.lowest.period),
-                      money(highlights.lowest.total),
-                      highlights.lowest.inProgress,
-                    )}
+                    value={highlights.lowest ? money(highlights.lowest.total) : null}
+                    label={
+                      highlights.lowest
+                        ? TREND_STRINGS.lowestLabel(
+                            monthLong(highlights.lowest.period),
+                            money(highlights.lowest.total),
+                          )
+                        : TREND_STRINGS.noLowestLabel
+                    }
                   />
                   <HighlightRow
                     divider

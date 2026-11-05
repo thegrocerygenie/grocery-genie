@@ -85,8 +85,8 @@ export interface DashboardData {
   prior_average?: number;
   previous_period: string;
   /**
-   * The period holding today, whichever period was asked for: Trend marks it
-   * "in progress" and tints its bar (BC-04 AC 8, 9). Absent from older servers.
+   * The period holding today, whichever period was asked for: Trend tints its
+   * bar and leaves it out of Lowest (BC-04 AC 8, 9). Absent from older servers.
    */
   current_period?: string;
   category_changes: DashboardCategoryChange[];

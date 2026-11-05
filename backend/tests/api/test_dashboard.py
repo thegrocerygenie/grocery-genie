@@ -770,7 +770,7 @@ async def test_dashboard_all_trend_follows_the_reset_day(
 async def test_dashboard_names_the_current_period(
     client: AsyncClient, seeded_db, monkeypatch
 ):
-    # BC-04 AC 8: the app marks the current month "in progress".
+    # BC-04 AC 8, 9: the app tints the current month and leaves it out of Lowest.
     await set_reset_day(client, "2026-09-15")
     pin_now(monkeypatch, "2026-10-10T12:00:00")
 

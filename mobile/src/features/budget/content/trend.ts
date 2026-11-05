@@ -124,14 +124,14 @@ export const TREND_STRINGS = {
   highest: 'Highest',
   lowest: 'Lowest',
   trend: 'Trend',
-  inProgress: (month: string) => `${month} · in progress`,
+  noLowest: 'No finished month with spending yet',
   rising: 'Rising',
   falling: 'Falling',
   steady: 'Steady',
   noTrend: 'Not enough history yet',
   highestLabel: (month: string, amount: string) => `Highest: ${month}, ${amount}`,
-  lowestLabel: (month: string, amount: string, inProgress: boolean) =>
-    `Lowest: ${month}${inProgress ? ', in progress' : ''}, ${amount}`,
+  lowestLabel: (month: string, amount: string) => `Lowest: ${month}, ${amount}`,
+  noLowestLabel: 'Lowest: no finished month with spending yet',
   trendLabel: (direction: string, change: number | null) =>
     change === null
       ? `Trend: ${direction}`

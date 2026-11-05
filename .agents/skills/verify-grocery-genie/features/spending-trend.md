@@ -6,7 +6,7 @@ The Trend screen charts monthly spend ending at the selected month, with the ave
 
 - `trend-3` returns the 3 months ending at `period`, oldest first, by default and with `months=3`; `prior_average` is the mean of the 3 months before.
 - `trend-1` returns just `period` for a free user, with `prior_average` the month before.
-- `trend-current-period` names the period holding today in `current_period`, whichever `period` was asked for (the app tints that bar and marks it "in progress").
+- `trend-current-period` names the period holding today in `current_period`, whichever `period` was asked for (the app tints that bar and leaves it out of Highlights' Lowest).
 - `trend-long-free` refuses `months=6`, `12` and `all` for a free user with `403`, `detail.code` `premium_required`, `detail.feature` `trend_12_months` (one feature id for every Premium range).
 - `trend-6`, `trend-12` return 6 and 12 months, oldest first, once RevenueCat's webhook has made the user Premium, with `prior_average` over as many months before.
 - `trend-all` starts at the user's first receipt's period (another user's older receipt never counts), and `prior_average` is `0.0`.
@@ -14,7 +14,7 @@ The Trend screen charts monthly spend ending at the selected month, with the ave
 
 ## How to get to it (user POV)
 
-- Budget tab, Trend. The screen opens on 3M and asks for `months=3`. The chips under the chart ask for their range; a free user's 6M, 1Y or All shows a "See more of your spending" upgrade prompt in place of the chart and Highlights, and the month-over-month card stays. The headline ("N-month average", "YoY" on 1Y), Highlights (highest, lowest, trend), grey bars with the current month tinted, and the prompt are UI only: this journey proves the API they read, and a Simulator check proves the screen (`docs/device-checklist.md`, "Trend range chips").
+- Budget tab, Trend. The screen opens on 3M and asks for `months=3`. The chips under the chart ask for their range; a free user's 6M, 1Y or All shows a "See more of your spending" upgrade prompt in place of the chart and Highlights, and the month-over-month card stays. The headline ("N-month average", "YoY" on 1Y), Highlights (highest; lowest without empty or current months; trend as the headline's change, halves for All), grey bars with the current month tinted, and the prompt are UI only: this journey proves the API they read, and a Simulator check proves the screen (`docs/device-checklist.md`, "Trend range chips").
 
 ## Driving it with gg-verify
 

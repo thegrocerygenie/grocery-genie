@@ -43,7 +43,7 @@ Real-time spending awareness with intelligent alerts. Turns receipt data into ac
 5. Dashboard loads within 2 seconds.
 6. [V1.1] (DA-10) Range chips 1M, 3M, 6M, 1Y, All under the Trend chart. 1M and 3M are free; 6M, 1Y and All are Premium (the 12-month gate, D2, stays) and show a free user the upgrade prompt, never an error. All covers every month since the user's first receipt. `GET /api/dashboard/spending` takes `months` 1, 3, 6, 12 or `all`; over 3 answers a free user `403 premium_required`.
 7. [V1.1] (DA-10) The headline is "<N>-month average" with the change from the N months before it (labelled "YoY" for 1Y); with no earlier months, or for All, no change is shown.
-8. [V1.1] (DA-10) A "Highlights" group under the chips: Highest (month and total), Lowest (month and total; the current month marked "in progress"), and Trend (direction in words and the percent).
+8. [V1.1] (DA-10) A "Highlights" group under the chips: Highest (month and total), Lowest (month and total; months with no spending and the current month, not yet over, are left out, and with none left it says "No finished month with spending yet"), and Trend (direction in words and the percent: the headline's change, so none when the headline has none; for All, which has no headline change, the later half of the months against the earlier half). A change under 5% either way reads "Steady". (User answers, DA-10 review, 2026-11-05.)
 9. [V1.1] (DA-10) Bars are grey with the current month in the tint colour, each labelled with its month's initial; VoiceOver reads each bar's month and total.
 10. [V1.1] (DA-10) Every Trend string lives in the content file for i18n; none is hard-coded in the screen.
 

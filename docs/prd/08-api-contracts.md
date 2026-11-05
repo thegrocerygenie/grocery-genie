@@ -155,7 +155,7 @@ Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-mont
 
 **`months` [V1.1].** `?months=1|3|6|12|all` sets the trend length, one per range chip on Trend (BC-04 AC 6, DA-10; default `3`; `GET /api/dashboard/spending?period=2026-03&months=12`). With a number N, `trend` holds the N months ending at `period`, oldest first, and `prior_average` covers the N months before them. With `all`, `trend` starts at the period holding the user's first receipt that counts toward spend (confirmed, not in Recently Deleted, in the budget currency; another user's never), and is just `period` when there is none on or before it; `prior_average` is `0.0`, since nothing comes before the first receipt. The rest of the response is unchanged. Any other value (`2`, `24`, `ALL`) returns `422`.
 
-`current_period` is the period holding today in the user's time zone, whichever `period` was asked for; Trend tints that month's bar and marks it "in progress" (BC-04 AC 8, 9).
+`current_period` is the period holding today in the user's time zone, whichever `period` was asked for; Trend tints that month's bar and, since it is not over, leaves it out of Highlights' Lowest (BC-04 AC 8, 9).
 
 `1` and `3` are free; `6`, `12` and `all` are Premium (decisions D2 and D11), checked on the server against the stored entitlement, never the app's. A free user asking for one gets `403` (`feature` stays `trend_12_months` for all three), which the app turns into an upgrade prompt, never an error screen:
 
