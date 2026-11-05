@@ -584,6 +584,17 @@ class ReceiptService:
             # Moving it back and confirming again would dispatch
             # ReceiptConfirmed a second time.
             raise ReceiptAlreadyConfirmedError(receipt_id)
+        # Locks before any change, in the order other writers take them: the
+        # user row (ensure_usable, for a custom category; a confirm holds it
+        # while it links lines to items), then the lines' items (lock order,
+        # DA-5), then the lines. So a split or merge of an item cannot move a
+        # line between here and the price rebuild in _record_prices.
+        if updates.items:
+            # A default or the user's own category only.
+            await CategoryService(self.db).ensure_usable(
+                user_id, (c.category_id for c in updates.items)
+            )
+        await ItemMatchingService(self.db).lock_line_items(receipt.line_items)
         # Dates of other confirmed receipts whose spend a category correction
         # moved. Their periods can cross a threshold too.
         other_changed: set[date] = set()
@@ -615,10 +626,6 @@ class ReceiptService:
             receipt.date = updates.date
 
         if updates.items:
-            # Before any change: a default or the user's own category only.
-            await CategoryService(self.db).ensure_usable(
-                user_id, (c.category_id for c in updates.items)
-            )
             line_items_by_id = {li.id: li for li in receipt.line_items}
             # Subtotal and total are not edited; they move by what price
             # corrections changed, which keeps any unitemised discount.

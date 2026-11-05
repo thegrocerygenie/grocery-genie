@@ -410,9 +410,7 @@ class ItemMatchingService:
         line_item.match_confidence = result.confidence
         line_item.match_method = result.method
         if result.method != MATCH_NEW and line_item.unit_of_measure:
-            item = await self.db.get(CanonicalItem, result.item_id)
-            if item is not None and item.unit_of_measure is None:
-                item.unit_of_measure = line_item.unit_of_measure
+            await self._fill_unit(result.item_id, line_item.unit_of_measure)
         dispatcher.dispatch(
             ItemMatched(
                 line_item_id=line_item.id,
@@ -421,6 +419,26 @@ class ItemMatchingService:
                 match_method=result.method,
             )
         )
+
+    async def _fill_unit(self, item_id: uuid.UUID, unit: str) -> None:
+        """Give the item its first unit, unless another transaction holds it.
+
+        The caller has linked lines already, so waiting for an item here would
+        take it after lines, against the lock order (DA-5): a receipt edit
+        holding the item (lock_line_items) can be waiting for one of those
+        lines (a category correction of the same name). A held item stays
+        without a unit until a later line with one links to it.
+        """
+        item = await self.db.scalar(
+            select(CanonicalItem)
+            .where(
+                CanonicalItem.id == item_id,
+                CanonicalItem.unit_of_measure.is_(None),
+            )
+            .with_for_update(key_share=True, skip_locked=True)
+        )
+        if item is not None:
+            item.unit_of_measure = unit
 
     async def match_unmatched(self, user_id: uuid.UUID) -> int:
         """Match the user's confirmed lines that have no item yet.
@@ -629,7 +647,11 @@ class ItemMatchingService:
     async def split_alias(
         self, user_id: uuid.UUID, item_id: uuid.UUID, alias_id: uuid.UUID
     ) -> CanonicalItem:
-        """Move one alias, with its lines and prices, to a new item (unlink)."""
+        """Move one alias, with its lines and prices, to a new item (unlink).
+
+        Locks the item first, as split_lines does (lock order, DA-5).
+        """
+        await self._lock_items(item_id)
         item = await self.get_item(user_id, item_id)
         await self.db.refresh(item, ["aliases"])
         alias = next((a for a in item.aliases if a.id == alias_id), None)
@@ -939,12 +961,13 @@ class ItemMatchingService:
         return (row[0], row[1]) if row else None
 
     async def _lock_items(self, *item_ids: uuid.UUID) -> None:
-        """Lock canonical item rows, in id order, for a merge.
+        """Lock canonical item rows, in id order, for a merge, split or edit.
 
-        Lock order (DA-5): items first, in id order, then suggestion rows.
-        merge() and accept_suggestion() both follow it, and reject_suggestion
-        locks only its one suggestion, so no two answers or merges can wait
-        on each other in a cycle. FOR NO KEY UPDATE: it does not block a
+        Lock order (DA-5): items first, in id order, then suggestion rows,
+        lines and prices. merge(), accept_suggestion(), split_lines(),
+        split_alias() and receipt edits (lock_line_items) all follow it, and
+        reject_suggestion locks only its one suggestion, so none of them can
+        wait on another in a cycle. FOR NO KEY UPDATE: it does not block a
         confirm linking new lines to the item (their foreign keys take KEY
         SHARE).
         """
@@ -954,6 +977,37 @@ class ItemMatchingService:
             .order_by(CanonicalItem.id)
             .with_for_update(key_share=True)
         )
+
+    async def lock_line_items(self, line_items: Sequence[LineItem]) -> None:
+        """Lock the items ``line_items`` link to, then read the links again.
+
+        A receipt edit calls this before it changes anything, so it keeps the
+        lock order (DA-5): items in id order, then lines. A split or merge of
+        one of these items then waits for the edit, or the edit for it, and
+        the links cannot move until the edit commits; sync_receipt records
+        each price on the line's item as read here.
+
+        A split or merge that commits while this waits moves lines to items
+        not yet locked. Then this lets go of its locks (the savepoint) and
+        locks the new set, so it never waits for an item while it holds one
+        with a higher id.
+        """
+        ids = [li.id for li in line_items]
+        wanted = {li.canonical_item_id for li in line_items} - {None}
+        while True:
+            async with self.db.begin_nested() as savepoint:
+                if wanted:
+                    await self._lock_items(*wanted)
+                rows = await self.db.execute(
+                    select(LineItem)
+                    .where(LineItem.id.in_(ids))
+                    .execution_options(populate_existing=True)
+                )
+                linked = {li.canonical_item_id for li in rows.scalars()} - {None}
+                if linked <= wanted:
+                    return
+                await savepoint.rollback()
+            wanted = linked
 
     async def _get_pending(
         self,
