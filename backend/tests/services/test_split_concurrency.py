@@ -16,8 +16,15 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.models.database import CanonicalItem, LineItem, PriceObservation, Receipt
+from app.models.database import (
+    CanonicalItem,
+    ItemMatchSuggestion,
+    LineItem,
+    PriceObservation,
+    Receipt,
+)
 from app.services.item_matching_service import (
+    ItemMatchConflictError,
     ItemMatchingService,
     ItemNotFoundError,
     SplitPart,
@@ -229,3 +236,55 @@ async def test_a_split_and_an_accept_of_its_item_at_once(db_engine):
             )
         ).scalar_one()
     assert lines_left == 3
+
+
+async def test_a_split_moving_a_question_then_its_accept(db_engine):
+    """A split moving the line that raised a question, then an accept of it
+    waiting behind the split: the question now pairs other items, so the
+    accept gets 409 and merges nothing the user did not see."""
+    factory = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as db:
+        service = ItemMatchingService(db)
+        lines = []
+        for name in ["Cucumber", "CUCUMBERS ENG", "CUCUMBERS ENG"]:
+            receipt, [line] = await _receipt(db, name)
+            await service.match_line_items(USER, [line])
+            await db.refresh(receipt, ["line_items"])
+            await PriceService(db).sync_receipt(receipt)
+            lines.append(line)
+        [suggestion] = await service.list_suggestions(USER)
+        await db.commit()
+    started = asyncio.Event()
+
+    async def split() -> str:
+        async with factory() as db, db.begin():
+            await ItemMatchingService(db).split_lines(
+                USER, suggestion.item_id, [SplitPart("English", [lines[1].id])]
+            )
+            started.set()
+            await asyncio.sleep(0.3)
+            return "ok"
+
+    async def accept() -> str:
+        await started.wait()
+        async with factory() as db, db.begin():
+            try:
+                await ItemMatchingService(db).accept_suggestion(USER, suggestion.id)
+                return "ok"
+            except ItemMatchConflictError:
+                return "conflict"
+
+    results = await asyncio.wait_for(asyncio.gather(split(), accept()), timeout=10)
+
+    assert results == ["ok", "conflict"]
+    async with factory() as db:
+        left = (
+            await db.execute(
+                select(func.count())
+                .select_from(LineItem)
+                .where(LineItem.canonical_item_id == suggestion.item_id)
+            )
+        ).scalar_one()
+        moved = await db.get(ItemMatchSuggestion, suggestion.id)
+    assert left == 1
+    assert moved.status == "pending" and moved.item_id != suggestion.item_id

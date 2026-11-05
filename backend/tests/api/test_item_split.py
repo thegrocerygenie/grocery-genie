@@ -403,3 +403,68 @@ async def test_item_list_rows_carry_their_average(
 
     assert row["observation_count"] == 3
     assert row["avg_unit_price"] == 0.74
+
+
+# --- The review's answers (2026-11-05): questions and mutes follow a split ----
+
+
+async def test_a_suggestion_moves_with_the_line_that_raised_it(client):
+    """AC 13: the pending "Same item?" question raised by a moved line goes
+    to the new item, so accepting it merges only that item's lines."""
+    cucumber = (await _manual(client, "2026-03-01", ("Cucumber", 1.0)))["items"][0]
+    raised = (await _manual(client, "2026-03-02", ("CUCUMBERS ENG", 2.0)))["items"][0]
+    stays = (await _manual(client, "2026-03-03", ("CUCUMBERS ENG", 2.1)))["items"][0]
+    original = raised["canonical_item_id"]
+    assert stays["canonical_item_id"] == original
+    [suggestion] = (await client.get(f"/api/items/{original}")).json()["suggestions"]
+
+    resp = await _split(client, original, ("English cucumber", [raised["id"]]))
+
+    assert resp.status_code == 201, resp.text
+    [new_item] = resp.json()["items"]
+    assert [s["id"] for s in new_item["suggestions"]] == [suggestion["id"]]
+    assert new_item["suggestions"][0]["receipt_line"]["date"] == "2026-03-02"
+    assert (await client.get(f"/api/items/{original}")).json()["suggestions"] == []
+    accepted = await client.post(f"/api/items/suggestions/{suggestion['id']}/accept")
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["id"] == cucumber["canonical_item_id"]
+    assert accepted.json()["observation_count"] == 2
+    assert (await client.get(f"/api/items/{original}")).json()["observation_count"] == 1
+
+
+async def test_a_suggestion_whose_line_stayed_stays(client):
+    """AC 13: a line left on the original keeps its question there."""
+    await _manual(client, "2026-03-01", ("Cucumber", 1.0))
+    raised = (await _manual(client, "2026-03-02", ("CUCUMBERS ENG", 2.0)))["items"][0]
+    moved = (await _manual(client, "2026-03-03", ("CUCUMBERS ENG", 2.1)))["items"][0]
+    original = raised["canonical_item_id"]
+
+    resp = await _split(client, original, ("Other", [moved["id"]]))
+
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["items"][0]["suggestions"] == []
+    assert len((await client.get(f"/api/items/{original}")).json()["suggestions"]) == 1
+
+
+async def test_new_items_keep_the_originals_alert_mute(client, everyone_premium):
+    """AC 13 (the user's answer): the new items of a muted item are muted
+    too; an unmuted item's are not."""
+    item_id, line_ids = await _olive_oil(client)
+    await _manual(client, "2026-03-22", ("Paprika", 3.0))
+    await _manual(client, "2026-03-23", ("Paprika", 3.1))
+    paprika = await _item_of(client, "Paprika")
+    assert (await client.post(f"/api/items/{item_id}/mute")).status_code == 204
+
+    muted = await _split(client, item_id, ("Olive oil 3L", [line_ids[2]]))
+    p_lines = (await client.get(f"/api/items/{paprika}/prices")).json()["observations"]
+    plain = await _split(client, paprika, ("Smoked", [p_lines[1]["line_item_id"]]))
+
+    assert muted.status_code == 201, muted.text
+    assert muted.json()["items"][0]["alerts_muted"] is True
+    assert (await client.get(f"/api/items/{item_id}")).json()["alerts_muted"] is True
+    assert plain.json()["items"][0]["alerts_muted"] is False
+    settings = (await client.get("/api/items/price-alert-settings")).json()
+    assert {i["canonical_name"] for i in settings["muted_items"]} == {
+        "OLIVE OIL",
+        "Olive oil 3L",
+    }

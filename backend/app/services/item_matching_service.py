@@ -648,7 +648,9 @@ class ItemMatchingService:
         its receipt name has other lines. A name whose lines all went to one
         new item goes with them, and so do its lines on deleted receipts, so
         a restore and later scans follow it; a name with lines on both sides,
-        or across two new items, stays. The original keeps at least one line
+        or across two new items, stays. The item's pending questions go with
+        the line that raised them (_move_raised_suggestions), and a muted
+        item's new items are muted too. The original keeps at least one line
         (ItemMatchConflictError: 409); a line that is not the item's, or one
         named twice, is SplitLineError (422).
 
@@ -725,11 +727,15 @@ class ItemMatchingService:
                     destination[line_item.id] = target
 
         lines = {**visible, **{li.id: li for li in hidden}}
+        await self._move_raised_suggestions(item.id, lines, destination)
         for line_id, target in destination.items():
             line_item = lines[line_id]
             line_item.canonical_item_id = target
-            line_item.match_method = MATCH_MANUAL
-            line_item.match_confidence = 1.0
+            # The line matching made the item from keeps "new": it is the
+            # line its question shows (suggestion_line) and was raised by.
+            if line_item.match_method != MATCH_NEW:
+                line_item.match_method = MATCH_MANUAL
+                line_item.match_confidence = 1.0
         # Each moved line takes its price along: the observation is the
         # line's (one per line), so nothing is lost or counted twice.
         for target in {*destination.values()}:
@@ -742,11 +748,52 @@ class ItemMatchingService:
                 )
                 .values(canonical_item_id=target)
             )
+        # A muted item's new items stay muted (the user's answer, 2026-11-05).
+        if await self.db.scalar(
+            select(PriceAlertItemMute.id).where(
+                PriceAlertItemMute.user_id == user_id,
+                PriceAlertItemMute.canonical_item_id == item.id,
+            )
+        ):
+            for new_item in new_items:
+                self.db.add(
+                    PriceAlertItemMute(user_id=user_id, canonical_item_id=new_item.id)
+                )
         await self.db.flush()
         await self.db.refresh(item, ["aliases"])
         for new_item in new_items:
             await self.db.refresh(new_item, ["aliases"])
         return new_items
+
+    async def _move_raised_suggestions(
+        self,
+        item_id: uuid.UUID,
+        lines: dict[uuid.UUID, LineItem],
+        destination: dict[uuid.UUID, uuid.UUID],
+    ) -> None:
+        """The item's pending questions go with the line that raised them:
+        the line matching made the item from (MATCH_NEW). When it moved, and
+        no such line stays, they belong to its new item, so accepting one
+        merges only that item's lines. A question the new item already has,
+        or one that would pair it with itself, is dropped. Suggestion rows
+        are written after the item lock (DA-5 lock order)."""
+        raisers = [li for li in lines.values() if li.match_method == MATCH_NEW]
+        targets = {destination.get(li.id) for li in raisers}
+        if len(targets) != 1 or None in targets:
+            return
+        target = targets.pop()
+        rows = await self.db.execute(
+            select(ItemMatchSuggestion).where(
+                ItemMatchSuggestion.item_id == item_id,
+                ItemMatchSuggestion.status == "pending",
+            )
+        )
+        for suggestion in rows.scalars().all():
+            if suggestion.suggested_item_id == target:
+                await self.db.delete(suggestion)
+            else:
+                suggestion.item_id = target
+        await self.db.flush()
 
     async def link_candidates(
         self, user_id: uuid.UUID, item: CanonicalItem, candidates: list[uuid.UUID]
