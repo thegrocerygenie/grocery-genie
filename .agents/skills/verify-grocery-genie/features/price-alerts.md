@@ -8,6 +8,7 @@ Confirming a receipt compares each price with the item's 30-day rolling average 
 - `pa.copy` (DA-4): a rise reads "Milk up 10%" / "Milk at FreshCo: was $4.00 avg, now $4.40"; a drop "Eggs down 20%" / "... now $2.40 · stock-up worth it"; `data` carries the row's parts and `recent_prices` oldest first.
 - `pa.list` (DA-4): `GET /api/notifications?type=price_change&order=newest` holds only price alerts, newest first, with `total` filtered; `order=bogus` is 422; another user's list is empty and their cooldown is still the default.
 - `pa.user-cooldown` (DA-4): with `cooldown_days` 1, an item alerted 2 days ago alerts again; with 30, it does not.
+- `pa.list-merge` (DA-4, EC-PI 11): after `POST /api/items/{milk}/merge` into Eggs, every listed alert's `data.canonical_item_id` is the surviving item.
 - `pa.alert`: a third price 10% above the average of two earlier ones sends one alert; its body names item, store, `$4.00` average, `$4.40` new price, `up 10%`; a `price_alerts_sent` row records it.
 - `pa.cooldown`: a further change for the same item within 7 days sends nothing.
 - `pa.threshold`: with the threshold at 25, a 20% change sends nothing and a 40% change alerts.
@@ -81,6 +82,9 @@ $G api PUT /api/items/price-alert-settings '{"cooldown_days":30}' > /dev/null
 $G sql "UPDATE price_alerts_sent SET alerted_at = alerted_at - interval '2 days'"
 milk 2026-11-05 6.50 Milk                                                    # cooldown 30: none (still 3)
 $G api GET '/api/notifications?order=bogus'                                  # 422
+# pa.list-merge: merge the Milk item (from the list's data) into the Eggs item, then every alert's item id is Eggs'
+$G api POST /api/items/<milk id>/merge '{"into_item_id":"<eggs id>"}'   # both ids from the list's data above
+$G api GET '/api/notifications?type=price_change&order=newest' | jq -c '[.items[] | (.data|fromjson|.canonical_item_id)] | unique'   # one id
 $G signup da4-other
 $G api GET '/api/notifications?type=price_change&order=newest' | jq .total   # 0
 $G signup other
@@ -99,4 +103,4 @@ $G api DELETE /api/stores/$store/mute                                        # 2
 - Pushes go through the existing pipeline (`deliver_pending_pushes`), which needs a Celery worker and an Expo token; the journey checks the notification rows. `backend/tests/tasks/test_push_tasks.py::test_a_price_change_push_opens_its_item` covers the push payload.
 - Verified 2026-11-03 against Postgres 16 (run `20261103-181419`, after the unmute fix); `pa.app-tap` and `pa.app-settings` with the app's calls in run `20261103-183706`.
 - Run in full as Premium users (`$G premium`, decision D8) on 2026-11-04: run `20261104-231631`.
-- `pa.copy`, `pa.list` and `pa.user-cooldown` verified 2026-11-05 (DA-4): run `20261105-153233`.
+- `pa.copy`, `pa.list` and `pa.user-cooldown` verified 2026-11-05 (DA-4): run `20261105-153233`; with `pa.list-merge` after the review fix: run `20261105-161842`.
