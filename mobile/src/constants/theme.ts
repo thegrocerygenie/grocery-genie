@@ -68,6 +68,13 @@ export const colors = {
   onIconSquare: pair('#FFFFFF', '#FFFFFF'),
   /** systemRed at 40% — the border of a field with an error. */
   redBorder: pair('rgba(255,59,48,0.40)', 'rgba(255,69,58,0.50)'),
+  /**
+   * Red and green for small text on a card: systemRed and systemGreen fall
+   * under 4.5:1 on white (3.6 and 2.2), these reach 5.4 (and 6.0, 9.2 on
+   * the dark card).
+   */
+  redText: pair('#D70015', '#FF6961'),
+  greenText: pair('#1E7A36', '#30DB5B'),
   /** systemBlue at 8% (16% in dark) — tip cards. */
   blueBg: pair('rgba(0,122,255,0.08)', 'rgba(10,132,255,0.16)'),
   /** Action sheet cards: near-opaque white, or the dark elevated gray. */

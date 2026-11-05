@@ -166,14 +166,14 @@ Setup for this section:
 **Device-check bug rechecks (`.planning/DEVICE-CHECK-2026-11-03.md`):**
 - [ ] **BUG-1.** At AX1 and AX5, Trend's bar amounts stay clear of the summary above the chart.
 - [ ] **BUG-2.** At AX5, the month-over-month change wraps under the total, on the SE.
-- [ ] **BUG-3.** At AX5 on the SE, the Prices list and item detail keep names and prices readable; "$4.79" stays on one line.
-- [ ] **BUG-5.** The "Prices" large title is drawn.
+- [ ] **BUG-3.** At AX5 on the SE, the Items list and item detail keep names and prices readable; "$4.79" stays on one line.
+- [ ] **BUG-5.** The "Items" large title is drawn.
 - [ ] **BUG-6.** A price alert tapped from a cold start opens the item with Back to Budget (also above).
 - [ ] **BUG-8.** With VoiceOver on the 12-month Trend, swiping reads the bars in month order.
 - [ ] **BUG-9.** At AX5 on the SE, the 12 month letters stay readable and apart.
 
 **Accessibility on each new screen:**
-- [ ] **VoiceOver** reads, in a logical order: Prices, item detail (chart summary, mute switches, Compare stores), Review Matches, Combine, Settings → Alerts (threshold, muted rows), Settings → Categories, Export data, Budget settings (rollover switches), the paywall, Settings → Premium, and Settings → Stores (merge, unmerge, the store picker). Every control reads as a button or switch with its label and state. (13 Accessibility)
+- [ ] **VoiceOver** reads, in a logical order: Items, item detail (chart summary, mute switches, Compare stores), Review Matches, Combine, Settings → Alerts (threshold, muted rows), Settings → Categories, Export data, Budget settings (rollover switches), the paywall, Settings → Premium, and Settings → Stores (merge, unmerge, the store picker). Every control reads as a button or switch with its label and state. (13 Accessibility)
 - [ ] **Dark mode** on each of those screens: text and charts keep their contrast, and nothing is drawn black on black. (13 Accessibility)
 
 ## After the session

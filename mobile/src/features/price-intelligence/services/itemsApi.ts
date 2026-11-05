@@ -19,6 +19,7 @@ export async function getItem(id: string): Promise<ItemDetail> {
   return apiClient<ItemDetail>(`/api/items/${id}`);
 }
 
+/** PI-01: every price; item detail's range control filters it (AC 5). */
 export async function getPriceHistory(id: string): Promise<PriceHistory> {
   return apiClient<PriceHistory>(`/api/items/${id}/prices`);
 }

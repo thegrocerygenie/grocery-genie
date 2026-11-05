@@ -1,6 +1,11 @@
+import type { PriceRange } from './utils/priceTrend';
+
 /** User-facing text for price history and item matching (PI-01, PI-02). */
 export const PRICES_COPY = {
-  listTitle: 'Prices',
+  listTitle: 'Items',
+  // The Budget dashboard's row that opens the list.
+  dashboardEntry: 'Items',
+  dashboardEntryHint: 'What you paid for each item over time',
   searchPlaceholder: 'Search items',
   emptyTitle: 'No prices yet',
   emptyBody: 'Confirm a receipt and every item on it starts a price history.',
@@ -14,18 +19,34 @@ export const PRICES_COPY = {
   matchesBannerHint: 'Opens the list of items that may be the same product',
 
   // Item detail's Back label names the screen it returns to (itemBackTitle).
-  detailBack: 'Prices',
+  detailBack: 'Items',
   backReceipt: 'Receipt',
   backBudget: 'Budget',
   backHistory: 'History',
   backScan: 'Scan',
-  latest: 'Latest price',
-  since: (percent: string, date: string) => `${percent} since ${date}`,
-  noChange: (date: string) => `Same as ${date}`,
-  timelineHeader: 'Price history',
+  backPriceAlerts: 'Price alerts',
+  // PI-01 AC 7: the headline, the 30-day average and its change.
+  average30: 'Avg · 30d',
+  asOf: (date: string) => `as of ${date}`,
+  average30Label: (price: string, change: string | null) =>
+    `Average over 30 days, ${price}${change ? `, ${change} on the 30 days before` : ''}`,
+  latestLine: (price: string, store: string, date: string) =>
+    `Latest ${price} · ${store} · ${date}`,
+  // PI-01 AC 5, 6: the chart's range control.
+  rangeLabels: {
+    '1M': '1 month',
+    '3M': '3 months',
+    '6M': '6 months',
+    '1Y': '1 year',
+    All: 'All prices',
+  } satisfies Record<PriceRange, string>,
+  rangeControlLabel: 'Chart range',
+  rangeTooFew: 'Not enough prices in this range',
+  showAll: 'Show All',
+  showAllLabel: 'Show all prices',
   needMorePrices: (min: number) =>
     `Buy it again to see its price trend. A trend needs ${min} prices.`,
-  pricesHeader: (count: number) => `Prices · ${count}`,
+  pricesHeader: (count: number) => `Purchases · ${count}`,
   otherUnit: 'Not in chart: another unit',
   unknownStore: 'Unknown store',
   namesHeader: 'Names on receipts',
@@ -37,7 +58,7 @@ export const PRICES_COPY = {
   splitConfirmBody: 'It becomes its own item, with its own prices.',
   rename: 'Rename',
   renamePrompt: 'Rename item',
-  renameBody: 'The name shown in Prices. Receipts keep their own names.',
+  renameBody: 'The name shown in Items. Receipts keep their own names.',
   combine: 'Combine with Another Item…',
   combineHint: 'Choose an item that is the same product',
   cancel: 'Cancel',

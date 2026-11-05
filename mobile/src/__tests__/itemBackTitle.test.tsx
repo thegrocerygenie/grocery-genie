@@ -1,5 +1,5 @@
 /**
- * Item detail's Back button names the screen it returns to. It said "Prices"
+ * Item detail's Back button names the screen it returns to. It said "Prices" (now "Items")
  * everywhere, but an item opens from a receipt line, and from a price alert
  * or link straight over the tabs (device check 2026-11-03).
  */
@@ -93,7 +93,7 @@ function launch(initialUrl: string) {
         >
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="items/index" options={{ title: 'Prices' }} />
+            <Stack.Screen name="items/index" options={{ title: 'Items' }} />
             <Stack.Screen name="receipt/[id]" options={{ title: 'Receipt' }} />
           </Stack>
         </QueryClientProvider>
@@ -121,7 +121,7 @@ async function openItemFrom(path: string | null) {
 describe('item detail Back label', () => {
   it('says Prices when the item opened from the Prices list', async () => {
     launch('/');
-    expect((await openItemFrom('/items')).backTitle).toBe('Prices');
+    expect((await openItemFrom('/items')).backTitle).toBe('Items');
   });
 
   it('says Receipt when the item opened from a receipt line', async () => {
