@@ -473,7 +473,7 @@ Pending suggestions, newest first:
 `?receipt_id=<uuid>`: only the suggestions that receipt's lines raised (a line there made the new item the suggestion asks about), for the prompt after a confirm (PI-02 AC 7). A later receipt that repeats the name links to that item by its alias and raises nothing. 404 for an unknown, deleted or another user's receipt; `[]` for a receipt that raised none. The confirm matches its lines inline, so its suggestions are there once the confirm answers.
 
 ### POST /api/items/suggestions/{id}/accept
-Same product: merges `item` into `suggested_item` and returns it. 409 when already resolved; 404 once accepted (the merge drops the suggestion). The prompt treats both as resolved elsewhere and moves on (PI-02 AC 9).
+Same product: merges `item` into `suggested_item` and returns it. 409 when already resolved; 404 once accepted (the merge drops the suggestion). Accept and reject lock the suggestion (accept locks its two items first, in id order, as a merge does), so of two answers at once the second waits and gets 409. The prompt treats both as resolved elsewhere and moves on (PI-02 AC 9).
 
 ### POST /api/items/suggestions/{id}/reject
 204. Different products: both items stay.

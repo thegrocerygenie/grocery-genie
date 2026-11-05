@@ -321,7 +321,7 @@ describe('Item names and combining (PI-02 AC 3)', () => {
 });
 
 describe('Possible matches (PI-02 AC 2)', () => {
-  it('asks on the item and merges when the user says Same Item', async () => {
+  it('asks on the item and merges when the user says Yes, merge', async () => {
     mockApi.getItem.mockResolvedValue(
       detail({ id: 'i-2', canonical_name: 'ORG BANANAS', suggestions: [suggestion] }),
     );
@@ -341,7 +341,7 @@ describe('Possible matches (PI-02 AC 2)', () => {
     await waitFor(() => expect(routerScreen.getPathname()).toBe('/items/i-1'));
   });
 
-  it('keeps them apart when the user says Different', async () => {
+  it('keeps them apart when the user says Keep as separate item', async () => {
     mockApi.listSuggestions.mockResolvedValue([suggestion]);
     mockApi.rejectSuggestion.mockResolvedValue(undefined);
     open('/items/matches');

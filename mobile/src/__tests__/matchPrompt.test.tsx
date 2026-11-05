@@ -12,6 +12,7 @@ import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testi
 import MatchPromptScreen from '../../app/items/match';
 import MatchesScreen from '../../app/items/matches';
 import ItemDetailScreen from '../../app/items/[id]';
+import ManualEntryScreen from '../../app/manual-entry';
 import ReviewScreen from '../../app/review';
 import { promptMatchesAfterConfirm } from '@/features/price-intelligence/services/postConfirmMatches';
 import type { ItemDetail, ItemSuggestion } from '@/features/price-intelligence/types';
@@ -19,6 +20,7 @@ import type { ReceiptScanResponse } from '@/features/receipt-capture/types';
 import { ApiError } from '@/services/api';
 import { useMatchPromptStore } from '@/store/matchPromptStore';
 import { useReceiptStore } from '@/store/receiptStore';
+import * as Haptics from 'expo-haptics';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('expo-haptics', () => ({
@@ -44,8 +46,11 @@ const mockConfirm = jest.fn<void, [unknown, ConfirmOptions]>();
 jest.mock('@/features/receipt-capture/hooks/useReceiptReview', () => ({
   useReceiptConfirm: () => ({ mutate: mockConfirm, isPending: false }),
 }));
+const mockGetReceipt = jest.fn();
+const mockCreateManual = jest.fn();
 jest.mock('@/features/receipt-capture/services/receiptApi', () => ({
-  getReceipt: jest.fn(),
+  getReceipt: (...a: unknown[]) => mockGetReceipt(...a),
+  createManualReceipt: (...a: unknown[]) => mockCreateManual(...a),
 }));
 
 const mockApi = {
@@ -155,6 +160,7 @@ function open(path: string) {
           {/* As app/_layout.tsx: modals, whose headers hold Save, Cancel and Skip. */}
           <Stack>
             <Stack.Screen name="review" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="manual-entry" options={{ presentation: 'modal' }} />
             <Stack.Screen name="items/match" options={{ presentation: 'fullScreenModal' }} />
           </Stack>
         </QueryClientProvider>
@@ -165,6 +171,7 @@ function open(path: string) {
       'items/[id]': ItemDetailScreen,
       'items/matches': MatchesScreen,
       'items/match': MatchPromptScreen,
+      'manual-entry': ManualEntryScreen,
     },
     { initialUrl: '/' },
   );
@@ -211,7 +218,7 @@ describe('What the prompt shows (PI-02 AC 5)', () => {
       screen.getByText('We think these are the same product. Confirm to merge price history.'),
     ).toBeTruthy();
     expect(screen.getByText('From your receipt')).toBeTruthy();
-    expect(screen.getByText('Costco · Mar 19, 2026')).toBeTruthy();
+    expect(screen.getByText('Costco · Mar 19')).toBeTruthy();
     expect(screen.getByTestId('match-percent').props.children).toBe('72% match');
     expect(screen.getByText('Existing item')).toBeTruthy();
     expect(screen.getByText('Chicken breast, boneless')).toBeTruthy();
@@ -222,6 +229,13 @@ describe('What the prompt shows (PI-02 AC 5)', () => {
     expect(screen.getByText('Keep as separate item')).toBeTruthy();
     expect(screen.getByLabelText('Skip, decide later')).toBeTruthy();
     expect(screen.getByLabelText('Cancel, decide later')).toBeTruthy();
+  });
+
+  it('dates a line from another year with its year', async () => {
+    mockToday.mockReturnValue(new Date(2027, 0, 5));
+    open('/items/match');
+
+    expect(await screen.findByText('Costco · Mar 19, 2026')).toBeTruthy();
   });
 
   it('heads a line from a receipt dated today as from today’s receipt', async () => {
@@ -235,7 +249,7 @@ describe('What the prompt shows (PI-02 AC 5)', () => {
     open('/items/match');
 
     expect(
-      await screen.findByLabelText('From your receipt, BNLS CHKN BRST 2LB, Costco · Mar 19, 2026'),
+      await screen.findByLabelText('From your receipt, BNLS CHKN BRST 2LB, Costco · Mar 19'),
     ).toBeTruthy();
     expect(
       screen.getByLabelText(
@@ -362,6 +376,42 @@ describe('Where the prompt opens (PI-02 AC 7)', () => {
     expect(mockApi.listReceiptSuggestions).toHaveBeenCalledWith('r-1');
   });
 
+  it('opens after a manual entry is saved, for that receipt', async () => {
+    mockCreateManual.mockResolvedValue({ id: 'r-9' });
+    const routerScreen = open('/manual-entry');
+
+    fireEvent.changeText(await screen.findByLabelText('Store name'), 'Costco');
+    fireEvent.press(screen.getByLabelText('Add line item'));
+    fireEvent.changeText(screen.getByLabelText('Item 1 name'), 'BNLS CHKN BRST 2LB');
+    fireEvent.changeText(screen.getByLabelText('Item 1 price'), '17.98');
+    await act(async () => fireEvent.press(screen.getByText('Save')));
+
+    await waitFor(() => expect(routerScreen.getPathname()).toBe('/items/match'));
+    expect(mockApi.listReceiptSuggestions).toHaveBeenCalledWith('r-9');
+  });
+
+  it('does not open again when a confirmed receipt is edited', async () => {
+    mockGetReceipt.mockResolvedValue({
+      ...scan.extraction,
+      id: 'r-1',
+      user_id: 'u-1',
+      subtotal: 17.98,
+      image_url: null,
+      extraction_confidence: 0.95,
+      status: 'confirmed',
+      created_at: null,
+      items: scan.extraction.items.map((i) => ({ ...i, receipt_id: 'r-1' })),
+    });
+    mockConfirm.mockImplementation((_vars, options) => options.onSuccess?.());
+    open('/review?receiptId=r-1&edit=1');
+
+    await screen.findByLabelText(/^Category, /);
+    fireEvent.press(screen.getByLabelText('Save'));
+
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalled());
+    expect(mockApi.listReceiptSuggestions).not.toHaveBeenCalled();
+  });
+
   it('does not open for a receipt that raised no suggestion', async () => {
     mockApi.listReceiptSuggestions.mockResolvedValue([]);
     const push = jest.spyOn(router, 'push');
@@ -398,6 +448,37 @@ describe('Where the prompt opens (PI-02 AC 7)', () => {
 });
 
 describe('Resolved elsewhere and failed saves (PI-02 AC 9)', () => {
+  it('passes over a suggestion merged away elsewhere (404) without an error', async () => {
+    mockApi.rejectSuggestion.mockRejectedValue(new ApiError(404, { detail: 'gone' }));
+    open('/items/match');
+
+    fireEvent.press(await screen.findByLabelText('Keep BNLS CHKN BRST 2LB as a separate item'));
+
+    expect(await screen.findByText('ORG BNNA')).toBeTruthy();
+    expect(screen.queryByText(/didn’t save/)).toBeNull();
+  });
+
+  it('saves a double-tapped Yes, merge once and still moves on', async () => {
+    let resolve: (d: ItemDetail) => void = () => {};
+    mockApi.acceptSuggestion.mockReturnValue(
+      new Promise<ItemDetail>((r) => {
+        resolve = r;
+      }),
+    );
+    open('/items/match');
+
+    const merge = await screen.findByLabelText(
+      'Yes, merge BNLS CHKN BRST 2LB into Chicken breast, boneless',
+    );
+    fireEvent.press(merge);
+    fireEvent.press(merge);
+    await act(async () => resolve(itemDetail({ id: 'i-1' })));
+
+    expect(await screen.findByText('ORG BNNA')).toBeTruthy();
+    expect(mockApi.acceptSuggestion).toHaveBeenCalledTimes(1);
+    expect(Haptics.notificationAsync).toHaveBeenCalledTimes(1);
+  });
+
   it('passes over a suggestion already resolved (409) without an error', async () => {
     mockApi.acceptSuggestion.mockRejectedValue(new ApiError(409, { detail: 'already' }));
     open('/items/match');

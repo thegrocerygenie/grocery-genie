@@ -177,3 +177,83 @@ async def test_counts_and_average_are_the_callers_own(
     assert suggestion["suggested_item_stats"]["purchase_count"] == 2
     assert suggestion["suggested_item_stats"]["store_count"] == 2
     assert suggestion["suggested_item_stats"]["avg_unit_price"] == 1.25
+
+
+async def test_the_average_is_like_for_like(client, mock_extractor, test_image_bytes):
+    """PI-02 AC 5: "Avg unit price $X / unit" averages only the prices in the
+    unit most of them are in; a price per each never mixes into a per-lb one."""
+    image = test_image_bytes
+    for store, day, unit_price, unit in [
+        ("FreshCo", "2026-03-01", 2.0, "lb"),
+        ("Metro", "2026-03-02", 3.0, "lb"),
+        ("Metro", "2026-03-03", 10.0, "ea"),
+    ]:
+        await _scan_and_confirm(
+            client, mock_extractor, image, store, day, ("Cucumber", 1, unit_price, unit)
+        )
+    await _scan_and_confirm(
+        client, mock_extractor, image, "FreshCo", "2026-03-08", ("CUCUMBERS ENG", 1, 1)
+    )
+
+    [suggestion] = (await client.get("/api/items/suggestions")).json()
+
+    assert suggestion["suggested_item_stats"] == {
+        "purchase_count": 3,
+        "store_count": 2,
+        "avg_unit_price": 2.5,
+        "unit_of_measure": "lb",
+        "currency": "USD",
+    }
+
+
+async def test_the_line_shown_is_the_one_that_raised_it(
+    client, mock_extractor, test_image_bytes, db_session
+):
+    """PI-02 AC 5: the prompt shows the line matching made the item from,
+    not a later receipt's repeat of the name, and never a line on a receipt
+    the user has not confirmed."""
+    from datetime import date
+
+    from app.models.database import LineItem, Receipt
+
+    asking = await _cucumbers(client, mock_extractor, test_image_bytes)
+    await _scan_and_confirm(
+        client,
+        mock_extractor,
+        test_image_bytes,
+        "Metro",
+        "2026-03-20",
+        ("CUCUMBERS ENG", 1, 1.35),
+    )
+    [suggestion] = (await client.get("/api/items/suggestions")).json()
+    pending = Receipt(
+        user_id=DEV_USER_ID,
+        date=date(2026, 3, 25),
+        status="pending_review",
+        currency="USD",
+        store_name="Pending Mart",
+    )
+    db_session.add(pending)
+    await db_session.flush()
+    db_session.add(
+        LineItem(
+            receipt_id=pending.id,
+            raw_name="CUCUMBER PENDING",
+            position=0,
+            quantity=1,
+            unit_price=1.0,
+            total_price=1.0,
+            canonical_item_id=uuid.UUID(suggestion["item"]["id"]),
+            match_method="new",
+        )
+    )
+    await db_session.flush()
+
+    [suggestion] = (await client.get("/api/items/suggestions")).json()
+
+    assert suggestion["receipt_line"] == {
+        "receipt_id": asking["id"],
+        "name": "CUCUMBERS ENG",
+        "store_name": "FreshCo",
+        "date": "2026-03-08",
+    }

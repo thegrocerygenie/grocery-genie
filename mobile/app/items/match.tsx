@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -99,9 +99,19 @@ export default function MatchPromptScreen() {
 
   const current = queue?.[index];
 
+  // Set on the tap itself: isPending disables the buttons only after a
+  // render, and a second mutate before then would drop the first one's
+  // callbacks (its haptic, the next suggestion, the redirect).
+  const saving = useRef(false);
+  const release = () => {
+    saving.current = false;
+  };
+
   const onMerge = () => {
-    if (!current) return;
+    if (!current || saving.current) return;
+    saving.current = true;
     accept.mutate(current.id, {
+      onSettled: release,
       onSuccess: (merged) => {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         // From item detail, the item on screen merged away: open the result.
@@ -115,8 +125,10 @@ export default function MatchPromptScreen() {
   };
 
   const onKeep = () => {
-    if (!current) return;
+    if (!current || saving.current) return;
+    saving.current = true;
     reject.mutate(current.id, {
+      onSettled: release,
       onSuccess: () => advance(),
       onError: (error) => (alreadyResolved(error) ? advance() : setFailed(true)),
     });
@@ -238,17 +250,25 @@ export default function MatchPromptScreen() {
   );
 }
 
+/** As the design: "Apr 19" this year, "Apr 19, 2025" another year. */
+function promptDate(iso: string, now: Date): string {
+  const long = formatLongDate(iso);
+  const thisYear = `, ${now.getFullYear()}`;
+  return long.endsWith(thisYear) ? long.slice(0, -thisYear.length) : long;
+}
+
 /** PI-02 AC 5: the receipt line, the match percent, and the existing item. */
 function MatchCards({ suggestion }: { suggestion: ItemSuggestion }) {
   const line = suggestion.receipt_line;
   const stats = suggestion.suggested_item_stats;
   const lineName = line?.name ?? suggestion.item.canonical_name;
+  const now = today();
   const heading =
-    line && line.date === toIsoDate(today())
+    line && line.date === toIsoDate(now)
       ? PRICES_COPY.matchFromToday
       : PRICES_COPY.matchFromReceipt;
   const where = line
-    ? [line.store_name, formatLongDate(line.date)].filter(Boolean).join(' · ')
+    ? [line.store_name, promptDate(line.date, now)].filter(Boolean).join(' · ')
     : null;
   const percent = PRICES_COPY.matchPercent(suggestion.confidence);
   const counts = stats ? PRICES_COPY.matchCounts(stats.purchase_count, stats.store_count) : null;
