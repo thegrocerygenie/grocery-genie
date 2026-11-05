@@ -285,7 +285,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "sets the price change threshold" | Pass |
 | PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "goes back to the default threshold" | Pass |
 | PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "turns price change alerts off" | Pass |
-| PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "says what size of change sends an alert, and when alerts are off" | Pass |
+| PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "sets the price change threshold" | Pass |
 | PI-04 | 1 | Side-by-side pricing across all stores with prices | Integration | `backend/tests/api/test_price_comparison.py::test_side_by_side_latest_and_average_per_store` | Pass |
 | PI-04 | 1 | Side-by-side pricing across all stores with prices | Integration | `backend/tests/api/test_price_comparison.py::test_stores_are_cheapest_first_by_average` | Pass |
 | PI-04 | 2 | Most recent and average price per store | Integration | `backend/tests/api/test_price_comparison.py::test_side_by_side_latest_and_average_per_store` | Pass |
@@ -708,11 +708,41 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-01 | 9 | Store rows lead with a coloured square, stable per store | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "leads each price row and comparison row with the store’s own colour" | Pass |
 | PI-01 | 10 | Back label names the opener; largest text size holds | Unit | `mobile/src/features/price-intelligence/__tests__/itemBackTitle.test.ts` "names the screen that opened the item: Items, Receipt, Price alerts (PI-01 AC 10)" | Pass |
 | PI-01 | 10 | Back label names the opener; largest text size holds | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "lets the range control wrap and keeps the headline price whole" | Pass |
-| PI-03 | 5 | Price alerts list: newest first, This week / Earlier, arrow, signed percent, was/now (drops add "stock-up worth it"), sparkline, tap opens item; opens from Settings → Alerts and the Budget dashboard bell (label "Price alerts") | Component | Not yet implemented (DA-4) | Pending |
-| PI-03 | 6 | Empty Price alerts list says "No price alerts yet" | Component | Not yet implemented (DA-4) | Pending |
-| PI-03 | 7 | Settings group: Threshold and Cooldown rows, footer from the user's settings | Component | Not yet implemented (DA-4) | Pending |
-| PI-03 | 8 | Cooldown user setting 1–30 days (null default, 422 otherwise), used by the alert check | Integration | Not yet implemented (DA-4) | Pending |
-| PI-03 | 9 | Alert title and body per design (a drop adds "stock-up worth it", push and in-app alike), still naming item, store, old average, new price, percent | Integration | Not yet implemented (DA-4) | Pending |
+| PI-03 | 5 | Price alerts list: This week / Earlier, newest first, arrow, signed percent, was/now, drop adds "stock-up worth it", sparkline | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "groups alerts This week and Earlier, newest first" | Pass |
+| PI-03 | 5 | Price alerts list: tapping a row opens the item | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "opens the item when a row is tapped (EC-PI 11: the id the server keeps current)" | Pass |
+| PI-03 | 5 | Price alerts list opens from the Budget dashboard bell (label "Price alerts") | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "opens from the bell on the Budget dashboard" | Pass |
+| PI-03 | 5 | Price alerts list opens from Settings → Alerts | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "opens from Settings → Alerts" | Pass |
+| PI-03 | 5 | Price alerts list: a failed load says so and retries | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "says so and offers a retry when the list fails to load" | Pass |
+| PI-03 | 5 | Price alerts row: a rise from the alert data | Unit | `mobile/src/features/price-intelligence/utils/priceAlertRows.test.ts` "reads a rise from the alert data" | Pass |
+| PI-03 | 5 | Price alerts row: a drop shows was/now with "stock-up worth it" under it | Unit | `mobile/src/features/price-intelligence/utils/priceAlertRows.test.ts` "shows a drop with was/now and stock-up worth it under it" | Pass |
+| PI-03 | 5 | Price alerts row: an alert sent before DA-4 shows its title and body | Unit | `mobile/src/features/price-intelligence/utils/priceAlertRows.test.ts` "falls back to the title and body of an alert sent before the list" | Pass |
+| PI-03 | 5 | Price alerts row: a malformed item id never becomes a route | Unit | `mobile/src/features/price-intelligence/utils/priceAlertRows.test.ts` "never opens a malformed item id" | Pass |
+| PI-03 | 5 | Price alerts groups: This week (last 7 days) and Earlier | Unit | `mobile/src/features/price-intelligence/utils/priceAlertRows.test.ts` "puts the last 7 days under This week and the rest under Earlier, newest first" | Pass |
+| PI-03 | 5 | The list: only price alerts, newest first | Integration | `backend/tests/api/test_price_alert_list.py::test_the_list_holds_only_price_alerts_newest_first` | Pass |
+| PI-03 | 5 | The list: an unknown order is 422 | Integration | `backend/tests/api/test_price_alert_list.py::test_an_unknown_order_is_422` | Pass |
+| PI-03 | 5 | The list is the caller's own (two users) | Integration | `backend/tests/api/test_price_alert_list.py::test_the_list_is_the_callers_own` | Pass |
+| PI-03 | 5 | Alert data carries what a row shows | Integration | `backend/tests/api/test_price_alert_list.py::test_the_alert_data_carries_what_the_list_row_shows` | Pass |
+| PI-03 | 5 | Alert sparkline: at most the last eight prices | Integration | `backend/tests/api/test_price_alert_list.py::test_the_sparkline_holds_at_most_the_last_eight_prices` | Pass |
+| PI-03 | 6 | Empty Price alerts list says "No price alerts yet" and when one comes | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "says No price alerts yet and when one comes, from the threshold" | Pass |
+| PI-03 | 7 | Settings group: Threshold and Cooldown rows, footer from the user's settings | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "shows Threshold and Cooldown with the footer from the user’s settings" | Pass |
+| PI-03 | 7 | Settings group: the threshold is set from the list | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "sets the threshold from the list" | Pass |
+| PI-03 | 8 | Cooldown choices 1, 3, 7, 14, 30 days, saved (app) | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "offers 1, 3, 7, 14 and 30 days and saves the cooldown" | Pass |
+| PI-03 | 8 | The default cooldown is sent as null (app) | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "sends the default cooldown as null, so a later default applies" | Pass |
+| PI-03 | 8 | Cooldown starts at the default | Integration | `backend/tests/api/test_price_alert_list.py::test_the_cooldown_starts_at_the_default` | Pass |
+| PI-03 | 8 | Default cooldown is a setting | Integration | `backend/tests/api/test_price_alert_list.py::test_the_default_cooldown_is_a_setting` | Pass |
+| PI-03 | 8 | The user sets their own cooldown | Integration | `backend/tests/api/test_price_alert_list.py::test_the_user_can_set_their_own_cooldown` | Pass |
+| PI-03 | 8 | A null cooldown goes back to the default | Integration | `backend/tests/api/test_price_alert_list.py::test_a_null_cooldown_goes_back_to_the_default` | Pass |
+| PI-03 | 8 | Leaving the cooldown out keeps it | Integration | `backend/tests/api/test_price_alert_list.py::test_leaving_the_cooldown_out_keeps_it` | Pass |
+| PI-03 | 8 | Cooldown must be 1–30 days (422) | Integration | `backend/tests/api/test_price_alert_list.py::test_the_cooldown_must_be_1_to_30_days` | Pass |
+| PI-03 | 8 | The alert check uses the user's cooldown | Integration | `backend/tests/api/test_price_alert_list.py::test_the_alert_check_uses_the_users_cooldown` | Pass |
+| PI-03 | 8 | The cooldown is the caller's own (two users) | Integration | `backend/tests/api/test_price_alert_list.py::test_the_cooldown_is_the_callers_own` | Pass |
+| PI-03 | 8 | Migration: existing users keep the default; downgrade and upgrade again | Integration | `backend/tests/migrations/test_0022_price_alert_cooldown.py::test_existing_users_keep_the_default_then_downgrade_and_upgrade_again` | Pass (Postgres only) |
+| PI-03 | 9 | A rise reads "<Item> up N%" and "was $X avg, now $Y" | Integration | `backend/tests/api/test_price_alert_list.py::test_a_rise_reads_was_avg_now` | Pass |
+| PI-03 | 9 | A drop adds "stock-up worth it" | Integration | `backend/tests/api/test_price_alert_list.py::test_a_drop_adds_stock_up_worth_it` | Pass |
+| PI-03 | 9 | A counted price has no unit | Integration | `backend/tests/api/test_price_alert_list.py::test_a_counted_price_has_no_unit` | Pass |
+| PI-03 | 9 | A half-cent average rounds half up, like the sparkline | Integration | `backend/tests/api/test_price_alert_list.py::test_a_half_cent_average_rounds_half_up_like_the_sparkline` | Pass |
+| PI-03 | 9 | Still names item, store, old average, new price, percent | Integration | `backend/tests/api/test_price_alerts.py::test_the_alert_names_item_store_average_new_price_and_percent` | Pass |
+| PI-03 | 9 | The push reads the same as the in-app list | Integration | `backend/tests/tasks/test_push_tasks.py::test_a_price_change_push_opens_its_item` | Pass |
 | PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "shows the receipt line, store, date, match percent and the existing item" | Pass |
 | PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "heads a line from a receipt dated today as from today’s receipt" | Pass |
 | PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "reads each card to VoiceOver as one element" | Pass |
@@ -753,18 +783,81 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/services/test_match_concurrency.py::test_an_answer_and_a_merge_of_its_item_at_once_never_deadlock` | Pass |
 | PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/services/test_match_concurrency.py::test_accept_takes_its_item_locks_first_in_id_order` | Pass |
 | PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/api/test_items.py::test_rejecting_a_suggestion_keeps_the_items_apart` | Pass |
-| PI-02 | 10 | Split by line, including one of several lines sharing a receipt name | Component | Not yet implemented (DA-6) | Pending |
-| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Component | Not yet implemented (DA-6) | Pending |
-| PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Unit | Not yet implemented (DA-6) | Pending |
-| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | Not yet implemented (DA-6) | Pending |
-| PI-02 | 14 | POST /api/items/{id}/split: 201, 409 empty original, 422, 404 | Integration | Not yet implemented (DA-6) | Pending |
-| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Component | Not yet implemented (DA-6) | Pending |
-| PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | Not yet implemented (DA-7) | Pending |
-| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | Not yet implemented (DA-7) | Pending |
-| PI-03 | 12 | A timed mute ends by itself; nothing sent for prices during it; ended mute not listed | Integration | Not yet implemented (DA-7) | Pending |
-| PI-03 | 12 | verify-budget-alerts rechecked for the expiry in _alert_on_price_changes | Formal | Not yet implemented (DA-7) | Pending |
-| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | Not yet implemented (DA-7) | Pending |
-| PI-03 | 14 | Settings lists mutes with Until/Forever; failed unmute keeps the row and says so | Component | Not yet implemented (DA-7) | Pending |
+| PI-02 | 10 | Split by line, including one of several lines sharing a receipt name | Component | `mobile/src/__tests__/itemSplit.test.tsx` "opens Split into 2 items with the original and its lines (AC 10)" | Pass |
+| PI-02 | 10 | Split by line, including one of several lines sharing a receipt name | Component | `mobile/src/__tests__/itemSplit.test.tsx` "moves one of several lines sharing a name, naming the new item from it (AC 10, 11)" | Pass |
+| PI-02 | 10 | Split by line, including one of several lines sharing a receipt name | Integration | `backend/tests/api/test_item_split.py::test_prices_name_their_line` | Pass |
+| PI-02 | 10 | Split by line, including one of several lines sharing a receipt name | Integration | `backend/tests/api/test_item_split.py::test_one_of_several_lines_sharing_a_name_moves_with_its_price` | Pass |
+| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Component | `mobile/src/__tests__/itemSplit.test.tsx` "moves one of several lines sharing a name, naming the new item from it (AC 10, 11)" | Pass |
+| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Component | `mobile/src/__tests__/itemSplit.test.tsx` "enables Save once the new item has a name and a line and the original keeps one (AC 11)" | Pass |
+| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Component | `mobile/src/__tests__/itemSplit.test.tsx` "Add another split makes it Split into 3 items and lines pick their item (AC 11)" | Pass |
+| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Unit | `mobile/src/features/price-intelligence/utils/split.test.ts` "counts purchases and averages the like-for-like prices" | Pass |
+| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Unit | `mobile/src/features/price-intelligence/utils/split.test.ts` "needs every new item named, with a line, and the original keeping one" | Pass |
+| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Integration | `backend/tests/api/test_item_split.py::test_split_into_several_new_items` | Pass |
+| PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Unit | `mobile/src/features/price-intelligence/utils/split.test.ts` "warns when the highest is at least 1.5 times the lowest" | Pass |
+| PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Unit | `mobile/src/features/price-intelligence/utils/split.test.ts` "stays quiet below 1.5 times" | Pass |
+| PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Unit | `mobile/src/features/price-intelligence/utils/split.test.ts` "compares like for like only, and needs two prices" | Pass |
+| PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Component | `mobile/src/__tests__/itemSplit.test.tsx` "warns on item detail and the split screen at 1.5 times or more" | Pass |
+| PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Component | `mobile/src/__tests__/itemSplit.test.tsx` "says nothing when the prices are close" | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Component | `mobile/src/__tests__/itemSplit.test.tsx` "saves the splits and opens the first new item (AC 13)" | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/api/test_item_split.py::test_one_of_several_lines_sharing_a_name_moves_with_its_price` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/api/test_item_split.py::test_a_name_whose_lines_all_move_goes_with_them` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/api/test_item_split.py::test_a_name_split_across_two_new_items_stays_with_the_original` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/api/test_item_split.py::test_lines_of_a_deleted_receipt_go_with_their_name` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_split_concurrency.py::test_a_split_and_a_merge_of_its_item_at_once` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_split_concurrency.py::test_split_takes_its_item_lock_before_any_line` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_split_concurrency.py::test_a_split_and_an_accept_of_its_item_at_once` | Pass |
+| PI-02 | 13 | A pending question goes with the line that raised it | Integration | `backend/tests/api/test_item_split.py::test_a_suggestion_moves_with_the_line_that_raised_it` | Pass |
+| PI-02 | 13 | A pending question goes with the line that raised it | Integration | `backend/tests/api/test_item_split.py::test_a_suggestion_whose_line_stayed_stays` | Pass |
+| PI-02 | 13 | A pending question goes with the line that raised it | Integration | `backend/tests/services/test_split_concurrency.py::test_a_split_moving_a_question_then_its_accept` | Pass |
+| PI-02 | 13 | New items inherit the original's price-alert mute | Integration | `backend/tests/api/test_item_split.py::test_new_items_keep_the_originals_alert_mute` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Component | `mobile/src/__tests__/itemSplit.test.tsx` "opens the FIRST new item after saving several" | Pass |
+| PI-02 | 11 | At most 10 new items, as the server allows | Component | `mobile/src/__tests__/itemSplit.test.tsx` "allows at most 10 new items, as the server does" | Pass |
+| PI-02 | 14 | POST /api/items/{id}/split: 201, 409 empty original, 422, 404 | Integration | `backend/tests/api/test_item_split.py::test_the_original_must_keep_a_line` | Pass |
+| PI-02 | 14 | POST /api/items/{id}/split: 201, 409 empty original, 422, 404 | Integration | `backend/tests/api/test_item_split.py::test_bad_splits_are_422` | Pass |
+| PI-02 | 14 | POST /api/items/{id}/split: 201, 409 empty original, 422, 404 | Integration | `backend/tests/api/test_item_split.py::test_split_is_scoped_to_the_caller` | Pass |
+| PI-02 | 14 | POST /api/items/{id}/split: 201, 409 empty original, 422, 404 | Integration | `backend/tests/api/test_item_split.py::test_the_alias_split_stays_as_it_is` | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Component | `mobile/src/__tests__/itemSplit.test.tsx` "shows the intro, search, Suggested and All items with purchases and averages" | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Component | `mobile/src/__tests__/itemSplit.test.tsx` "never lists the item itself" | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Component | `mobile/src/__tests__/itemSplit.test.tsx` "searches as the user types" | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Component | `mobile/src/__tests__/itemSplit.test.tsx` "enables Link once a radio is picked, then merges and opens the result" | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Integration | `backend/tests/api/test_item_split.py::test_link_candidates_suggested_first_then_all_items` | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Integration | `backend/tests/api/test_item_split.py::test_link_candidates_rank_similar_names` | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Integration | `backend/tests/api/test_item_split.py::test_link_candidates_search` | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Integration | `backend/tests/api/test_item_split.py::test_link_candidates_are_the_callers_own` | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Integration | `backend/tests/api/test_item_split.py::test_item_list_rows_carry_their_average` | Pass |
+| PI-02 | 15 | Link asks "Merge X into Y?" before merging | Component | `mobile/src/__tests__/itemSplit.test.tsx` "enables Link once a radio is picked, then merges and opens the result" | Pass |
+| PI-02 | 15 | Link asks "Merge X into Y?" before merging | Component | `mobile/src/__tests__/itemSplit.test.tsx` "Cancel on the confirm merges nothing" | Pass |
+| PI-02 | 15 | Search waits for a pause in typing (about 300 ms) | Component | `mobile/src/__tests__/itemSplit.test.tsx` "searches as the user types" | Pass |
+| PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | `mobile/src/__tests__/timedMutes.test.tsx` "offers Forever first, then 1 week, 1 month and 3 months" | Pass |
+| PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | `mobile/src/__tests__/timedMutes.test.tsx` "turns a choice into the end time, null for Forever" | Pass |
+| PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | `mobile/src/__tests__/timedMutes.test.tsx` "Mute until changes the time of the item mute" | Pass |
+| PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | `mobile/src/__tests__/timedMutes.test.tsx` "turning a store off asks Mute until, then mutes it for that long" | Pass |
+| PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | `mobile/src/__tests__/timedMutes.test.tsx` "Forever on the store sheet mutes with no end" | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/api/test_timed_mutes.py::test_a_mute_takes_an_until_and_returns_it` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/api/test_timed_mutes.py::test_no_body_or_a_null_until_is_forever` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/api/test_timed_mutes.py::test_an_until_not_in_the_future_is_422` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/api/test_timed_mutes.py::test_muting_again_replaces_the_time` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/api/test_timed_mutes.py::test_an_until_with_an_offset_is_kept_in_utc` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/api/test_timed_mutes.py::test_a_store_mute_again_replaces_the_time_across_the_group` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/api/test_item_split.py::test_new_items_keep_the_originals_mute_time` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/migrations/test_0023_timed_mutes.py::test_existing_mutes_become_forever_then_downgrade_and_upgrade_again` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned: two users, a timed item mute is the caller's own (listings, merge, split) | Integration | `backend/tests/api/test_timed_mutes.py::test_timed_mutes_are_the_callers_own` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned: two users, a timed store mute is the caller's own | Integration | `backend/tests/api/test_timed_mutes.py::test_store_mutes_are_the_callers_own` | Pass |
+| PI-03 | 12 | A timed mute ends by itself; nothing sent for prices during it; ended mute not listed | Integration | `backend/tests/api/test_timed_mutes.py::test_a_timed_item_mute_ends_by_itself` | Pass |
+| PI-03 | 12 | A timed mute ends by itself; nothing sent for prices during it; ended mute not listed | Integration | `backend/tests/api/test_timed_mutes.py::test_a_timed_store_mute_ends_by_itself` | Pass |
+| PI-03 | 12 | A timed mute ends by itself; nothing sent for prices during it; ended mute not listed | Integration | `backend/tests/api/test_timed_mutes.py::test_muting_an_ended_mute_again_starts_a_new_one` | Pass |
+| PI-03 | 12 | verify-budget-alerts rechecked for the expiry in _alert_on_price_changes | Formal | `formal/budget_alerts/run.sh`: every config as expected; coverage record synced (DA-7) | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "reads On, Muted, or Muted until the date" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "pushes the Alerts screen, whose Back button names the item" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "no longer has the mute switches on item detail" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "lays out the item and store groups, the store note and the footer" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "every switch reads on = alerts on" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "turning the item off mutes it forever and shows Mute until under it" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "closing the store sheet leaves the store on" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "a timed store mute shows its end under the store" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "mutes and unmutes price alerts at each store the item was bought from" | Pass |
+| PI-03 | 14 | Settings lists mutes with Until/Forever; failed unmute keeps the row and says so | Component | `mobile/src/__tests__/timedMutes.test.tsx` "lists each mute with Until <date> or Forever" | Pass |
+| PI-03 | 14 | Settings lists mutes with Until/Forever; failed unmute keeps the row and says so | Component | `mobile/src/__tests__/timedMutes.test.tsx` "a failed unmute keeps the row, says so, and can be tried again" | Pass |
 | PREM-04 | 1 | Range: Last 12 months first, All time and other presets, From/To months; export holds receipts in range | Integration | `backend/tests/api/test_data_export_options.py::test_export_holds_only_receipts_dated_in_the_range` | Pass |
 | PREM-04 | 1 | Range: Last 12 months first, All time and other presets, From/To months; export holds receipts in range | Integration | `backend/tests/api/test_data_export_options.py::test_range_bounds_are_inclusive_and_open_ended` | Pass |
 | PREM-04 | 1 | Range: Last 12 months first, All time and other presets, From/To months; export holds receipts in range | Integration | `backend/tests/api/test_data_export_options.py::test_csv_export_honours_the_range` | Pass |
@@ -862,18 +955,34 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | BC-04 | 8 | Highlights: Highest, Lowest (in progress), Trend | Component | Not yet implemented (DA-10) | Pending |
 | BC-04 | 9 | Grey bars, current month tinted, VoiceOver per bar | Component | Not yet implemented (DA-10) | Pending |
 | BC-04 | 10 | Trend strings externalized | Component | Not yet implemented (DA-10) | Pending |
-| EC-PI | 4 | Timed mute expiry | Integration | Not yet implemented (DA-7) | Pending |
-| EC-PI | 5 | Lapsed Premium with existing mutes | Integration | Not yet implemented (DA-1, DA-7) | Pending |
-| EC-PI | 6 | Split with one line, or of every line | Integration | Not yet implemented (DA-6) | Pending |
+| EC-PI | 4 | Timed mute expiry | Integration | `backend/tests/api/test_timed_mutes.py::test_a_timed_item_mute_ends_by_itself` | Pass |
+| EC-PI | 4 | Timed mute expiry | Integration | `backend/tests/api/test_timed_mutes.py::test_an_until_with_an_offset_is_kept_in_utc` | Pass |
+| EC-PI | 4 | Timed mute expiry | Integration | `backend/tests/api/test_timed_mutes.py::test_an_ended_mute_can_still_be_removed` | Pass |
+| EC-PI | 4 | Timed mute expiry | Integration | `backend/tests/api/test_timed_mutes.py::test_muting_an_ended_mute_again_starts_a_new_one` | Pass |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Integration | `backend/tests/api/test_premium_gating.py::test_a_mute_outlives_a_premium_lapse` | Pass |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Integration | `backend/tests/api/test_timed_mutes.py::test_a_timed_mute_runs_to_its_end_after_a_premium_lapse` | Pass |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Integration | `backend/tests/api/test_timed_mutes.py::test_a_merge_keeps_the_longer_mute` | Pass |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Integration | `backend/tests/api/test_timed_mutes.py::test_a_merge_into_an_item_whose_mute_ended_takes_the_live_one` | Pass |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Integration | `backend/tests/api/test_timed_mutes.py::test_a_merge_of_an_ended_mute_mutes_nothing` | Pass |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Component | `mobile/src/__tests__/timedMutes.test.tsx` "a lapsed user changing Mute until gets the upgrade prompt, and can unmute" | Pass |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Component | `mobile/src/__tests__/timedMutes.test.tsx` "a 403 on a new time shows the upgrade prompt" | Pass |
+| EC-PI | 6 | Split with one line, or of every line | Integration | `backend/tests/api/test_item_split.py::test_the_original_must_keep_a_line` | Pass |
+| EC-PI | 6 | Split with one line, or of every line | Component | `mobile/src/__tests__/itemSplit.test.tsx` "offers no split for an item with one purchase (EC-PI 6)" | Pass |
+| EC-PI | 6 | Split with one line, or of every line | Integration | `backend/tests/api/test_item_split.py::test_a_name_split_across_two_new_items_stays_with_the_original` | Pass |
 | EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "passes over a suggestion already resolved (409) without an error" | Pass |
 | EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/hooks/__tests__/useSyncQueue.test.tsx` "shows no match prompt when a queued receipt syncs (EC-PI 7)" | Pass |
 | EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Yes, merge accepts and shows the next suggestion" | Pass |
 | EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Cancel closes the prompt and leaves the rest pending" | Pass |
 | EC-PI | 8 | A range with too few prices | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "says so instead of drawing a chart, with All one tap away" | Pass |
 | EC-PI | 8 | A range with too few prices | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "counts only like-for-like prices as plotted" | Pass |
-| EC-PI | 9 | Cooldown setting changes | Integration | Not yet implemented (DA-4) | Pending |
+| EC-PI | 9 | A longer cooldown counts from the item's last alert | Integration | `backend/tests/api/test_price_alert_list.py::test_a_longer_cooldown_counts_from_the_last_alert` | Pass |
+| EC-PI | 9 | Shortening the cooldown never resends a held-back alert | Integration | `backend/tests/api/test_price_alert_list.py::test_shortening_the_cooldown_never_resends_a_held_back_alert` | Pass |
 | EC-PI | 10 | Store comparison ties | Component | Not yet implemented (DA-10) | Pending |
-| EC-PI | 11 | Price alerts list after a merge or split | Component | Not yet implemented (DA-4) | Pending |
+| EC-PI | 11 | An alert for a merged item opens the item it went into | Integration | `backend/tests/api/test_price_alert_list.py::test_an_alert_for_a_merged_item_opens_the_item_it_went_into` | Pass |
+| EC-PI | 11 | A merge never touches another user's alerts (two users) | Integration | `backend/tests/api/test_price_alert_list.py::test_a_merge_never_touches_another_users_alerts` | Pass |
+| EC-PI | 11 | An alert written during a merge opens the surviving item (race) | Integration | `backend/tests/services/test_merge_price_alert_race.py::test_an_alert_written_during_a_merge_opens_the_surviving_item` | Pass (Postgres only) |
+| EC-PI | 11 | An alert stays listed after its item is split | Integration | `backend/tests/api/test_price_alert_list.py::test_an_alert_stays_listed_after_its_item_is_split` | Pass |
+| EC-PI | 11 | A row opens the item id the server keeps current | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "opens the item when a row is tapped (EC-PI 11: the id the server keeps current)" | Pass |
 | EC-PREM | 1 | Free trial eligibility, cancel and refund in the trial | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_a_trial_cancelled_in_its_7_days_stays_premium_to_its_end` | Pass |
 | EC-PREM | 1 | Free trial eligibility, cancel and refund in the trial | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_a_refund_in_the_trial_ends_premium_now` | Pass |
 | EC-PREM | 1 | Free trial eligibility, cancel and refund in the trial | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_a_trial_is_premium_until_it_ends` | Pass |

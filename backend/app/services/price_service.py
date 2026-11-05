@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.database import (
     CanonicalItem,
     CanonicalItemAlias,
+    LineItem,
     PriceObservation,
     Receipt,
 )
@@ -52,6 +53,8 @@ class ItemSummary:
     observation_count: int
     store_count: int
     latest: PriceObservation | None
+    # PI-02 AC 15 (DA-6): the like-for-like mean (_average).
+    average: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -133,6 +136,25 @@ def _series(observations: list[PriceObservation]) -> tuple[str | None, str | Non
     return counts.most_common(1)[0][0]
 
 
+def _average(
+    observations: list[PriceObservation],
+) -> tuple[Decimal | None, str | None, str | None]:
+    """(mean unit price, unit, currency) of the prices in the unit and
+    currency most of them are in, to the cent (half up); no prices: None."""
+    unit, currency = _series(observations)
+    alike = [
+        Decimal(str(o.unit_price))
+        for o in observations
+        if (o.unit_of_measure, o.currency) == (unit, currency)
+    ]
+    if not alike:
+        return None, unit, currency
+    mean = (sum(alike, Decimal()) / len(alike)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    return mean, unit, currency
+
+
 class PriceService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
@@ -212,6 +234,47 @@ class PriceService:
         total = sum((Decimal(str(p)) for p in prices), Decimal(0))
         return RollingAverage(average=total / len(prices), count=len(prices))
 
+    async def recent_prices(
+        self,
+        user_id: uuid.UUID,
+        item_id: uuid.UUID,
+        *,
+        unit_of_measure: str | None,
+        currency: str,
+        as_of: date,
+        limit: int,
+        exclude_receipt_id: uuid.UUID | None = None,
+    ) -> list[Decimal]:
+        """The item's last ``limit`` like-for-like prices up to ``as_of``,
+        oldest first: the sparkline of a price alert (PI-03 AC 5)."""
+        conditions = [
+            *self._visible(user_id),
+            PriceObservation.canonical_item_id == item_id,
+            PriceObservation.unit_of_measure.is_not_distinct_from(unit_of_measure),
+            PriceObservation.currency == currency,
+            PriceObservation.date <= as_of,
+        ]
+        if exclude_receipt_id is not None:
+            conditions.append(PriceObservation.receipt_id != exclude_receipt_id)
+        prices = (
+            (
+                await self.db.execute(
+                    select(PriceObservation.unit_price)
+                    .join(Receipt, PriceObservation.receipt_id == Receipt.id)
+                    .where(*conditions)
+                    .order_by(
+                        PriceObservation.date.desc(),
+                        Receipt.created_at.desc(),
+                        PriceObservation.id.desc(),
+                    )
+                    .limit(limit)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return [Decimal(str(p)) for p in reversed(prices)]
+
     def _visible(self, user_id: uuid.UUID) -> tuple:
         """Observations of this user's receipts that are not deleted."""
         return (
@@ -271,16 +334,46 @@ class PriceService:
         item_ids = [row[0].id for row in rows]
         latest = await self._latest_by_item(user_id, item_ids)
         store_counts = await self._store_counts(user_id, item_ids)
+        averages = await self.averages(user_id, item_ids)
         summaries = [
             ItemSummary(
                 item=item,
                 observation_count=int(count),
                 store_count=store_counts.get(item.id, 0),
                 latest=latest.get(item.id),
+                average=averages.get(item.id),
             )
             for item, count in rows
         ]
         return summaries, int(total or 0)
+
+    async def averages(
+        self, user_id: uuid.UUID, item_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, Decimal | None]:
+        """Each item's like-for-like mean unit price (_average), in one read."""
+        if not item_ids:
+            return {}
+        rows = await self.db.execute(
+            select(PriceObservation)
+            .join(Receipt, PriceObservation.receipt_id == Receipt.id)
+            .where(
+                *self._visible(user_id),
+                PriceObservation.canonical_item_id.in_(item_ids),
+            )
+        )
+        by_item: dict[uuid.UUID, list[PriceObservation]] = {}
+        for observation in rows.scalars():
+            by_item.setdefault(observation.canonical_item_id, []).append(observation)
+        return {item_id: _average(obs)[0] for item_id, obs in by_item.items()}
+
+    async def line_names(self, line_item_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+        """The receipt name of each line (PI-02 AC 10: the split screen)."""
+        if not line_item_ids:
+            return {}
+        rows = await self.db.execute(
+            select(LineItem.id, LineItem.raw_name).where(LineItem.id.in_(line_item_ids))
+        )
+        return {line_id: name for line_id, name in rows.all()}
 
     async def _store_counts(
         self, user_id: uuid.UUID, item_ids: list[uuid.UUID]
@@ -371,19 +464,7 @@ class PriceService:
         of the prices in the unit and currency most of them are in."""
         observations, _ = await self._observations(user_id, item_id)
         stores = (await self._store_counts(user_id, [item_id])).get(item_id, 0)
-        unit, currency = _series(observations)
-        alike = [
-            Decimal(str(o.unit_price))
-            for o in observations
-            if (o.unit_of_measure, o.currency) == (unit, currency)
-        ]
-        average = (
-            (sum(alike, Decimal()) / len(alike)).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
-            if alike
-            else None
-        )
+        average, unit, currency = _average(observations)
         return ItemStats(len(observations), stores, average, unit, currency)
 
     async def history(

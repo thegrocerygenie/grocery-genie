@@ -110,9 +110,8 @@ def test_a_price_change_push_opens_its_item(db):
     n = Notification(
         user_id=USER_ID,
         type="price_change",
-        title="Organic Bananas price up 20%",
-        body="Organic Bananas: $0.78/lb at Loblaws, up 20% from your 30-day "
-        "average of $0.65/lb.",
+        title="Organic Bananas up 20%",
+        body="Organic Bananas at Loblaws: was $0.65/lb avg, now $0.78/lb",
         data=json.dumps({"canonical_item_id": item_id, "store_id": store_id}),
     )
     db.add(n)
@@ -122,6 +121,8 @@ def test_a_price_change_push_opens_its_item(db):
     deliver_pending_pushes(db, client, now=_now())
 
     [msg] = client.sent
+    # PI-03 AC 9: the push reads as the in-app list does, from the same row.
+    assert (msg.title, msg.body) == (n.title, n.body)
     assert msg.data == {
         "notification_id": str(n.id),
         "type": "price_change",

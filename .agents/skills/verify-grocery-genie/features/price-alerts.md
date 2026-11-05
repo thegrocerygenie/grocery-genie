@@ -1,10 +1,14 @@
 # Price change alerts (V1.1)
 
-Confirming a receipt compares each price with the item's 30-day rolling average (its earlier prices in the same unit and currency). A change of at least the user's threshold, 10% by default, up or down, sends one `price_change` notification naming the item, store, average, new price and percent, with `data` `{canonical_item_id, store_id}`. An item alerts at most once in 7 days. The user can turn alerts off, set their own threshold, and mute an item or a store (PI-03). Alerts and their settings are free; muting is Premium (decision D8, PREM-02) and unmuting is open to everyone, so this journey makes its users Premium with `$G premium`. A free user's mute `403` and a mute outliving a lapse are in [premium.md](./premium.md) (`premium-free-features`, `premium-mute-lapse`).
+Confirming a receipt compares each price with the item's 30-day rolling average (its earlier prices in the same unit and currency). A change of at least the user's threshold, 10% by default, up or down, sends one `price_change` notification naming the item, store, average, new price and percent: "<Item> up N%", "<Item> at <Store>: was $X avg, now $Y", a drop adding " · stock-up worth it" (PI-03 AC 9, DA-4). Its `data` is `{canonical_item_id, store_id}` plus, since DA-4, what a Price alerts row shows (`item_name`, `store_name`, `direction`, signed `percent`, `old_average`, `new_price`, `recent_prices`). An item alerts at most once per the user's cooldown, 7 days by default (PI-03 AC 8). The in-app Price alerts list is `GET /api/notifications?type=price_change&order=newest` (AC 5). The user can turn alerts off, set their own threshold, and mute an item or a store (PI-03). Alerts and their settings are free; muting is Premium (decision D8, PREM-02) and unmuting is open to everyone, so this journey makes its users Premium with `$G premium`. A free user's mute `403` and a mute outliving a lapse are in [premium.md](./premium.md) (`premium-free-features`, `premium-mute-lapse`).
 
 ## Sub-features
 
-- `pa.settings`: `GET /api/items/price-alert-settings` gives `enabled`, `threshold_percent` (10), `default_threshold_percent`, `cooldown_days` (7), `muted_items`, `muted_stores`; `PUT` changes `enabled` and `threshold_percent` (1-100, `null` resets; 0 is 422).
+- `pa.settings`: `GET /api/items/price-alert-settings` gives `enabled`, `threshold_percent` (10), `default_threshold_percent`, `cooldown_days` (7), `default_cooldown_days` (7), `muted_items`, `muted_stores`; `PUT` changes `enabled`, `threshold_percent` (1-100, `null` resets; 0 is 422) and `cooldown_days` (an integer 1-30, `null` resets; 0 or `"7"` is 422).
+- `pa.copy` (DA-4): a rise reads "Milk up 10%" / "Milk at FreshCo: was $4.00 avg, now $4.40"; a drop "Eggs down 20%" / "... now $2.40 · stock-up worth it"; `data` carries the row's parts and `recent_prices` oldest first.
+- `pa.list` (DA-4): `GET /api/notifications?type=price_change&order=newest` holds only price alerts, newest first, with `total` filtered; `order=bogus` is 422; another user's list is empty and their cooldown is still the default.
+- `pa.user-cooldown` (DA-4): with `cooldown_days` 1, an item alerted 2 days ago alerts again; with 30, it does not.
+- `pa.list-merge` (DA-4, EC-PI 11): after `POST /api/items/{milk}/merge` into Eggs, every listed alert's `data.canonical_item_id` is the surviving item.
 - `pa.alert`: a third price 10% above the average of two earlier ones sends one alert; its body names item, store, `$4.00` average, `$4.40` new price, `up 10%`; a `price_alerts_sent` row records it.
 - `pa.cooldown`: a further change for the same item within 7 days sends nothing.
 - `pa.threshold`: with the threshold at 25, a 20% change sends nothing and a 40% change alerts.
@@ -17,7 +21,7 @@ Confirming a receipt compares each price with the item's 30-day rolling average 
 
 ## How to get to it (user POV)
 
-A push: tapping a `price_change` alert opens the item (`mobile/src/features/notifications/notificationTap.ts`). Item detail (Budget tab → Price history → an item) → Price alerts: a switch for the item and one per store it was bought at. Settings → Alerts → Price alerts: the on/off switch and "Alert when a price changes by" (a picker; the default is sent as `null`), and a Muted price alerts list with Unmute. The screens are UI-only: check them on a simulator.
+A push: tapping a `price_change` alert opens the item (`mobile/src/features/notifications/notificationTap.ts`). Item detail (Budget tab → Price history → an item) → the Alerts row opens the item's Alerts screen (DA-7): a "Price alerts" switch for the item and one per store it was bought at, every switch on = alerts on; timed mutes are in [timed-mutes.md](./timed-mutes.md). Since DA-4 the Price alerts list (`mobile/app/price-alerts.tsx`) opens from the bell on the Budget dashboard and from Settings → Alerts → Price alerts; it ends with Threshold and Cooldown rows. Settings → Alerts → Price alerts: the on/off switch and "Alert when a price changes by" (a picker; the default is sent as `null`), and a Muted price alerts list with Unmute. The screens are UI-only: check them on a simulator.
 
 ## Driving it with gg-verify
 
@@ -63,6 +67,26 @@ milk 2026-11-01 5.00 Butter; milk 2026-11-02 5.00 Butter
 milk 2026-11-03 8.00 Butter & milk 2026-11-03 8.00 Butter & wait            # pa.concurrent
 $G sql "SELECT title FROM notifications WHERE type='price_change' ORDER BY created_at"  # Milk, Eggs, Butter once
 $G sql "SELECT count(*) FROM price_alerts_sent"                              # 3
+# DA-4: pa.copy, pa.list, pa.user-cooldown (a fresh user; dates are the receipt's, the cooldown the server clock's)
+$G signup da4-alerts
+$G api PUT /api/items/price-alert-settings '{"cooldown_days":0}'             # 422
+$G api PUT /api/items/price-alert-settings '{"cooldown_days":"7"}'           # 422 (strict integer)
+$G api PUT /api/items/price-alert-settings '{"cooldown_days":null}' | jq .cooldown_days   # 7
+$G api PUT /api/items/price-alert-settings '{"cooldown_days":1}' > /dev/null
+milk 2026-11-01 4.00 Milk; milk 2026-11-02 4.00 Milk; milk 2026-11-03 4.40 Milk
+milk 2026-11-01 3.00 Eggs; milk 2026-11-02 3.00 Eggs; milk 2026-11-03 2.40 Eggs   # a drop
+$G api GET '/api/notifications?type=price_change&order=newest' | jq -c '.total, (.items[] | {title, body, data: (.data|fromjson)})'
+$G sql "UPDATE price_alerts_sent SET alerted_at = alerted_at - interval '2 days'"
+milk 2026-11-04 5.00 Milk                                                    # cooldown 1: alerts again (3)
+$G api PUT /api/items/price-alert-settings '{"cooldown_days":30}' > /dev/null
+$G sql "UPDATE price_alerts_sent SET alerted_at = alerted_at - interval '2 days'"
+milk 2026-11-05 6.50 Milk                                                    # cooldown 30: none (still 3)
+$G api GET '/api/notifications?order=bogus'                                  # 422
+# pa.list-merge: merge the Milk item (from the list's data) into the Eggs item, then every alert's item id is Eggs'
+$G api POST /api/items/<milk id>/merge '{"into_item_id":"<eggs id>"}'   # both ids from the list's data above
+$G api GET '/api/notifications?type=price_change&order=newest' | jq -c '[.items[] | (.data|fromjson|.canonical_item_id)] | unique'   # one id
+$G signup da4-other
+$G api GET '/api/notifications?type=price_change&order=newest' | jq .total   # 0
 $G signup other
 $G premium
 $G api POST /api/items/$bread/mute; $G api POST /api/stores/$store/mute      # pa.isolation: 404, 404
@@ -79,3 +103,4 @@ $G api DELETE /api/stores/$store/mute                                        # 2
 - Pushes go through the existing pipeline (`deliver_pending_pushes`), which needs a Celery worker and an Expo token; the journey checks the notification rows. `backend/tests/tasks/test_push_tasks.py::test_a_price_change_push_opens_its_item` covers the push payload.
 - Verified 2026-11-03 against Postgres 16 (run `20261103-181419`, after the unmute fix); `pa.app-tap` and `pa.app-settings` with the app's calls in run `20261103-183706`.
 - Run in full as Premium users (`$G premium`, decision D8) on 2026-11-04: run `20261104-231631`.
+- `pa.copy`, `pa.list` and `pa.user-cooldown` verified 2026-11-05 (DA-4): run `20261105-153233`; with `pa.list-merge` after the review fix: run `20261105-161842`.

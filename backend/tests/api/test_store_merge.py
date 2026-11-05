@@ -264,7 +264,9 @@ async def test_a_muted_store_merged_into_another_mutes_the_merged_store(
     await _merge(client, freshco, loblaws)
 
     settings = (await client.get("/api/items/price-alert-settings")).json()
-    assert settings["muted_stores"] == [{"id": loblaws, "name": "Loblaws"}]
+    assert settings["muted_stores"] == [
+        {"id": loblaws, "name": "Loblaws", "muted_until": None}
+    ]
     await _manual(client, "Loblaws", "2026-03-04", "Limes", 2.0)
     assert await _alerts(db_session) == []
 
@@ -287,7 +289,9 @@ async def test_after_unmerge_a_mute_stays_with_the_store_it_was_set_on(client):
     assert (await client.delete(f"/api/stores/{freshco}/merge")).status_code == 204
 
     settings = (await client.get("/api/items/price-alert-settings")).json()
-    assert settings["muted_stores"] == [{"id": freshco, "name": "FreshCo"}]
+    assert settings["muted_stores"] == [
+        {"id": freshco, "name": "FreshCo", "muted_until": None}
+    ]
 
 
 async def test_muting_a_merged_group_quiets_the_merged_store(client, db_session):
@@ -302,7 +306,9 @@ async def test_muting_a_merged_group_quiets_the_merged_store(client, db_session)
     assert (await client.post(f"/api/stores/{freshco}/mute")).status_code == 204
 
     settings = (await client.get("/api/items/price-alert-settings")).json()
-    assert settings["muted_stores"] == [{"id": loblaws, "name": "Loblaws"}]
+    assert settings["muted_stores"] == [
+        {"id": loblaws, "name": "Loblaws", "muted_until": None}
+    ]
     await _manual(client, "FreshCo", "2026-03-04", "Limes", 2.0)
     assert await _alerts(db_session) == []
 
@@ -320,7 +326,7 @@ async def test_a_price_alert_names_the_merged_store(client, db_session):
     await _manual(client, "FreshCo", "2026-03-04", "Limes", 1.5)
 
     [alert] = await _alerts(db_session)
-    assert " at Loblaws," in alert.body
+    assert " at Loblaws:" in alert.body
 
 
 # --- names never cross accounts ----------------------------------------------
@@ -447,7 +453,7 @@ async def test_a_merge_target_purged_keeps_the_users_name(client, db_session):
     # A price alert from the merged store names the user's store too.
     await _manual(client, "Superstore", "2026-03-04", "Limes", 2.0)
     [alert] = await _alerts(db_session)
-    assert " at Loblaws," in alert.body
+    assert " at Loblaws:" in alert.body
 
 
 async def test_a_mute_outliving_its_receipts_keeps_the_users_name(client, db_session):
@@ -459,4 +465,6 @@ async def test_a_mute_outliving_its_receipts_keeps_the_users_name(client, db_ses
     await _purge_receipts_at(db_session, "Loblaws")
 
     settings = (await client.get("/api/items/price-alert-settings")).json()
-    assert settings["muted_stores"] == [{"id": loblaws, "name": "Loblaws"}]
+    assert settings["muted_stores"] == [
+        {"id": loblaws, "name": "Loblaws", "muted_until": None}
+    ]

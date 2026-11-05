@@ -7,11 +7,16 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.core import clock
 from app.models.category_looks import (
     CUSTOM_COLORS,
     CUSTOM_ICONS,
     DEFAULT_COLOR,
     DEFAULT_ICON,
+)
+from app.models.database import (
+    PRICE_ALERT_COOLDOWN_MAX_DAYS,
+    PRICE_ALERT_COOLDOWN_MIN_DAYS,
 )
 
 _CURRENCY_CODE = re.compile(r"^[A-Z]{3}$")
@@ -718,6 +723,9 @@ class ItemSummaryResponse(BaseModel):
     observation_count: int
     store_count: int
     latest_price: LatestPrice | None = None
+    # PI-02 AC 11, 15 (DA-6): "N purchases · $X avg": the mean unit price of
+    # the prices in the unit and currency most of them are in, to the cent.
+    avg_unit_price: float | None = None
 
 
 class ItemListResponse(BaseModel):
@@ -767,12 +775,20 @@ class ItemDetailResponse(ItemSummaryResponse):
     aliases: list[ItemAliasResponse]
     # "Is this the same as …?" questions about this item.
     suggestions: list[ItemSuggestionResponse]
-    # PI-03 AC 4: the user muted price change alerts for this item.
+    # PI-03 AC 4: the user muted price change alerts for this item (a live
+    # mute: one that has ended is not muted, AC 12).
     alerts_muted: bool = False
+    # PI-03 AC 11 (DA-7): when the mute ends, in UTC; null when it is
+    # forever or the item is not muted.
+    muted_until: datetime | None = None
 
 
 class PricePointResponse(BaseModel):
     receipt_id: uuid.UUID
+    # PI-02 AC 10 (DA-6): the receipt line, which a split by line moves, and
+    # its name as the receipt printed it.
+    line_item_id: uuid.UUID
+    line_name: str
     date: date
     store_id: uuid.UUID | None = None
     store_name: str | None = None
@@ -830,6 +846,39 @@ class ItemRenameRequest(BaseModel):
         return value
 
 
+class ItemSplitPart(BaseModel):
+    """One new item of a split by line (PI-02 AC 11, 14)."""
+
+    name: str = Field(min_length=1, max_length=255)
+    line_item_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+
+    @field_validator("name")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Name cannot be blank")
+        return value
+
+
+class ItemSplitRequest(BaseModel):
+    splits: list[ItemSplitPart] = Field(min_length=1, max_length=10)
+
+
+class ItemSplitResponse(BaseModel):
+    # The new items, in the order of the request's splits.
+    items: list[ItemDetailResponse]
+
+
+class LinkCandidatesResponse(BaseModel):
+    """The Link items sheet (PI-02 AC 15)."""
+
+    # The item's pending suggestions, then the most similar names.
+    suggested: list[ItemSummaryResponse]
+    # Every other item, most recently bought first.
+    items: list[ItemSummaryResponse]
+
+
 class ItemMergeRequest(BaseModel):
     # The item this one is the same product as; it keeps its name.
     into_item_id: uuid.UUID
@@ -868,19 +917,60 @@ class StoreMergeRequest(BaseModel):
     into_store_id: uuid.UUID
 
 
+class MutedItemResponse(ItemRef):
+    # PI-03 AC 11 (DA-7): when the mute ends (UTC); null is forever.
+    muted_until: datetime | None = None
+
+
+class MutedStoreResponse(StoreRef):
+    muted_until: datetime | None = None
+
+
+class MuteRequest(BaseModel):
+    """PI-03 AC 11 (DA-7): the body of a mute POST, which is optional. No
+    ``until``, or null, is forever. A time with no offset is taken as UTC;
+    one not in the future is 422."""
+
+    until: datetime | None = None
+
+    @field_validator("until")
+    @classmethod
+    def _in_the_future(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        value = (
+            value.replace(tzinfo=dt.UTC)
+            if value.tzinfo is None
+            else value.astimezone(dt.UTC)
+        )
+        if value <= clock.now():
+            raise ValueError("until must be in the future")
+        return value
+
+
 class PriceAlertSettingsResponse(BaseModel):
     enabled: bool
     # The user's threshold, or the default when they have not set one.
     threshold_percent: int
     default_threshold_percent: int
+    # The user's cooldown in days (PI-03 AC 8), or the default.
     cooldown_days: int
-    muted_items: list[ItemRef]
-    muted_stores: list[StoreRef]
+    default_cooldown_days: int
+    # Live mutes only, each with its end (PI-03 AC 11, 12).
+    muted_items: list[MutedItemResponse]
+    muted_stores: list[MutedStoreResponse]
 
 
 class PriceAlertSettingsUpdate(BaseModel):
-    """Fields left out stay as they are; a null threshold goes back to the
-    default."""
+    """Fields left out stay as they are; a null threshold or cooldown goes
+    back to the default."""
 
     enabled: bool | None = None
     threshold_percent: int | None = Field(default=None, ge=1, le=100)
+    # PI-03 AC 8: 1-30 days (the app offers 1, 3, 7, 14 and 30).
+    cooldown_days: int | None = Field(
+        default=None,
+        strict=True,
+        ge=PRICE_ALERT_COOLDOWN_MIN_DAYS,
+        le=PRICE_ALERT_COOLDOWN_MAX_DAYS,
+    )

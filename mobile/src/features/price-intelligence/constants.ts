@@ -59,8 +59,45 @@ export const PRICES_COPY = {
   rename: 'Rename',
   renamePrompt: 'Rename item',
   renameBody: 'The name shown in Items. Receipts keep their own names.',
-  combine: 'Combine with Another Item…',
+  combine: 'Link Items…',
   combineHint: 'Choose an item that is the same product',
+  // PI-02 AC 10-13 (DA-6): split by line.
+  splitByLine: 'Split Into Separate Items…',
+  splitByLineHint: 'Move some of its purchases to a new item',
+  splitTitle: (count: number) => `Split into ${count} items`,
+  splitWarning:
+    'We grouped these as one item but the unit price varies a lot. Split if these are different products.',
+  splitOriginal: 'Original',
+  splitInto: 'Split into',
+  splitLines: 'Purchases',
+  splitLinesFooter: 'Tap a purchase to choose which item it belongs to.',
+  splitNamePlaceholder: 'Item name',
+  splitNameLabel: (index: number) => `Name of new item ${index}`,
+  splitNewItem: (index: number) => `New item ${index}`,
+  splitAddAnother: '+ Add another split',
+  splitAddAnotherLabel: 'Add another split',
+  splitRemove: 'Remove',
+  splitRemoveLabel: (name: string) => `Remove ${name}`,
+  splitMoveTitle: 'Move this purchase to',
+  splitLineLabel: (date: string, store: string, price: string, name: string, item: string) =>
+    `${date}, ${store}, ${price}, ${name}, in ${item}`,
+  splitLineHint: 'Choose which item this purchase belongs to',
+  splitStats: (count: number, average: string | null) =>
+    `${count} ${count === 1 ? 'purchase' : 'purchases'}${average ? ` · ${average} avg` : ''}`,
+  splitSaveLabel: 'Save the split',
+  // PI-02 AC 15 (DA-6): the Link items sheet.
+  linkTitle: 'Link items',
+  linkAction: 'Link',
+  linkActionLabel: 'Link the items',
+  linkIntro: (name: string) => `Pick an existing item to merge “${name}” into.`,
+  linkSuggested: 'Suggested',
+  linkAll: 'All items',
+  linkEmpty: 'No other items yet.',
+  linkConfirmTitle: (from: string, into: string) => `Merge “${from}” into “${into}”?`,
+  linkConfirmBody: 'Its prices and names move to that item.',
+  linkConfirmAction: 'Merge',
+  linkRowLabel: (name: string, stats: string, selected: boolean) =>
+    `${name}, ${stats}${selected ? ', selected' : ''}`,
   cancel: 'Cancel',
   save: 'Save',
   actionFailed: 'That didn’t save. Check your connection and try again.',
@@ -97,13 +134,6 @@ export const PRICES_COPY = {
     'These names came close to an item you’ve bought before. Combining them joins their price histories.',
   matchesEmpty: 'No matches to review.',
 
-  combineTitle: 'Combine',
-  combineIntro: (name: string) =>
-    `Choose the item “${name}” is the same as. Its prices move there.`,
-  combineConfirmTitle: (from: string, into: string) => `Combine “${from}” into “${into}”?`,
-  combineConfirmBody: 'Its prices and names move to that item.',
-  combineAction: 'Combine',
-
   chartLabel: (count: number, low: string, high: string, latest: string) =>
     `Price chart, ${count} prices from ${low} to ${high}, latest ${latest}`,
 
@@ -123,14 +153,7 @@ export const PRICES_COPY = {
   compareBelowMinimum: (count: number, min: number) =>
     `${count} more ${count === 1 ? 'store needs' : 'stores need'} ${min} prices of this item to compare.`,
 
-  // PI-03 AC 4: mute price alerts for the item, or at a store.
-  alertsHeader: 'Price alerts',
-  alertsItem: 'This item',
-  alertsItemLabel: (name: string) => `Price alerts for ${name}`,
-  alertsStore: (store: string) => `At ${store}`,
-  alertsStoreLabel: (store: string) => `Price alerts at ${store}`,
-  alertsFooter: (threshold: number, days: number) =>
-    `You get an alert when a price moves ${threshold}% or more from your 30-day average, at most once every ${days} days.`,
+  // PI-03 AC 4: muting lives on the item's Alerts screen (MUTE_COPY).
   alertsOff: 'Price alerts are off. Turn them on in Settings → Alerts.',
 
   // PREM-02 AC 5, 6 (D8): comparison and muting are Premium.
@@ -144,6 +167,39 @@ export const PRICES_COPY = {
     'Premium lets you mute price alerts for an item or a store. Price alerts themselves stay free.',
 } as const;
 
+/**
+ * PI-03 AC 10, 13, 14 (DA-7): the item's Alerts screen, as in the design
+ * ("PI-03 · Mute alerts"), with every switch on = alerts on, and timed mutes.
+ */
+export const MUTE_COPY = {
+  // Item detail's row that pushes the Alerts screen.
+  row: 'Alerts',
+  rowOn: 'On',
+  rowMuted: 'Muted',
+  rowMutedUntil: (date: string) => `Muted until ${date}`,
+  rowLabel: (value: string) => `Alerts: ${value}`,
+
+  title: 'Alerts',
+  itemHeader: 'Item-level',
+  itemSwitch: 'Price alerts',
+  itemSubtitle: (name: string) => `For ${name} across all stores`,
+  itemSwitchLabel: (name: string) => `Price alerts for ${name}`,
+  storeHeader: 'Per store',
+  storeSwitchLabel: (store: string) => `Price alerts at ${store}`,
+  storeNote: 'A store mute covers every item you buy there.',
+  footer: 'You’ll still see price changes in the item detail — just no notifications.',
+
+  muteUntil: 'Mute until',
+  muteUntilLabel: (value: string) => `Mute until: ${value}`,
+  // PI-03 AC 10: Forever first (the user's choice, D11).
+  choices: ['Forever', '1 week', '1 month', '3 months'],
+  forever: 'Forever',
+  until: (date: string) => `Until ${date}`,
+
+  // Settings → Alerts (AC 14).
+  unmuteFailed: 'Couldn’t unmute. Check your connection and try again.',
+} as const;
+
 /** Settings → Alerts: price change alerts (PI-03 settings). */
 export const PRICE_ALERT_SETTINGS_COPY = {
   header: 'PRICE ALERTS',
@@ -154,7 +210,7 @@ export const PRICE_ALERT_SETTINGS_COPY = {
   footer: (days: number) =>
     `Compared with your 30-day average for the item, up or down. At most one alert per item every ${days} days.`,
   mutedHeader: 'MUTED PRICE ALERTS',
-  mutedFooter: 'Mute an item or a store from the item’s price history.',
+  mutedFooter: 'Mute an item or a store from the item’s Alerts.',
   unmute: 'Unmute',
   unmuteLabel: (name: string) => `Unmute ${name}`,
   store: 'Store',
@@ -190,3 +246,38 @@ export const STORE_MERGE_COPY = {
 
 /** The threshold choices; the default and the user's own are always added. */
 export const PRICE_ALERT_THRESHOLDS = [5, 10, 15, 20, 25, 30, 50] as const;
+
+/** PI-03 AC 8: the cooldown choices; the default and the user's own are always added. */
+export const PRICE_ALERT_COOLDOWNS = [1, 3, 7, 14, 30] as const;
+
+/** PI-03 AC 5-7 (DA-4): the Price alerts list and its Settings group. */
+export const PRICE_ALERTS_LIST_COPY = {
+  title: 'Price alerts',
+  // The Budget dashboard's bell and the row in Settings → Alerts.
+  open: 'Price alerts',
+  openHint: 'Price changes on things you buy',
+  thisWeek: 'This week',
+  earlier: 'Earlier',
+  stockUp: 'stock-up worth it',
+  wasNow: (oldAverage: string, newPrice: string) => `was ${oldAverage} avg, now ${newPrice}`,
+  rowLabel: (
+    item: string,
+    direction: 'up' | 'down',
+    percent: string,
+    detail: string,
+    stockUp: boolean,
+  ) => `${item}, ${direction} ${percent}, ${detail}${stockUp ? ', stock-up worth it' : ''}`,
+  emptyTitle: 'No price alerts yet',
+  emptyBody: (threshold: number) =>
+    `You’ll get one when something you buy regularly changes price by ${threshold}% or more.`,
+  loadFailed: 'Couldn’t load your price alerts',
+  settingsHeader: 'Settings',
+  threshold: 'Threshold',
+  cooldown: 'Cooldown',
+  days: (days: number) => `${days} ${days === 1 ? 'day' : 'days'}`,
+  cooldownOption: (days: number, isDefault: boolean) =>
+    `${days} ${days === 1 ? 'day' : 'days'}${isDefault ? ' (default)' : ''}`,
+  footer: (days: number, threshold: number) =>
+    `Cooldown: ${days} ${days === 1 ? 'day' : 'days'} · alerts at ≥${threshold}% change`,
+  saveFailed: 'Couldn’t save. Check your connection and try again.',
+} as const;

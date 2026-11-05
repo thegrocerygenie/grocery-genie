@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Stack, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
+import { OptionSheet } from '@/components/OptionSheet';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useMe, useUpdatePreferences } from '@/features/auth/hooks/useAuth';
 import { useBudgets } from '@/features/budget/hooks/useBudget';
 import { useCategories } from '@/features/budget/hooks/useCategories';
 import {
+  MUTE_COPY,
+  PRICE_ALERTS_LIST_COPY,
   PRICE_ALERT_SETTINGS_COPY as PRICE_COPY,
   PRICE_ALERT_THRESHOLDS,
 } from '@/features/price-intelligence/constants';
@@ -18,6 +21,7 @@ import {
   useUpdatePriceAlertSettings,
 } from '@/features/price-intelligence/hooks/useItems';
 import type { PriceAlertSettings } from '@/features/price-intelligence/types';
+import { formatMuteEnd } from '@/features/price-intelligence/utils/muteUntil';
 import { useNotificationStore } from '@/store/notificationStore';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -46,6 +50,27 @@ export default function NotificationSettingsScreen() {
   const updatePriceAlerts = useUpdatePriceAlertSettings();
   const unmuteItem = useMuteItem();
   const unmuteStore = useMuteStore();
+  // PI-03 AC 14: rows whose unmute failed, by key; the row stays, says so, and can retry.
+  const [unmuteFailed, setUnmuteFailed] = useState<ReadonlySet<string>>(new Set());
+  const markUnmute = (key: string, failed: boolean) =>
+    setUnmuteFailed((current) => {
+      const next = new Set(current);
+      if (failed) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  const onUnmuteItem = (id: string) => {
+    const key = `item-${id}`;
+    markUnmute(key, false);
+    unmuteItem.mutate({ id, muted: false }, { onError: () => markUnmute(key, true) });
+  };
+  const onUnmuteStore = (storeId: string) => {
+    const key = `store-${storeId}`;
+    markUnmute(key, false);
+    unmuteStore.mutate({ storeId, muted: false }, { onError: () => markUnmute(key, true) });
+  };
+  const muteEnd = (until: string | null) =>
+    until ? MUTE_COPY.until(formatMuteEnd(until)) : MUTE_COPY.forever;
   const priceAlertsOn = updatePriceAlerts.isPending
     ? (updatePriceAlerts.variables.enabled ?? priceAlerts?.enabled)
     : priceAlerts?.enabled;
@@ -143,6 +168,12 @@ export default function NotificationSettingsScreen() {
               on={priceAlertsOn ?? true}
               onChange={(v) => updatePriceAlerts.mutate({ enabled: v })}
             />
+            {/* PI-03 AC 5: the list is a root screen, so Settings closes first
+                (dismissTo) and the list opens over Budget, with Back. */}
+            <NavRow
+              label={PRICE_ALERTS_LIST_COPY.open}
+              onPress={() => router.dismissTo('/price-alerts')}
+            />
             {priceAlertsOn ? (
               <NavRow
                 label={PRICE_COPY.threshold}
@@ -159,16 +190,18 @@ export default function NotificationSettingsScreen() {
               <UnmuteRow
                 key={`item-${item.id}`}
                 name={item.canonical_name}
-                kind={PRICE_COPY.item}
-                onPress={() => unmuteItem.mutate({ id: item.id, muted: false })}
+                detail={`${PRICE_COPY.item} · ${muteEnd(item.muted_until)}`}
+                failed={unmuteFailed.has(`item-${item.id}`)}
+                onPress={() => onUnmuteItem(item.id)}
               />
             ))}
             {priceAlerts.muted_stores.map((store) => (
               <UnmuteRow
                 key={`store-${store.id}`}
                 name={store.name}
-                kind={PRICE_COPY.store}
-                onPress={() => unmuteStore.mutate({ storeId: store.id, muted: false })}
+                detail={`${PRICE_COPY.store} · ${muteEnd(store.muted_until)}`}
+                failed={unmuteFailed.has(`store-${store.id}`)}
+                onPress={() => onUnmuteStore(store.id)}
               />
             ))}
           </Section>
@@ -190,7 +223,7 @@ export default function NotificationSettingsScreen() {
         </Section>
       </ScrollView>
 
-      <DayPickerSheet
+      <DayOptionSheet
         visible={dayPickerOpen}
         selected={summaryDay}
         onSelect={(d) => {
@@ -201,7 +234,7 @@ export default function NotificationSettingsScreen() {
       />
 
       {priceAlerts ? (
-        <PickerSheet
+        <OptionSheet
           visible={thresholdPickerOpen}
           options={thresholdChoices(priceAlerts).map((p) => ({
             key: p,
@@ -268,7 +301,8 @@ function ToggleRow({ label, on, onChange, accessibilityLabel }: ToggleRowProps) 
 
 interface NavRowProps {
   label: string;
-  value: string;
+  /** Shown before the chevron; a row that only opens a screen has none. */
+  value?: string;
   onPress: () => void;
 }
 
@@ -278,11 +312,13 @@ function NavRow({ label, value, onPress }: NavRowProps) {
       onPress={onPress}
       style={styles.row}
       accessibilityRole="button"
-      accessibilityLabel={`${label}: ${value}`}
+      accessibilityLabel={value === undefined ? label : `${label}: ${value}`}
     >
       <Text style={type.body}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        <Text style={[type.body, { color: colors.iosLabel2 }]}>{value}</Text>
+        {value !== undefined ? (
+          <Text style={[type.body, { color: colors.iosLabel2 }]}>{value}</Text>
+        ) : null}
         <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
       </View>
     </Pressable>
@@ -291,19 +327,26 @@ function NavRow({ label, value, onPress }: NavRowProps) {
 
 interface UnmuteRowProps {
   name: string;
-  /** "Item" or "Store", shown under the name. */
-  kind: string;
+  /** "Item · Until Mar 27, 2026" or "Store · Forever", under the name (PI-03 AC 14). */
+  detail: string;
+  /** The last unmute failed: the row says so, and Unmute tries again. */
+  failed: boolean;
   onPress: () => void;
 }
 
-function UnmuteRow({ name, kind, onPress }: UnmuteRowProps) {
+function UnmuteRow({ name, detail, failed, onPress }: UnmuteRowProps) {
   return (
     <View style={styles.row}>
       <View style={styles.rowText}>
         <Text style={type.body} numberOfLines={1}>
           {name}
         </Text>
-        <Text style={styles.caption}>{kind}</Text>
+        <Text style={styles.caption}>{detail}</Text>
+        {failed ? (
+          <Text style={styles.error} accessibilityRole="alert">
+            {MUTE_COPY.unmuteFailed}
+          </Text>
+        ) : null}
       </View>
       <Pressable
         onPress={onPress}
@@ -318,16 +361,16 @@ function UnmuteRow({ name, kind, onPress }: UnmuteRowProps) {
   );
 }
 
-interface DayPickerSheetProps {
+interface DayOptionSheetProps {
   visible: boolean;
   selected: number;
   onSelect: (day: number) => void;
   onClose: () => void;
 }
 
-function DayPickerSheet({ visible, selected, onSelect, onClose }: DayPickerSheetProps) {
+function DayOptionSheet({ visible, selected, onSelect, onClose }: DayOptionSheetProps) {
   return (
-    <PickerSheet
+    <OptionSheet
       visible={visible}
       options={DAYS.map((d, i) => ({ key: i, label: d }))}
       selected={selected}
@@ -336,65 +379,6 @@ function DayPickerSheet({ visible, selected, onSelect, onClose }: DayPickerSheet
     />
   );
 }
-
-interface PickerSheetProps {
-  visible: boolean;
-  options: { key: number; label: string }[];
-  selected: number;
-  onSelect: (key: number) => void;
-  onClose: () => void;
-}
-
-function PickerSheet({ visible, options, selected, onSelect, onClose }: PickerSheetProps) {
-  return (
-    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-      {/* Taps only: accessible, these would hide the options from VoiceOver. */}
-      <Pressable
-        style={sheetStyles.backdrop}
-        onPress={onClose}
-        accessible={false}
-        onAccessibilityEscape={onClose}
-      >
-        <Pressable
-          style={sheetStyles.sheet}
-          onPress={(e) => e.stopPropagation()}
-          accessible={false}
-        >
-          <View style={styles.listCard}>
-            {options.map((o, i) => (
-              <Pressable
-                key={o.key}
-                onPress={() => onSelect(o.key)}
-                style={[styles.row, i > 0 && styles.rowDivider]}
-                accessibilityRole="button"
-                accessibilityLabel={o.label}
-                accessibilityState={{ selected: selected === o.key }}
-              >
-                <Text style={type.body}>{o.label}</Text>
-                {selected === o.key ? (
-                  <SymbolView name="checkmark" size={14} tintColor={colors.tint} />
-                ) : null}
-              </Pressable>
-            ))}
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-const sheetStyles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
-    backgroundColor: 'transparent',
-  },
-});
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
@@ -427,12 +411,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  rowDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.iosSeparator,
-  },
   rowText: { flex: 1, gap: 2 },
   caption: { ...type.footnote, color: colors.iosLabel2 },
+  error: { ...type.footnote, color: colors.redText },
   inlineButton: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'flex-end' },
   link: { ...type.body, color: colors.tint },
   separator: {

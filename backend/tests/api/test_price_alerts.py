@@ -78,7 +78,7 @@ async def test_a_ten_percent_rise_from_the_rolling_average_alerts(
     await _buy(client, mock_extractor, test_image_bytes, "2026-03-15", 1.10)
 
     [alert] = await _price_alerts(client)
-    assert "up 10%" in alert["body"]
+    assert alert["title"].endswith(" up 10%")
 
 
 async def test_a_change_under_the_threshold_does_not_alert(
@@ -97,7 +97,7 @@ async def test_a_ten_percent_drop_alerts(client, mock_extractor, test_image_byte
     await _buy(client, mock_extractor, test_image_bytes, "2026-03-15", 1.80)
 
     [alert] = await _price_alerts(client)
-    assert "down 10%" in alert["body"]
+    assert alert["title"].endswith(" down 10%")
 
 
 async def test_the_user_can_set_their_own_threshold(
@@ -257,12 +257,11 @@ async def test_the_alert_names_item_store_average_new_price_and_percent(
     assert "Loblaws" in body
     assert "$0.65/lb" in body  # the 30-day average
     assert "$0.78/lb" in body  # the new price
-    assert "up 20%" in body
+    assert alert["title"] == "Organic Bananas up 20%"  # the percent
     item_id = await _item_id(client, "Organic Bananas")
-    assert json.loads(alert["data"]) == {
-        "canonical_item_id": item_id,
-        "store_id": await _store_id(client),
-    }
+    data = json.loads(alert["data"])
+    assert data["canonical_item_id"] == item_id
+    assert data["store_id"] == await _store_id(client)
 
 
 async def test_the_alert_dispatches_price_change_detected(
@@ -385,7 +384,9 @@ async def test_a_muted_store_does_not_alert(client, mock_extractor, test_image_b
     resp = await client.post(f"/api/stores/{store_id}/mute")
     assert resp.status_code == 204, resp.text
     settings = (await client.get("/api/items/price-alert-settings")).json()
-    assert settings["muted_stores"] == [{"id": store_id, "name": "Loblaws"}]
+    assert settings["muted_stores"] == [
+        {"id": store_id, "name": "Loblaws", "muted_until": None}
+    ]
 
     await _buy(client, mock_extractor, test_image_bytes, "2026-03-15", 1.50)
     assert await _price_alerts(client) == []
@@ -411,7 +412,7 @@ async def test_muting_twice_is_fine(client, mock_extractor, test_image_bytes):
     assert (await client.post(f"/api/items/{item_id}/mute")).status_code == 204
     settings = (await client.get("/api/items/price-alert-settings")).json()
     assert settings["muted_items"] == [
-        {"id": item_id, "canonical_name": "Organic Bananas"}
+        {"id": item_id, "canonical_name": "Organic Bananas", "muted_until": None}
     ]
     assert (await client.delete(f"/api/items/{item_id}/mute")).status_code == 204
     assert (await client.delete(f"/api/items/{item_id}/mute")).status_code == 204
@@ -673,14 +674,17 @@ async def test_an_alert_emits_price_alert_triggered(
 async def test_muting_emits_price_alert_muted(
     client, mock_extractor, test_image_bytes, analytics_spy
 ):
-    """12-analytics.md: price_alert_muted {scope: item|store}; unmuting and a
-    404 send nothing."""
+    """12-analytics.md: price_alert_muted {scope: item|store, duration:
+    forever|timed} (DA-7); unmuting and a 404 send nothing."""
     await _history(client, mock_extractor, test_image_bytes, 1.00)
     item_id = await _item_id(client, "Organic Bananas")
     store_id = await _store_id(client)
 
     assert (await client.post(f"/api/items/{item_id}/mute")).status_code == 204
     assert (await client.post(f"/api/stores/{store_id}/mute")).status_code == 204
+    timed = {"until": "2026-04-20T12:00:00Z"}
+    resp = await client.post(f"/api/items/{item_id}/mute", json=timed)
+    assert resp.status_code == 204, resp.text
     assert (await client.delete(f"/api/items/{item_id}/mute")).status_code == 204
     assert (await client.delete(f"/api/stores/{store_id}/mute")).status_code == 204
     unknown = uuid.uuid4()
@@ -688,6 +692,7 @@ async def test_muting_emits_price_alert_muted(
     assert (await client.post(f"/api/stores/{unknown}/mute")).status_code == 404
 
     assert _sent(analytics_spy, "price_alert_muted") == [
-        {"scope": "item"},
-        {"scope": "store"},
+        {"scope": "item", "duration": "forever"},
+        {"scope": "store", "duration": "forever"},
+        {"scope": "item", "duration": "timed"},
     ]

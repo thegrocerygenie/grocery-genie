@@ -5,6 +5,7 @@ import { isPremiumRequired } from '@/utils/premium';
 import {
   acceptSuggestion,
   getItem,
+  getLinkCandidates,
   getPriceAlertSettings,
   getPriceComparison,
   getPriceHistory,
@@ -16,11 +17,12 @@ import {
   rejectSuggestion,
   renameItem,
   splitAlias,
+  splitItem,
   unmuteItem,
   unmuteStore,
   updatePriceAlertSettings,
 } from '../services/itemsApi';
-import type { PriceAlertSettingsUpdate } from '../types';
+import type { ItemSplitPart, PriceAlertSettingsUpdate } from '../types';
 
 export const ITEMS_KEY = ['items'] as const;
 
@@ -37,6 +39,16 @@ export function useItem(id: string | undefined) {
     queryKey: [...ITEMS_KEY, 'detail', id],
     queryFn: () => getItem(id as string),
     enabled: !!id,
+  });
+}
+
+/** PI-02 AC 15: the Link items sheet's groups, narrowed by `query`. */
+export function useLinkCandidates(id: string | undefined, query: string) {
+  return useQuery({
+    queryKey: [...ITEMS_KEY, 'link-candidates', id, query.trim()],
+    queryFn: () => getLinkCandidates(id as string, query),
+    enabled: !!id,
+    staleTime: 30_000,
   });
 }
 
@@ -76,12 +88,15 @@ export function useUpdatePriceAlertSettings() {
   });
 }
 
-/** PI-03 AC 4: `muted` true mutes the item's price alerts, false unmutes. */
+/**
+ * PI-03 AC 4, 11: `muted` true mutes the item's price alerts until `until`
+ * (ISO; null or left out is forever), false unmutes.
+ */
 export function useMuteItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, muted }: { id: string; muted: boolean }) =>
-      muted ? muteItem(id) : unmuteItem(id),
+    mutationFn: ({ id, muted, until }: { id: string; muted: boolean; until?: string | null }) =>
+      muted ? muteItem(id, until ?? null) : unmuteItem(id),
     onSettled: (_data, _error, { id }) =>
       Promise.all([
         qc.invalidateQueries({ queryKey: [...ITEMS_KEY, 'detail', id] }),
@@ -90,12 +105,19 @@ export function useMuteItem() {
   });
 }
 
-/** PI-03 AC 4: `muted` true mutes price alerts at the store, false unmutes. */
+/** PI-03 AC 4, 11: `muted` true mutes price alerts at the store until `until`, false unmutes. */
 export function useMuteStore() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ storeId, muted }: { storeId: string; muted: boolean }) =>
-      muted ? muteStore(storeId) : unmuteStore(storeId),
+    mutationFn: ({
+      storeId,
+      muted,
+      until,
+    }: {
+      storeId: string;
+      muted: boolean;
+      until?: string | null;
+    }) => (muted ? muteStore(storeId, until ?? null) : unmuteStore(storeId)),
     onSettled: () => qc.invalidateQueries({ queryKey: PRICE_ALERT_SETTINGS_KEY }),
   });
 }
@@ -134,6 +156,15 @@ export function useSplitAlias() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, aliasId }: { id: string; aliasId: string }) => splitAlias(id, aliasId),
+    onSuccess: () => invalidate(qc),
+  });
+}
+
+/** PI-02 AC 13, 14 (DA-6): split by line. */
+export function useSplitItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, splits }: { id: string; splits: ItemSplitPart[] }) => splitItem(id, splits),
     onSuccess: () => invalidate(qc),
   });
 }

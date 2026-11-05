@@ -23,6 +23,8 @@ export interface ItemSummary {
   observation_count: number;
   store_count: number;
   latest_price: LatestPrice | null;
+  /** PI-02 AC 11, 15 (DA-6): like-for-like mean unit price; null with none. */
+  avg_unit_price?: number | null;
 }
 
 export interface ItemList {
@@ -70,12 +72,18 @@ export interface ItemAlias {
 export interface ItemDetail extends ItemSummary {
   aliases: ItemAlias[];
   suggestions: ItemSuggestion[];
-  /** PI-03 AC 4: the user muted price alerts for this item. */
+  /** PI-03 AC 4: the user muted price alerts for this item (a live mute). */
   alerts_muted: boolean;
+  /** PI-03 AC 11 (DA-7): when the mute ends (ISO, UTC); null is forever or not muted. */
+  muted_until?: string | null;
 }
 
 export interface PricePoint {
   receipt_id: string;
+  /** PI-02 AC 10 (DA-6): the receipt line a split by line moves. */
+  line_item_id: string;
+  /** The line's name as the receipt printed it. */
+  line_name: string;
   date: string;
   store_id: string | null;
   store_name: string | null;
@@ -98,6 +106,18 @@ export interface PriceHistory {
   observations: PricePoint[];
 }
 
+/** PI-02 AC 14: one new item of `POST /api/items/{id}/split`. */
+export interface ItemSplitPart {
+  name: string;
+  line_item_ids: string[];
+}
+
+/** PI-02 AC 15: `GET /api/items/{id}/link-candidates`, for Link items. */
+export interface LinkCandidates {
+  suggested: ItemSummary[];
+  items: ItemSummary[];
+}
+
 export interface StoreRef {
   id: string;
   name: string;
@@ -109,15 +129,40 @@ export interface PriceAlertSettings {
   /** The user's own threshold, or the default when they set none. */
   threshold_percent: number;
   default_threshold_percent: number;
+  /** Days between two alerts for one item: the user's own, or the default (PI-03 AC 8). */
   cooldown_days: number;
-  muted_items: ItemRef[];
-  muted_stores: StoreRef[];
+  default_cooldown_days: number;
+  /** Live mutes only, each with its end (PI-03 AC 11, 12). */
+  muted_items: MutedItem[];
+  muted_stores: MutedStore[];
 }
 
-/** A field left out stays; `threshold_percent: null` goes back to the default. */
+/** PI-03 AC 11 (DA-7): a mute and when it ends (ISO, UTC); null is forever. */
+export interface MutedItem extends ItemRef {
+  muted_until: string | null;
+}
+
+export interface MutedStore extends StoreRef {
+  muted_until: string | null;
+}
+
+/** A field left out stays; `null` threshold or cooldown goes back to the default. */
 export interface PriceAlertSettingsUpdate {
   enabled?: boolean;
   threshold_percent?: number | null;
+  cooldown_days?: number | null;
+}
+
+/** One price change notification from `GET /api/notifications` (PI-03 AC 5). */
+export interface PriceAlertNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  /** A JSON string: the item id and, since DA-4, what a list row shows. */
+  data: string | null;
+  read: boolean;
+  created_at: string;
 }
 
 export interface StorePrice {
