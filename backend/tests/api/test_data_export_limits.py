@@ -6,8 +6,7 @@ hour and one at a time. Past either, ``429`` with ``{"detail": {"code":
 "export_rate_limited" | "export_in_progress", "message": ...}}`` and a
 ``Retry-After`` header. The one-at-a-time slot is a Postgres advisory lock on
 the request's transaction, so it holds across API workers and is released
-when the transaction ends, on success or error. A build whose client has gone
-stops at its next page.
+when the transaction ends, on success or error.
 """
 
 import asyncio
@@ -151,36 +150,6 @@ async def test_the_slot_is_released_when_the_build_fails(premium_client, monkeyp
     again = await premium_client.get(EXPORT)
 
     assert again.status_code == 200
-
-
-async def test_a_build_stops_when_the_client_has_gone(db_session, monkeypatch):
-    """The check runs before each page: a gone client stops the build and its
-    spooled file is closed."""
-    from app.services import export_service
-    from app.services.export_service import (
-        ExportCancelledError,
-        ExportOptions,
-        ExportService,
-    )
-
-    spools: list = []
-    real_spool = export_service._spool
-
-    def tracking_spool():
-        spool = real_spool()
-        spools.append(spool)
-        return spool
-
-    monkeypatch.setattr(export_service, "_spool", tracking_spool)
-    user = User(id=uuid.uuid4(), email="gone@example.com")
-
-    async def gone() -> bool:
-        return True
-
-    with pytest.raises(ExportCancelledError):
-        await ExportService(db_session).build(user, ExportOptions(), should_stop=gone)
-
-    assert spools and all(s.closed for s in spools)
 
 
 # --- one at a time across transactions (Postgres) ---------------------------------

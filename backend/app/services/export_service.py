@@ -30,7 +30,7 @@ import json
 import shutil
 import uuid
 import zipfile
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
+from collections.abc import AsyncIterator, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -78,10 +78,6 @@ TOP_ITEMS = 10
 
 class ExportBusyError(Exception):
     """The user already has an export being built."""
-
-
-class ExportCancelledError(Exception):
-    """The client went away; the build stopped at its next page."""
 
 
 # Exports being built in this process, for the database that has no advisory
@@ -279,12 +275,6 @@ class ExportService:
         self.db = db
         # Where receipt images are; needed only to include them.
         self.storage = storage
-        # Asked before each page: True stops the build (the client has gone).
-        self._should_stop: Callable[[], Awaitable[bool]] | None = None
-
-    async def _check_stop(self) -> None:
-        if self._should_stop is not None and await self._should_stop():
-            raise ExportCancelledError
 
     # --- reads ----------------------------------------------------------------
 
@@ -317,7 +307,13 @@ class ExportService:
             .order_by(Category.sort_order, Category.name)
         )
         return [
-            ExportCategory(id=c.id, name=c.name, is_default=bool(c.is_default))
+            ExportCategory(
+                id=c.id,
+                name=c.name,
+                is_default=bool(c.is_default),
+                color=c.color,
+                icon=c.icon,
+            )
             for c in rows.scalars()
         ]
 
@@ -328,7 +324,6 @@ class ExportService:
         ``BATCH_SIZE`` at a time (keyset on date, id)."""
         after: tuple[date, uuid.UUID] | None = None
         while True:
-            await self._check_stop()
             query = (
                 select(Receipt, Store)
                 .outerjoin(Store, Store.id == Receipt.store_id)
@@ -416,7 +411,6 @@ class ExportService:
         history reads them), oldest first, keyset on date, id."""
         after: tuple[date, uuid.UUID] | None = None
         while True:
-            await self._check_stop()
             query = (
                 select(PriceObservation, CanonicalItem.canonical_name, Store.name)
                 .join(Receipt, Receipt.id == PriceObservation.receipt_id)
@@ -491,20 +485,10 @@ class ExportService:
 
     # --- writers --------------------------------------------------------------
 
-    async def build(
-        self,
-        user: User,
-        options: ExportOptions,
-        *,
-        should_stop: Callable[[], Awaitable[bool]] | None = None,
-    ) -> ExportFile:
-        """Build the export into a spooled file. ``should_stop`` is asked
-        before each page; True raises ``ExportCancelledError``."""
+    async def build(self, user: User, options: ExportOptions) -> ExportFile:
         today = clock.now().date().isoformat()
-        self._should_stop = should_stop
         out = _spool()
         try:
-            await self._check_stop()
             if options.has(ExportInclude.IMAGES):
                 counts = await self._write_zip_with_images(user, options, out, today)
                 media_type, ext = "application/zip", "zip"

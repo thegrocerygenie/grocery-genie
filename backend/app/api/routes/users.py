@@ -5,7 +5,7 @@ from datetime import date
 from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.types import Receive, Scope, Send
@@ -34,7 +34,6 @@ from app.services.analytics_service import AnalyticsService, get_analytics_servi
 from app.services.budget_service import BudgetService
 from app.services.export_service import (
     ExportBusyError,
-    ExportCancelledError,
     ExportFile,
     ExportFormat,
     ExportOptions,
@@ -353,7 +352,6 @@ async def export_summary(
 
 @router.get("/me/export")
 async def export_data(
-    request: Request,
     fmt: ExportFormat = Query(
         default=ExportFormat.JSON,
         alias="format",
@@ -374,14 +372,14 @@ async def export_data(
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(require_premium(FEATURE_DATA_EXPORT)),
     analytics: AnalyticsService = Depends(get_analytics_service),
-) -> Response:
+) -> StreamingResponse:
     """Download receipts, line items, categories, budgets and prices (NFR
     Privacy 2), for a range and chosen sections (PREM-04).
 
     Premium (D2). The file is built from batched reads into a spooled
     temporary file, then streamed, so a large account stays bounded in memory.
     One export at a time per user and ``max_exports_per_hour`` an hour, else
-    429; a build whose client has gone stops at its next page.
+    429.
     """
     _check_range(start, end)
     try:
@@ -409,9 +407,7 @@ async def export_data(
                     },
                     headers={"Retry-After": "600"},
                 )
-            export = await ExportService(db, storage=storage).build(
-                user, options, should_stop=request.is_disconnected
-            )
+            export = await ExportService(db, storage=storage).build(user, options)
     except ExportBusyError:
         raise HTTPException(
             status_code=429,
@@ -421,9 +417,6 @@ async def export_data(
             },
             headers={"Retry-After": "30"},
         ) from None
-    except ExportCancelledError:
-        # Nobody is listening; the spooled file is already closed.
-        return Response(status_code=499)
     try:
         analytics.emit(
             "data_exported",

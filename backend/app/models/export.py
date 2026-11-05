@@ -51,6 +51,9 @@ class ExportCategory(BaseModel):
     id: uuid.UUID
     name: str
     is_default: bool
+    # BC-05 AC 5 (DA-9): names from app.models.category_looks.
+    color: str
+    icon: str
 
 
 class ExportBudget(BaseModel):

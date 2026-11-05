@@ -357,6 +357,33 @@ async def test_includes_leave_out_the_sections_switched_off(
     assert "price_observations" not in settings_only
 
 
+async def test_categories_carry_their_colour_and_icon(premium_client):
+    """NFR Privacy 2, BC-05 AC 5: a category's colour and icon are the user's
+    data too, in JSON and in categories.csv."""
+    made = await premium_client.post(
+        "/api/categories", json={"name": "Garden", "color": "mint", "icon": "leaf"}
+    )
+    assert made.status_code == 201, made.text
+
+    body = (await premium_client.get(EXPORT, params={"include": "budgets"})).json()
+    csv_resp = await premium_client.get(
+        EXPORT, params={"format": "csv", "include": "budgets"}
+    )
+    rows = _csv_rows(zipfile.ZipFile(io.BytesIO(csv_resp.content)), "categories.csv")
+
+    by_name = {c["name"]: c for c in body["categories"]}
+    assert (by_name["Garden"]["color"], by_name["Garden"]["icon"]) == ("mint", "leaf")
+    assert (by_name["Groceries"]["color"], by_name["Groceries"]["icon"]) == (
+        "green",
+        "cart",
+    )
+    csv_by_name = {r["name"]: r for r in rows}
+    assert (csv_by_name["Garden"]["color"], csv_by_name["Garden"]["icon"]) == (
+        "mint",
+        "leaf",
+    )
+
+
 async def test_categories_and_budgets_hold_custom_categories(
     premium_client, mock_extractor, test_image_bytes, other_user
 ):

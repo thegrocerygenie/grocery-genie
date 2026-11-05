@@ -386,7 +386,7 @@ Data export (NFR Privacy 2), Premium (D2), with the options of PREM-04 (DA-8). A
             "quantity": 2.0, "unit_price": 0.69, "total_price": 1.38, "unit_of_measure": "lb",
             "category": "Groceries", "canonical_item_id": "uuid", "canonical_item_name": "ORG BANANAS",
             "corrected": false } ] } ],
-    "categories": [ { "id": "uuid", "name": "Groceries", "is_default": true } ],
+    "categories": [ { "id": "uuid", "name": "Groceries", "is_default": true, "color": "green", "icon": "cart" } ],
     "budgets": [
       { "id": "uuid", "category": null, "category_id": null, "amount": 450.0, "currency": "USD",
         "period_type": "monthly", "period_start": "2026-03-01", "rollover_enabled": false,
@@ -397,7 +397,7 @@ Data export (NFR Privacy 2), Premium (D2), with the options of PREM-04 (DA-8). A
         "currency": "USD", "receipt_id": "uuid", "line_item_id": "uuid" } ]
   }
   ```
-  `range` holds `null` for an open bound. A budget's `category` is null for the overall budget. `currency` is the budget currency (`currency_preference`).
+  `range` holds `null` for an open bound. A category carries its `color` and `icon` (BC-05 AC 5, names as in [Categories](#categories-v11)). A budget's `category` is null for the overall budget. `currency` is the budget currency (`currency_preference`).
 - `csv` (`application/zip`): `receipts.csv` and `line_items.csv` (with `receipt_id`) for `receipts`, `categories.csv` and `budgets.csv` for `budgets`, `price_observations.csv` for `prices`, with the same columns as the JSON. UTF-8 with a byte order mark, so Excel reads accented names; money has two decimals, quantities three. A text cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading `'`, so a spreadsheet does not run it as a formula (CSV injection). JSON values are not escaped.
 - `pdf` (`application/pdf`): a spend report of the range (PREM-04 AC 5): the range, the receipt count, then "Monthly spend by category" (for `budgets`), "Top items" (the ten most spent on) and "Receipts" (date, store, total; for `receipts`). Spend counts what the budget dashboard counts: confirmed receipts in the user's currency; the receipt list shows every receipt in its own currency, marking one not confirmed. `prices` has no section of its own. A range with no receipts says "No receipts in this range." The report uses the PDF's built-in Helvetica (Windows-1252): a letter outside it is drawn without its accent, or as `?` (JSON and CSV keep every name as it is).
 - With `images`, every format comes as one zip (`application/zip`): the CSV files at the top, or the JSON or PDF file, and `images/` with each scanned receipt's image as `images/<receipt id>.<ext>` (`.jpg`, `.png`, `.heic` or `.pdf`; a HEIC or PDF upload's JPEG copy first, as the receipt screen shows). A manual receipt has no image, and an image no longer stored is left out; `images/README.txt` says how many images there are and how many receipts have none.
@@ -408,7 +408,7 @@ Data export (NFR Privacy 2), Premium (D2), with the options of PREM-04 (DA-8). A
 ```json
 { "detail": { "code": "export_rate_limited", "message": "Too many exports this hour. Try again later." } }
 ```
-(`Retry-After: 600`), or `export_in_progress` while another export of the user's is being built (`Retry-After: 30`). The one-at-a-time slot is a Postgres advisory lock on the request's transaction (`pg_try_advisory_xact_lock`), so every API worker sees it and the database releases it when the transaction ends, committed, rolled back on an error, or with a dropped connection. A refused request (422, 403 or `export_in_progress`) does not use up the hourly count, and the summary below is not counted. A build whose client has gone stops before its next page and its spooled file is closed. The app shows one message for either 429: the native download gives only the status, not the body.
+(`Retry-After: 600`), or `export_in_progress` while another export of the user's is being built (`Retry-After: 30`). The one-at-a-time slot is a Postgres advisory lock on the request's transaction (`pg_try_advisory_xact_lock`), so every API worker sees it and the database releases it when the transaction ends, committed, rolled back on an error, or with a dropped connection. A refused request (422, 403 or `export_in_progress`) does not use up the hourly count, and the summary below is not counted. A build runs to the end even if its client has gone (the caps above bound that); its spooled file is closed however the response ends. The app shows one message for either 429: the native download gives only the status, not the body.
 
 Records `data_exported` with the format, the range and the includes (12-analytics.md). The 300 reads/minute limit applies too.
 
