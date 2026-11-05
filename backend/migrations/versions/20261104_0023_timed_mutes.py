@@ -6,8 +6,12 @@ forever. The column has no default and no backfill, so every existing mute
 reads as forever, as it worked before. Alerts compare it with the server
 clock when a receipt is confirmed, so no job ends a mute.
 
-A downgrade drops both columns: the mutes stay, and every timed one becomes
-forever. A re-upgrade leaves them forever.
+A downgrade first deletes every timed mute, ended or not, then drops both
+columns. The code before this revision has no end time, so a timed row left
+in place would come back as a forever mute: an ended one would silence
+alerts again, and a live one would never end. Dropping them errs towards
+alerts (the default the user had before muting), and the user can mute
+again. Forever mutes stay as they were.
 
 Revision ID: 20261104_0023
 Revises: 20261104_0022
@@ -37,4 +41,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     for table in _TABLES:
+        op.execute(sa.text(f"DELETE FROM {table} WHERE muted_until IS NOT NULL"))
         op.drop_column(table, "muted_until")

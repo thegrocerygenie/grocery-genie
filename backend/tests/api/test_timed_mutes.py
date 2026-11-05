@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 
 from app.core import clock
 from tests.api.test_items import _item_id
@@ -403,3 +404,93 @@ async def test_a_store_mute_again_replaces_the_time_across_the_group(
     assert [s["muted_until"] for s in (await _settings(client))["muted_stores"]] == [
         _iso(WEEK)
     ]
+
+
+# --- Two users: a timed mute is the caller's own ----------------------------
+
+
+async def test_timed_mutes_are_the_callers_own(client, client_user_b, db_session):
+    """B never sees A's timed mutes (settings, item detail), and B's mutes,
+    merges and splits never carry or change A's muted_until."""
+    from app.models.database import PriceAlertItemMute
+    from tests.api.test_item_split import _act_as, _manual, _olive_oil, _split
+    from tests.conftest import USER_B_ID
+
+    await _act_as(db_session, DEV_USER_ID)
+    a_item, _ = await _olive_oil(client)
+    resp = await client.post(f"/api/items/{a_item}/mute", json={"until": _iso(WEEK)})
+    assert resp.status_code == 204, resp.text
+
+    await set_premium(db_session, USER_B_ID, True)
+    await _act_as(db_session, USER_B_ID)
+    assert (await _settings(client))["muted_items"] == []
+    assert (await client.get(f"/api/items/{a_item}")).status_code == 404
+    b_lines = [
+        (await _manual(client, day, ("OLIVE OIL", price)))["items"][0]
+        for day, price in [("2026-03-02", 9.0), ("2026-03-09", 9.5)]
+    ]
+    b_item = b_lines[0]["canonical_item_id"]
+    olives = (await _manual(client, "2026-03-03", ("Olives", 3.0)))["items"][0]
+    assert b_item != a_item
+    later = WEEK + timedelta(days=60)
+    resp = await client.post(f"/api/items/{b_item}/mute", json={"until": _iso(later)})
+    assert resp.status_code == 204, resp.text
+    # B cannot merge into or out of A's item, nor split it.
+    for source, target in [(b_item, a_item), (a_item, b_item)]:
+        resp = await client.post(
+            f"/api/items/{source}/merge", json={"into_item_id": target}
+        )
+        assert resp.status_code == 404, resp.text
+    foreign = await _split(client, a_item, ("Mine", [b_lines[0]["id"]]))
+    assert foreign.status_code == 404
+    # B's own split and merge carry B's time, never A's.
+    split = await _split(client, b_item, ("Olive oil 3L", [b_lines[1]["id"]]))
+    assert split.status_code == 201, split.text
+    assert split.json()["items"][0]["muted_until"] == _iso(later)
+    await _merge(client, olives["canonical_item_id"], b_item)
+    assert (await _detail(client, b_item))["muted_until"] == _iso(later)
+    b_ends = [m["muted_until"] for m in (await _settings(client))["muted_items"]]
+    assert b_ends == [_iso(later)] * 2
+
+    await _act_as(db_session, DEV_USER_ID)
+    assert (await _detail(client, a_item))["muted_until"] == _iso(WEEK)
+    a_listed = [
+        (m["id"], m["muted_until"]) for m in (await _settings(client))["muted_items"]
+    ]
+    assert a_listed == [(a_item, _iso(WEEK))]
+    a_rows = (
+        await db_session.execute(
+            select(PriceAlertItemMute.canonical_item_id).where(
+                PriceAlertItemMute.user_id == DEV_USER_ID
+            )
+        )
+    ).scalars()
+    assert [str(i) for i in a_rows] == [a_item]
+
+
+async def test_store_mutes_are_the_callers_own(
+    client, client_user_b, db_session, mock_extractor, test_image_bytes
+):
+    """Stores are shared: B's mute of the same store never shows in A's
+    settings or changes A's end, and B unmuting leaves A's mute."""
+    from tests.api.test_item_split import _act_as
+    from tests.conftest import USER_B_ID
+
+    await _act_as(db_session, DEV_USER_ID)
+    _, store_id = await _bananas(client, mock_extractor, test_image_bytes)
+    resp = await client.post(f"/api/stores/{store_id}/mute", json={"until": _iso(WEEK)})
+    assert resp.status_code == 204, resp.text
+
+    await set_premium(db_session, USER_B_ID, True)
+    await _act_as(db_session, USER_B_ID)
+    assert (await _settings(client))["muted_stores"] == []
+    await _bananas(client, mock_extractor, test_image_bytes)
+    assert await _store_id(client) == store_id  # one shared store row
+    assert (await client.post(f"/api/stores/{store_id}/mute")).status_code == 204
+    b_ends = [s["muted_until"] for s in (await _settings(client))["muted_stores"]]
+    assert b_ends == [None]
+    assert (await client.delete(f"/api/stores/{store_id}/mute")).status_code == 204
+
+    await _act_as(db_session, DEV_USER_ID)
+    a_ends = [s["muted_until"] for s in (await _settings(client))["muted_stores"]]
+    assert a_ends == [_iso(WEEK)]

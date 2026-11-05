@@ -4,8 +4,10 @@ Like the 0022 round trip, this runs Alembic for real against a throwaway
 Postgres database next to the test database (``<test db>_mig0023``), so it
 runs only with ``GG_TEST_DATABASE_URL`` on Postgres (``make backend-test-pg``).
 It seeds an item mute and a store mute at 0022, upgrades, checks that both
-read as forever (a null ``muted_until``), stores a timed one, then downgrades
-and upgrades again.
+read as forever (a null ``muted_until``), adds an ended and a live timed mute
+to each table, then downgrades: only the forever mutes may remain, since the
+old code has no end and would keep a timed mute forever. Then it upgrades
+again.
 """
 
 import uuid
@@ -117,16 +119,59 @@ async def test_existing_mutes_become_forever_then_downgrade_and_upgrade_again(
         rows = await _fetch(dsn, f"SELECT muted_until FROM {table}")  # noqa: S608
         assert [r["muted_until"] for r in rows] == [None]
 
-    until = datetime(2026, 12, 1, 12, 0, tzinfo=UTC)
-    await _fetch(dsn, "UPDATE price_alert_item_mutes SET muted_until = $1", until)
-    [row] = await _fetch(dsn, "SELECT muted_until FROM price_alert_item_mutes")
-    assert row["muted_until"] == until
+    forever = {
+        table: [r["id"] for r in await _fetch(dsn, f"SELECT id FROM {table}")]  # noqa: S608
+        for table in TABLES
+    }
+    ended = datetime(2020, 1, 1, tzinfo=UTC)
+    live = datetime(2099, 1, 1, tzinfo=UTC)
+    for n, until in enumerate((ended, live)):
+        other_item, other_store = uuid.uuid4(), uuid.uuid4()
+        await _fetch(
+            dsn,
+            "INSERT INTO canonical_items (id, user_id, canonical_name) "
+            "VALUES ($1, $2, $3)",
+            other_item,
+            user,
+            f"Item {n}",
+        )
+        await _fetch(
+            dsn,
+            "INSERT INTO stores (id, name, normalized_name) VALUES ($1, $2, $2)",
+            other_store,
+            f"store {n}",
+        )
+        await _fetch(
+            dsn,
+            "INSERT INTO price_alert_item_mutes "
+            "(id, user_id, canonical_item_id, muted_until) VALUES ($1, $2, $3, $4)",
+            uuid.uuid4(),
+            user,
+            other_item,
+            until,
+        )
+        await _fetch(
+            dsn,
+            "INSERT INTO price_alert_store_mutes "
+            "(id, user_id, store_id, store_name, muted_until) "
+            "VALUES ($1, $2, $3, 'Other', $4)",
+            uuid.uuid4(),
+            user,
+            other_store,
+            until,
+        )
+    [row] = await _fetch(
+        dsn, "SELECT muted_until FROM price_alert_item_mutes WHERE muted_until > now()"
+    )
+    assert row["muted_until"] == live
 
     _alembic(url, "downgrade", "20261104_0022")
     for table in TABLES:
         assert not await _has_column(dsn, table)
-        # The mutes themselves stay; only their end time goes.
-        assert len(await _fetch(dsn, f"SELECT id FROM {table}")) == 1  # noqa: S608
+        # Only the forever mutes stay: a timed one, ended or not, would come
+        # back as forever on code that cannot end it.
+        rows = await _fetch(dsn, f"SELECT id FROM {table}")  # noqa: S608
+        assert [r["id"] for r in rows] == forever[table]
 
     _alembic(url, "upgrade", "20261104_0023")
     for table in TABLES:
