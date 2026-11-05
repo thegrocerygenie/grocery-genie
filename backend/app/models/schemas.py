@@ -729,12 +729,38 @@ class ItemListResponse(BaseModel):
     pending_suggestions: int
 
 
+class SuggestionReceiptLine(BaseModel):
+    """The receipt line that raised a suggestion, as the receipt printed it
+    (PI-02 AC 5): the "Same item?" prompt's first card."""
+
+    receipt_id: uuid.UUID
+    name: str
+    store_name: str | None
+    date: date
+
+
+class SuggestedItemStats(BaseModel):
+    """The existing item a suggestion would merge into (PI-02 AC 5): the
+    caller's own purchases of it, the stores they were at, and the mean
+    unit price in the unit and currency most of its prices are in."""
+
+    purchase_count: int
+    store_count: int
+    avg_unit_price: float | None
+    unit_of_measure: str | None
+    currency: str | None
+
+
 class ItemSuggestionResponse(BaseModel):
     id: uuid.UUID
     item: ItemRef
     suggested_item: ItemRef
     confidence: float
     method: str
+    # PI-02 AC 8 (DA-5): what the "Same item?" prompt shows. None only when
+    # the item has no line on a receipt the user can see.
+    receipt_line: SuggestionReceiptLine | None = None
+    suggested_item_stats: SuggestedItemStats | None = None
 
 
 class ItemDetailResponse(ItemSummaryResponse):

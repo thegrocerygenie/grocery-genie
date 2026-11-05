@@ -40,6 +40,26 @@ export interface ItemSuggestion {
   suggested_item: ItemRef;
   confidence: number;
   method: string;
+  /** PI-02 AC 8 (DA-5): what the "Same item?" prompt shows. */
+  receipt_line?: SuggestionReceiptLine | null;
+  suggested_item_stats?: SuggestedItemStats | null;
+}
+
+/** PI-02 AC 5: the receipt line a suggestion asks about, as printed. */
+export interface SuggestionReceiptLine {
+  receipt_id: string;
+  name: string;
+  store_name: string | null;
+  date: string;
+}
+
+/** PI-02 AC 5: the existing item it would merge into (the user's own prices). */
+export interface SuggestedItemStats {
+  purchase_count: number;
+  store_count: number;
+  avg_unit_price: number | null;
+  unit_of_measure: string | null;
+  currency: string | null;
 }
 
 export interface ItemAlias {

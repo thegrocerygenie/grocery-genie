@@ -233,7 +233,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-02 | 2 | Thresholds default to 0.85 fuzzy, 0.80 semantic, 0.6 ask | Unit | `backend/tests/services/test_item_matching.py::test_thresholds_default_to_the_prd_values` | Pass |
 | PI-02 | 2 | >= 0.85 auto-link | Integration | `backend/tests/services/test_item_matching.py::test_high_fuzzy_score_auto_links_and_learns_the_alias` | Pass |
 | PI-02 | 2 | 0.6-0.85 asks the user | Integration | `backend/tests/services/test_item_matching.py::test_medium_score_asks_the_user_and_keeps_the_line_separate` | Pass |
-| PI-02 | 2 | 0.6-0.85 asks the user | Component | `mobile/src/__tests__/priceHistory.test.tsx` "asks on the item and merges when the user says Same Item" | Pass |
+| PI-02 | 2 | 0.6-0.85 asks the user | Component | `mobile/src/__tests__/priceHistory.test.tsx` "asks on the item and merges when the user says Yes, merge" | Pass |
 | PI-02 | 2 | < 0.6 distinct | Integration | `backend/tests/services/test_item_matching.py::test_low_score_is_a_distinct_item_with_no_question` | Pass |
 | PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Unit | `backend/tests/services/test_item_matching.py::test_a_qualifier_difference_is_detected` | Pass |
 | PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Integration | `backend/tests/services/test_item_matching.py::test_a_qualifier_difference_asks_instead_of_auto_linking` | Pass |
@@ -714,11 +714,46 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-03 | 7 | Settings group: Threshold and Cooldown rows, footer from the user's settings | Component | Not yet implemented (DA-4) | Pending |
 | PI-03 | 8 | Cooldown user setting 1–30 days (null default, 422 otherwise), used by the alert check | Integration | Not yet implemented (DA-4) | Pending |
 | PI-03 | 9 | Alert title and body per design (a drop adds "stock-up worth it", push and in-app alike), still naming item, store, old average, new price, percent | Integration | Not yet implemented (DA-4) | Pending |
-| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | Not yet implemented (DA-5) | Pending |
-| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Component | Not yet implemented (DA-5) | Pending |
-| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | Not yet implemented (DA-5) | Pending |
-| PI-02 | 8 | GET /api/items/suggestions?receipt_id= filters and carries the prompt's fields; another user's receipt 404 | Integration | Not yet implemented (DA-5) | Pending |
-| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Component | Not yet implemented (DA-5) | Pending |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "shows the receipt line, store, date, match percent and the existing item" | Pass |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "heads a line from a receipt dated today as from today’s receipt" | Pass |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "reads each card to VoiceOver as one element" | Pass |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Integration | `backend/tests/api/test_match_prompt.py::test_a_suggestion_carries_what_the_prompt_shows` | Pass |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "dates a line from another year with its year" | Pass |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Integration | `backend/tests/api/test_match_prompt.py::test_the_average_is_like_for_like` | Pass |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Integration | `backend/tests/api/test_match_prompt.py::test_the_line_shown_is_the_one_that_raised_it` | Pass |
+| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Yes, merge accepts and shows the next suggestion" | Pass |
+| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Keep as separate item rejects, and the prompt closes after the last" | Pass |
+| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Skip leaves the suggestion pending and shows the next, then closes" | Pass |
+| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Cancel closes the prompt and leaves the rest pending" | Pass |
+| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "saves a double-tapped Yes, merge once and still moves on" | Pass |
+| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Integration | `backend/tests/api/test_items.py::test_accepting_a_suggestion_merges_the_history` | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "opens from Review Matches on the suggestion tapped" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "opens from item detail with only that item’s suggestions" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/priceHistory.test.tsx` "asks on the item and merges when the user says Yes, merge" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "opens after a confirm succeeds, with only that receipt’s suggestions" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "never opens when the confirm fails" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "never holds up the confirm: the app leaves the review before the fetch answers" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "does not open for a receipt that raised no suggestion" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "shows each suggestion after a confirm only once" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "gives up quietly when the fetch fails" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "opens after a manual entry is saved, for that receipt" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "does not open again when a confirmed receipt is edited" | Pass |
+| PI-02 | 7 | After a confirm: at most 3, best match first; the rest stay on Review Matches | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "asks about at most the 3 best matches, best first" | Pass |
+| PI-02 | 7 | After a confirm: at most 3, best match first; the rest stay on Review Matches | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "shows the capped suggestions in that order, counting up to 3" | Pass |
+| PI-02 | 7 | After a confirm: only while still on the screen the confirm left the user on | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "does not open once the user has moved on before the suggestions load" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Integration | `backend/tests/api/test_match_prompt.py::test_a_repeat_of_the_name_does_not_raise_the_suggestion_again` | Pass |
+| PI-02 | 8 | GET /api/items/suggestions?receipt_id= filters and carries the prompt's fields; another user's receipt 404 | Integration | `backend/tests/api/test_match_prompt.py::test_receipt_id_returns_only_that_receipts_suggestions` | Pass |
+| PI-02 | 8 | GET /api/items/suggestions?receipt_id= filters and carries the prompt's fields; another user's receipt 404 | Integration | `backend/tests/api/test_match_prompt.py::test_a_suggestion_carries_what_the_prompt_shows` | Pass |
+| PI-02 | 8 | GET /api/items/suggestions?receipt_id= filters and carries the prompt's fields; another user's receipt 404 | Integration | `backend/tests/api/test_match_prompt.py::test_unknown_receipt_is_404` | Pass |
+| PI-02 | 8 | GET /api/items/suggestions?receipt_id= filters and carries the prompt's fields; another user's receipt 404 | Integration | `backend/tests/api/test_match_prompt.py::test_another_users_receipt_is_404_and_their_suggestions_stay_theirs` | Pass |
+| PI-02 | 8 | GET /api/items/suggestions?receipt_id= filters and carries the prompt's fields; another user's receipt 404 | Integration | `backend/tests/api/test_match_prompt.py::test_counts_and_average_are_the_callers_own` | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "passes over a suggestion already resolved (409) without an error" | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "keeps the prompt open and says so inline when a save fails" | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "passes over a suggestion merged away elsewhere (404) without an error" | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/services/test_match_concurrency.py::test_two_answers_at_once_resolve_once` | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/services/test_match_concurrency.py::test_an_answer_and_a_merge_of_its_item_at_once_never_deadlock` | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/services/test_match_concurrency.py::test_accept_takes_its_item_locks_first_in_id_order` | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/api/test_items.py::test_rejecting_a_suggestion_keeps_the_items_apart` | Pass |
 | PI-02 | 10 | Split by line, including one of several lines sharing a receipt name | Component | Not yet implemented (DA-6) | Pending |
 | PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Component | Not yet implemented (DA-6) | Pending |
 | PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Unit | Not yet implemented (DA-6) | Pending |
@@ -781,7 +816,10 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | EC-PI | 4 | Timed mute expiry | Integration | Not yet implemented (DA-7) | Pending |
 | EC-PI | 5 | Lapsed Premium with existing mutes | Integration | Not yet implemented (DA-1, DA-7) | Pending |
 | EC-PI | 6 | Split with one line, or of every line | Integration | Not yet implemented (DA-6) | Pending |
-| EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | Not yet implemented (DA-5) | Pending |
+| EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "passes over a suggestion already resolved (409) without an error" | Pass |
+| EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/hooks/__tests__/useSyncQueue.test.tsx` "shows no match prompt when a queued receipt syncs (EC-PI 7)" | Pass |
+| EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Yes, merge accepts and shows the next suggestion" | Pass |
+| EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Cancel closes the prompt and leaves the rest pending" | Pass |
 | EC-PI | 8 | A range with too few prices | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "says so instead of drawing a chart, with All one tap away" | Pass |
 | EC-PI | 8 | A range with too few prices | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "counts only like-for-like prices as plotted" | Pass |
 | EC-PI | 9 | Cooldown setting changes | Integration | Not yet implemented (DA-4) | Pending |

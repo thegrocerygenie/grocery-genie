@@ -19,6 +19,12 @@ const mockSync = jest.fn();
 jest.mock('@/features/receipt-capture/services/offlineQueue', () => ({
   syncPendingReceipts: (...args: unknown[]) => mockSync(...args),
 }));
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({ router: { push: (...args: unknown[]) => mockPush(...args) } }));
+const mockListReceiptSuggestions = jest.fn();
+jest.mock('@/features/price-intelligence/services/itemsApi', () => ({
+  listReceiptSuggestions: (...args: unknown[]) => mockListReceiptSuggestions(...args),
+}));
 jest.mock('@/features/receipt-capture/services/pendingImageFiles', () => ({
   deletePendingImage: jest.fn(),
 }));
@@ -107,6 +113,18 @@ describe('useSyncQueue', () => {
     await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['receipts'] }));
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['dashboard'] });
     expect(mockSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no match prompt when a queued receipt syncs (EC-PI 7)', async () => {
+    // A synced photo is a scan waiting for review, not a confirm: its
+    // suggestions come when the user confirms it, or wait in Review Matches.
+    mockSync.mockResolvedValue({ synced: 1, failed: 0 });
+    queue();
+    const { invalidate } = renderSync();
+
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['receipts'] }));
+    expect(mockListReceiptSuggestions).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('uploads as the signed-in user', async () => {
