@@ -26,8 +26,8 @@ MVP notes on the table below:
 | `budget_alert_opened` | threshold_percent, notification_source (push/in_app) | Alert engagement rate |
 | `price_history_viewed` | canonical_item_id, store_count | Price intelligence engagement |
 | `price_alert_triggered` | direction (up/down), percent_change | Price alert frequency (PI-03) |
-| `price_alert_muted` | scope (item/store) | Price alert fatigue: how often users mute |
-| `price_comparison_viewed` | canonical_item_id, store_count (stores compared) | Cross-store comparison engagement (PI-04) |
+| `price_alert_muted` | scope (item/store) | Price alert fatigue: how often users mute. Muting is Premium (D8): sent by the server only for a mute saved, not for a refused free user (PREM-02 AC 7) |
+| `price_comparison_viewed` | canonical_item_id, store_count (stores compared) | Cross-store comparison engagement (PI-04). Premium (D8): sent by the server only for a comparison served, not for a refused free user (PREM-02 AC 7) |
 | `store_merged` | none | Store normalization misses (EC Price Intelligence 1): how often users merge two stores themselves. Sent by the server on each successful `POST /api/stores/{id}/merge` |
 | `store_unmerged` | none | Wrong merges: sent by the server on each `DELETE /api/stores/{id}/merge` |
 | `budget_rollover_toggled` | enabled, type (overall/category) | Rollover adoption (V1.1, Premium): sent by the server on each `PUT /api/budgets/{id}/rollover` |

@@ -52,6 +52,8 @@ $G sql "SELECT ..."               # read gg_verify (observe only; never write th
 $G revenuecat JSON [--secret V]   # POST a RevenueCat webhook body as RevenueCat does, with the
                                   # launch's random GG_REVENUECAT_WEBHOOK_SECRET (or V, to prove a
                                   # wrong one is refused); see features/premium.md
+$G premium                        # make the signed-in user Premium through that webhook (a yearly
+                                  # INITIAL_PURCHASE), for journeys that drive a Premium feature
 $G waitlist import CSV | backfill | retry   # the waitlist ops commands (docs/DEPLOYMENT.md 2.10)
                                   # against this instance; see features/waitlist-offer.md
 $G rcstub fail | ok | grants      # with --stub-revenuecat: refuse grants (503), accept them, or
