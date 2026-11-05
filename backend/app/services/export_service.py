@@ -20,6 +20,11 @@ written, about a kilobyte a page: its receipt list grows by one line per
 receipt, everything else is bounded (months x categories, ten top items). The
 route then streams that file; the database work is done before the first byte
 is sent.
+
+A client that goes away stops the build: ``should_stop`` (the route passes
+``request.is_disconnected``) is asked before each page of receipts or prices,
+and once it says yes the build raises ``ExportCancelledError`` with its
+spooled file closed.
 """
 
 import contextlib
@@ -30,7 +35,7 @@ import json
 import shutil
 import uuid
 import zipfile
-from collections.abc import AsyncIterator, Iterator, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -78,6 +83,10 @@ TOP_ITEMS = 10
 
 class ExportBusyError(Exception):
     """The user already has an export being built."""
+
+
+class ExportCancelledError(Exception):
+    """The client has gone: the build stopped before its next page."""
 
 
 # Exports being built in this process, for the database that has no advisory
@@ -271,10 +280,21 @@ def _spool() -> IO[bytes]:
 
 
 class ExportService:
-    def __init__(self, db: AsyncSession, storage: FileStorage | None = None) -> None:
+    def __init__(
+        self,
+        db: AsyncSession,
+        storage: FileStorage | None = None,
+        should_stop: Callable[[], Awaitable[bool]] | None = None,
+    ) -> None:
         self.db = db
         # Where receipt images are; needed only to include them.
         self.storage = storage
+        # Asked before each page; True stops the build (the client has gone).
+        self.should_stop = should_stop
+
+    async def _stop_if_asked(self) -> None:
+        if self.should_stop is not None and await self.should_stop():
+            raise ExportCancelledError
 
     # --- reads ----------------------------------------------------------------
 
@@ -324,6 +344,7 @@ class ExportService:
         ``BATCH_SIZE`` at a time (keyset on date, id)."""
         after: tuple[date, uuid.UUID] | None = None
         while True:
+            await self._stop_if_asked()
             query = (
                 select(Receipt, Store)
                 .outerjoin(Store, Store.id == Receipt.store_id)
@@ -411,6 +432,7 @@ class ExportService:
         history reads them), oldest first, keyset on date, id."""
         after: tuple[date, uuid.UUID] | None = None
         while True:
+            await self._stop_if_asked()
             query = (
                 select(PriceObservation, CanonicalItem.canonical_name, Store.name)
                 .join(Receipt, Receipt.id == PriceObservation.receipt_id)
