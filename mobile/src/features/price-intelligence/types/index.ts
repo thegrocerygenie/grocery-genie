@@ -72,8 +72,10 @@ export interface ItemAlias {
 export interface ItemDetail extends ItemSummary {
   aliases: ItemAlias[];
   suggestions: ItemSuggestion[];
-  /** PI-03 AC 4: the user muted price alerts for this item. */
+  /** PI-03 AC 4: the user muted price alerts for this item (a live mute). */
   alerts_muted: boolean;
+  /** PI-03 AC 11 (DA-7): when the mute ends (ISO, UTC); null is forever or not muted. */
+  muted_until?: string | null;
 }
 
 export interface PricePoint {
@@ -130,8 +132,18 @@ export interface PriceAlertSettings {
   /** Days between two alerts for one item: the user's own, or the default (PI-03 AC 8). */
   cooldown_days: number;
   default_cooldown_days: number;
-  muted_items: ItemRef[];
-  muted_stores: StoreRef[];
+  /** Live mutes only, each with its end (PI-03 AC 11, 12). */
+  muted_items: MutedItem[];
+  muted_stores: MutedStore[];
+}
+
+/** PI-03 AC 11 (DA-7): a mute and when it ends (ISO, UTC); null is forever. */
+export interface MutedItem extends ItemRef {
+  muted_until: string | null;
+}
+
+export interface MutedStore extends StoreRef {
+  muted_until: string | null;
 }
 
 /** A field left out stays; `null` threshold or cooldown goes back to the default. */

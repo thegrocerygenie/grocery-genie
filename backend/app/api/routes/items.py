@@ -32,13 +32,15 @@ from app.models.schemas import (
     ItemSummaryResponse,
     LatestPrice,
     LinkCandidatesResponse,
+    MutedItemResponse,
+    MutedStoreResponse,
+    MuteRequest,
     PriceAlertSettingsResponse,
     PriceAlertSettingsUpdate,
     PriceComparisonResponse,
     PriceHistoryResponse,
     PricePointResponse,
     StorePriceResponse,
-    StoreRef,
     SuggestedItemStats,
     SuggestionReceiptLine,
 )
@@ -50,7 +52,11 @@ from app.services.item_matching_service import (
     SplitLineError,
     SplitPart,
 )
-from app.services.price_alert_service import PriceAlertService, PriceAlertSettings
+from app.services.price_alert_service import (
+    PriceAlertService,
+    PriceAlertSettings,
+    mute_event,
+)
 from app.services.price_service import (
     MIN_COMPARISON_OBSERVATIONS,
     MIN_TIMELINE_POINTS,
@@ -158,6 +164,7 @@ async def _detail(
     average = (await prices.averages(user_id, [item.id])).get(item.id)
     groups = await _store_groups(db, user_id, [latest])
     suggestions = await ItemMatchingService(db).list_suggestions(user_id, item.id)
+    muted, muted_until = await PriceAlertService(db).item_mute(user_id, item.id)
     return ItemDetailResponse(
         id=item.id,
         canonical_name=item.canonical_name,
@@ -168,7 +175,8 @@ async def _detail(
         avg_unit_price=_money(average),
         aliases=[ItemAliasResponse.model_validate(a) for a in item.aliases],
         suggestions=[await _suggestion(db, user_id, s) for s in suggestions],
-        alerts_muted=await PriceAlertService(db).is_item_muted(user_id, item.id),
+        alerts_muted=muted,
+        muted_until=muted_until,
     )
 
 
@@ -179,8 +187,20 @@ def _settings(settings: PriceAlertSettings) -> PriceAlertSettingsResponse:
         default_threshold_percent=settings.default_threshold_percent,
         cooldown_days=settings.cooldown_days,
         default_cooldown_days=settings.default_cooldown_days,
-        muted_items=[ItemRef.model_validate(i) for i in settings.muted_items],
-        muted_stores=[StoreRef.model_validate(s) for s in settings.muted_stores],
+        muted_items=[
+            MutedItemResponse(
+                id=m.item.id,
+                canonical_name=m.item.canonical_name,
+                muted_until=m.muted_until,
+            )
+            for m in settings.muted_items
+        ],
+        muted_stores=[
+            MutedStoreResponse(
+                id=m.group.id, name=m.group.name, muted_until=m.muted_until
+            )
+            for m in settings.muted_stores
+        ],
     )
 
 
@@ -526,15 +546,18 @@ async def link_candidates(
 @router.post("/{item_id}/mute", status_code=204)
 async def mute_item(
     item_id: uuid.UUID,
+    body: MuteRequest | None = None,
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(require_premium(FEATURE_PRICE_ALERT_MUTE)),
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> Response:
-    """No price change alerts for this item (PI-03 AC 4). Idempotent. Premium
-    (D8, PREM-02 AC 2); unmuting below is open to everyone."""
+    """No price change alerts for this item (PI-03 AC 4), until ``until``
+    or forever (AC 11). Muting again replaces the time. Premium (D8, PREM-02
+    AC 2); unmuting below is open to everyone."""
+    until = body.until if body else None
     item = await _get_item(ItemMatchingService(db), user.id, item_id)
-    await PriceAlertService(db).mute_item(user.id, item.id)
-    analytics.emit("price_alert_muted", {"scope": "item"}, user.id)
+    await PriceAlertService(db).mute_item(user.id, item.id, until)
+    analytics.emit("price_alert_muted", mute_event("item", until), user.id)
     return Response(status_code=204)
 
 

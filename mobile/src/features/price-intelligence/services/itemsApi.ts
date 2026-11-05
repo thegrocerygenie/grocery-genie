@@ -102,18 +102,27 @@ export async function updatePriceAlertSettings(
   });
 }
 
-/** PI-03 AC 4: no price alerts for the item. Idempotent. */
-export async function muteItem(id: string): Promise<void> {
-  await apiClient<void>(`/api/items/${id}/mute`, { method: 'POST' });
+/**
+ * PI-03 AC 4, 11: no price alerts for the item until `until` (ISO), or
+ * forever when null. Muting again replaces the time.
+ */
+export async function muteItem(id: string, until: string | null = null): Promise<void> {
+  await apiClient<void>(`/api/items/${id}/mute`, {
+    method: 'POST',
+    body: JSON.stringify({ until }),
+  });
 }
 
 export async function unmuteItem(id: string): Promise<void> {
   await apiClient<void>(`/api/items/${id}/mute`, { method: 'DELETE' });
 }
 
-/** PI-03 AC 4: no price alerts for prices paid at the store. Idempotent. */
-export async function muteStore(storeId: string): Promise<void> {
-  await apiClient<void>(`/api/stores/${storeId}/mute`, { method: 'POST' });
+/** PI-03 AC 4, 11: no price alerts for prices paid at the store, until `until` or forever. */
+export async function muteStore(storeId: string, until: string | null = null): Promise<void> {
+  await apiClient<void>(`/api/stores/${storeId}/mute`, {
+    method: 'POST',
+    body: JSON.stringify({ until }),
+  });
 }
 
 export async function unmuteStore(storeId: string): Promise<void> {

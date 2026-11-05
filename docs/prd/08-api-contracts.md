@@ -485,7 +485,7 @@ Price observations for a canonical item, oldest first.
 
 **Request:** `{ "splits": [{ "name": "Olive oil 3L", "line_item_ids": ["uuid"] }] }` (1 to 10 splits). A line is one of the item's on the caller's confirmed receipts that are not deleted: the `line_item_id`s of its prices. Any line can move, though its receipt name has other lines.
 
-**Response** `201 { "items": [<item detail>, ...] }`: the new items, in the order of `splits`, each with its lines and their prices (each line's observation moves with it, so history, comparison and alerts use the new grouping; nothing is copied). A receipt name all of whose lines went to one new item goes with them: its alias, and its lines on Recently Deleted receipts, so a restore and later scans join the new item. A name with lines left on the original, or spread over two new items, stays with the original. A new item's name may equal an existing item's (it is still a new item; the user can link them). The item's pending suggestions go with the line that raised them (the line matching made the item from, which keeps `match_method` `new`): when it moved, they belong to its new item, so an accept merges only that item's lines; one whose line stayed stays. A muted item's new items are muted too (`alerts_muted`, PI-03 AC 4).
+**Response** `201 { "items": [<item detail>, ...] }`: the new items, in the order of `splits`, each with its lines and their prices (each line's observation moves with it, so history, comparison and alerts use the new grouping; nothing is copied). A receipt name all of whose lines went to one new item goes with them: its alias, and its lines on Recently Deleted receipts, so a restore and later scans join the new item. A name with lines left on the original, or spread over two new items, stays with the original. A new item's name may equal an existing item's (it is still a new item; the user can link them). The item's pending suggestions go with the line that raised them (the line matching made the item from, which keeps `match_method` `new`): when it moved, they belong to its new item, so an accept merges only that item's lines; one whose line stayed stays. A muted item's new items are muted too (`alerts_muted`, PI-03 AC 4), until the same `muted_until` (DA-7); an ended mute is not copied.
 
 Errors: `409` when the original would keep no line (also an item with one line, EC-PI 6); `422` for an empty name, an empty split, no split, a line that is not the item's, or one line in two splits; `404` for another user's item. The split locks the item before it reads or moves anything, the order merge and accept use (items first), so a split racing a merge of the item waits: the merge then takes what is left, or the split finds the item gone (404).
 
@@ -519,11 +519,11 @@ Same product: merges `item` into `suggested_item` and returns it. 409 when alrea
 
 ### Price change alerts (PI-03) [V1.1]
 
-Contract frozen 2026-11-03 (V11-01); the app (V11-02) uses it: an alert tap opens `/items/{canonical_item_id}`, item detail has the item and store mute switches, and Settings → Alerts the on/off switch, the threshold and the muted list.
+Contract frozen 2026-11-03 (V11-01); the app (V11-02) uses it: an alert tap opens `/items/{canonical_item_id}`, item detail's Alerts row opens the item and store mute switches (DA-7), and Settings → Alerts the on/off switch, the threshold and the muted list.
 
 **When one is sent.** Confirming a receipt (scan + `PATCH status=confirmed`, or a manual entry) compares each of its prices with the item's 30-day rolling average: the item's earlier prices in the same unit and currency, dated in the 30 days up to the receipt's date, this receipt left out. Two lines of one item on one receipt count as one price, their mean. A change of at least the user's threshold (`GG_PRICE_ALERT_THRESHOLD_PERCENT`, default 10), up or down, sends an alert, when:
 - the average has at least `GG_PRICE_ALERT_MIN_OBSERVATIONS` earlier prices (default 2);
-- alerts are on, and neither the item nor the receipt's store is muted;
+- alerts are on, and neither the item nor the receipt's store is muted: a mute counts while its `muted_until` is null (forever) or later than the confirm's server time (UTC), so a confirm at or after it alerts as if unmuted, with no job to end it (PI-03 AC 12, DA-7). Nothing is sent afterwards for prices confirmed while muted;
 - the item has not alerted in the user's cooldown: their `cooldown_days` (PI-03 AC 8, DA-4), or `GG_PRICE_ALERT_COOLDOWN_DAYS` (default 7) when they set none, on the server clock. The cooldown is read when the alert is claimed, so a changed one counts from the item's last alert, and shortening it never resends an alert that was held back (EC-PI 9). A muted item or store, or a change under the threshold, does not use up the cooldown.
 
 Only a confirm alerts: editing a confirmed receipt later sends none. A failure in the price alert check is logged and never fails the confirm.
@@ -549,22 +549,24 @@ A drop reads "<Item> down N%" and its body ends " · stock-up worth it". `data` 
   "default_threshold_percent": 10,
   "cooldown_days": 7,
   "default_cooldown_days": 7,
-  "muted_items": [{ "id": "uuid", "canonical_name": "Organic Bananas" }],
-  "muted_stores": [{ "id": "uuid", "name": "Loblaws" }]
+  "muted_items": [{ "id": "uuid", "canonical_name": "Organic Bananas", "muted_until": "2026-12-01T17:00:00Z" }],
+  "muted_stores": [{ "id": "uuid", "name": "Loblaws", "muted_until": null }]
 }
 ```
-`threshold_percent` and `cooldown_days` are the user's own, or the default when they have not set one.
+`threshold_percent` and `cooldown_days` are the user's own, or the default when they have not set one. `muted_items` and `muted_stores` list live mutes only, each with `muted_until` (UTC; null is forever; DA-7): an ended mute is not listed (PI-03 AC 12).
 
 ### PUT /api/items/price-alert-settings
 **Request:** any of `{ "enabled": false }`, `{ "threshold_percent": 15 }`, `{ "cooldown_days": 14 }`. A field left out stays as it is; `"threshold_percent": null` and `"cooldown_days": null` go back to the default. `threshold_percent` is 1–100 and `cooldown_days` an integer 1–30 (the app offers 1, 3, 7, 14 and 30; PI-03 AC 8); 422 otherwise. Returns the settings above.
 
 ### POST /api/items/{canonical_id}/mute · DELETE /api/items/{canonical_id}/mute
-The `POST` is Premium (D8, PREM-02 AC 2): a free user gets `403 premium_required` (`feature` `price_alert_mute`); the `DELETE` stays open to everyone. 204. No price alerts for the item, or alerts again. Both are idempotent; another user's item is 404. Item detail (`GET /api/items/{canonical_id}`) carries `alerts_muted: bool`. Merging a muted item into another mutes the other.
+The `POST` is Premium (D8, PREM-02 AC 2): a free user gets `403 premium_required` (`feature` `price_alert_mute`); the `DELETE` stays open to everyone. 204. No price alerts for the item, or alerts again. Both are idempotent; another user's item is 404. Item detail (`GET /api/items/{canonical_id}`) carries `alerts_muted: bool` and `muted_until` (null when forever or not muted). Merging a muted item into another mutes the other; when both are muted the later end stays (forever is the latest), and an ended mute moves nothing (EC-PI 5).
+
+**Timed mutes (PI-03 AC 10-12, DA-7).** Both mute `POST`s take an optional body `{ "until": "<ISO 8601 time>" }`. No body, or `"until": null`, mutes forever. A time with an offset is converted to UTC; one with none is taken as UTC; one not later than the server clock is `422`, as is a string that is not a time. Muting again replaces the time (a timed mute made forever, forever made timed, or an ended mute started again). The mute ends by itself at `until`. After Premium lapses, a timed mute runs to its end and can be removed, but changing its time is a mute `POST`, so `403 premium_required` (EC-PI 5). The app offers Forever, 1 week, 1 month and 3 months, counted on the phone's calendar.
 
 ### POST /api/stores/{store_id}/mute · DELETE /api/stores/{store_id}/mute
 The `POST` is Premium (D8, PREM-02 AC 2): a free user gets `403 premium_required` (`feature` `price_alert_mute`); the `DELETE` stays open to everyone. 204. No price alerts for prices paid at the store, or alerts again. Idempotent. Muting a store the user has no receipt from is 404 (stores are shared across users); unmuting removes only the user's own mute and is never 404, so a mute whose receipts were since deleted and purged can still be undone. Store ids come from `GET /api/items/{canonical_id}/prices` (`observations[].store_id`), `/compare` or `GET /api/stores`.
 
-**Mutes and merged stores (V11-05).** A mute covers the store as the user groups it ([Stores](#stores-normalization-and-merge-v11)): muting any store of a group mutes the whole group, and the mute is recorded on the group's store (`muted_stores` lists it once, with the group's id and name). A muted store merged into another mutes the merged group. Unmuting a group removes every one of the user's mutes inside it. Unmerging leaves each mute on the store it was recorded on: a mute set on a store before it was merged stays with that store, and one set on the group stays with the group's store.
+**Mutes and merged stores (V11-05).** A mute covers the store as the user groups it ([Stores](#stores-normalization-and-merge-v11)): muting any store of a group mutes the whole group, and the mute is recorded on the group's store (`muted_stores` lists it once, with the group's id and name). Muting a group again replaces the user's other mutes inside it, so the group has one `muted_until` (DA-7). A muted store merged into another mutes the merged group. Unmuting a group removes every one of the user's mutes inside it. Unmerging leaves each mute on the store it was recorded on: a mute set on a store before it was merged stays with that store, and one set on the group stays with the group's store.
 
 ### Stores: normalization and merge [V1.1]
 

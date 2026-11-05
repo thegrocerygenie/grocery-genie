@@ -88,12 +88,15 @@ export function useUpdatePriceAlertSettings() {
   });
 }
 
-/** PI-03 AC 4: `muted` true mutes the item's price alerts, false unmutes. */
+/**
+ * PI-03 AC 4, 11: `muted` true mutes the item's price alerts until `until`
+ * (ISO; null or left out is forever), false unmutes.
+ */
 export function useMuteItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, muted }: { id: string; muted: boolean }) =>
-      muted ? muteItem(id) : unmuteItem(id),
+    mutationFn: ({ id, muted, until }: { id: string; muted: boolean; until?: string | null }) =>
+      muted ? muteItem(id, until ?? null) : unmuteItem(id),
     onSettled: (_data, _error, { id }) =>
       Promise.all([
         qc.invalidateQueries({ queryKey: [...ITEMS_KEY, 'detail', id] }),
@@ -102,12 +105,19 @@ export function useMuteItem() {
   });
 }
 
-/** PI-03 AC 4: `muted` true mutes price alerts at the store, false unmutes. */
+/** PI-03 AC 4, 11: `muted` true mutes price alerts at the store until `until`, false unmutes. */
 export function useMuteStore() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ storeId, muted }: { storeId: string; muted: boolean }) =>
-      muted ? muteStore(storeId) : unmuteStore(storeId),
+    mutationFn: ({
+      storeId,
+      muted,
+      until,
+    }: {
+      storeId: string;
+      muted: boolean;
+      until?: string | null;
+    }) => (muted ? muteStore(storeId, until ?? null) : unmuteStore(storeId)),
     onSettled: () => qc.invalidateQueries({ queryKey: PRICE_ALERT_SETTINGS_KEY }),
   });
 }

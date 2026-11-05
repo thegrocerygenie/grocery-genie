@@ -9,6 +9,7 @@ import { useMe, useUpdatePreferences } from '@/features/auth/hooks/useAuth';
 import { useBudgets } from '@/features/budget/hooks/useBudget';
 import { useCategories } from '@/features/budget/hooks/useCategories';
 import {
+  MUTE_COPY,
   PRICE_ALERTS_LIST_COPY,
   PRICE_ALERT_SETTINGS_COPY as PRICE_COPY,
   PRICE_ALERT_THRESHOLDS,
@@ -20,6 +21,7 @@ import {
   useUpdatePriceAlertSettings,
 } from '@/features/price-intelligence/hooks/useItems';
 import type { PriceAlertSettings } from '@/features/price-intelligence/types';
+import { formatMuteEnd } from '@/features/price-intelligence/utils/muteUntil';
 import { useNotificationStore } from '@/store/notificationStore';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -48,6 +50,27 @@ export default function NotificationSettingsScreen() {
   const updatePriceAlerts = useUpdatePriceAlertSettings();
   const unmuteItem = useMuteItem();
   const unmuteStore = useMuteStore();
+  // PI-03 AC 14: rows whose unmute failed, by key; the row stays, says so, and can retry.
+  const [unmuteFailed, setUnmuteFailed] = useState<ReadonlySet<string>>(new Set());
+  const markUnmute = (key: string, failed: boolean) =>
+    setUnmuteFailed((current) => {
+      const next = new Set(current);
+      if (failed) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  const onUnmuteItem = (id: string) => {
+    const key = `item-${id}`;
+    markUnmute(key, false);
+    unmuteItem.mutate({ id, muted: false }, { onError: () => markUnmute(key, true) });
+  };
+  const onUnmuteStore = (storeId: string) => {
+    const key = `store-${storeId}`;
+    markUnmute(key, false);
+    unmuteStore.mutate({ storeId, muted: false }, { onError: () => markUnmute(key, true) });
+  };
+  const muteEnd = (until: string | null) =>
+    until ? MUTE_COPY.until(formatMuteEnd(until)) : MUTE_COPY.forever;
   const priceAlertsOn = updatePriceAlerts.isPending
     ? (updatePriceAlerts.variables.enabled ?? priceAlerts?.enabled)
     : priceAlerts?.enabled;
@@ -167,16 +190,18 @@ export default function NotificationSettingsScreen() {
               <UnmuteRow
                 key={`item-${item.id}`}
                 name={item.canonical_name}
-                kind={PRICE_COPY.item}
-                onPress={() => unmuteItem.mutate({ id: item.id, muted: false })}
+                detail={`${PRICE_COPY.item} · ${muteEnd(item.muted_until)}`}
+                failed={unmuteFailed.has(`item-${item.id}`)}
+                onPress={() => onUnmuteItem(item.id)}
               />
             ))}
             {priceAlerts.muted_stores.map((store) => (
               <UnmuteRow
                 key={`store-${store.id}`}
                 name={store.name}
-                kind={PRICE_COPY.store}
-                onPress={() => unmuteStore.mutate({ storeId: store.id, muted: false })}
+                detail={`${PRICE_COPY.store} · ${muteEnd(store.muted_until)}`}
+                failed={unmuteFailed.has(`store-${store.id}`)}
+                onPress={() => onUnmuteStore(store.id)}
               />
             ))}
           </Section>
@@ -302,19 +327,26 @@ function NavRow({ label, value, onPress }: NavRowProps) {
 
 interface UnmuteRowProps {
   name: string;
-  /** "Item" or "Store", shown under the name. */
-  kind: string;
+  /** "Item · Until Mar 27, 2026" or "Store · Forever", under the name (PI-03 AC 14). */
+  detail: string;
+  /** The last unmute failed: the row says so, and Unmute tries again. */
+  failed: boolean;
   onPress: () => void;
 }
 
-function UnmuteRow({ name, kind, onPress }: UnmuteRowProps) {
+function UnmuteRow({ name, detail, failed, onPress }: UnmuteRowProps) {
   return (
     <View style={styles.row}>
       <View style={styles.rowText}>
         <Text style={type.body} numberOfLines={1}>
           {name}
         </Text>
-        <Text style={styles.caption}>{kind}</Text>
+        <Text style={styles.caption}>{detail}</Text>
+        {failed ? (
+          <Text style={styles.error} accessibilityRole="alert">
+            {MUTE_COPY.unmuteFailed}
+          </Text>
+        ) : null}
       </View>
       <Pressable
         onPress={onPress}
@@ -381,6 +413,7 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1, gap: 2 },
   caption: { ...type.footnote, color: colors.iosLabel2 },
+  error: { ...type.footnote, color: colors.redText },
   inlineButton: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'flex-end' },
   link: { ...type.body, color: colors.tint },
   separator: {
