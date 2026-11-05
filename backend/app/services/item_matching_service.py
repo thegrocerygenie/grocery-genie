@@ -23,7 +23,7 @@ however close they score; step 4 asks the user instead. Fuzzy matching
 reads a qualifier's receipt abbreviations as the word ("org" is organic).
 
 The user can also merge two items, split an alias off into its own item,
-and rename an item.
+split chosen lines off into new items, and rename an item.
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ import math
 import re
 import unicodedata
 import uuid
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -76,11 +77,26 @@ MATCH_MANUAL = "manual"
 # number or qualifier check, so look a little further.
 _SEMANTIC_CANDIDATES = 5
 
+# PI-02 AC 15: similar names offered under "Suggested" on Link items.
+_SIMILAR_LINKS = 5
+
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 
 
 class ItemNotFoundError(Exception):
     """No canonical item (or alias, or suggestion) with that id for this user."""
+
+
+class SplitLineError(Exception):
+    """A split names a line that is not one of the item's, or one twice (422)."""
+
+
+@dataclass(frozen=True)
+class SplitPart:
+    """A new item of a split by line (PI-02 AC 11): its name and lines."""
+
+    name: str
+    line_item_ids: list[uuid.UUID]
 
 
 class ItemMatchConflictError(Exception):
@@ -655,6 +671,207 @@ class ItemMatchingService:
         await self.db.flush()
         await self.db.refresh(item, ["aliases"])
         return new_item
+
+    async def split_lines(
+        self, user_id: uuid.UUID, item_id: uuid.UUID, parts: Sequence[SplitPart]
+    ) -> list[CanonicalItem]:
+        """Move chosen lines, with their prices, to new items (PI-02 AC 10-14).
+
+        A line is one of the item's on the user's confirmed receipts that are
+        not deleted (what the split screen lists). Any one can move, though
+        its receipt name has other lines. A name whose lines all went to one
+        new item goes with them, and so do its lines on deleted receipts, so
+        a restore and later scans follow it; a name with lines on both sides,
+        or across two new items, stays. The item's pending questions go with
+        the line that raised them (_move_raised_suggestions), and a muted
+        item's new items are muted too. The original keeps at least one line
+        (ItemMatchConflictError: 409); a line that is not the item's, or one
+        named twice, is SplitLineError (422).
+
+        Lock order (DA-5): the item first, before any line, price or alias
+        row, as merge() and accept_suggestion() lock it; the new items are
+        not visible to anyone else until commit.
+        """
+        await self._lock_items(item_id)
+        item = await self.get_item(user_id, item_id)
+        rows = await self.db.execute(
+            select(LineItem, Receipt.status, Receipt.deleted_at)
+            .join(Receipt, LineItem.receipt_id == Receipt.id)
+            .where(
+                LineItem.canonical_item_id == item.id,
+                Receipt.user_id == user_id,
+            )
+        )
+        visible: dict[uuid.UUID, LineItem] = {}
+        hidden: list[LineItem] = []
+        for line_item, status, deleted_at in rows.all():
+            if status == "confirmed" and deleted_at is None:
+                visible[line_item.id] = line_item
+            else:
+                hidden.append(line_item)
+
+        chosen: dict[uuid.UUID, int] = {}
+        for index, part in enumerate(parts):
+            for line_id in part.line_item_ids:
+                if line_id not in visible or line_id in chosen:
+                    raise SplitLineError(line_id)
+                chosen[line_id] = index
+        if len(chosen) >= len(visible):
+            raise ItemMatchConflictError(
+                "The original item must keep at least one line"
+            )
+
+        new_items = []
+        for part in parts:
+            units = Counter(
+                visible[i].unit_of_measure
+                for i in part.line_item_ids
+                if visible[i].unit_of_measure
+            )
+            new_item = CanonicalItem(
+                user_id=user_id,
+                household_id=item.household_id,
+                canonical_name=part.name.strip()[:255],
+                unit_of_measure=(
+                    units.most_common(1)[0][0] if units else item.unit_of_measure
+                ),
+            )
+            self.db.add(new_item)
+            new_items.append(new_item)
+        await self.db.flush()
+
+        destination = {
+            line_id: new_items[index].id for line_id, index in chosen.items()
+        }
+        # A name goes with its lines when they all went to one new item.
+        by_name: dict[str, set[uuid.UUID]] = {}
+        for line_id, line_item in visible.items():
+            by_name.setdefault(normalize_item_name(line_item.raw_name), set()).add(
+                destination.get(line_id, item.id)
+            )
+        await self.db.refresh(item, ["aliases"])
+        for alias in list(item.aliases):
+            targets = by_name.get(alias.normalized_name, set())
+            if len(targets) != 1 or item.id in targets:
+                continue
+            target = next(iter(targets))
+            alias.canonical_item_id = target
+            for line_item in hidden:
+                if normalize_item_name(line_item.raw_name) == alias.normalized_name:
+                    destination[line_item.id] = target
+
+        lines = {**visible, **{li.id: li for li in hidden}}
+        await self._move_raised_suggestions(item.id, lines, destination)
+        for line_id, target in destination.items():
+            line_item = lines[line_id]
+            line_item.canonical_item_id = target
+            # The line matching made the item from keeps "new": it is the
+            # line its question shows (suggestion_line) and was raised by.
+            if line_item.match_method != MATCH_NEW:
+                line_item.match_method = MATCH_MANUAL
+                line_item.match_confidence = 1.0
+        # Each moved line takes its price along: the observation is the
+        # line's (one per line), so nothing is lost or counted twice.
+        for target in {*destination.values()}:
+            await self.db.execute(
+                update(PriceObservation)
+                .where(
+                    PriceObservation.line_item_id.in_(
+                        [i for i, t in destination.items() if t == target]
+                    )
+                )
+                .values(canonical_item_id=target)
+            )
+        # A muted item's new items stay muted (the user's answer, 2026-11-05).
+        if await self.db.scalar(
+            select(PriceAlertItemMute.id).where(
+                PriceAlertItemMute.user_id == user_id,
+                PriceAlertItemMute.canonical_item_id == item.id,
+            )
+        ):
+            for new_item in new_items:
+                self.db.add(
+                    PriceAlertItemMute(user_id=user_id, canonical_item_id=new_item.id)
+                )
+        await self.db.flush()
+        await self.db.refresh(item, ["aliases"])
+        for new_item in new_items:
+            await self.db.refresh(new_item, ["aliases"])
+        return new_items
+
+    async def _move_raised_suggestions(
+        self,
+        item_id: uuid.UUID,
+        lines: dict[uuid.UUID, LineItem],
+        destination: dict[uuid.UUID, uuid.UUID],
+    ) -> None:
+        """The item's pending questions go with the line that raised them:
+        the line matching made the item from (MATCH_NEW). When it moved, and
+        no such line stays, they belong to its new item, so accepting one
+        merges only that item's lines. A question the new item already has,
+        or one that would pair it with itself, is dropped. Suggestion rows
+        are written after the item lock (DA-5 lock order)."""
+        raisers = [li for li in lines.values() if li.match_method == MATCH_NEW]
+        targets = {destination.get(li.id) for li in raisers}
+        if len(targets) != 1 or None in targets:
+            return
+        target = targets.pop()
+        rows = await self.db.execute(
+            select(ItemMatchSuggestion).where(
+                ItemMatchSuggestion.item_id == item_id,
+                ItemMatchSuggestion.status == "pending",
+            )
+        )
+        for suggestion in rows.scalars().all():
+            if suggestion.suggested_item_id == target:
+                await self.db.delete(suggestion)
+            else:
+                suggestion.item_id = target
+        await self.db.flush()
+
+    async def link_candidates(
+        self, user_id: uuid.UUID, item: CanonicalItem, candidates: list[uuid.UUID]
+    ) -> list[uuid.UUID]:
+        """The Link items sheet's "Suggested" group (PI-02 AC 15), of the
+        ``candidates`` (the user's other items): the item's pending
+        suggestions first, newest first, then up to _SIMILAR_LINKS of the
+        most similar names, scoring at least the suggest threshold."""
+        allowed = set(candidates) - {item.id}
+        suggested: list[uuid.UUID] = []
+        for suggestion in await self.list_suggestions(user_id, item.id):
+            target = suggestion.suggested_item_id
+            if target in allowed and target not in suggested:
+                suggested.append(target)
+
+        rows = await self.db.execute(
+            select(
+                CanonicalItemAlias.canonical_item_id,
+                CanonicalItemAlias.normalized_name,
+            ).where(CanonicalItemAlias.user_id == user_id)
+        )
+        names: dict[uuid.UUID, set[str]] = {}
+        for owner, name in rows.all():
+            names.setdefault(owner, set()).add(name)
+        items = await self.db.execute(
+            select(CanonicalItem.id, CanonicalItem.canonical_name).where(
+                CanonicalItem.id.in_(allowed | {item.id})
+            )
+        )
+        for owner, canonical_name in items.all():
+            names.setdefault(owner, set()).add(normalize_item_name(canonical_name))
+        own = names.get(item.id, set())
+        scored = []
+        for candidate in candidates:
+            if candidate not in allowed or candidate in suggested:
+                continue
+            score = max(
+                (fuzzy_similarity(a, b) for a in own for b in names.get(candidate, ())),
+                default=0.0,
+            )
+            if score >= self.settings.item_match_suggest_threshold:
+                scored.append((score, candidate))
+        scored.sort(key=lambda pair: -pair[0])
+        return suggested + [c for _, c in scored[:_SIMILAR_LINKS]]
 
     # --- Suggestions (PI-02 AC 2) -----------------------------------------
 

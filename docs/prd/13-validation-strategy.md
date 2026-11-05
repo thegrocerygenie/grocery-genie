@@ -783,12 +783,51 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/services/test_match_concurrency.py::test_an_answer_and_a_merge_of_its_item_at_once_never_deadlock` | Pass |
 | PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/services/test_match_concurrency.py::test_accept_takes_its_item_locks_first_in_id_order` | Pass |
 | PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/api/test_items.py::test_rejecting_a_suggestion_keeps_the_items_apart` | Pass |
-| PI-02 | 10 | Split by line, including one of several lines sharing a receipt name | Component | Not yet implemented (DA-6) | Pending |
-| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Component | Not yet implemented (DA-6) | Pending |
-| PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Unit | Not yet implemented (DA-6) | Pending |
-| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | Not yet implemented (DA-6) | Pending |
-| PI-02 | 14 | POST /api/items/{id}/split: 201, 409 empty original, 422, 404 | Integration | Not yet implemented (DA-6) | Pending |
-| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Component | Not yet implemented (DA-6) | Pending |
+| PI-02 | 10 | Split by line, including one of several lines sharing a receipt name | Component | `mobile/src/__tests__/itemSplit.test.tsx` "opens Split into 2 items with the original and its lines (AC 10)" | Pass |
+| PI-02 | 10 | Split by line, including one of several lines sharing a receipt name | Component | `mobile/src/__tests__/itemSplit.test.tsx` "moves one of several lines sharing a name, naming the new item from it (AC 10, 11)" | Pass |
+| PI-02 | 10 | Split by line, including one of several lines sharing a receipt name | Integration | `backend/tests/api/test_item_split.py::test_prices_name_their_line` | Pass |
+| PI-02 | 10 | Split by line, including one of several lines sharing a receipt name | Integration | `backend/tests/api/test_item_split.py::test_one_of_several_lines_sharing_a_name_moves_with_its_price` | Pass |
+| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Component | `mobile/src/__tests__/itemSplit.test.tsx` "moves one of several lines sharing a name, naming the new item from it (AC 10, 11)" | Pass |
+| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Component | `mobile/src/__tests__/itemSplit.test.tsx` "enables Save once the new item has a name and a line and the original keeps one (AC 11)" | Pass |
+| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Component | `mobile/src/__tests__/itemSplit.test.tsx` "Add another split makes it Split into 3 items and lines pick their item (AC 11)" | Pass |
+| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Unit | `mobile/src/features/price-intelligence/utils/split.test.ts` "counts purchases and averages the like-for-like prices" | Pass |
+| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Unit | `mobile/src/features/price-intelligence/utils/split.test.ts` "needs every new item named, with a line, and the original keeping one" | Pass |
+| PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Integration | `backend/tests/api/test_item_split.py::test_split_into_several_new_items` | Pass |
+| PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Unit | `mobile/src/features/price-intelligence/utils/split.test.ts` "warns when the highest is at least 1.5 times the lowest" | Pass |
+| PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Unit | `mobile/src/features/price-intelligence/utils/split.test.ts` "stays quiet below 1.5 times" | Pass |
+| PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Unit | `mobile/src/features/price-intelligence/utils/split.test.ts` "compares like for like only, and needs two prices" | Pass |
+| PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Component | `mobile/src/__tests__/itemSplit.test.tsx` "warns on item detail and the split screen at 1.5 times or more" | Pass |
+| PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Component | `mobile/src/__tests__/itemSplit.test.tsx` "says nothing when the prices are close" | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Component | `mobile/src/__tests__/itemSplit.test.tsx` "saves the splits and opens the first new item (AC 13)" | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/api/test_item_split.py::test_one_of_several_lines_sharing_a_name_moves_with_its_price` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/api/test_item_split.py::test_a_name_whose_lines_all_move_goes_with_them` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/api/test_item_split.py::test_a_name_split_across_two_new_items_stays_with_the_original` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/api/test_item_split.py::test_lines_of_a_deleted_receipt_go_with_their_name` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_split_concurrency.py::test_a_split_and_a_merge_of_its_item_at_once` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_split_concurrency.py::test_split_takes_its_item_lock_before_any_line` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_split_concurrency.py::test_a_split_and_an_accept_of_its_item_at_once` | Pass |
+| PI-02 | 13 | A pending question goes with the line that raised it | Integration | `backend/tests/api/test_item_split.py::test_a_suggestion_moves_with_the_line_that_raised_it` | Pass |
+| PI-02 | 13 | A pending question goes with the line that raised it | Integration | `backend/tests/api/test_item_split.py::test_a_suggestion_whose_line_stayed_stays` | Pass |
+| PI-02 | 13 | A pending question goes with the line that raised it | Integration | `backend/tests/services/test_split_concurrency.py::test_a_split_moving_a_question_then_its_accept` | Pass |
+| PI-02 | 13 | New items inherit the original's price-alert mute | Integration | `backend/tests/api/test_item_split.py::test_new_items_keep_the_originals_alert_mute` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Component | `mobile/src/__tests__/itemSplit.test.tsx` "opens the FIRST new item after saving several" | Pass |
+| PI-02 | 11 | At most 10 new items, as the server allows | Component | `mobile/src/__tests__/itemSplit.test.tsx` "allows at most 10 new items, as the server does" | Pass |
+| PI-02 | 14 | POST /api/items/{id}/split: 201, 409 empty original, 422, 404 | Integration | `backend/tests/api/test_item_split.py::test_the_original_must_keep_a_line` | Pass |
+| PI-02 | 14 | POST /api/items/{id}/split: 201, 409 empty original, 422, 404 | Integration | `backend/tests/api/test_item_split.py::test_bad_splits_are_422` | Pass |
+| PI-02 | 14 | POST /api/items/{id}/split: 201, 409 empty original, 422, 404 | Integration | `backend/tests/api/test_item_split.py::test_split_is_scoped_to_the_caller` | Pass |
+| PI-02 | 14 | POST /api/items/{id}/split: 201, 409 empty original, 422, 404 | Integration | `backend/tests/api/test_item_split.py::test_the_alias_split_stays_as_it_is` | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Component | `mobile/src/__tests__/itemSplit.test.tsx` "shows the intro, search, Suggested and All items with purchases and averages" | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Component | `mobile/src/__tests__/itemSplit.test.tsx` "never lists the item itself" | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Component | `mobile/src/__tests__/itemSplit.test.tsx` "searches as the user types" | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Component | `mobile/src/__tests__/itemSplit.test.tsx` "enables Link once a radio is picked, then merges and opens the result" | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Integration | `backend/tests/api/test_item_split.py::test_link_candidates_suggested_first_then_all_items` | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Integration | `backend/tests/api/test_item_split.py::test_link_candidates_rank_similar_names` | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Integration | `backend/tests/api/test_item_split.py::test_link_candidates_search` | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Integration | `backend/tests/api/test_item_split.py::test_link_candidates_are_the_callers_own` | Pass |
+| PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Integration | `backend/tests/api/test_item_split.py::test_item_list_rows_carry_their_average` | Pass |
+| PI-02 | 15 | Link asks "Merge X into Y?" before merging | Component | `mobile/src/__tests__/itemSplit.test.tsx` "enables Link once a radio is picked, then merges and opens the result" | Pass |
+| PI-02 | 15 | Link asks "Merge X into Y?" before merging | Component | `mobile/src/__tests__/itemSplit.test.tsx` "Cancel on the confirm merges nothing" | Pass |
+| PI-02 | 15 | Search waits for a pause in typing (about 300 ms) | Component | `mobile/src/__tests__/itemSplit.test.tsx` "searches as the user types" | Pass |
 | PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | Not yet implemented (DA-7) | Pending |
 | PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | Not yet implemented (DA-7) | Pending |
 | PI-03 | 12 | A timed mute ends by itself; nothing sent for prices during it; ended mute not listed | Integration | Not yet implemented (DA-7) | Pending |
@@ -889,7 +928,9 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | BC-04 | 10 | Trend strings externalized | Component | Not yet implemented (DA-10) | Pending |
 | EC-PI | 4 | Timed mute expiry | Integration | Not yet implemented (DA-7) | Pending |
 | EC-PI | 5 | Lapsed Premium with existing mutes | Integration | Not yet implemented (DA-1, DA-7) | Pending |
-| EC-PI | 6 | Split with one line, or of every line | Integration | Not yet implemented (DA-6) | Pending |
+| EC-PI | 6 | Split with one line, or of every line | Integration | `backend/tests/api/test_item_split.py::test_the_original_must_keep_a_line` | Pass |
+| EC-PI | 6 | Split with one line, or of every line | Component | `mobile/src/__tests__/itemSplit.test.tsx` "offers no split for an item with one purchase (EC-PI 6)" | Pass |
+| EC-PI | 6 | Split with one line, or of every line | Integration | `backend/tests/api/test_item_split.py::test_a_name_split_across_two_new_items_stays_with_the_original` | Pass |
 | EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "passes over a suggestion already resolved (409) without an error" | Pass |
 | EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/hooks/__tests__/useSyncQueue.test.tsx` "shows no match prompt when a queued receipt syncs (EC-PI 7)" | Pass |
 | EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Yes, merge accepts and shows the next suggestion" | Pass |

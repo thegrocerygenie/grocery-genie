@@ -116,7 +116,14 @@ export default function RootLayout() {
                 options={{ title: 'Price alerts', headerBackTitle: 'Budget' }}
               />
               <Stack.Screen name="items/matches" options={{ title: 'Review Matches' }} />
-              <Stack.Screen name="items/merge" options={{ title: 'Combine' }} />
+              <Stack.Screen
+                name="items/merge"
+                options={{ title: 'Link items', presentation: 'modal' }}
+              />
+              <Stack.Screen
+                name="items/split"
+                options={{ title: 'Split', presentation: 'modal' }}
+              />
               <Stack.Screen
                 name="items/match"
                 options={{ title: 'Same item?', presentation: 'fullScreenModal' }}
