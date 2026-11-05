@@ -16,6 +16,9 @@ export function unitPriceVaries(points: PricePoint[]): boolean {
   return low > 0 && high >= low * UNIT_PRICE_VARIES_RATIO;
 }
 
+/** PI-02 AC 11, 14: at most this many new items per split, as the server allows. */
+export const MAX_SPLITS = 10;
+
 export interface GroupStats {
   count: number;
   /** Mean unit price in the unit and currency most lines are in; null with none. */

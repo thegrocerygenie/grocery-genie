@@ -21,7 +21,11 @@ import {
   useMergeItem,
 } from '@/features/price-intelligence/hooks/useItems';
 import type { ItemSummary } from '@/features/price-intelligence/types';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatMoney } from '@/utils/money';
+
+/** PI-02 AC 15: the search asks once typing pauses, not on every key. */
+const SEARCH_DEBOUNCE_MS = 300;
 
 function rowStats(item: ItemSummary): string {
   const average =
@@ -36,7 +40,7 @@ function rowStats(item: ItemSummary): string {
  * Link in its bar; a search field; "Suggested" (the item's pending
  * suggestions, then the most similar names) and "All items", each row a
  * radio with "N purchases · $X avg". Link, enabled once one is picked,
- * merges this item into it and opens the result. The item is never listed.
+ * asks "Merge X into Y?", then merges this item into it and opens the result. The item is never listed.
  */
 export default function LinkItemsScreen() {
   const router = useRouter();
@@ -44,7 +48,7 @@ export default function LinkItemsScreen() {
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<string | null>(null);
   const source = useItem(id);
-  const candidates = useLinkCandidates(id, query);
+  const candidates = useLinkCandidates(id, useDebouncedValue(query, SEARCH_DEBOUNCE_MS));
   const merge = useMergeItem();
   const name = source.data?.canonical_name ?? '';
 
@@ -58,10 +62,9 @@ export default function LinkItemsScreen() {
   const target = picked && visible.has(picked) ? picked : null;
   const canLink = target !== null && !merge.isPending;
 
-  const onLink = () => {
-    if (!target) return;
+  const doLink = (intoId: string) =>
     merge.mutate(
-      { id, intoId: target },
+      { id, intoId },
       {
         onSuccess: (merged) => {
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -71,6 +74,19 @@ export default function LinkItemsScreen() {
         },
         onError: () => Alert.alert(PRICES_COPY.actionFailed),
       },
+    );
+
+  // The user's answer (2026-11-05): Link asks before it merges.
+  const onLink = () => {
+    const into = sections.flatMap((s) => s.data).find((i) => i.id === target);
+    if (!into) return;
+    Alert.alert(
+      PRICES_COPY.linkConfirmTitle(name, into.canonical_name),
+      PRICES_COPY.linkConfirmBody,
+      [
+        { text: PRICES_COPY.cancel, style: 'cancel' },
+        { text: PRICES_COPY.linkConfirmAction, onPress: () => doLink(into.id) },
+      ],
     );
   };
 

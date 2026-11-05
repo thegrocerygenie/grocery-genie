@@ -311,7 +311,9 @@ describe('Item names and combining (PI-02 AC 3)', () => {
     fireEvent.press(await screen.findByLabelText('Link Items…'));
     expect(routerScreen.getPathname()).toBe('/items/merge');
     fireEvent.press(await screen.findByLabelText('Bananas, 4 purchases · $0.69 avg'));
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     fireEvent.press(screen.getByLabelText('Link the items'));
+    choose(alert, 'Merge');
 
     await waitFor(() => expect(mockApi.mergeItem).toHaveBeenCalledWith('i-1', 'i-3'));
     await waitFor(() => expect(routerScreen.getPathname()).toBe('/items/i-3'));

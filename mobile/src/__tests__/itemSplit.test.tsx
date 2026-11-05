@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ActionSheetIOS } from 'react-native';
+import { ActionSheetIOS, Alert, type AlertButton } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 
@@ -165,6 +165,12 @@ function headerFor(title: string): Record<string, unknown> | undefined {
   return found;
 }
 
+/** Presses the button named `choice` in the last Alert.alert call. */
+function choose(alert: jest.SpyInstance, choice: string) {
+  const buttons = alert.mock.calls[alert.mock.calls.length - 1][2] as AlertButton[];
+  act(() => buttons.find((b) => b.text === choice)?.onPress?.());
+}
+
 const WARNING =
   'We grouped these as one item but the unit price varies a lot. Split if these are different products.';
 
@@ -292,6 +298,51 @@ describe('Split by line (PI-02 AC 10-13)', () => {
   });
 });
 
+describe('Split limits and Save (PI-02 AC 11, 13)', () => {
+  it('allows at most 10 new items, as the server does', async () => {
+    open('/items/split?id=i-1');
+    await screen.findByTestId('split-original-stats');
+
+    for (let i = 0; i < 9; i += 1) fireEvent.press(screen.getByLabelText('Add another split'));
+
+    await waitFor(() => expect(headerFor('Split into 11 items')).toBeDefined());
+    expect(screen.getByLabelText('Add another split').props.accessibilityState).toEqual({
+      disabled: true,
+    });
+    fireEvent.press(screen.getByLabelText('Add another split'));
+    expect(headerFor('Split into 12 items')).toBeUndefined();
+  });
+
+  it('opens the FIRST new item after saving several', async () => {
+    const sheet = jest
+      .spyOn(ActionSheetIOS, 'showActionSheetWithOptions')
+      .mockImplementation(() => {});
+    mockApi.splitItem.mockResolvedValue([
+      detail({ id: 'i-9', canonical_name: 'Olive oil 3L' }),
+      detail({ id: 'i-10', canonical_name: 'Olive oil (Loblaws)' }),
+    ]);
+    const routerScreen = open('/items/i-1');
+    fireEvent.press(await screen.findByLabelText('Split Into Separate Items…'));
+    fireEvent.press(
+      await screen.findByLabelText('Mar 15, 2026, FreshCo, $24.99, OLIVE OIL, in Olive oil'),
+    );
+    fireEvent.press(screen.getByLabelText('Add another split'));
+    fireEvent.press(screen.getByLabelText(/^Mar 8, 2026, Loblaws/));
+    act(() => sheet.mock.calls[0][1](2));
+    mockApi.getItem.mockResolvedValue(detail({ id: 'i-9', canonical_name: 'Olive oil 3L' }));
+
+    fireEvent.press(screen.getByLabelText('Save the split'));
+
+    await waitFor(() =>
+      expect(mockApi.splitItem).toHaveBeenCalledWith('i-1', [
+        { name: 'OLIVE OIL', line_item_ids: ['l-3'] },
+        { name: 'OLIVE OIL', line_item_ids: ['l-2'] },
+      ]),
+    );
+    await waitFor(() => expect(routerScreen.getPathname()).toBe('/items/i-9'));
+  });
+});
+
 describe('Unit price varies (PI-02 AC 12)', () => {
   it('warns on item detail and the split screen at 1.5 times or more', async () => {
     open('/items/i-1');
@@ -354,9 +405,28 @@ describe('Link items sheet (PI-02 AC 15)', () => {
     open('/items/merge?id=i-1');
     await screen.findByText('Cooking oil');
 
+    fireEvent.changeText(screen.getByLabelText('Search items'), 's');
+    fireEvent.changeText(screen.getByLabelText('Search items'), 'se');
     fireEvent.changeText(screen.getByLabelText('Search items'), 'ses');
 
+    // Debounced (about 300 ms): one request for what was typed, none per key.
+    expect(mockApi.getLinkCandidates).not.toHaveBeenCalledWith('i-1', 'ses');
     await waitFor(() => expect(mockApi.getLinkCandidates).toHaveBeenCalledWith('i-1', 'ses'));
+    const queries = mockApi.getLinkCandidates.mock.calls.map((c) => c[1]);
+    expect(queries).not.toContain('s');
+    expect(queries).not.toContain('se');
+  });
+
+  it('Cancel on the confirm merges nothing', async () => {
+    open('/items/merge?id=i-1');
+    fireEvent.press(await screen.findByLabelText('Cooking oil, 14 purchases · $13.99 avg'));
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    fireEvent.press(screen.getByLabelText('Link the items'));
+    choose(alert, 'Cancel');
+
+    expect(alert.mock.calls[0][1]).toBe('Its prices and names move to that item.');
+    expect(mockApi.mergeItem).not.toHaveBeenCalled();
   });
 
   it('enables Link once a radio is picked, then merges and opens the result', async () => {
@@ -375,8 +445,13 @@ describe('Link items sheet (PI-02 AC 15)', () => {
       disabled: false,
     });
     mockApi.getItem.mockResolvedValue(detail({ id: 'i-3', canonical_name: 'Cooking oil' }));
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     fireEvent.press(screen.getByLabelText('Link the items'));
 
+    // The user's answer: a native confirm first, and nothing merges before it.
+    expect(alert.mock.calls[0][0]).toBe('Merge “Olive oil” into “Cooking oil”?');
+    expect(mockApi.mergeItem).not.toHaveBeenCalled();
+    choose(alert, 'Merge');
     await waitFor(() => expect(mockApi.mergeItem).toHaveBeenCalledWith('i-1', 'i-3'));
     await waitFor(() => expect(routerScreen.getPathname()).toBe('/items/i-3'));
   });

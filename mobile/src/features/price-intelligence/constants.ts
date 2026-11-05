@@ -93,6 +93,9 @@ export const PRICES_COPY = {
   linkSuggested: 'Suggested',
   linkAll: 'All items',
   linkEmpty: 'No other items yet.',
+  linkConfirmTitle: (from: string, into: string) => `Merge “${from}” into “${into}”?`,
+  linkConfirmBody: 'Its prices and names move to that item.',
+  linkConfirmAction: 'Merge',
   linkRowLabel: (name: string, stats: string, selected: boolean) =>
     `${name}, ${stats}${selected ? ', selected' : ''}`,
   cancel: 'Cancel',

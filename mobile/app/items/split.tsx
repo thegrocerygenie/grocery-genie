@@ -25,6 +25,7 @@ import {
 import type { PricePoint } from '@/features/price-intelligence/types';
 import { formatUnitPrice } from '@/features/price-intelligence/utils/priceTrend';
 import {
+  MAX_SPLITS,
   canSaveSplit,
   groupStats,
   unitPriceVaries,
@@ -254,12 +255,18 @@ export default function SplitScreen() {
           ))}
         </View>
         <Pressable
-          onPress={() => setDrafts((current) => [...current, EMPTY])}
+          onPress={() =>
+            setDrafts((current) => (current.length < MAX_SPLITS ? [...current, EMPTY] : current))
+          }
+          disabled={drafts.length >= MAX_SPLITS}
           style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
           accessibilityRole="button"
           accessibilityLabel={PRICES_COPY.splitAddAnotherLabel}
+          accessibilityState={{ disabled: drafts.length >= MAX_SPLITS }}
         >
-          <Text style={styles.addText}>{PRICES_COPY.splitAddAnother}</Text>
+          <Text style={[styles.addText, drafts.length >= MAX_SPLITS && styles.addDisabled]}>
+            {PRICES_COPY.splitAddAnother}
+          </Text>
         </Pressable>
 
         <Text style={styles.sectionLabel} accessibilityRole="header">
@@ -368,6 +375,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addText: { ...type.subheadline, fontWeight: '600', color: colors.tint },
+  addDisabled: { color: colors.iosLabel3 },
   footer: { ...type.footnote, color: colors.iosLabel2, paddingHorizontal: spacing.xs },
   pressed: { opacity: 0.6 },
 });

@@ -776,6 +776,12 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_split_concurrency.py::test_a_split_and_a_merge_of_its_item_at_once` | Pass |
 | PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_split_concurrency.py::test_split_takes_its_item_lock_before_any_line` | Pass |
 | PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_split_concurrency.py::test_a_split_and_an_accept_of_its_item_at_once` | Pass |
+| PI-02 | 13 | A pending question goes with the line that raised it | Integration | `backend/tests/api/test_item_split.py::test_a_suggestion_moves_with_the_line_that_raised_it` | Pass |
+| PI-02 | 13 | A pending question goes with the line that raised it | Integration | `backend/tests/api/test_item_split.py::test_a_suggestion_whose_line_stayed_stays` | Pass |
+| PI-02 | 13 | A pending question goes with the line that raised it | Integration | `backend/tests/services/test_split_concurrency.py::test_a_split_moving_a_question_then_its_accept` | Pass |
+| PI-02 | 13 | New items inherit the original's price-alert mute | Integration | `backend/tests/api/test_item_split.py::test_new_items_keep_the_originals_alert_mute` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Component | `mobile/src/__tests__/itemSplit.test.tsx` "opens the FIRST new item after saving several" | Pass |
+| PI-02 | 11 | At most 10 new items, as the server allows | Component | `mobile/src/__tests__/itemSplit.test.tsx` "allows at most 10 new items, as the server does" | Pass |
 | PI-02 | 14 | POST /api/items/{id}/split: 201, 409 empty original, 422, 404 | Integration | `backend/tests/api/test_item_split.py::test_the_original_must_keep_a_line` | Pass |
 | PI-02 | 14 | POST /api/items/{id}/split: 201, 409 empty original, 422, 404 | Integration | `backend/tests/api/test_item_split.py::test_bad_splits_are_422` | Pass |
 | PI-02 | 14 | POST /api/items/{id}/split: 201, 409 empty original, 422, 404 | Integration | `backend/tests/api/test_item_split.py::test_split_is_scoped_to_the_caller` | Pass |
@@ -789,6 +795,9 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Integration | `backend/tests/api/test_item_split.py::test_link_candidates_search` | Pass |
 | PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Integration | `backend/tests/api/test_item_split.py::test_link_candidates_are_the_callers_own` | Pass |
 | PI-02 | 15 | Link items sheet: Suggested / All items, radio, N purchases · avg, Link merges | Integration | `backend/tests/api/test_item_split.py::test_item_list_rows_carry_their_average` | Pass |
+| PI-02 | 15 | Link asks "Merge X into Y?" before merging | Component | `mobile/src/__tests__/itemSplit.test.tsx` "enables Link once a radio is picked, then merges and opens the result" | Pass |
+| PI-02 | 15 | Link asks "Merge X into Y?" before merging | Component | `mobile/src/__tests__/itemSplit.test.tsx` "Cancel on the confirm merges nothing" | Pass |
+| PI-02 | 15 | Search waits for a pause in typing (about 300 ms) | Component | `mobile/src/__tests__/itemSplit.test.tsx` "searches as the user types" | Pass |
 | PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | Not yet implemented (DA-7) | Pending |
 | PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | Not yet implemented (DA-7) | Pending |
 | PI-03 | 12 | A timed mute ends by itself; nothing sent for prices during it; ended mute not listed | Integration | Not yet implemented (DA-7) | Pending |
