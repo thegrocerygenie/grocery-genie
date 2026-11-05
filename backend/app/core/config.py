@@ -76,6 +76,10 @@ class Settings(BaseSettings):
     # email a day (past it the same 202, and nothing sent).
     max_waitlist_claims_per_hour: int = 5
     max_waitlist_claims_per_email_per_day: int = 3
+    # Data export (PREM-04): each export is built whole in the request, receipt
+    # images included, so a user gets this many an hour (429 past it), and
+    # one at a time (export_service.export_slot).
+    max_exports_per_hour: int = 10
 
     # Per-IP cap on unauthenticated /api/auth/* POSTs (sign-up, sign-in, social,
     # forgot/reset password, verify, refresh). 30/min/IP is generous enough for

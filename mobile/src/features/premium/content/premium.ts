@@ -15,7 +15,7 @@ export const PREMIUM_STRINGS = {
   benefits: [
     { key: 'compare', symbol: 'cart.fill', title: 'Cross-store comparison' },
     { key: 'categories', symbol: 'tag.fill', title: 'Custom categories' },
-    { key: 'export', symbol: 'square.and.arrow.up', title: 'Data export · CSV/JSON' },
+    { key: 'export', symbol: 'square.and.arrow.up', title: 'Data export · CSV/JSON/PDF' },
     { key: 'trend', symbol: 'chart.bar.xaxis', title: '12-month trends' },
     { key: 'mute', symbol: 'bell.slash.fill', title: 'Per-item & per-store mute' },
     { key: 'ocr', symbol: 'viewfinder', title: 'Priority OCR processing' },

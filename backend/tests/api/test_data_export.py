@@ -28,7 +28,13 @@ from tests.api.test_analytics import SpyBackend
 from tests.api.test_items import _scan_and_confirm
 from tests.conftest import USER_B_ID, _create_test_client, consented, ensure_user
 
-CSV_FILES = {"receipts.csv", "line_items.csv", "budgets.csv", "price_observations.csv"}
+CSV_FILES = {
+    "receipts.csv",
+    "line_items.csv",
+    "categories.csv",
+    "budgets.csv",
+    "price_observations.csv",
+}
 
 
 async def _client_for(db_session, mock_extractor, *, premium: bool) -> User:
@@ -315,9 +321,12 @@ async def test_csv_export_of_an_empty_account_has_headers(premium_client):
     resp = await premium_client.get("/api/users/me/export", params={"format": "csv"})
 
     archive = zipfile.ZipFile(io.BytesIO(resp.content))
-    for name in CSV_FILES:
+    for name in CSV_FILES - {"categories.csv"}:
         header = archive.read(name).decode("utf-8-sig").splitlines()
         assert len(header) == 1 and header[0].startswith("id,")
+    # The built-in categories are every account's.
+    categories = _csv_rows(archive, "categories.csv")
+    assert categories and all(c["is_default"] == "true" for c in categories)
 
 
 async def test_export_leaves_out_a_deleted_budget(premium_client):
@@ -529,10 +538,16 @@ async def test_export_records_data_exported_event(
     [(name, props, _user)] = [c for c in spy.calls if c[0] == "data_exported"]
     assert props == {
         "format": "csv",
+        "from": None,
+        "to": None,
+        "includes": ["receipts", "prices", "budgets"],
         "receipt_count": 1,
         "line_item_count": 2,
         "budget_count": 1,
+        "category_count": 8,  # the built-in eight
         "price_observation_count": 2,
+        "image_count": 0,
+        "images_left_out": 0,
     }
 
 
@@ -622,8 +637,8 @@ async def test_export_file_closed_when_analytics_fails(premium_client, monkeypat
     built: list = []
     real_build = export_service.ExportService.build
 
-    async def spy_build(self, user, fmt):
-        export = await real_build(self, user, fmt)
+    async def spy_build(self, user, options, **kwargs):
+        export = await real_build(self, user, options, **kwargs)
         built.append(export)
         return export
 
@@ -649,7 +664,11 @@ async def test_export_file_closed_when_build_fails(db_session, monkeypatch, fmt)
     """A read failing mid-write (the database gone): every spooled file is
     closed before the error reaches the route."""
     from app.services import export_service
-    from app.services.export_service import ExportFormat, ExportService
+    from app.services.export_service import (
+        ExportFormat,
+        ExportOptions,
+        ExportService,
+    )
 
     spools: list = []
     real_spool = export_service._spool
@@ -667,7 +686,9 @@ async def test_export_file_closed_when_build_fails(db_session, monkeypatch, fmt)
     user = User(id=uuid.uuid4(), email="build-fails@example.com")
 
     with pytest.raises(RuntimeError, match="database gone"):
-        await ExportService(db_session).build(user, ExportFormat(fmt))
+        await ExportService(db_session).build(
+            user, ExportOptions(fmt=ExportFormat(fmt))
+        )
 
     assert spools
     assert all(spool.closed for spool in spools)
