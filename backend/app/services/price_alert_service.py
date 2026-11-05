@@ -84,8 +84,14 @@ def cooldown_days(user: User) -> int:
     return user.price_alert_cooldown_days or get_settings().price_alert_cooldown_days
 
 
+def _cents(amount: Decimal) -> Decimal:
+    """Half up to the cent: the alert's text and its sparkline agree."""
+    return amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
 def _price_text(amount: Decimal, currency: str, unit: str | None) -> str:
-    text = format_money(float(amount), currency)
+    # Rounded here, not by format_money's binary float ($1.005 -> "$1.00").
+    text = format_money(float(_cents(amount)), currency)
     if unit and unit.strip().casefold() not in _COUNT_UNITS:
         text += f"/{unit.strip()}"
     return text
@@ -357,10 +363,7 @@ class PriceAlertService:
                 "percent": percent if direction == "up" else -percent,
                 "old_average": old_text,
                 "new_price": new_text,
-                "recent_prices": [
-                    float(p.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
-                    for p in recent
-                ],
+                "recent_prices": [float(_cents(p)) for p in recent],
             },
         )
 

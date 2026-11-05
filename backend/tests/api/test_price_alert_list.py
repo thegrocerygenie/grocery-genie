@@ -226,6 +226,19 @@ async def test_a_counted_price_has_no_unit(client, mock_extractor, test_image_by
     assert alert["body"] == "Eggs at Loblaws: was $4.49 avg, now $5.49"
 
 
+async def test_a_half_cent_average_rounds_half_up_like_the_sparkline(
+    client, mock_extractor, test_image_bytes
+):
+    # An average of $1.005: the text rounds half up, as recent_prices do,
+    # never down by binary float ("$1.00").
+    await _history(client, mock_extractor, test_image_bytes, 1.00, 1.01)
+    await _buy(client, mock_extractor, test_image_bytes, "2026-03-15", 1.25)
+
+    [alert] = await _list(client)
+    assert json.loads(alert["data"])["old_average"] == "$1.01/lb"
+    assert "was $1.01/lb avg" in alert["body"]
+
+
 async def test_the_alert_data_carries_what_the_list_row_shows(
     client, mock_extractor, test_image_bytes
 ):
@@ -395,6 +408,8 @@ async def test_a_merge_never_touches_another_users_alerts(client, db_session):
     await ItemMatchingService(db_session)._move_price_alerts(
         DEV_USER_ID, source, target
     )
+    # Flush first: refresh would drop an unflushed change and prove nothing.
+    await db_session.flush()
 
     await db_session.refresh(theirs)
     assert json.loads(theirs.data)["canonical_item_id"] == str(source)

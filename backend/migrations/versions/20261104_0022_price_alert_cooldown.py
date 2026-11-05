@@ -7,6 +7,9 @@ backfill, so every existing user keeps the cooldown they had: the default.
 A check constraint holds the range the API validates (1-30), copied here so
 the migration stays as written if the app's range changes.
 
+A downgrade drops the column, and with it every cooldown users saved: after
+a re-upgrade everyone is back on the default.
+
 Revision ID: 20261104_0022
 Revises: 20261104_0021
 Create Date: 2026-11-04

@@ -740,6 +740,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-03 | 9 | A rise reads "<Item> up N%" and "was $X avg, now $Y" | Integration | `backend/tests/api/test_price_alert_list.py::test_a_rise_reads_was_avg_now` | Pass |
 | PI-03 | 9 | A drop adds "stock-up worth it" | Integration | `backend/tests/api/test_price_alert_list.py::test_a_drop_adds_stock_up_worth_it` | Pass |
 | PI-03 | 9 | A counted price has no unit | Integration | `backend/tests/api/test_price_alert_list.py::test_a_counted_price_has_no_unit` | Pass |
+| PI-03 | 9 | A half-cent average rounds half up, like the sparkline | Integration | `backend/tests/api/test_price_alert_list.py::test_a_half_cent_average_rounds_half_up_like_the_sparkline` | Pass |
 | PI-03 | 9 | Still names item, store, old average, new price, percent | Integration | `backend/tests/api/test_price_alerts.py::test_the_alert_names_item_store_average_new_price_and_percent` | Pass |
 | PI-03 | 9 | The push reads the same as the in-app list | Integration | `backend/tests/tasks/test_push_tasks.py::test_a_price_change_push_opens_its_item` | Pass |
 | PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "shows the receipt line, store, date, match percent and the existing item" | Pass |
@@ -900,6 +901,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | EC-PI | 10 | Store comparison ties | Component | Not yet implemented (DA-10) | Pending |
 | EC-PI | 11 | An alert for a merged item opens the item it went into | Integration | `backend/tests/api/test_price_alert_list.py::test_an_alert_for_a_merged_item_opens_the_item_it_went_into` | Pass |
 | EC-PI | 11 | A merge never touches another user's alerts (two users) | Integration | `backend/tests/api/test_price_alert_list.py::test_a_merge_never_touches_another_users_alerts` | Pass |
+| EC-PI | 11 | An alert written during a merge opens the surviving item (race) | Integration | `backend/tests/services/test_merge_price_alert_race.py::test_an_alert_written_during_a_merge_opens_the_surviving_item` | Pass (Postgres only) |
 | EC-PI | 11 | An alert stays listed after its item is split | Integration | `backend/tests/api/test_price_alert_list.py::test_an_alert_stays_listed_after_its_item_is_split` | Pass |
 | EC-PI | 11 | A row opens the item id the server keeps current | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "opens the item when a row is tapped (EC-PI 11: the id the server keeps current)" | Pass |
 | EC-PREM | 1 | Free trial eligibility, cancel and refund in the trial | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_a_trial_cancelled_in_its_7_days_stays_premium_to_its_end` | Pass |

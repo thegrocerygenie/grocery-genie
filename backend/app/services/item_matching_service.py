@@ -501,7 +501,6 @@ class ItemMatchingService:
         )
         await self._move_suggestions(source.id, target.id)
         await self._move_price_alert_state(user_id, source.id, target.id)
-        await self._move_price_alerts(user_id, source.id, target.id)
         if target.unit_of_measure is None:
             target.unit_of_measure = source.unit_of_measure
 
@@ -511,6 +510,11 @@ class ItemMatchingService:
         await self.db.execute(
             delete(CanonicalItem).where(CanonicalItem.id == source.id)
         )
+        # After the DELETE (EC-PI 11): it waits on the key-share lock of a
+        # confirm still writing an alert for the source (its price_alerts_sent
+        # row), so this statement, a new snapshot at READ COMMITTED, sees that
+        # alert once the confirm commits. Before the DELETE it would miss it.
+        await self._move_price_alerts(user_id, source.id, target.id)
         await self.db.flush()
         await self.db.refresh(target, ["aliases"])
         return target
