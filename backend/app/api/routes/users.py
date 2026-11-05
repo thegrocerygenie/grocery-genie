@@ -5,11 +5,12 @@ from datetime import date
 from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.types import Receive, Scope, Send
 
+from app.core import rate_limit
 from app.core.config import get_settings
 from app.core.dependencies import get_db
 from app.core.entitlements import FEATURE_DATA_EXPORT, is_premium, require_premium
@@ -32,10 +33,13 @@ from app.services import auth as auth_service
 from app.services.analytics_service import AnalyticsService, get_analytics_service
 from app.services.budget_service import BudgetService
 from app.services.export_service import (
+    ExportBusyError,
+    ExportCancelledError,
     ExportFile,
     ExportFormat,
     ExportOptions,
     ExportService,
+    export_slot,
     parse_includes,
 )
 from app.services.premium_service import PremiumService
@@ -349,6 +353,7 @@ async def export_summary(
 
 @router.get("/me/export")
 async def export_data(
+    request: Request,
     fmt: ExportFormat = Query(
         default=ExportFormat.JSON,
         alias="format",
@@ -369,12 +374,14 @@ async def export_data(
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(require_premium(FEATURE_DATA_EXPORT)),
     analytics: AnalyticsService = Depends(get_analytics_service),
-) -> StreamingResponse:
+) -> Response:
     """Download receipts, line items, categories, budgets and prices (NFR
     Privacy 2), for a range and chosen sections (PREM-04).
 
     Premium (D2). The file is built from batched reads into a spooled
     temporary file, then streamed, so a large account stays bounded in memory.
+    One export at a time per user and ``max_exports_per_hour`` an hour, else
+    429; a build whose client has gone stops at its next page.
     """
     _check_range(start, end)
     try:
@@ -384,8 +391,39 @@ async def export_data(
             status_code=422, detail={"code": "invalid_include", "message": str(e)}
         ) from e
     options = ExportOptions(fmt=fmt, start=start, end=end, includes=includes)
-    storage = LocalFileStorage(get_settings().storage_path)
-    export = await ExportService(db, storage=storage).build(user, options)
+    settings = get_settings()
+    storage = LocalFileStorage(settings.storage_path)
+    try:
+        async with export_slot(db, user.id):
+            # Counted once the slot is ours: a refused request costs nothing.
+            if not await rate_limit.allow(
+                f"export:{user.id}",
+                window=3600.0,
+                limit=settings.max_exports_per_hour,
+            ):
+                raise HTTPException(
+                    status_code=429,
+                    detail={
+                        "code": "export_rate_limited",
+                        "message": "Too many exports this hour. Try again later.",
+                    },
+                    headers={"Retry-After": "600"},
+                )
+            export = await ExportService(db, storage=storage).build(
+                user, options, should_stop=request.is_disconnected
+            )
+    except ExportBusyError:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "export_in_progress",
+                "message": "An export is already being prepared. Try again soon.",
+            },
+            headers={"Retry-After": "30"},
+        ) from None
+    except ExportCancelledError:
+        # Nobody is listening; the spooled file is already closed.
+        return Response(status_code=499)
     try:
         analytics.emit(
             "data_exported",

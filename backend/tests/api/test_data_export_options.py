@@ -31,7 +31,7 @@ from app.models.database import (
     User,
 )
 from tests.api.test_analytics import SpyBackend
-from tests.api.test_items import _scan_and_confirm
+from tests.api.test_items import _scan, _scan_and_confirm
 from tests.conftest import USER_B_ID, _create_test_client, consented, ensure_user
 
 EXPORT = "/api/users/me/export"
@@ -481,6 +481,38 @@ async def test_pdf_report_is_a_spend_summary_of_the_range(
     # Out of range, deleted, and another user's: not in the report.
     for absent in ("OldMart", "LateMart", "Loblaws", "B Mart", "B SECRET CHEESE"):
         assert absent not in text
+
+
+async def test_pdf_monthly_spend_counts_only_confirmed_receipts(
+    premium_client, mock_extractor, test_image_bytes
+):
+    """PREM-04 AC 5: spend is what the budget counts, confirmed receipts only;
+    an unconfirmed scan is listed, marked, and never adds to the spend."""
+    await _scan_and_confirm(
+        premium_client,
+        mock_extractor,
+        test_image_bytes,
+        "ConfirmedMart",
+        "2026-03-01",
+        ("KEPT ITEM", 1.0, 4.0),
+    )
+    await _scan(
+        premium_client,
+        mock_extractor,
+        test_image_bytes,
+        "PendingMart",
+        "2026-03-02",
+        ("PENDING ITEM", 1.0, 7.0),
+    )
+
+    text = _pdf_text(
+        (await premium_client.get(EXPORT, params={"format": "pdf"})).content
+    )
+
+    assert "March 2026 $4.00" in text
+    assert "$11.00" not in text
+    assert "PENDING ITEM" not in text  # not a top item either
+    assert "PendingMart (not confirmed)" in text
 
 
 async def test_pdf_report_leaves_out_sections_switched_off(

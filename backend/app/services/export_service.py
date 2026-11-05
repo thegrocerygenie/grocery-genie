@@ -22,13 +22,15 @@ route then streams that file; the database work is done before the first byte
 is sent.
 """
 
+import contextlib
 import csv
+import hashlib
 import io
 import json
 import shutil
 import uuid
 import zipfile
-from collections.abc import AsyncIterator, Iterator, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -37,7 +39,7 @@ from tempfile import SpooledTemporaryFile
 from typing import IO, Any
 
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import clock
@@ -72,6 +74,51 @@ CHUNK_BYTES = 64 * 1024
 
 
 TOP_ITEMS = 10
+
+
+class ExportBusyError(Exception):
+    """The user already has an export being built."""
+
+
+class ExportCancelledError(Exception):
+    """The client went away; the build stopped at its next page."""
+
+
+# Exports being built in this process, for the database that has no advisory
+# locks (SQLite, in tests) and for two requests sharing one session.
+_building: set[uuid.UUID] = set()
+
+
+def _lock_key(user_id: uuid.UUID) -> int:
+    """A signed 64-bit advisory lock key for the user's export."""
+    digest = hashlib.sha256(f"export:{user_id}".encode()).digest()
+    return int.from_bytes(digest[:8], "big", signed=True)
+
+
+@contextlib.asynccontextmanager
+async def export_slot(db: AsyncSession, user_id: uuid.UUID) -> AsyncIterator[None]:
+    """One export at a time per user, or ``ExportBusyError``.
+
+    On Postgres a transaction-level advisory lock on the request's session:
+    every API worker shares it, and the database releases it when the
+    request's transaction ends, committed or rolled back, even if the worker
+    dies. An in-process set covers this worker (and SQLite) and is released
+    when the block exits, on success or error.
+    """
+    if user_id in _building:
+        raise ExportBusyError
+    _building.add(user_id)
+    try:
+        if db.get_bind().dialect.name == "postgresql":
+            got = await db.scalar(
+                text("SELECT pg_try_advisory_xact_lock(:key)"),
+                {"key": _lock_key(user_id)},
+            )
+            if not got:
+                raise ExportBusyError
+        yield
+    finally:
+        _building.discard(user_id)
 
 
 class ExportFormat(StrEnum):
@@ -232,6 +279,12 @@ class ExportService:
         self.db = db
         # Where receipt images are; needed only to include them.
         self.storage = storage
+        # Asked before each page: True stops the build (the client has gone).
+        self._should_stop: Callable[[], Awaitable[bool]] | None = None
+
+    async def _check_stop(self) -> None:
+        if self._should_stop is not None and await self._should_stop():
+            raise ExportCancelledError
 
     # --- reads ----------------------------------------------------------------
 
@@ -275,6 +328,7 @@ class ExportService:
         ``BATCH_SIZE`` at a time (keyset on date, id)."""
         after: tuple[date, uuid.UUID] | None = None
         while True:
+            await self._check_stop()
             query = (
                 select(Receipt, Store)
                 .outerjoin(Store, Store.id == Receipt.store_id)
@@ -362,6 +416,7 @@ class ExportService:
         history reads them), oldest first, keyset on date, id."""
         after: tuple[date, uuid.UUID] | None = None
         while True:
+            await self._check_stop()
             query = (
                 select(PriceObservation, CanonicalItem.canonical_name, Store.name)
                 .join(Receipt, Receipt.id == PriceObservation.receipt_id)
@@ -436,10 +491,20 @@ class ExportService:
 
     # --- writers --------------------------------------------------------------
 
-    async def build(self, user: User, options: ExportOptions) -> ExportFile:
+    async def build(
+        self,
+        user: User,
+        options: ExportOptions,
+        *,
+        should_stop: Callable[[], Awaitable[bool]] | None = None,
+    ) -> ExportFile:
+        """Build the export into a spooled file. ``should_stop`` is asked
+        before each page; True raises ``ExportCancelledError``."""
         today = clock.now().date().isoformat()
+        self._should_stop = should_stop
         out = _spool()
         try:
+            await self._check_stop()
             if options.has(ExportInclude.IMAGES):
                 counts = await self._write_zip_with_images(user, options, out, today)
                 media_type, ext = "application/zip", "zip"

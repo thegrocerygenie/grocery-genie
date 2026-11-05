@@ -637,8 +637,8 @@ async def test_export_file_closed_when_analytics_fails(premium_client, monkeypat
     built: list = []
     real_build = export_service.ExportService.build
 
-    async def spy_build(self, user, options):
-        export = await real_build(self, user, options)
+    async def spy_build(self, user, options, **kwargs):
+        export = await real_build(self, user, options, **kwargs)
         built.append(export)
         return export
 
