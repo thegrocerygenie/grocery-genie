@@ -323,7 +323,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | BC-05 | 3 | Delete racing a budget, correction or scan: no 500 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_category_deleted_during_a_scan_moves_the_mapped_item_to_other` | Pass |
 | BC-05 | 3 | App: a free user sees the upgrade prompt, never an error | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a free user sees the upgrade prompt that opens the paywall, not an add button" | Pass |
 | BC-05 | 3 | App: a refused create shows the upgrade prompt | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a refused create (Premium lapsed) shows the upgrade prompt, not an error" | Pass |
-| BC-05 | 3 | App: add, rename, delete | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a Premium user adds a category by name" | Pass |
+| BC-05 | 3 | App: add, rename, delete | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a Premium user adds a category by name, with the first colour and icon by default" | Pass |
 | BC-05 | 3 | App: add, rename, delete | Component | `mobile/src/__tests__/categorySettings.test.tsx` "renames a custom category" | Pass |
 | BC-05 | 3 | App: add, rename, delete | Component | `mobile/src/__tests__/categorySettings.test.tsx` "deletes a custom category after confirming" | Pass |
 | BC-05 | 3 | App: at 10 the add button is disabled | Component | `mobile/src/__tests__/categorySettings.test.tsx` "at 10 the add button is disabled and says why" | Pass |
@@ -731,10 +731,36 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PREM-04 | 6 | Export and summary routes: params, Premium 403, 422, data_exported properties | Integration | Not yet implemented (DA-8) | Pending |
 | PREM-04 | 7 | All time with every include still exports all data (NFR Privacy 2) | Integration | Not yet implemented (DA-8) | Pending |
 | PREM-04 | 8 | Intro card: "Export your receipts, prices and budgets for the dates you choose. Yours forever." | Component | Not yet implemented (DA-8) | Pending |
-| BC-05 | 5 | Colour and icon per category; API returns and validates them; migration | Integration | Not yet implemented (DA-9) | Pending |
-| BC-05 | 6 | Categories screen: Built-in first, Custom, New category row, footer, Edit button | Component | Not yet implemented (DA-9) | Pending |
-| BC-05 | 7 | Colour and icon in Categories, the picker and dashboard bars | Component | Not yet implemented (DA-9) | Pending |
-| BC-05 | 8 | After a lapse colours stay; changing them is 403 premium_required / upgrade prompt | Integration | Not yet implemented (DA-9) | Pending |
+| BC-05 | 5 | Built-ins have their fixed colour and icon | Integration | `backend/tests/api/test_category_looks.py::test_built_in_categories_have_their_fixed_colour_and_icon` | Pass |
+| BC-05 | 5 | No choice: the first colour and icon | Integration | `backend/tests/api/test_category_looks.py::test_a_new_category_without_a_choice_gets_the_first_colour_and_icon` | Pass |
+| BC-05 | 5 | Create keeps the colour and icon chosen | Integration | `backend/tests/api/test_category_looks.py::test_a_new_category_keeps_the_colour_and_icon_chosen` | Pass |
+| BC-05 | 5 | Values outside the allowed sets: 422 on POST and PATCH | Integration | `backend/tests/api/test_category_looks.py::test_colour_and_icon_outside_the_allowed_sets_are_refused` | Pass |
+| BC-05 | 5 | PATCH changes colour and icon, keeps the name | Integration | `backend/tests/api/test_category_looks.py::test_patch_changes_colour_and_icon_and_keeps_the_name` | Pass |
+| BC-05 | 5 | PATCH with nothing to change: 422 | Integration | `backend/tests/api/test_category_looks.py::test_patch_with_nothing_to_change_is_refused` | Pass |
+| BC-05 | 5 | Built-in looks cannot be changed | Integration | `backend/tests/api/test_category_looks.py::test_built_in_colours_cannot_be_changed` | Pass |
+| BC-05 | 5 | Two users: another user's look is neither changed nor seen | Integration | `backend/tests/api/test_category_looks.py::test_another_users_category_colour_cannot_be_changed_or_seen` | Pass |
+| BC-05 | 5 | A look-only change sends no `renamed` event | Integration | `backend/tests/api/test_category_looks.py::test_a_look_only_change_is_not_counted_as_a_rename` | Pass |
+| BC-05 | 5 | Migration `20261104_0021`: rows before it read the defaults | Integration | `backend/tests/api/test_category_looks.py::test_a_category_made_before_colours_reads_the_defaults` | Pass |
+| BC-05 | 5 | Migration `20261104_0021`: seeded at 0020, upgrade, downgrade, re-upgrade | Integration (Postgres) | `backend/tests/migrations/test_0021_category_color_icon.py::test_upgrade_backfills_looks_then_downgrades_and_upgrades_again` | Pass |
+| BC-05 | 5 | Migration `20261104_0021`: frozen built-in looks match the app's | Unit | `backend/tests/migrations/test_0021_category_color_icon.py::test_the_migration_gives_built_ins_the_looks_the_app_has` | Pass |
+| BC-05 | 5 | App palette and icons match the server's, defaults first | Unit | `mobile/src/constants/__tests__/categories.test.ts` "offers the same palette and icons as the server, defaults first" | Pass |
+| BC-05 | 5 | App: new category starts on the first colour and icon | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a Premium user adds a category by name, with the first colour and icon by default" | Pass |
+| BC-05 | 5 | App: new category takes the colour and icon picked | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a new category takes the colour and icon picked" | Pass |
+| BC-05 | 5 | App: edit sends only what changed | Component | `mobile/src/__tests__/categorySettings.test.tsx` "tapping a custom category edits its colour and icon, sending only what changed" | Pass |
+| BC-05 | 6 | Built-in first, Custom, New category row, footer | Component | `mobile/src/__tests__/categorySettings.test.tsx` "lists Built-in first, then Custom with a New category row and the Premium footer" | Pass |
+| BC-05 | 6 | Built-ins in icon squares, read-only | Component | `mobile/src/__tests__/categorySettings.test.tsx` "lists the built-in categories as read-only, each with its own icon square" | Pass |
+| BC-05 | 6 | Edit button: delete per row; Done | Component | `mobile/src/__tests__/categorySettings.test.tsx` "the Edit button shows a delete button per custom category, and Done hides them" | Pass |
+| BC-05 | 6 | Edit: rename | Component | `mobile/src/__tests__/categorySettings.test.tsx` "renames a custom category" | Pass |
+| BC-05 | 6 | Edit: delete after confirming | Component | `mobile/src/__tests__/categorySettings.test.tsx` "deletes a custom category after confirming" | Pass |
+| BC-05 | 7 | Categories: custom in a round icon with its colour and icon | Component | `mobile/src/__tests__/categorySettings.test.tsx` "shows each custom category in a round icon with its colour and icon (AC 7)" | Pass |
+| BC-05 | 7 | Picker shows the category's colour and icon | Component | `mobile/src/__tests__/categoryLooks.test.tsx` "shows a custom category in its own colour and icon" | Pass |
+| BC-05 | 7 | Dashboard bars in the category's colour and icon | Component | `mobile/src/__tests__/categoryLooks.test.tsx` "draw a custom category in its own colour and icon" | Pass |
+| BC-05 | 7 | Dashboard and summary API carry colour and icon | Integration | `backend/tests/api/test_category_looks.py::test_dashboard_category_bars_carry_colour_and_icon` | Pass |
+| BC-05 | 7 | Spend with no budget: the bar still carries its colour and icon | Integration | `backend/tests/api/test_category_looks.py::test_a_category_with_spend_but_no_budget_carries_its_look` | Pass |
+| BC-05 | 7 | Unknown or missing look falls back by name | Unit | `mobile/src/constants/__tests__/categories.test.ts` "falls back to the built-in look by name for an unknown or missing value" | Pass |
+| BC-05 | 8 | After a lapse the look stays; changing it is 403 premium_required | Integration | `backend/tests/api/test_category_looks.py::test_after_a_lapse_the_look_stays_and_changing_it_needs_premium` | Pass |
+| BC-05 | 8 | App: lapsed editor shows the upgrade prompt, look kept | Component | `mobile/src/__tests__/categorySettings.test.tsx` "after Premium lapses a category keeps its colour and icon, and changing them shows the upgrade prompt" | Pass |
+| BC-05 | 8 | App: a 403 on save turns the editor into the upgrade prompt | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a change refused with 403 premium_required turns the editor into the upgrade prompt" | Pass |
 | PI-04 | 5 | "Save by switching $X / unit" card, 2+ stores and a gap above zero | Component | Not yet implemented (DA-10) | Pending |
 | PI-04 | 6 | Rows lead with latest price, ordered by it; CHEAPEST badge; N purchases · avg | Component | Not yet implemented (DA-10) | Pending |
 | PI-04 | 7 | Price bar per row, latest over highest latest | Component | Not yet implemented (DA-10) | Pending |
@@ -762,7 +788,8 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | EC-PREM | 3 | Priority OCR model chosen at extraction start; fallback to the default model, then the usual failed-scan path (503, the app's offline retry, manual entry) | Integration | `backend/tests/api/test_priority_ocr.py::test_a_lapsed_premium_scan_uses_the_default_model` | Pass |
 | EC-PREM | 3 | Priority OCR model chosen at extraction start; fallback to the default model, then the usual failed-scan path (503, the app's offline retry, manual entry) | Integration | `backend/tests/api/test_priority_ocr.py::test_a_failed_premium_model_hands_the_scan_to_the_default` | Pass |
 | EC-PREM | 4 | Export: empty range, From after To, images left out | Integration | Not yet implemented (DA-8) | Pending |
-| EC-PREM | 5 | Category colour and icon after a lapse | Integration | Not yet implemented (DA-9) | Pending |
+| EC-PREM | 5 | Category colour and icon after a lapse | Integration | `backend/tests/api/test_category_looks.py::test_after_a_lapse_the_look_stays_and_changing_it_needs_premium` | Pass |
+| EC-PREM | 5 | Category made before DA-9: first colour, default icon | Integration | `backend/tests/api/test_category_looks.py::test_a_category_made_before_colours_reads_the_defaults` | Pass |
 
 This matrix is the source of truth for completeness. A phase is not done until every row has a passing test.
 

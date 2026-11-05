@@ -151,6 +151,7 @@ Setup for this section:
 **Trend, categories, export, rollover, quota (BC-FR, BC-05 AC 3, NFR Privacy 2):**
 - [ ] **Trend 3/12 toggle.** 3 Months is selected by default. A Premium user's 12 Months shows 12 bars. A free user's 12 Months shows the upgrade prompt, and its button opens the paywall. (BC-FR Trends; DEVICE-CHECK A1–A3, D3)
 - [ ] **Settings → Categories.** Premium: add, rename and delete a category; at 10 the add button is disabled and says why. Free: the upgrade prompt, not an add button. (BC-05 AC 3)
+- [ ] **Category editor sheet.** Match the category editor sheet (name, colour, icon) to the design once it exists; the design export has none yet, and the user will design it. (BC-05 AC 5, DA-9)
 - [ ] **Data export.** Settings → Export data, as Premium: the share sheet opens with the file, and saving it to Files works. As free: the upgrade prompt. (NFR Privacy 2)
 - [ ] **Rollover.** Budget settings: turn rollover on for a budget and Save. The dashboard ring text says how much rolled over once a period has ended with money left. A free user sees the upgrade prompt instead of the switches. (BC-FR Rollover)
 - [ ] **Receipt quota prompt.** As a free user at the monthly receipt limit, scan: the prompt offers Premium, and nothing uploads. As Premium, the scan goes through. (D2, unlimited receipts)

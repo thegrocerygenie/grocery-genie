@@ -1,6 +1,6 @@
 import type { ColorValue } from 'react-native';
 
-import { colors } from './theme';
+import { categoryPalette, colors, type CategoryColorName } from './theme';
 
 export interface CategoryMeta {
   readonly id: string;
@@ -65,11 +65,106 @@ const CATEGORY_BY_NAME = new Map(DEFAULT_CATEGORIES.map((c) => [c.name.toLowerCa
 /**
  * Minimal shape of a backend category. Matches the relevant fields of the
  * server's CategoryResponse so callers can pass `useCategories().data` directly
- * without importing the full feature type here.
+ * without importing the full feature type here. `color` and `icon` are names
+ * (BC-05 AC 5, DA-9); servers before DA-9 send neither.
  */
 export interface BackendCategory {
   readonly id: string;
   readonly name: string;
+  readonly color?: string | null;
+  readonly icon?: string | null;
+}
+
+/**
+ * Icon names the server stores, mapped to SF Symbols (BC-05 AC 5). The first
+ * eight are the built-ins'; CUSTOM_CATEGORY_ICONS lists those a custom
+ * category may take. Keep in step with `backend/app/models/category_looks.py`.
+ */
+export const CATEGORY_ICON_SYMBOLS = {
+  cart: 'cart.fill',
+  house: 'house.fill',
+  heart: 'heart.fill',
+  cup: 'cup.and.saucer.fill',
+  cake: 'birthday.cake.fill',
+  family: 'figure.and.child.holdinghands',
+  paw: 'pawprint.fill',
+  tag: 'tag.fill',
+  leaf: 'leaf.fill',
+  gift: 'gift.fill',
+  sparkles: 'sparkles',
+  'fork-knife': 'fork.knife',
+  wineglass: 'wineglass.fill',
+  dumbbell: 'dumbbell.fill',
+  pills: 'pills.fill',
+  book: 'book.fill',
+  gamecontroller: 'gamecontroller.fill',
+  wrench: 'wrench.and.screwdriver.fill',
+  airplane: 'airplane',
+} as const;
+
+export type CategoryIconName = keyof typeof CATEGORY_ICON_SYMBOLS;
+
+/** The colours a custom category can take, in picker order; the first is the default. */
+export const CUSTOM_CATEGORY_COLORS: readonly CategoryColorName[] = [
+  'indigo',
+  'purple',
+  'pink',
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'mint',
+  'teal',
+  'cyan',
+  'blue',
+  'brown',
+];
+
+/** The icons a custom category can take, in picker order; the first is the default. */
+export const CUSTOM_CATEGORY_ICONS: readonly CategoryIconName[] = [
+  'tag',
+  'leaf',
+  'gift',
+  'sparkles',
+  'fork-knife',
+  'wineglass',
+  'dumbbell',
+  'pills',
+  'book',
+  'gamecontroller',
+  'wrench',
+  'airplane',
+];
+
+export const DEFAULT_CUSTOM_COLOR: CategoryColorName = 'indigo';
+export const DEFAULT_CUSTOM_ICON: CategoryIconName = 'tag';
+
+function isColorName(value: string | null | undefined): value is CategoryColorName {
+  return value != null && Object.prototype.hasOwnProperty.call(categoryPalette, value);
+}
+
+function isIconName(value: string | null | undefined): value is CategoryIconName {
+  return value != null && Object.prototype.hasOwnProperty.call(CATEGORY_ICON_SYMBOLS, value);
+}
+
+/**
+ * Display meta for a backend category: its own colour and icon when the server
+ * sent them (BC-05 AC 7), else the built-in look matched by name (servers
+ * before DA-9, and offline). A name the app doesn't know falls back per field.
+ */
+export function categoryMeta(cat: {
+  readonly name: string;
+  readonly color?: string | null;
+  readonly icon?: string | null;
+}): CategoryMeta {
+  const byName = getCategoryMetaByName(cat.name);
+  if (!isColorName(cat.color) && !isIconName(cat.icon) && byName.name === cat.name) return byName;
+  return {
+    ...byName,
+    name: cat.name,
+    color: isColorName(cat.color) ? categoryPalette[cat.color] : byName.color,
+    symbol: isIconName(cat.icon) ? CATEGORY_ICON_SYMBOLS[cat.icon] : byName.symbol,
+  };
 }
 
 /**
@@ -110,7 +205,7 @@ export function resolveCategoryMeta(
   // Backend UUID path: resolve UUID -> name -> display meta.
   if (categories && categories.length > 0) {
     const match = categories.find((c) => c.id === id);
-    if (match) return getCategoryMetaByName(match.name);
+    if (match) return categoryMeta(match);
   }
 
   return FALLBACK_CATEGORY;

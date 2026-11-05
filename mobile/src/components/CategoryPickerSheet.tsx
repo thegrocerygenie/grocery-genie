@@ -3,11 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
-import {
-  DEFAULT_CATEGORIES,
-  getCategoryMetaByName,
-  type CategoryMeta,
-} from '@/constants/categories';
+import { DEFAULT_CATEGORIES, categoryMeta, type CategoryMeta } from '@/constants/categories';
 import type { CategoryResponse } from '@/features/budget/types';
 
 export interface CategoryPickerSheetProps {
@@ -26,8 +22,8 @@ export interface CategoryPickerSheetProps {
 
 /**
  * A single selectable row: the id sent on select plus the display meta. For
- * backend categories the id is a UUID while icon/color come from the matching
- * default category (by name); offline this is just a default category.
+ * backend categories the id is a UUID and the icon and colour are the
+ * category's own (BC-05 AC 7); offline this is just a default category.
  */
 interface CategoryOption {
   readonly id: string;
@@ -38,7 +34,7 @@ function buildOptions(categories: CategoryResponse[] | undefined): CategoryOptio
   if (categories && categories.length > 0) {
     return categories.map((cat) => ({
       id: cat.id,
-      meta: { ...getCategoryMetaByName(cat.name), name: cat.name },
+      meta: categoryMeta(cat),
     }));
   }
   return DEFAULT_CATEGORIES.map((meta) => ({ id: meta.id, meta }));
@@ -102,7 +98,10 @@ export function CategoryPickerSheet({
                 accessibilityRole="button"
                 accessibilityLabel={`${opt.meta.name}${selectedId === opt.id ? ', selected' : ''}`}
               >
-                <View style={[styles.circle, { backgroundColor: opt.meta.color }]}>
+                <View
+                  testID={`category-icon-${opt.id}`}
+                  style={[styles.circle, { backgroundColor: opt.meta.color }]}
+                >
                   <SymbolView
                     name={opt.meta.symbol as Parameters<typeof SymbolView>[0]['name']}
                     size={14}
