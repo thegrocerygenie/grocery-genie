@@ -50,6 +50,12 @@ export async function listSuggestions(): Promise<ItemSuggestion[]> {
   return apiClient<ItemSuggestion[]>('/api/items/suggestions');
 }
 
+/** PI-02 AC 7, 8: only the suggestions that one receipt's lines raised. */
+export async function listReceiptSuggestions(receiptId: string): Promise<ItemSuggestion[]> {
+  const params = new URLSearchParams({ receipt_id: receiptId });
+  return apiClient<ItemSuggestion[]>(`/api/items/suggestions?${params.toString()}`);
+}
+
 export async function acceptSuggestion(id: string): Promise<ItemDetail> {
   return apiClient<ItemDetail>(`/api/items/suggestions/${id}/accept`, { method: 'POST' });
 }

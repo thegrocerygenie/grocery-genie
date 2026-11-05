@@ -55,6 +55,15 @@ class ItemSummary:
 
 
 @dataclass(frozen=True)
+class ItemStats:
+    purchase_count: int
+    store_count: int
+    average: Decimal | None
+    unit_of_measure: str | None
+    currency: str | None
+
+
+@dataclass(frozen=True)
 class PricePoint:
     observation: PriceObservation
     # The store as the user groups it; None when the receipt has no store.
@@ -396,6 +405,27 @@ class PriceService:
         stores = (await self._store_counts(user_id, [item_id])).get(item_id, 0)
         latest = (await self._latest_by_item(user_id, [item_id])).get(item_id)
         return int(count or 0), stores, latest
+
+    async def purchase_stats(self, user_id: uuid.UUID, item_id: uuid.UUID) -> ItemStats:
+        """The "Existing item" card of the match prompt (PI-02 AC 5): the
+        user's purchases of the item, their stores, and the mean unit price
+        of the prices in the unit and currency most of them are in."""
+        observations, _ = await self._observations(user_id, item_id)
+        stores = (await self._store_counts(user_id, [item_id])).get(item_id, 0)
+        unit, currency = _series(observations)
+        alike = [
+            Decimal(str(o.unit_price))
+            for o in observations
+            if (o.unit_of_measure, o.currency) == (unit, currency)
+        ]
+        average = (
+            (sum(alike, Decimal()) / len(alike)).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            if alike
+            else None
+        )
+        return ItemStats(len(observations), stores, average, unit, currency)
 
     async def history(
         self,

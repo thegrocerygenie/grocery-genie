@@ -37,7 +37,7 @@ MVP notes on the table below:
 | `waitlist_claim_requested` | none | "Claim your waitlist offer" use (Hide My Email and other emails). Sent by the server on each accepted claim request, whether or not the email is on the waitlist |
 | `custom_category_changed` | action (created/renamed/deleted), custom_count (after the change); a colour or icon change alone (DA-9) sends none | Custom category adoption (BC-05 AC 3, Premium): how many users make their own, and how many they keep |
 | `data_exported` | format (json/csv), receipt_count, line_item_count, budget_count, price_observation_count | Data export use (NFR Privacy 2, Premium): sent by the server when an export is built, not for a refused free user |
-| `item_match_resolved` | decision (accepted/rejected), method (fuzzy/semantic), confidence | Item matching precision against user-confirmed matches |
+| `item_match_resolved` | decision (accepted/rejected), method (fuzzy/semantic), confidence | Item matching precision against user-confirmed matches. Sent by the server for "Yes, merge" and "Keep as separate item" in the "Same item?" prompt (DA-5, PI-02 AC 6); Skip and Cancel save nothing and send none |
 | `recipe_suggestion_viewed` | recipe_id, match_score, had_expiring_ingredient | Recipe relevance |
 | `recipe_suggestion_cooked` | recipe_id, ingredients_from_pantry, ingredients_purchased | End-to-end meal planner value |
 | `shopping_list_generated` | recipe_count, item_count | Shopping list adoption |
