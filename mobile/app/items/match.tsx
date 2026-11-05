@@ -42,10 +42,13 @@ function alreadyResolved(error: unknown): boolean {
 
 /** The suggestions to ask about, in order, from the one asked for first. */
 function queueOf(all: ItemSuggestion[], params: Params): ItemSuggestion[] {
-  const wanted = params.ids ? new Set(params.ids.split(',')) : null;
-  const list = all.filter(
-    (s) => (!params.itemId || s.item.id === params.itemId) && (!wanted || wanted.has(s.id)),
-  );
+  // `ids` is also the order: the post-confirm prompt asks best match first.
+  const wanted = params.ids ? params.ids.split(',') : null;
+  const list = all
+    .filter(
+      (s) => (!params.itemId || s.item.id === params.itemId) && (!wanted || wanted.includes(s.id)),
+    )
+    .sort((a, b) => (wanted ? wanted.indexOf(a.id) - wanted.indexOf(b.id) : 0));
   const first = params.start ? list.findIndex((s) => s.id === params.start) : -1;
   return first > 0 ? [...list.slice(first), ...list.slice(0, first)] : list;
 }

@@ -12,6 +12,7 @@ import { colors, navigationTheme } from '@/constants/theme';
 import { useMe } from '@/features/auth/hooks/useAuth';
 import { usePushNotifications } from '@/features/notifications/hooks/usePushNotifications';
 import { useSyncQueue } from '@/hooks/useSyncQueue';
+import { RouteTracker } from '@/components/RouteTracker';
 import { useAuthStore } from '@/store/authStore';
 
 // A push tap or link that launches the app opens its screen (an item, a
@@ -77,6 +78,7 @@ export default function RootLayout() {
       <ThemeProvider value={navigationTheme(scheme)}>
         <QueryClientProvider client={queryClient}>
           <SyncQueueProvider />
+          <RouteTracker />
           <OnboardingGate>
             <Stack>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

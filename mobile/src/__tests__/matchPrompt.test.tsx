@@ -18,6 +18,7 @@ import { promptMatchesAfterConfirm } from '@/features/price-intelligence/service
 import type { ItemDetail, ItemSuggestion } from '@/features/price-intelligence/types';
 import type { ReceiptScanResponse } from '@/features/receipt-capture/types';
 import { ApiError } from '@/services/api';
+import { RouteTracker } from '@/components/RouteTracker';
 import { useMatchPromptStore } from '@/store/matchPromptStore';
 import { useReceiptStore } from '@/store/receiptStore';
 import * as Haptics from 'expo-haptics';
@@ -157,7 +158,8 @@ function open(path: string) {
     {
       _layout: () => (
         <QueryClientProvider client={queryClient}>
-          {/* As app/_layout.tsx: modals, whose headers hold Save, Cancel and Skip. */}
+          {/* As app/_layout.tsx: the route tracker, and modals whose headers hold Save, Cancel and Skip. */}
+          <RouteTracker />
           <Stack>
             <Stack.Screen name="review" options={{ presentation: 'modal' }} />
             <Stack.Screen name="manual-entry" options={{ presentation: 'modal' }} />
@@ -420,6 +422,60 @@ describe('Where the prompt opens (PI-02 AC 7)', () => {
 
     expect(push).not.toHaveBeenCalled();
     push.mockRestore();
+  });
+
+  it('asks about at most the 3 best matches, best first', async () => {
+    mockApi.listReceiptSuggestions.mockResolvedValue([
+      suggestion('sg-a', { confidence: 0.61 }),
+      suggestion('sg-b', { confidence: 0.83 }),
+      suggestion('sg-c', { confidence: 0.7 }),
+      suggestion('sg-d', { confidence: 0.64 }),
+      suggestion('sg-e', { confidence: 0.79 }),
+    ]);
+    const push = jest.spyOn(router, 'push').mockImplementation(() => {});
+
+    await promptMatchesAfterConfirm('r-1', new QueryClient());
+
+    expect(push).toHaveBeenCalledWith({
+      pathname: '/items/match',
+      params: { receiptId: 'r-1', ids: 'sg-b,sg-e,sg-c' },
+    });
+    push.mockRestore();
+  });
+
+  it('shows the capped suggestions in that order, counting up to 3', async () => {
+    mockApi.listReceiptSuggestions.mockResolvedValue([
+      suggestion('sg-a', { confidence: 0.61 }),
+      suggestion('sg-b', { confidence: 0.83 }),
+      suggestion('sg-c', { confidence: 0.7 }),
+      suggestion('sg-d', { confidence: 0.64 }),
+    ]);
+    open('/items/match?receiptId=r-1&ids=sg-b,sg-c,sg-d');
+
+    expect(await screen.findByText('1 of 3')).toBeTruthy();
+    expect(screen.getByText('83% match')).toBeTruthy();
+  });
+
+  it('does not open once the user has moved on before the suggestions load', async () => {
+    useReceiptStore.getState().setActiveScanResponse(scan);
+    mockConfirm.mockImplementation((_vars, options) => options.onSuccess?.());
+    let answer: (s: ItemSuggestion[]) => void = () => {};
+    mockApi.listReceiptSuggestions.mockReturnValue(
+      new Promise<ItemSuggestion[]>((r) => {
+        answer = r;
+      }),
+    );
+    const routerScreen = open('/review');
+
+    fireEvent.press(await screen.findByLabelText('Save'));
+    await waitFor(() => expect(routerScreen.getPathname()).toBe('/'));
+    // The user starts something else (here: Review Matches) meanwhile.
+    act(() => router.push('/items/matches'));
+    await act(async () => answer([suggestion('sg-1')]));
+
+    expect(routerScreen.getPathname()).toBe('/items/matches');
+    // Left pending for Review Matches, and still askable later.
+    expect(useMatchPromptStore.getState().prompted).toEqual({});
   });
 
   it('shows each suggestion after a confirm only once', async () => {
