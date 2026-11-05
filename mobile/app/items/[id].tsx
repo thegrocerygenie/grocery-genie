@@ -17,13 +17,12 @@ import { LoadErrorState } from '@/components/LoadErrorState';
 import { PremiumUpgradePrompt } from '@/components/PremiumUpgradePrompt';
 import { colors, fontScale, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { useMe } from '@/features/auth/hooks/useAuth';
-import { PriceAlertControls } from '@/features/price-intelligence/components/PriceAlertControls';
 import { PriceChart } from '@/features/price-intelligence/components/PriceChart';
 import { RangeControl } from '@/features/price-intelligence/components/RangeControl';
 import { StoreSquare } from '@/features/price-intelligence/components/StoreSquare';
 import { StoreComparison } from '@/features/price-intelligence/components/StoreComparison';
 import { SuggestionCard } from '@/features/price-intelligence/components/SuggestionCard';
-import { PRICES_COPY } from '@/features/price-intelligence/constants';
+import { MUTE_COPY, PRICES_COPY } from '@/features/price-intelligence/constants';
 import { itemBackTitle, type RouteLike } from '@/features/price-intelligence/utils/itemBackTitle';
 import {
   useItem,
@@ -32,7 +31,8 @@ import {
   useRenameItem,
   useSplitAlias,
 } from '@/features/price-intelligence/hooks/useItems';
-import type { ItemAlias, PriceHistory, StoreRef } from '@/features/price-intelligence/types';
+import type { ItemAlias, ItemDetail, PriceHistory } from '@/features/price-intelligence/types';
+import { formatMuteEnd } from '@/features/price-intelligence/utils/muteUntil';
 import {
   formatPercent,
   formatUnitPrice,
@@ -58,7 +58,8 @@ import { today } from '@/utils/today';
  * the user can split off, and combining it with another item (the Link items
  * sheet, AC 15). PI-02 AC 10, 12 (DA-6): split by line, and a warning when
  * its unit price varies a lot. PI-04 AC 4:
- * its price at each store. PI-03 AC 4: muting its price alerts, or a store's.
+ * its price at each store. PI-03 AC 13 (DA-7): an Alerts row opens the item's
+ * Alerts screen (app/items/alerts.tsx), where its price alerts, or a store's, are muted.
  * Comparison and muting are Premium (D8, PREM-02): a free user sees an
  * upgrade prompt in their place. A price change alert opens this screen.
  */
@@ -175,7 +176,6 @@ export default function ItemDetailScreen() {
   const detail = item.data;
   const prices = history.data;
   const newestFirst = [...prices.observations].reverse();
-  const stores = storesOf(newestFirst);
   // PI-01 AC 5: the chart filters the one full history by date, so a range
   // costs no request (and no price_history_viewed). 3M first, or the
   // smallest range with prices when 3M has none.
@@ -266,13 +266,17 @@ export default function ItemDetailScreen() {
           })}
         </View>
 
-        <PriceAlertControls
-          canMute={me === undefined || premium}
-          itemId={id}
-          itemName={detail.canonical_name}
-          alertsMuted={detail.alerts_muted}
-          stores={stores}
-        />
+        {/* PI-03 AC 13 (DA-7): the mutes live on their own Alerts screen. */}
+        <Pressable
+          onPress={() => router.push({ pathname: '/items/alerts', params: { id } })}
+          style={({ pressed }) => [styles.listCard, styles.row, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel={MUTE_COPY.rowLabel(alertsValue(detail))}
+        >
+          <Text style={[type.body, styles.rowText]}>{MUTE_COPY.row}</Text>
+          <Text style={styles.value}>{alertsValue(detail)}</Text>
+          <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
+        </Pressable>
 
         <Text style={styles.sectionLabel} accessibilityRole="header">
           {PRICES_COPY.namesHeader}
@@ -327,15 +331,12 @@ export default function ItemDetailScreen() {
   );
 }
 
-/** Each store with a price of the item, once, in the order given. */
-function storesOf(points: PriceHistory['observations']): StoreRef[] {
-  const seen = new Map<string, string>();
-  for (const p of points) {
-    if (p.store_id && !seen.has(p.store_id)) {
-      seen.set(p.store_id, p.store_name ?? PRICES_COPY.unknownStore);
-    }
-  }
-  return [...seen].map(([storeId, name]) => ({ id: storeId, name }));
+/** The Alerts row's value: "On", "Muted" or "Muted until <date>" (PI-03 AC 13). */
+function alertsValue(detail: ItemDetail): string {
+  if (!detail.alerts_muted) return MUTE_COPY.rowOn;
+  return detail.muted_until
+    ? MUTE_COPY.rowMutedUntil(formatMuteEnd(detail.muted_until))
+    : MUTE_COPY.rowMuted;
 }
 
 /**
@@ -489,6 +490,7 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1, gap: 2 },
   caption: { ...type.footnote, color: colors.iosLabel2 },
+  value: { ...type.body, color: colors.iosLabel2, flexShrink: 1 },
   price: { ...type.money, fontSize: 15 },
   inlineButton: {
     minHeight: touchTarget.minHeight,

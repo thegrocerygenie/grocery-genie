@@ -466,9 +466,11 @@ class ReceiptService:
         try:
             async with self.db.begin_nested():
                 service = PriceAlertService(self.db)
-                alerts = await service.detect(receipt)
-                notification_service = NotificationService(self.db)
+                # One server time for the mute check and the claims: a mute
+                # ending at or before it no longer counts (PI-03 AC 12).
                 now = clock.now()
+                alerts = await service.detect(receipt, now)
+                notification_service = NotificationService(self.db)
                 for alert in alerts:
                     event = alert.event
                     if not await service.claim(
