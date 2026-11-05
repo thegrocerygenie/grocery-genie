@@ -510,20 +510,22 @@ Contract frozen 2026-11-03 (V11-01); the app (V11-02) uses it: an alert tap open
 **When one is sent.** Confirming a receipt (scan + `PATCH status=confirmed`, or a manual entry) compares each of its prices with the item's 30-day rolling average: the item's earlier prices in the same unit and currency, dated in the 30 days up to the receipt's date, this receipt left out. Two lines of one item on one receipt count as one price, their mean. A change of at least the user's threshold (`GG_PRICE_ALERT_THRESHOLD_PERCENT`, default 10), up or down, sends an alert, when:
 - the average has at least `GG_PRICE_ALERT_MIN_OBSERVATIONS` earlier prices (default 2);
 - alerts are on, and neither the item nor the receipt's store is muted;
-- the item has not alerted in the last `GG_PRICE_ALERT_COOLDOWN_DAYS` (default 7, on the server clock). A muted item or store, or a change under the threshold, does not use up the cooldown.
+- the item has not alerted in the user's cooldown: their `cooldown_days` (PI-03 AC 8, DA-4), or `GG_PRICE_ALERT_COOLDOWN_DAYS` (default 7) when they set none, on the server clock. The cooldown is read when the alert is claimed, so a changed one counts from the item's last alert, and shortening it never resends an alert that was held back (EC-PI 9). A muted item or store, or a change under the threshold, does not use up the cooldown.
 
 Only a confirm alerts: editing a confirmed receipt later sends none. A failure in the price alert check is logged and never fails the confirm.
 
-**The notification** (`GET /api/notifications`, and the push the existing pipeline sends):
+**The notification** (`GET /api/notifications`, and the push the existing pipeline sends). The copy follows the design (PI-03 AC 9, DA-4); push and in-app read the same title and body:
 ```json
 {
   "type": "price_change",
-  "title": "Organic Bananas price up 20%",
-  "body": "Organic Bananas: $0.78/lb at Loblaws, up 20% from your 30-day average of $0.65/lb.",
-  "data": "{\"canonical_item_id\": \"uuid\", \"store_id\": \"uuid\"}"
+  "title": "Organic Bananas up 20%",
+  "body": "Organic Bananas at Loblaws: was $0.65/lb avg, now $0.78/lb",
+  "data": "{\"canonical_item_id\": \"uuid\", \"store_id\": \"uuid\", \"item_name\": \"Organic Bananas\", \"store_name\": \"Loblaws\", \"direction\": \"up\", \"percent\": 20, \"old_average\": \"$0.65/lb\", \"new_price\": \"$0.78/lb\", \"recent_prices\": [0.65, 0.65, 0.78]}"
 }
 ```
-`data` is a JSON string, as for every notification; `store_id` is null for a receipt with no store. The body names the item, the store, the 30-day average, the new price and the percent (rounded); "/lb" follows the price for a measured unit. The push's `data` is `{notification_id, type: "price_change", url: "/items/{canonical_item_id}", canonical_item_id, store_id}`, so a tap opens the item.
+A drop reads "<Item> down N%" and its body ends " · stock-up worth it". `data` is a JSON string, as for every notification; `store_id` and `store_name` are null for a receipt with no store ("<Item>: was ... avg, now ..."). The body names the item, the store, the 30-day average, the new price and the percent (rounded, in the title); "/lb" follows the price for a measured unit. Since DA-4 `data` also carries what a Price alerts row shows (PI-03 AC 5), as it was sent: `item_name`, `store_name`, `direction` (`up`/`down`), the signed `percent`, `old_average` and `new_price` as shown, and `recent_prices`, the item's last like-for-like prices up to this one, oldest first (at most 8, the alerted price last). An alert sent before DA-4 has only `canonical_item_id` and `store_id`; the app then shows its title and body. Merging an item into another moves the user's alerts for it to the other's `canonical_item_id` (EC-PI 11), and a split leaves them as they are. The push's `data` is `{notification_id, type: "price_change", url: "/items/{canonical_item_id}", canonical_item_id, store_id}`, so a tap opens the item.
+
+**The Price alerts list** (PI-03 AC 5): `GET /api/notifications?type=price_change&order=newest`. `type` keeps one kind of notification; `order` is `unread` (the default: unread first, then newest) or `newest` (by date alone; 422 otherwise). Paged as before (`page`, `per_page` up to 100); `total` counts the filtered list. Only the caller's own notifications.
 
 ### GET /api/items/price-alert-settings
 ```json
@@ -532,14 +534,15 @@ Only a confirm alerts: editing a confirmed receipt later sends none. A failure i
   "threshold_percent": 10,
   "default_threshold_percent": 10,
   "cooldown_days": 7,
+  "default_cooldown_days": 7,
   "muted_items": [{ "id": "uuid", "canonical_name": "Organic Bananas" }],
   "muted_stores": [{ "id": "uuid", "name": "Loblaws" }]
 }
 ```
-`threshold_percent` is the user's own, or the default when they have not set one.
+`threshold_percent` and `cooldown_days` are the user's own, or the default when they have not set one.
 
 ### PUT /api/items/price-alert-settings
-**Request:** `{ "enabled": false }`, `{ "threshold_percent": 15 }`, or both. A field left out stays as it is; `"threshold_percent": null` goes back to the default. `threshold_percent` is 1–100 (422 otherwise). Returns the settings above.
+**Request:** any of `{ "enabled": false }`, `{ "threshold_percent": 15 }`, `{ "cooldown_days": 14 }`. A field left out stays as it is; `"threshold_percent": null` and `"cooldown_days": null` go back to the default. `threshold_percent` is 1–100 and `cooldown_days` an integer 1–30 (the app offers 1, 3, 7, 14 and 30; PI-03 AC 8); 422 otherwise. Returns the settings above.
 
 ### POST /api/items/{canonical_id}/mute · DELETE /api/items/{canonical_id}/mute
 The `POST` is Premium (D8, PREM-02 AC 2): a free user gets `403 premium_required` (`feature` `price_alert_mute`); the `DELETE` stays open to everyone. 204. No price alerts for the item, or alerts again. Both are idempotent; another user's item is 404. Item detail (`GET /api/items/{canonical_id}`) carries `alerts_muted: bool`. Merging a muted item into another mutes the other.

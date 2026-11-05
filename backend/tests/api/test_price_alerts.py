@@ -78,7 +78,7 @@ async def test_a_ten_percent_rise_from_the_rolling_average_alerts(
     await _buy(client, mock_extractor, test_image_bytes, "2026-03-15", 1.10)
 
     [alert] = await _price_alerts(client)
-    assert "up 10%" in alert["body"]
+    assert alert["title"].endswith(" up 10%")
 
 
 async def test_a_change_under_the_threshold_does_not_alert(
@@ -97,7 +97,7 @@ async def test_a_ten_percent_drop_alerts(client, mock_extractor, test_image_byte
     await _buy(client, mock_extractor, test_image_bytes, "2026-03-15", 1.80)
 
     [alert] = await _price_alerts(client)
-    assert "down 10%" in alert["body"]
+    assert alert["title"].endswith(" down 10%")
 
 
 async def test_the_user_can_set_their_own_threshold(
@@ -257,12 +257,11 @@ async def test_the_alert_names_item_store_average_new_price_and_percent(
     assert "Loblaws" in body
     assert "$0.65/lb" in body  # the 30-day average
     assert "$0.78/lb" in body  # the new price
-    assert "up 20%" in body
+    assert alert["title"] == "Organic Bananas up 20%"  # the percent
     item_id = await _item_id(client, "Organic Bananas")
-    assert json.loads(alert["data"]) == {
-        "canonical_item_id": item_id,
-        "store_id": await _store_id(client),
-    }
+    data = json.loads(alert["data"])
+    assert data["canonical_item_id"] == item_id
+    assert data["store_id"] == await _store_id(client)
 
 
 async def test_the_alert_dispatches_price_change_detected(

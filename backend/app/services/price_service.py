@@ -212,6 +212,47 @@ class PriceService:
         total = sum((Decimal(str(p)) for p in prices), Decimal(0))
         return RollingAverage(average=total / len(prices), count=len(prices))
 
+    async def recent_prices(
+        self,
+        user_id: uuid.UUID,
+        item_id: uuid.UUID,
+        *,
+        unit_of_measure: str | None,
+        currency: str,
+        as_of: date,
+        limit: int,
+        exclude_receipt_id: uuid.UUID | None = None,
+    ) -> list[Decimal]:
+        """The item's last ``limit`` like-for-like prices up to ``as_of``,
+        oldest first: the sparkline of a price alert (PI-03 AC 5)."""
+        conditions = [
+            *self._visible(user_id),
+            PriceObservation.canonical_item_id == item_id,
+            PriceObservation.unit_of_measure.is_not_distinct_from(unit_of_measure),
+            PriceObservation.currency == currency,
+            PriceObservation.date <= as_of,
+        ]
+        if exclude_receipt_id is not None:
+            conditions.append(PriceObservation.receipt_id != exclude_receipt_id)
+        prices = (
+            (
+                await self.db.execute(
+                    select(PriceObservation.unit_price)
+                    .join(Receipt, PriceObservation.receipt_id == Receipt.id)
+                    .where(*conditions)
+                    .order_by(
+                        PriceObservation.date.desc(),
+                        Receipt.created_at.desc(),
+                        PriceObservation.id.desc(),
+                    )
+                    .limit(limit)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return [Decimal(str(p)) for p in reversed(prices)]
+
     def _visible(self, user_id: uuid.UUID) -> tuple:
         """Observations of this user's receipts that are not deleted."""
         return (
