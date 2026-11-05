@@ -168,3 +168,38 @@ export const STORE_MERGE_COPY = {
 
 /** The threshold choices; the default and the user's own are always added. */
 export const PRICE_ALERT_THRESHOLDS = [5, 10, 15, 20, 25, 30, 50] as const;
+
+/** PI-03 AC 8: the cooldown choices; the default and the user's own are always added. */
+export const PRICE_ALERT_COOLDOWNS = [1, 3, 7, 14, 30] as const;
+
+/** PI-03 AC 5-7 (DA-4): the Price alerts list and its Settings group. */
+export const PRICE_ALERTS_LIST_COPY = {
+  title: 'Price alerts',
+  // The Budget dashboard's bell and the row in Settings → Alerts.
+  open: 'Price alerts',
+  openHint: 'Price changes on things you buy',
+  thisWeek: 'This week',
+  earlier: 'Earlier',
+  stockUp: 'stock-up worth it',
+  wasNow: (oldAverage: string, newPrice: string) => `was ${oldAverage} avg, now ${newPrice}`,
+  rowLabel: (
+    item: string,
+    direction: 'up' | 'down',
+    percent: string,
+    detail: string,
+    stockUp: boolean,
+  ) => `${item}, ${direction} ${percent}, ${detail}${stockUp ? ', stock-up worth it' : ''}`,
+  emptyTitle: 'No price alerts yet',
+  emptyBody: (threshold: number) =>
+    `You’ll get one when something you buy regularly changes price by ${threshold}% or more.`,
+  loadFailed: 'Couldn’t load your price alerts',
+  settingsHeader: 'Settings',
+  threshold: 'Threshold',
+  cooldown: 'Cooldown',
+  days: (days: number) => `${days} ${days === 1 ? 'day' : 'days'}`,
+  cooldownOption: (days: number, isDefault: boolean) =>
+    `${days} ${days === 1 ? 'day' : 'days'}${isDefault ? ' (default)' : ''}`,
+  footer: (days: number, threshold: number) =>
+    `Cooldown: ${days} ${days === 1 ? 'day' : 'days'} · alerts at ≥${threshold}% change`,
+  saveFailed: 'Couldn’t save. Check your connection and try again.',
+} as const;

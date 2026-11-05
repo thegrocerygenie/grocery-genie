@@ -17,7 +17,7 @@ import * as Haptics from 'expo-haptics';
 
 import { BudgetRing } from '@/components/BudgetRing';
 import { headerBlurFor } from '@/utils/headerBlur';
-import { PRICES_COPY } from '@/features/price-intelligence/constants';
+import { PRICES_COPY, PRICE_ALERTS_LIST_COPY } from '@/features/price-intelligence/constants';
 import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { categoryMeta } from '@/constants/categories';
 import { ROLLOVER_STRINGS } from '@/features/budget/content/rollover';
@@ -145,6 +145,10 @@ export default function DashboardScreen() {
     router.push('/settings');
   };
 
+  const onPriceAlerts = () => {
+    router.push('/price-alerts');
+  };
+
   // Rendered in every state: without it the header falls back to the route name ("index").
   const header = (
     <Stack.Screen
@@ -154,14 +158,26 @@ export default function DashboardScreen() {
         headerTransparent: true,
         headerBlurEffect: headerBlurFor(Platform.Version),
         headerRight: () => (
-          <Pressable
-            onPress={onSettings}
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel="Settings"
-          >
-            <SymbolView name="gearshape.fill" size={20} tintColor={colors.tint} />
-          </Pressable>
+          <View style={styles.headerButtons}>
+            {/* PI-03 AC 5: the bell opens the Price alerts list. */}
+            <Pressable
+              onPress={onPriceAlerts}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={PRICE_ALERTS_LIST_COPY.open}
+              accessibilityHint={PRICE_ALERTS_LIST_COPY.openHint}
+            >
+              <SymbolView name="bell.fill" size={20} tintColor={colors.tint} />
+            </Pressable>
+            <Pressable
+              onPress={onSettings}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
+            >
+              <SymbolView name="gearshape.fill" size={20} tintColor={colors.tint} />
+            </Pressable>
+          </View>
         ),
       }}
     />
@@ -534,6 +550,7 @@ function CategoryRow({ cat, showDivider }: CategoryRowProps) {
 }
 
 const styles = StyleSheet.create({
+  headerButtons: { flexDirection: 'row', alignItems: 'center', gap: spacing.xl },
   rolledOver: { ...type.caption1, color: colors.iosLabel2, marginTop: 2 },
   root: { flex: 1, backgroundColor: colors.iosBg },
   center: { alignItems: 'center', justifyContent: 'center' },

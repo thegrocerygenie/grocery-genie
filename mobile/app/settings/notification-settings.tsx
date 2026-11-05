@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Stack, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
+import { OptionSheet } from '@/components/OptionSheet';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useMe, useUpdatePreferences } from '@/features/auth/hooks/useAuth';
 import { useBudgets } from '@/features/budget/hooks/useBudget';
 import { useCategories } from '@/features/budget/hooks/useCategories';
 import {
+  PRICE_ALERTS_LIST_COPY,
   PRICE_ALERT_SETTINGS_COPY as PRICE_COPY,
   PRICE_ALERT_THRESHOLDS,
 } from '@/features/price-intelligence/constants';
@@ -143,6 +145,12 @@ export default function NotificationSettingsScreen() {
               on={priceAlertsOn ?? true}
               onChange={(v) => updatePriceAlerts.mutate({ enabled: v })}
             />
+            {/* PI-03 AC 5: the list is a root screen, so Settings closes first
+                (dismissTo) and the list opens over Budget, with Back. */}
+            <NavRow
+              label={PRICE_ALERTS_LIST_COPY.open}
+              onPress={() => router.dismissTo('/price-alerts')}
+            />
             {priceAlertsOn ? (
               <NavRow
                 label={PRICE_COPY.threshold}
@@ -190,7 +198,7 @@ export default function NotificationSettingsScreen() {
         </Section>
       </ScrollView>
 
-      <DayPickerSheet
+      <DayOptionSheet
         visible={dayPickerOpen}
         selected={summaryDay}
         onSelect={(d) => {
@@ -201,7 +209,7 @@ export default function NotificationSettingsScreen() {
       />
 
       {priceAlerts ? (
-        <PickerSheet
+        <OptionSheet
           visible={thresholdPickerOpen}
           options={thresholdChoices(priceAlerts).map((p) => ({
             key: p,
@@ -268,7 +276,8 @@ function ToggleRow({ label, on, onChange, accessibilityLabel }: ToggleRowProps) 
 
 interface NavRowProps {
   label: string;
-  value: string;
+  /** Shown before the chevron; a row that only opens a screen has none. */
+  value?: string;
   onPress: () => void;
 }
 
@@ -278,11 +287,13 @@ function NavRow({ label, value, onPress }: NavRowProps) {
       onPress={onPress}
       style={styles.row}
       accessibilityRole="button"
-      accessibilityLabel={`${label}: ${value}`}
+      accessibilityLabel={value === undefined ? label : `${label}: ${value}`}
     >
       <Text style={type.body}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        <Text style={[type.body, { color: colors.iosLabel2 }]}>{value}</Text>
+        {value !== undefined ? (
+          <Text style={[type.body, { color: colors.iosLabel2 }]}>{value}</Text>
+        ) : null}
         <SymbolView name="chevron.right" size={12} tintColor={colors.iosLabel3} />
       </View>
     </Pressable>
@@ -318,16 +329,16 @@ function UnmuteRow({ name, kind, onPress }: UnmuteRowProps) {
   );
 }
 
-interface DayPickerSheetProps {
+interface DayOptionSheetProps {
   visible: boolean;
   selected: number;
   onSelect: (day: number) => void;
   onClose: () => void;
 }
 
-function DayPickerSheet({ visible, selected, onSelect, onClose }: DayPickerSheetProps) {
+function DayOptionSheet({ visible, selected, onSelect, onClose }: DayOptionSheetProps) {
   return (
-    <PickerSheet
+    <OptionSheet
       visible={visible}
       options={DAYS.map((d, i) => ({ key: i, label: d }))}
       selected={selected}
@@ -336,65 +347,6 @@ function DayPickerSheet({ visible, selected, onSelect, onClose }: DayPickerSheet
     />
   );
 }
-
-interface PickerSheetProps {
-  visible: boolean;
-  options: { key: number; label: string }[];
-  selected: number;
-  onSelect: (key: number) => void;
-  onClose: () => void;
-}
-
-function PickerSheet({ visible, options, selected, onSelect, onClose }: PickerSheetProps) {
-  return (
-    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-      {/* Taps only: accessible, these would hide the options from VoiceOver. */}
-      <Pressable
-        style={sheetStyles.backdrop}
-        onPress={onClose}
-        accessible={false}
-        onAccessibilityEscape={onClose}
-      >
-        <Pressable
-          style={sheetStyles.sheet}
-          onPress={(e) => e.stopPropagation()}
-          accessible={false}
-        >
-          <View style={styles.listCard}>
-            {options.map((o, i) => (
-              <Pressable
-                key={o.key}
-                onPress={() => onSelect(o.key)}
-                style={[styles.row, i > 0 && styles.rowDivider]}
-                accessibilityRole="button"
-                accessibilityLabel={o.label}
-                accessibilityState={{ selected: selected === o.key }}
-              >
-                <Text style={type.body}>{o.label}</Text>
-                {selected === o.key ? (
-                  <SymbolView name="checkmark" size={14} tintColor={colors.tint} />
-                ) : null}
-              </Pressable>
-            ))}
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-const sheetStyles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
-    backgroundColor: 'transparent',
-  },
-});
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
@@ -426,10 +378,6 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 16,
     paddingVertical: 8,
-  },
-  rowDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.iosSeparator,
   },
   rowText: { flex: 1, gap: 2 },
   caption: { ...type.footnote, color: colors.iosLabel2 },
