@@ -22,7 +22,7 @@ The V1.1 design alignment (plan `.planning/PLAN-2026-11-04-v1.1-design-alignment
 ## Explicitly OUT of V1.1 Scope
 
 - Multi-image receipt linking (the "V1.1 stretch" in the edge cases) → dropped from V1.1
-- Household sharing, multi-member anything → **V1.5**
+- Household sharing, multi-member anything → **V1.5**. Decided 2026-11-05 (user, DA-9 review): custom categories stay per user in V1.1; when households ship in V1.5 they become shared per household, colour and icon included.
 - Ingredient classification, pantry, recipes, shopping lists → **V2.0**
 - Community features, basket comparison, personal inflation → **V2.5**
 - Semantic search, LLM recipe variations, taste profiles → **V3.0**

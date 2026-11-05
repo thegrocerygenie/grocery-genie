@@ -700,6 +700,8 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | BC-05 | 5 | Two users: another user's look is neither changed nor seen | Integration | `backend/tests/api/test_category_looks.py::test_another_users_category_colour_cannot_be_changed_or_seen` | Pass |
 | BC-05 | 5 | A look-only change sends no `renamed` event | Integration | `backend/tests/api/test_category_looks.py::test_a_look_only_change_is_not_counted_as_a_rename` | Pass |
 | BC-05 | 5 | Migration `20261104_0021`: rows before it read the defaults | Integration | `backend/tests/api/test_category_looks.py::test_a_category_made_before_colours_reads_the_defaults` | Pass |
+| BC-05 | 5 | Migration `20261104_0021`: seeded at 0020, upgrade, downgrade, re-upgrade | Integration (Postgres) | `backend/tests/migrations/test_0021_category_color_icon.py::test_upgrade_backfills_looks_then_downgrades_and_upgrades_again` | Pass |
+| BC-05 | 5 | Migration `20261104_0021`: frozen built-in looks match the app's | Unit | `backend/tests/migrations/test_0021_category_color_icon.py::test_the_migration_gives_built_ins_the_looks_the_app_has` | Pass |
 | BC-05 | 5 | App palette and icons match the server's, defaults first | Unit | `mobile/src/constants/__tests__/categories.test.ts` "offers the same palette and icons as the server, defaults first" | Pass |
 | BC-05 | 5 | App: new category starts on the first colour and icon | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a Premium user adds a category by name, with the first colour and icon by default" | Pass |
 | BC-05 | 5 | App: new category takes the colour and icon picked | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a new category takes the colour and icon picked" | Pass |
@@ -713,6 +715,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | BC-05 | 7 | Picker shows the category's colour and icon | Component | `mobile/src/__tests__/categoryLooks.test.tsx` "shows a custom category in its own colour and icon" | Pass |
 | BC-05 | 7 | Dashboard bars in the category's colour and icon | Component | `mobile/src/__tests__/categoryLooks.test.tsx` "draw a custom category in its own colour and icon" | Pass |
 | BC-05 | 7 | Dashboard and summary API carry colour and icon | Integration | `backend/tests/api/test_category_looks.py::test_dashboard_category_bars_carry_colour_and_icon` | Pass |
+| BC-05 | 7 | Spend with no budget: the bar still carries its colour and icon | Integration | `backend/tests/api/test_category_looks.py::test_a_category_with_spend_but_no_budget_carries_its_look` | Pass |
 | BC-05 | 7 | Unknown or missing look falls back by name | Unit | `mobile/src/constants/__tests__/categories.test.ts` "falls back to the built-in look by name for an unknown or missing value" | Pass |
 | BC-05 | 8 | After a lapse the look stays; changing it is 403 premium_required | Integration | `backend/tests/api/test_category_looks.py::test_after_a_lapse_the_look_stays_and_changing_it_needs_premium` | Pass |
 | BC-05 | 8 | App: lapsed editor shows the upgrade prompt, look kept | Component | `mobile/src/__tests__/categorySettings.test.tsx` "after Premium lapses a category keeps its colour and icon, and changing them shows the upgrade prompt" | Pass |

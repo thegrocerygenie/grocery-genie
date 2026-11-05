@@ -277,3 +277,50 @@ async def test_dashboard_category_bars_carry_colour_and_icon(
     assert dashboard.status_code == 200
     bars = {c["name"]: c for c in dashboard.json()["categories"]}
     assert (bars["Garden"]["color"], bars["Garden"]["icon"]) == ("mint", "leaf")
+
+
+async def test_a_category_with_spend_but_no_budget_carries_its_look(
+    client: AsyncClient, seeded, premium
+):
+    """A bar for spend with no budget behind it is drawn in the category's
+    own colour and icon too, not the default ones."""
+    cid = (
+        await client.post(
+            "/api/categories", json={"name": "Garden", "color": "mint", "icon": "leaf"}
+        )
+    ).json()["id"]
+    groceries = (await _by_name(client))["Groceries"]["id"]
+    resp = await client.post(
+        "/api/receipts",
+        json={
+            "store_name": "Market",
+            "date": "2026-03-10",
+            "total": 5.0,
+            "items": [
+                {
+                    "name": "Seeds",
+                    "unit_price": 3.0,
+                    "total_price": 3.0,
+                    "category_id": cid,
+                },
+                {
+                    "name": "Bread",
+                    "unit_price": 2.0,
+                    "total_price": 2.0,
+                    "category_id": groceries,
+                },
+            ],
+        },
+    )
+    assert resp.status_code == 201
+
+    for path in ("/api/budgets/summary", "/api/dashboard/spending"):
+        body = (await client.get(path, params={"period": "2026-03"})).json()
+        bars = {c["name"]: c for c in body["categories"]}
+        assert bars["Garden"]["budget"] == 0.0
+        assert bars["Garden"]["spent"] == 3.0
+        assert (bars["Garden"]["color"], bars["Garden"]["icon"]) == ("mint", "leaf")
+        assert (bars["Groceries"]["color"], bars["Groceries"]["icon"]) == (
+            "green",
+            "cart",
+        )
