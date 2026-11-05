@@ -15,6 +15,8 @@
 #   gg-verify sql "SELECT ..."      read the instance's database
 #   gg-verify revenuecat JSON [--secret VALUE]  POST a RevenueCat webhook body with the
 #                                   launch's webhook secret (or VALUE, to prove a wrong one fails)
+#   gg-verify premium               make the signed-in user Premium as RevenueCat would: a
+#                                   yearly INITIAL_PURCHASE webhook, one year long
 #   gg-verify waitlist import CSV | backfill | retry
 #                                   the waitlist's ops commands (app.tasks.waitlist_tasks) against
 #                                   this instance: load a Resend CSV export, match every account,
@@ -302,6 +304,19 @@ cmd_revenuecat() {
   [ "$code" -lt 400 ]
 }
 
+# Premium for the signed-in user, the way RevenueCat grants it (never a write
+# to the database): for journeys that drive a Premium feature (comparison and
+# mutes are Premium from D8). features/premium.md drives the webhook itself.
+cmd_premium() {
+  [ $# -eq 0 ] || die "usage: gg-verify premium"
+  [ -f "$STATE/token" ] || die "no user; run: gg-verify signup"
+  local uid now
+  uid="$(cmd_api GET /api/users/me 2>/dev/null | jq -r .id)"
+  [ -n "$uid" ] && [ "$uid" != null ] || die "could not read the signed-in user"
+  now="$(date +%s)000"
+  cmd_revenuecat "$(jq -nc --arg u "$uid" --argjson at "$now" '{api_version:"1.0",event:{id:("gg-verify-premium-"+$u+"-"+($at|tostring)),type:"INITIAL_PURCHASE",app_user_id:$u,aliases:[$u],entitlement_ids:["premium"],product_id:"gg_premium_yearly",period_type:"NORMAL",environment:"SANDBOX",event_timestamp_ms:$at,expiration_at_ms:($at+31536000000)}}')"
+}
+
 cmd_scan() {
   local run; run="$(run_dir)"
   [ -f "$STATE/token" ] || die "no user; run: gg-verify signup"
@@ -433,6 +448,6 @@ cmd_cleanup() {
 cmd_last() { ls -1d "$ROOT"/runs/* 2>/dev/null | tail -1; }
 
 case "${1:-}" in
-  launch|doctor|signup|api|download|scan|sql|revenuecat|waitlist|rcstub|cleanup|last) sub="$1"; shift; "cmd_$sub" "$@" ;;
-  *) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  launch|doctor|signup|api|download|scan|sql|revenuecat|premium|waitlist|rcstub|cleanup|last) sub="$1"; shift; "cmd_$sub" "$@" ;;
+  *) sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

@@ -132,7 +132,7 @@ Setup for this section:
 
 **Premium (V11-P0, D1, D2):**
 - [ ] **Sandbox purchase.** As a free user, open the paywall, tap Subscribe and buy with the Sandbox account. Settings → Premium then reads Premium, and the server's profile says `is_premium: true`. (PHASE_SCOPE D1; DEVICE-CHECK D6)
-- [ ] **Restore.** Delete and reinstall the app, sign in, open the paywall and tap Restore Purchases: Premium comes back. (DEVICE-CHECK D5)
+- [ ] **Restore.** Delete and reinstall the app, sign in, open the paywall and tap Restore purchase: Premium comes back. (DEVICE-CHECK D5)
 - [ ] **Webhook test event.** In RevenueCat, Project settings → Integrations → Webhooks, tap "Send test event". The backend answers 200. (V11-P0)
 - [ ] **Paywall.** Free user: the title, what Premium unlocks, the App Store price, Subscribe, Restore, and the Terms of Use and Privacy Policy links, each 44 pt. Premium user: "You're on Premium" with the renewal date and Manage Subscription. (DEVICE-CHECK D2, D4)
 - [ ] **Settings → Premium.** Free: "Free plan · Upgrade" opens the paywall. Premium: the row reads Premium. (DEVICE-CHECK D1)

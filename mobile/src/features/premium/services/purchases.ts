@@ -1,5 +1,5 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
-import type { PurchasesPackage } from 'react-native-purchases';
+import type { PurchasesIntroPrice, PurchasesPackage } from 'react-native-purchases';
 
 /**
  * Premium through RevenueCat (V11-P0, decision D1). The app only buys and
@@ -11,11 +11,31 @@ import type { PurchasesPackage } from 'react-native-purchases';
  * nothing here throws.
  */
 
-export interface PremiumOffer {
-  /** The App Store price for the user's storefront, e.g. "$5.99". */
+export type PlanKind = 'yearly' | 'monthly';
+
+/** One plan of the RevenueCat offering (PREM-01 AC 1), priced by the App Store. */
+export interface PremiumPlan {
+  kind: PlanKind;
+  /** The App Store price for the user's storefront, e.g. "$39.99". */
   priceString: string;
+  price: number;
+  currencyCode: string;
+  /**
+   * Days of free trial this user may take on this plan (PREM-01 AC 2): set
+   * only when the product has a free introductory offer and RevenueCat says
+   * the user is eligible; null otherwise, including when eligibility is unknown.
+   */
+  trialDays: number | null;
   pkg: PurchasesPackage;
 }
+
+/** The offering's plans, yearly first (PREM-01 AC 1). Never empty. */
+export interface PremiumOffer {
+  plans: PremiumPlan[];
+}
+
+// RevenueCat's INTRO_ELIGIBILITY_STATUS_ELIGIBLE.
+const INTRO_ELIGIBLE = 2;
 
 export type PurchaseOutcome =
   | { kind: 'purchased' }
@@ -32,8 +52,15 @@ interface PurchasesModule {
   configure: (config: { apiKey: string; appUserID: string }) => void;
   logIn: (appUserID: string) => Promise<unknown>;
   getOfferings: () => Promise<{
-    current: { monthly: PurchasesPackage | null; availablePackages: PurchasesPackage[] } | null;
+    current: {
+      monthly: PurchasesPackage | null;
+      annual: PurchasesPackage | null;
+      availablePackages: PurchasesPackage[];
+    } | null;
   }>;
+  checkTrialOrIntroductoryPriceEligibility: (
+    productIds: string[],
+  ) => Promise<Record<string, { status: number }>>;
   purchasePackage: (pkg: PurchasesPackage) => Promise<unknown>;
   restorePurchases: () => Promise<unknown>;
 }
@@ -88,28 +115,68 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'purchase error';
 }
 
-/** The monthly package of the current offering, or null. Never throws. */
+/** Length in days of a free introductory offer, or null for a paid one. */
+function freeTrialDays(intro: PurchasesIntroPrice | null | undefined): number | null {
+  if (!intro || intro.price !== 0) return null;
+  const perUnit = { DAY: 1, WEEK: 7, MONTH: 30, YEAR: 365 }[intro.periodUnit] ?? null;
+  if (perUnit === null) return null;
+  return perUnit * intro.periodNumberOfUnits * Math.max(1, intro.cycles);
+}
+
+/** Which products the user may take an introductory offer on. Unknown: none. */
+async function eligibleForIntro(sdk: PurchasesModule, productIds: string[]): Promise<Set<string>> {
+  try {
+    const byId = await sdk.checkTrialOrIntroductoryPriceEligibility(productIds);
+    return new Set(productIds.filter((id) => byId[id]?.status === INTRO_ELIGIBLE));
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * The current offering's Yearly and Monthly packages (PREM-01 AC 1), yearly
+ * first, each with the trial the user may take (AC 2); null when the offering
+ * has neither. Never throws.
+ */
 export async function getPremiumOffer(userId: string): Promise<PremiumOffer | null> {
   try {
     const sdk = await purchasesFor(userId);
     if (!sdk) return null;
     const offering = (await sdk.getOfferings()).current;
-    const pkg = offering?.monthly ?? offering?.availablePackages[0] ?? null;
-    return pkg ? { priceString: pkg.product.priceString, pkg } : null;
+    if (!offering) return null;
+    const packages: [PlanKind, PurchasesPackage | null][] = [
+      ['yearly', offering.annual],
+      ['monthly', offering.monthly ?? (offering.annual ? null : offering.availablePackages[0])],
+    ];
+    const found = packages.filter((p): p is [PlanKind, PurchasesPackage] => p[1] != null);
+    if (found.length === 0) return null;
+    const eligible = await eligibleForIntro(
+      sdk,
+      found.map(([, pkg]) => pkg.product.identifier),
+    );
+    return {
+      plans: found.map(([kind, pkg]) => ({
+        kind,
+        priceString: pkg.product.priceString,
+        price: pkg.product.price,
+        currencyCode: pkg.product.currencyCode,
+        trialDays: eligible.has(pkg.product.identifier)
+          ? freeTrialDays(pkg.product.introPrice)
+          : null,
+        pkg,
+      })),
+    };
   } catch {
     return null;
   }
 }
 
-/** Show Apple's purchase sheet for the offer. Never throws. */
-export async function purchasePremium(
-  userId: string,
-  offer: PremiumOffer,
-): Promise<PurchaseOutcome> {
+/** Show Apple's purchase sheet for the plan. Never throws. */
+export async function purchasePremium(userId: string, plan: PremiumPlan): Promise<PurchaseOutcome> {
   try {
     const sdk = await purchasesFor(userId);
     if (!sdk) return { kind: 'unavailable' };
-    await sdk.purchasePackage(offer.pkg);
+    await sdk.purchasePackage(plan.pkg);
     return { kind: 'purchased' };
   } catch (error) {
     if (

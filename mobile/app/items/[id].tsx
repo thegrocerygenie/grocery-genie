@@ -14,7 +14,9 @@ import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-rout
 import { useRoute } from '@react-navigation/native';
 
 import { LoadErrorState } from '@/components/LoadErrorState';
+import { PremiumUpgradePrompt } from '@/components/PremiumUpgradePrompt';
 import { colors, fontScale, radii, spacing, touchTarget, type } from '@/constants/theme';
+import { useMe } from '@/features/auth/hooks/useAuth';
 import { PriceAlertControls } from '@/features/price-intelligence/components/PriceAlertControls';
 import { PriceChart } from '@/features/price-intelligence/components/PriceChart';
 import { StoreComparison } from '@/features/price-intelligence/components/StoreComparison';
@@ -36,6 +38,7 @@ import {
   timelinePoints,
 } from '@/features/price-intelligence/utils/priceTrend';
 import { formatLongDate } from '@/features/receipt-capture/utils/receiptDate';
+import { isPremiumRequired } from '@/utils/premium';
 
 /**
  * PI-01: one item's price history — the latest unit price and its change, a
@@ -43,7 +46,8 @@ import { formatLongDate } from '@/features/receipt-capture/utils/receiptDate';
  * its date and store (AC 1). PI-02 AC 3: the names receipts gave it, which
  * the user can split off, and combining it with another item. PI-04 AC 4:
  * its price at each store. PI-03 AC 4: muting its price alerts, or a store's.
- * A price change alert opens this screen.
+ * Comparison and muting are Premium (D8, PREM-02): a free user sees an
+ * upgrade prompt in their place. A price change alert opens this screen.
  */
 /** The Back label: the screen under this one in the stack (itemBackTitle). */
 function useBackTitle(): string | undefined {
@@ -60,8 +64,13 @@ export default function ItemDetailScreen() {
   const backTitle = useBackTitle();
   const item = useItem(id);
   const history = usePriceHistory(id);
+  // Premium (PREM-02 AC 1) as the server last said; undefined while loading.
+  const me = useMe().data;
+  const premium = me?.is_premium === true;
   // Not awaited: the rest of the screen shows while the comparison loads.
-  const comparison = usePriceComparison(id);
+  const comparison = usePriceComparison(id, premium);
+  // PREM-02 AC 5, 6: a free user, or a 403 (Premium lapsed meanwhile).
+  const compareLocked = (me !== undefined && !premium) || isPremiumRequired(comparison.error);
   const rename = useRenameItem();
   const split = useSplitAlias();
   // At accessibility sizes a price moves under its date and store (BUG-3).
@@ -174,7 +183,18 @@ export default function ItemDetailScreen() {
           />
         ))}
 
-        {comparison.data ? <StoreComparison comparison={comparison.data} /> : null}
+        {compareLocked ? (
+          <View style={styles.card}>
+            <PremiumUpgradePrompt
+              title={PRICES_COPY.compareUpgradeTitle}
+              message={PRICES_COPY.compareUpgradeMessage}
+              upgradeLabel={PRICES_COPY.upgradeAction}
+              onUpgrade={() => router.push('/paywall')}
+            />
+          </View>
+        ) : comparison.data ? (
+          <StoreComparison comparison={comparison.data} />
+        ) : null}
 
         <Text style={styles.sectionLabel} accessibilityRole="header">
           {PRICES_COPY.timelineHeader}
@@ -222,6 +242,7 @@ export default function ItemDetailScreen() {
         </View>
 
         <PriceAlertControls
+          canMute={me === undefined || premium}
           itemId={id}
           itemName={detail.canonical_name}
           alertsMuted={detail.alerts_muted}
