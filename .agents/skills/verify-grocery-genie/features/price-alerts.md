@@ -21,7 +21,7 @@ Confirming a receipt compares each price with the item's 30-day rolling average 
 
 ## How to get to it (user POV)
 
-A push: tapping a `price_change` alert opens the item (`mobile/src/features/notifications/notificationTap.ts`). Item detail (Budget tab → Price history → an item) → Price alerts: a switch for the item and one per store it was bought at. Since DA-4 the Price alerts list (`mobile/app/price-alerts.tsx`) opens from the bell on the Budget dashboard and from Settings → Alerts → Price alerts; it ends with Threshold and Cooldown rows. Settings → Alerts → Price alerts: the on/off switch and "Alert when a price changes by" (a picker; the default is sent as `null`), and a Muted price alerts list with Unmute. The screens are UI-only: check them on a simulator.
+A push: tapping a `price_change` alert opens the item (`mobile/src/features/notifications/notificationTap.ts`). Item detail (Budget tab → Price history → an item) → the Alerts row opens the item's Alerts screen (DA-7): a "Price alerts" switch for the item and one per store it was bought at, every switch on = alerts on; timed mutes are in [timed-mutes.md](./timed-mutes.md). Since DA-4 the Price alerts list (`mobile/app/price-alerts.tsx`) opens from the bell on the Budget dashboard and from Settings → Alerts → Price alerts; it ends with Threshold and Cooldown rows. Settings → Alerts → Price alerts: the on/off switch and "Alert when a price changes by" (a picker; the default is sent as `null`), and a Muted price alerts list with Unmute. The screens are UI-only: check them on a simulator.
 
 ## Driving it with gg-verify
 

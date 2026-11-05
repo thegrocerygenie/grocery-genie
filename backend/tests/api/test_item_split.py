@@ -6,6 +6,7 @@ item by its alias, which is what a split by line takes apart.
 """
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from httpx import AsyncClient
 from sqlalchemy import func, select
@@ -468,3 +469,22 @@ async def test_new_items_keep_the_originals_alert_mute(client, everyone_premium)
         "OLIVE OIL",
         "Olive oil 3L",
     }
+
+
+async def test_new_items_keep_the_originals_mute_time(client, everyone_premium):
+    """AC 13 with PI-03 AC 11 (DA-7): a timed mute is copied with its time,
+    so the new items' mutes end when the original's does."""
+    item_id, line_ids = await _olive_oil(client)
+    until = (datetime.now(UTC) + timedelta(days=7)).replace(microsecond=0)
+    until_text = until.isoformat().replace("+00:00", "Z")
+    resp = await client.post(f"/api/items/{item_id}/mute", json={"until": until_text})
+    assert resp.status_code == 204, resp.text
+
+    split = await _split(client, item_id, ("Olive oil 3L", [line_ids[2]]))
+
+    assert split.status_code == 201, split.text
+    [new_item] = split.json()["items"]
+    assert new_item["alerts_muted"] is True
+    assert new_item["muted_until"] == until_text
+    settings = (await client.get("/api/items/price-alert-settings")).json()
+    assert [i["muted_until"] for i in settings["muted_items"]] == [until_text] * 2

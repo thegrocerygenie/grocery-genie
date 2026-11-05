@@ -1,6 +1,7 @@
 /**
  * V1.1 PI-03 price change alerts and PI-04 cross-store comparison in the app:
- * muting an item or a store from item detail, the store comparison on item
+ * muting an item or a store on the item's Alerts screen (PI-03 AC 13, DA-7;
+ * timed mutes: timedMutes.test.tsx), the store comparison on item
  * detail, and the price alert threshold in Settings → Alerts. Comparison and
  * muting are Premium (D8, PREM-02): a free user gets the upgrade prompt.
  */
@@ -11,6 +12,7 @@ import { Stack, router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 
 import ItemDetailScreen from '../../app/items/[id]';
+import ItemAlertsScreen from '../../app/items/alerts';
 import { ApiError } from '@/services/api';
 import NotificationSettingsScreen from '../../app/settings/notification-settings';
 import type {
@@ -92,6 +94,7 @@ function detail(overrides: Partial<ItemDetail> = {}): ItemDetail {
     aliases: [{ id: 'a-1', alias: 'Organic Bananas' }],
     suggestions: [],
     alerts_muted: false,
+    muted_until: null,
     ...overrides,
   };
 }
@@ -166,11 +169,12 @@ function open(path: string) {
       index: () => null,
       paywall: () => null,
       'items/[id]': ItemDetailScreen,
+      'items/alerts': ItemAlertsScreen,
       'settings/notification-settings': NotificationSettingsScreen,
     },
     { initialUrl: '/' },
   );
-  act(() => router.push(path));
+  act(() => router.push(path as never));
   return routerScreen;
 }
 
@@ -196,18 +200,20 @@ beforeEach(() => {
   mockApi.unmuteStore.mockResolvedValue(undefined);
 });
 
-describe('Price alert mutes on item detail (PI-03 AC 4)', () => {
+const ALERTS = '/items/alerts?id=i-1';
+
+describe('Price alert mutes on the item’s Alerts screen (PI-03 AC 4, 13)', () => {
   it('mutes price alerts for the item', async () => {
-    open('/items/i-1');
+    open(ALERTS);
     const toggle = await screen.findByLabelText('Price alerts for Organic Bananas');
     expect(toggle.props.value).toBe(true);
     fireEvent(toggle, 'valueChange', false);
-    await waitFor(() => expect(mockApi.muteItem).toHaveBeenCalledWith('i-1'));
+    await waitFor(() => expect(mockApi.muteItem).toHaveBeenCalledWith('i-1', null));
   });
 
   it('unmutes an item whose price alerts are muted', async () => {
     mockApi.getItem.mockResolvedValue(detail({ alerts_muted: true }));
-    open('/items/i-1');
+    open(ALERTS);
     const toggle = await screen.findByLabelText('Price alerts for Organic Bananas');
     expect(toggle.props.value).toBe(false);
     fireEvent(toggle, 'valueChange', true);
@@ -216,9 +222,9 @@ describe('Price alert mutes on item detail (PI-03 AC 4)', () => {
 
   it('mutes and unmutes price alerts at each store the item was bought from', async () => {
     mockApi.getPriceAlertSettings.mockResolvedValue(
-      settings({ muted_stores: [{ id: 's-Loblaws', name: 'Loblaws' }] }),
+      settings({ muted_stores: [{ id: 's-Loblaws', name: 'Loblaws', muted_until: null }] }),
     );
-    open('/items/i-1');
+    open(ALERTS);
     const freshco = await screen.findByLabelText('Price alerts at FreshCo');
     await waitFor(() =>
       expect(screen.getByLabelText('Price alerts at Loblaws').props.value).toBe(false),
@@ -226,7 +232,8 @@ describe('Price alert mutes on item detail (PI-03 AC 4)', () => {
     expect(freshco.props.value).toBe(true);
 
     fireEvent(freshco, 'valueChange', false);
-    await waitFor(() => expect(mockApi.muteStore).toHaveBeenCalledWith('s-FreshCo'));
+    fireEvent.press(await screen.findByLabelText('Forever'));
+    await waitFor(() => expect(mockApi.muteStore).toHaveBeenCalledWith('s-FreshCo', null));
     fireEvent(screen.getByLabelText('Price alerts at Loblaws'), 'valueChange', true);
     await waitFor(() => expect(mockApi.unmuteStore).toHaveBeenCalledWith('s-Loblaws'));
   });
@@ -234,7 +241,7 @@ describe('Price alert mutes on item detail (PI-03 AC 4)', () => {
   it('puts the switch back and says so when a mute fails', async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     mockApi.muteItem.mockRejectedValue(new Error('offline'));
-    open('/items/i-1');
+    open(ALERTS);
     const toggle = await screen.findByLabelText('Price alerts for Organic Bananas');
     fireEvent(toggle, 'valueChange', false);
     await waitFor(() => expect(alert).toHaveBeenCalled());
@@ -244,14 +251,9 @@ describe('Price alert mutes on item detail (PI-03 AC 4)', () => {
     alert.mockRestore();
   });
 
-  it('says what size of change sends an alert, and when alerts are off', async () => {
-    mockApi.getPriceAlertSettings.mockResolvedValue(settings({ threshold_percent: 15 }));
-    const { unmount } = open('/items/i-1');
-    expect(await screen.findByText(/moves 15% or more/)).toBeTruthy();
-    unmount();
-
+  it('says when price alerts are off', async () => {
     mockApi.getPriceAlertSettings.mockResolvedValue(settings({ enabled: false }));
-    open('/items/i-1');
+    open(ALERTS);
     expect(await screen.findByText(/Price alerts are off/)).toBeTruthy();
   });
 });
@@ -322,7 +324,7 @@ describe('Premium comparison and mutes for a free user (PREM-02 AC 5, 6)', () =>
   it('AC 5: a free user turning a switch off gets the upgrade prompt and the switch stays on', async () => {
     free();
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
-    const view = open('/items/i-1');
+    const view = open(ALERTS);
     const item = await screen.findByLabelText('Price alerts for Organic Bananas');
     fireEvent(item, 'valueChange', false);
     expect(alert).toHaveBeenCalledWith(
@@ -349,9 +351,9 @@ describe('Premium comparison and mutes for a free user (PREM-02 AC 5, 6)', () =>
     free();
     mockApi.getItem.mockResolvedValue(detail({ alerts_muted: true }));
     mockApi.getPriceAlertSettings.mockResolvedValue(
-      settings({ muted_stores: [{ id: 's-Loblaws', name: 'Loblaws' }] }),
+      settings({ muted_stores: [{ id: 's-Loblaws', name: 'Loblaws', muted_until: null }] }),
     );
-    open('/items/i-1');
+    open(ALERTS);
     const item = await screen.findByLabelText('Price alerts for Organic Bananas');
     expect(item.props.value).toBe(false);
     fireEvent(item, 'valueChange', true);
@@ -366,7 +368,7 @@ describe('Premium comparison and mutes for a free user (PREM-02 AC 5, 6)', () =>
   it('AC 6: a 403 premium_required from a mute shows the upgrade prompt and puts the switch back', async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     mockApi.muteItem.mockRejectedValue(premiumRequired('price_alert_mute'));
-    open('/items/i-1');
+    open(ALERTS);
     fireEvent(
       await screen.findByLabelText('Price alerts for Organic Bananas'),
       'valueChange',
@@ -419,8 +421,8 @@ describe('Price alert settings (PI-03 settings)', () => {
   it('unmutes a muted item and a muted store', async () => {
     mockApi.getPriceAlertSettings.mockResolvedValue(
       settings({
-        muted_items: [{ id: 'i-1', canonical_name: 'Organic Bananas' }],
-        muted_stores: [{ id: 's-Loblaws', name: 'Loblaws' }],
+        muted_items: [{ id: 'i-1', canonical_name: 'Organic Bananas', muted_until: null }],
+        muted_stores: [{ id: 's-Loblaws', name: 'Loblaws', muted_until: null }],
       }),
     );
     open('/settings/notification-settings');

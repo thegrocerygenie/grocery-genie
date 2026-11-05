@@ -4,6 +4,10 @@ When a receipt is confirmed, each of its prices is compared with the item's
 30-day rolling average: earlier prices of the same item in the same unit and
 currency. A change of at least the user's threshold (10% by default) is a
 PriceChangeDetected, unless the item or the store is muted or alerts are off.
+A mute may end (PI-03 AC 11, DA-7): it is live while its ``muted_until`` is
+null (forever) or later than the confirm's server time, so an ended one needs
+no job to end it and counts as unmuted from that instant (AC 12). Times are
+compared in UTC: SQLite keeps no offset, so every time written is UTC first.
 claim() then lets each item alert at most once per the user's cooldown (7
 days by default, PI-03 AC 8), and the caller writes the notification in the
 same transaction.
@@ -19,14 +23,15 @@ from __future__ import annotations
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy import delete, select
+from sqlalchemy import ColumnElement, delete, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import clock
 from app.core.config import get_settings
 from app.core.money import format_money
 from app.events.types import PriceChangeDetected
@@ -56,15 +61,29 @@ _COUNT_UNITS = {"each", "ea", "unit", "units", "item", "items", "pc", "pcs"}
 
 
 @dataclass(frozen=True)
+class MutedItem:
+    item: CanonicalItem
+    # When the mute ends (UTC), or None for forever.
+    muted_until: datetime | None
+
+
+@dataclass(frozen=True)
+class MutedStore:
+    group: StoreGroup
+    muted_until: datetime | None
+
+
+@dataclass(frozen=True)
 class PriceAlertSettings:
     enabled: bool
     threshold_percent: int
     default_threshold_percent: int
     cooldown_days: int
     default_cooldown_days: int
-    muted_items: list[CanonicalItem]
+    # Live mutes only: an ended one is not listed (PI-03 AC 12).
+    muted_items: list[MutedItem]
     # One entry per muted store group, as the user's merges group stores.
-    muted_stores: list[StoreGroup]
+    muted_stores: list[MutedStore]
 
 
 @dataclass(frozen=True)
@@ -77,6 +96,32 @@ class PriceAlert:
 
 def _insert(db: AsyncSession):
     return pg_insert if db.bind.dialect.name == "postgresql" else sqlite_insert
+
+
+def utc(value: datetime | None) -> datetime | None:
+    """A stored time as aware UTC: SQLite gives it back naive (it was written
+    in UTC), Postgres aware."""
+    if value is None:
+        return None
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def live(muted_until: ColumnElement, now: datetime) -> ColumnElement[bool]:
+    """A mute is live while it has no end, or ends after ``now`` (UTC)."""
+    return or_(muted_until.is_(None), muted_until > now)
+
+
+def later_end(a: datetime | None, b: datetime | None) -> datetime | None:
+    """The later of two mute ends; None (forever) is the latest."""
+    if a is None or b is None:
+        return None
+    return max(utc(a), utc(b))
+
+
+def mute_event(scope: str, muted_until: datetime | None) -> dict:
+    """``price_alert_muted`` properties: what was muted, and whether for a
+    time or forever (PI-03 AC 10). The time itself is not sent."""
+    return {"scope": scope, "duration": "forever" if muted_until is None else "timed"}
 
 
 def cooldown_days(user: User) -> int:
@@ -105,25 +150,34 @@ class PriceAlertService:
 
     async def get_settings(self, user: User) -> PriceAlertSettings:
         default = get_settings().price_alert_threshold_percent
-        muted_items = (
-            (
+        now = clock.now()
+        muted_items = [
+            MutedItem(item=item, muted_until=utc(until))
+            for item, until in (
                 await self.db.execute(
-                    select(CanonicalItem)
+                    select(CanonicalItem, PriceAlertItemMute.muted_until)
                     .join(
                         PriceAlertItemMute,
                         PriceAlertItemMute.canonical_item_id == CanonicalItem.id,
                     )
-                    .where(PriceAlertItemMute.user_id == user.id)
+                    .where(
+                        PriceAlertItemMute.user_id == user.id,
+                        live(PriceAlertItemMute.muted_until, now),
+                    )
                     .order_by(CanonicalItem.canonical_name)
                 )
-            )
-            .scalars()
-            .all()
-        )
-        groups = await self._muted_groups(user.id)
+            ).all()
+        ]
+        # A group muted on two of its stores (one since merged into the
+        # other) shows once, with the later end.
+        by_group: dict[uuid.UUID, MutedStore] = {}
+        for _, group, until in await self._store_mutes(user.id, now):
+            seen = by_group.get(group.id)
+            end = until if seen is None else later_end(seen.muted_until, until)
+            by_group[group.id] = MutedStore(group=group, muted_until=end)
         muted_stores = sorted(
-            {g.id: g for g in groups.values()}.values(),
-            key=lambda g: (g.name.casefold(), str(g.id)),
+            by_group.values(),
+            key=lambda m: (m.group.name.casefold(), str(m.group.id)),
         )
         return PriceAlertSettings(
             enabled=user.price_alerts_enabled,
@@ -131,8 +185,8 @@ class PriceAlertService:
             default_threshold_percent=default,
             cooldown_days=cooldown_days(user),
             default_cooldown_days=get_settings().price_alert_cooldown_days,
-            muted_items=list(muted_items),
-            muted_stores=list(muted_stores),
+            muted_items=muted_items,
+            muted_stores=muted_stores,
         )
 
     async def update_settings(self, user: User, changes: dict) -> PriceAlertSettings:
@@ -147,11 +201,25 @@ class PriceAlertService:
         await self.db.flush()
         return await self.get_settings(user)
 
-    async def mute_item(self, user_id: uuid.UUID, item_id: uuid.UUID) -> None:
+    async def mute_item(
+        self,
+        user_id: uuid.UUID,
+        item_id: uuid.UUID,
+        muted_until: datetime | None = None,
+    ) -> None:
+        """Mute until ``muted_until`` (None: forever). Muting again replaces
+        the time, an ended mute's too (PI-03 AC 11)."""
+        statement = _insert(self.db)(PriceAlertItemMute).values(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            canonical_item_id=item_id,
+            muted_until=utc(muted_until),
+        )
         await self.db.execute(
-            _insert(self.db)(PriceAlertItemMute)
-            .values(id=uuid.uuid4(), user_id=user_id, canonical_item_id=item_id)
-            .on_conflict_do_nothing(index_elements=["user_id", "canonical_item_id"])
+            statement.on_conflict_do_update(
+                index_elements=["user_id", "canonical_item_id"],
+                set_={"muted_until": statement.excluded.muted_until},
+            )
         )
 
     async def unmute_item(self, user_id: uuid.UUID, item_id: uuid.UUID) -> None:
@@ -168,35 +236,67 @@ class PriceAlertService:
     # merged into another mutes the merged group. Unmerging leaves each mute
     # on the store it was recorded on.
 
-    async def _muted_groups(self, user_id: uuid.UUID) -> dict[uuid.UUID, StoreGroup]:
-        """Each of the user's mute rows' store id -> its group, named with the
-        name saved on the mute once the user's receipts there are purged."""
-        saved = dict(
-            (
-                await self.db.execute(
-                    select(
-                        PriceAlertStoreMute.store_id, PriceAlertStoreMute.store_name
-                    ).where(PriceAlertStoreMute.user_id == user_id)
-                )
-            ).all()
-        )
-        return await StoreService(self.db).groups(user_id, saved, saved)
+    async def _store_mutes(
+        self, user_id: uuid.UUID, now: datetime | None
+    ) -> list[tuple[uuid.UUID, StoreGroup, datetime | None]]:
+        """The user's store mute rows as (store id, its group, end): the live
+        ones at ``now``, or every row when ``now`` is None. A group is named
+        with the name saved on the mute once the user's receipts there are
+        purged."""
+        query = select(
+            PriceAlertStoreMute.store_id,
+            PriceAlertStoreMute.store_name,
+            PriceAlertStoreMute.muted_until,
+        ).where(PriceAlertStoreMute.user_id == user_id)
+        if now is not None:
+            query = query.where(live(PriceAlertStoreMute.muted_until, now))
+        rows = (await self.db.execute(query)).all()
+        saved = {store_id: name for store_id, name, _ in rows}
+        groups = await StoreService(self.db).groups(user_id, saved, saved)
+        return [(store_id, groups[store_id], utc(end)) for store_id, _, end in rows]
 
-    async def mute_store(self, user_id: uuid.UUID, store_id: uuid.UUID) -> None:
-        """Stores are shared: a user may mute only one they have a receipt from."""
+    async def mute_store(
+        self,
+        user_id: uuid.UUID,
+        store_id: uuid.UUID,
+        muted_until: datetime | None = None,
+    ) -> None:
+        """Stores are shared: a user may mute only one they have a receipt from.
+
+        Muting again replaces the time for the whole group: a mute recorded
+        on another store of the group (one since merged into it) goes, so
+        the group has one end."""
         stores = StoreService(self.db)
         await stores.check_shopped(user_id, store_id)
         group = (await stores.groups(user_id, [store_id]))[store_id]
-        await self.db.execute(
-            _insert(self.db)(PriceAlertStoreMute)
-            .values(
-                id=uuid.uuid4(),
-                user_id=user_id,
-                store_id=group.id,
-                # The user's name, kept for when their receipts are purged.
-                store_name=group.name,
+        others = {
+            muted_id
+            for muted_id, muted_group, _ in await self._store_mutes(user_id, None)
+            if muted_group.id == group.id and muted_id != group.id
+        }
+        if others:
+            await self.db.execute(
+                delete(PriceAlertStoreMute).where(
+                    PriceAlertStoreMute.user_id == user_id,
+                    PriceAlertStoreMute.store_id.in_(others),
+                )
             )
-            .on_conflict_do_nothing(index_elements=["user_id", "store_id"])
+        statement = _insert(self.db)(PriceAlertStoreMute).values(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            store_id=group.id,
+            # The user's name, kept for when their receipts are purged.
+            store_name=group.name,
+            muted_until=utc(muted_until),
+        )
+        await self.db.execute(
+            statement.on_conflict_do_update(
+                index_elements=["user_id", "store_id"],
+                set_={
+                    "muted_until": statement.excluded.muted_until,
+                    "store_name": statement.excluded.store_name,
+                },
+            )
         )
 
     async def unmute_store(self, user_id: uuid.UUID, store_id: uuid.UUID) -> None:
@@ -208,7 +308,7 @@ class PriceAlertService:
         if target is not None:
             ids |= {
                 muted_id
-                for muted_id, group in (await self._muted_groups(user_id)).items()
+                for muted_id, group, _ in await self._store_mutes(user_id, None)
                 if group.id == target.id
             }
         await self.db.execute(
@@ -218,20 +318,27 @@ class PriceAlertService:
             )
         )
 
-    async def is_item_muted(self, user_id: uuid.UUID, item_id: uuid.UUID) -> bool:
-        return (
-            await self.db.scalar(
-                select(PriceAlertItemMute.id).where(
+    async def item_mute(
+        self, user_id: uuid.UUID, item_id: uuid.UUID
+    ) -> tuple[bool, datetime | None]:
+        """Whether the item's alerts are muted now, and until when (None:
+        forever, or not muted). An ended mute is not muted."""
+        row = (
+            await self.db.execute(
+                select(PriceAlertItemMute.muted_until).where(
                     PriceAlertItemMute.user_id == user_id,
                     PriceAlertItemMute.canonical_item_id == item_id,
+                    live(PriceAlertItemMute.muted_until, clock.now()),
                 )
             )
-        ) is not None
+        ).first()
+        return (False, None) if row is None else (True, utc(row[0]))
 
     # --- detection --------------------------------------------------------
 
-    async def detect(self, receipt: Receipt) -> list[PriceAlert]:
+    async def detect(self, receipt: Receipt, now: datetime) -> list[PriceAlert]:
         """Alerts the receipt's prices call for, before the cooldown claim.
+        A mute counts while it is live at ``now``, the confirm's server time.
 
         Ordered by item id, so claims take ledger row locks in one order and
         two concurrent confirms cannot deadlock on them.
@@ -240,7 +347,7 @@ class PriceAlertService:
         if user is None or not user.price_alerts_enabled:
             return []
         if receipt.store_id is not None and await self._store_muted(
-            user.id, receipt.store_id
+            user.id, receipt.store_id, now
         ):
             return []
         threshold = Decimal(
@@ -266,7 +373,7 @@ class PriceAlertService:
             key = (obs.canonical_item_id, obs.unit_of_measure, obs.currency)
             grouped[key].append(Decimal(str(obs.unit_price)))
 
-        muted = await self._muted_items(user.id, {k[0] for k in grouped})
+        muted = await self._muted_items(user.id, {k[0] for k in grouped}, now)
         store_name = await self._store_name(user.id, receipt.store_id)
         prices = PriceService(self.db)
         alerts: list[PriceAlert] = []
@@ -405,7 +512,7 @@ class PriceAlertService:
         return result.scalar_one_or_none() is not None
 
     async def _muted_items(
-        self, user_id: uuid.UUID, item_ids: set[uuid.UUID]
+        self, user_id: uuid.UUID, item_ids: set[uuid.UUID], now: datetime
     ) -> set[uuid.UUID]:
         if not item_ids:
             return set()
@@ -413,19 +520,22 @@ class PriceAlertService:
             select(PriceAlertItemMute.canonical_item_id).where(
                 PriceAlertItemMute.user_id == user_id,
                 PriceAlertItemMute.canonical_item_id.in_(item_ids),
+                live(PriceAlertItemMute.muted_until, now),
             )
         )
         return set(rows.scalars().all())
 
-    async def _store_muted(self, user_id: uuid.UUID, store_id: uuid.UUID) -> bool:
-        """Whether the user muted the store's group (see the mute notes)."""
-        muted = await self._muted_groups(user_id)
+    async def _store_muted(
+        self, user_id: uuid.UUID, store_id: uuid.UUID, now: datetime
+    ) -> bool:
+        """Whether a live mute covers the store's group (see the mute notes)."""
+        muted = await self._store_mutes(user_id, now)
         if not muted:
             return False
         group = (await StoreService(self.db).groups(user_id, [store_id])).get(store_id)
         if group is None:
             return False
-        return any(g.id == group.id for g in muted.values())
+        return any(g.id == group.id for _, g, _ in muted)
 
     async def _store_name(
         self, user_id: uuid.UUID, store_id: uuid.UUID | None

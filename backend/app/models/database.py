@@ -478,6 +478,9 @@ class PriceAlertItemMute(Base):
     canonical_item_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("canonical_items.id", ondelete="CASCADE"), nullable=False
     )
+    # PI-03 AC 11 (DA-7): when the mute ends, in UTC; null is forever. An
+    # ended mute is ignored, not deleted: no job is needed to end it.
+    muted_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -505,6 +508,8 @@ class PriceAlertStoreMute(Base):
     # mute outlives its receipts, and the shared row's name may be another
     # user's.
     store_name: Mapped[str | None] = mapped_column(String(255))
+    # PI-03 AC 11 (DA-7): when the mute ends, in UTC; null is forever.
+    muted_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
