@@ -3,6 +3,9 @@ import type { PriceRange } from './utils/priceTrend';
 /** User-facing text for price history and item matching (PI-01, PI-02). */
 export const PRICES_COPY = {
   listTitle: 'Items',
+  // The Budget dashboard's row that opens the list.
+  dashboardEntry: 'Items',
+  dashboardEntryHint: 'What you paid for each item over time',
   searchPlaceholder: 'Search items',
   emptyTitle: 'No prices yet',
   emptyBody: 'Confirm a receipt and every item on it starts a price history.',
@@ -43,7 +46,7 @@ export const PRICES_COPY = {
   showAllLabel: 'Show all prices',
   needMorePrices: (min: number) =>
     `Buy it again to see its price trend. A trend needs ${min} prices.`,
-  pricesHeader: (count: number) => `Prices · ${count}`,
+  pricesHeader: (count: number) => `Purchases · ${count}`,
   otherUnit: 'Not in chart: another unit',
   unknownStore: 'Unknown store',
   namesHeader: 'Names on receipts',

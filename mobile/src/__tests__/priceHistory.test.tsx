@@ -176,7 +176,7 @@ describe('Item price history (PI-01)', () => {
   it('shows every price with its date and store, newest first (AC 1)', async () => {
     open('/items/i-1');
 
-    expect(await screen.findByText('Prices · 2')).toBeTruthy();
+    expect(await screen.findByText('Purchases · 2')).toBeTruthy();
     expect(mockApi.getPriceHistory).toHaveBeenCalledWith('i-1');
     expect(screen.getByText('Mar 20, 2026')).toBeTruthy();
     expect(screen.getByText('Mar 1, 2026')).toBeTruthy();
@@ -243,7 +243,7 @@ describe('Item price history (PI-01)', () => {
     expect(await screen.findByText('Couldn’t load this item')).toBeTruthy();
     mockApi.getItem.mockResolvedValue(detail());
     fireEvent.press(screen.getByLabelText('Try again'));
-    expect(await screen.findByText('Prices · 2')).toBeTruthy();
+    expect(await screen.findByText('Purchases · 2')).toBeTruthy();
   });
 });
 
@@ -274,7 +274,7 @@ describe('Item names and combining (PI-02 AC 3)', () => {
     mockApi.renameItem.mockResolvedValue(detail({ canonical_name: 'Bananas' }));
     const prompt = jest.spyOn(Alert, 'prompt').mockImplementation(() => {});
     open('/items/i-1');
-    await screen.findByText('Prices · 2');
+    await screen.findByText('Purchases · 2');
 
     fireEvent.press(screen.getByLabelText('Rename item'));
     const buttons = prompt.mock.calls[0][2] as AlertButton[];

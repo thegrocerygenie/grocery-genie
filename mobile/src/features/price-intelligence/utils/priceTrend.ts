@@ -106,14 +106,18 @@ export function pointsInRange(points: PricePoint[], range: PriceRange, now: Date
   return from === undefined ? points : points.filter((p) => p.date >= from);
 }
 
+/** A chart needs 2 prices (PI-01 AC 4); the opening range needs as many. */
+const MIN_CHART_POINTS = 2;
+
 /**
- * The range item detail opens on: 3M, or when 3M holds no price the smallest
- * range that does (6M, 1Y, then All). `points` are the plotted prices.
+ * The range item detail opens on: 3M when it holds 2 plotted prices, else the
+ * smallest of 6M, 1Y and All that does, so it never opens on "Not enough
+ * prices in this range". `points` are the plotted prices.
  */
 export function openingRange(points: PricePoint[], now: Date): PriceRange {
   const start = PRICE_RANGES.indexOf(DEFAULT_PRICE_RANGE);
   for (const range of PRICE_RANGES.slice(start)) {
-    if (pointsInRange(points, range, now).length > 0) return range;
+    if (pointsInRange(points, range, now).length >= MIN_CHART_POINTS) return range;
   }
   return 'All';
 }

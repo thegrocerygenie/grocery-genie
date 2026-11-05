@@ -18,7 +18,7 @@ Confirming a receipt links each line to a canonical item (PI-02) and records its
 
 ## How to get to it (user POV)
 
-Budget tab → Price history (the Items list) → an item. Also: History → a receipt → tap a line. Possible matches: the banner at the top of Items, or the question card on the item.
+Budget tab → Items → an item. Also: History → a receipt → tap a line. Possible matches: the banner at the top of Items, or the question card on the item.
 
 ## Driving it with gg-verify
 

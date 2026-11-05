@@ -14,7 +14,7 @@ const TAB_TITLES: Record<string, string> = {
 
 /**
  * The Back label for item detail: the name of the screen under it. An item
- * opens from the Prices list, from a receipt line, from the Price alerts list,
+ * opens from the Items list, from a receipt line, from the Price alerts list,
  * and from a price alert or link straight over the tabs (then the tab that
  * was showing). Undefined
  * leaves iOS's default, the previous screen's title.

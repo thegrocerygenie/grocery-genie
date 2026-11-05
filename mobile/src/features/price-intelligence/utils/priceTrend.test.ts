@@ -177,10 +177,12 @@ describe('pointsInRange and openingRange (PI-01 AC 5)', () => {
     expect(pointsInRange(pts, 'All', now)).toHaveLength(3);
   });
 
-  it('opens on 3M, or the smallest range with prices when 3M has none', () => {
+  it('opens on 3M with 2 prices, else the smallest of 6M, 1Y, All that has 2', () => {
     expect(openingRange(pts, now)).toBe('3M');
-    expect(openingRange([point('2025-12-01', 1)], now)).toBe('6M');
-    expect(openingRange([point('2025-06-01', 1)], now)).toBe('1Y');
+    // One price in 3M is not enough: 6M has two.
+    expect(openingRange([point('2025-12-01', 1), point('2026-04-15', 2)], now)).toBe('6M');
+    expect(openingRange([point('2025-06-01', 1), point('2026-04-15', 2)], now)).toBe('1Y');
+    expect(openingRange([point('2024-06-01', 1), point('2026-04-15', 2)], now)).toBe('All');
     expect(openingRange([point('2024-06-01', 1)], now)).toBe('All');
   });
 });

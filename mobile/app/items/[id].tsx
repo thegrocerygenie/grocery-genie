@@ -338,7 +338,12 @@ function Headline({ history }: { history: PriceHistory }) {
   const change = average.percent === null ? null : formatPercent(percent);
   const changeStyle =
     percent > 0 ? styles.changeUp : percent < 0 ? styles.changeDown : styles.changeFlat;
-  const asOf = isStale(latest.date, today()) ? PRICES_COPY.asOf(formatLongDate(latest.date)) : null;
+  // The latest price the average counts: like-for-like, as the 30 days are.
+  const comparable = timelinePoints(history);
+  const averaged = comparable[comparable.length - 1] ?? latest;
+  const asOf = isStale(averaged.date, today())
+    ? PRICES_COPY.asOf(formatLongDate(averaged.date))
+    : null;
   const latestLine = PRICES_COPY.latestLine(
     formatUnitPrice(latest.unit_price, latest.currency, latest.unit_of_measure),
     latest.store_name ?? PRICES_COPY.unknownStore,

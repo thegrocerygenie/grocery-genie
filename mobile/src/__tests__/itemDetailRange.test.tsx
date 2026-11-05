@@ -177,7 +177,7 @@ describe('Range control (PI-01 AC 5)', () => {
       'Price chart, 3 prices from $2.00 to $2.60, latest $2.60',
     );
     // The price list still has every price (AC 1).
-    expect(screen.getByText('Prices · 5')).toBeTruthy();
+    expect(screen.getByText('Purchases · 5')).toBeTruthy();
   });
 
   it('follows the chosen range, and All plots every price', async () => {
@@ -213,6 +213,17 @@ describe('Range control (PI-01 AC 5)', () => {
     expect(mockApi.getPriceHistory).toHaveBeenCalledWith('i-1');
   });
 
+  it('never opens on too few prices: 1 price in 3M opens 1Y with both', async () => {
+    serve([point('2025-06-01', 1.5, 'FreshCo'), point('2026-04-15', 2.6, 'FreshCo')]);
+    open();
+
+    expect((await screen.findByTestId('price-chart')).props.accessibilityLabel).toMatch(
+      /^Price chart, 2 prices/,
+    );
+    expect(screen.getByLabelText('1 year').props.accessibilityState).toEqual({ selected: true });
+    expect(screen.queryByText('Not enough prices in this range')).toBeNull();
+  });
+
   it('opens on the smallest range with prices when 3M has none', async () => {
     serve([point('2025-06-01', 1.5, 'FreshCo'), point('2025-09-01', 1.8, 'Loblaws')]);
     open();
@@ -237,6 +248,7 @@ describe('A range with too few prices (PI-01 AC 6, edge case 8)', () => {
     serve([point('2025-06-01', 1.5, 'FreshCo'), point('2026-04-15', 2.6, 'FreshCo')]);
     open();
 
+    fireEvent.press(await screen.findByLabelText('3 months'));
     expect(await screen.findByText('Not enough prices in this range')).toBeTruthy();
     expect(screen.queryByTestId('price-chart')).toBeNull();
     fireEvent.press(screen.getByLabelText('Show all prices'));
@@ -254,6 +266,11 @@ describe('A range with too few prices (PI-01 AC 6, edge case 8)', () => {
     ]);
     open();
 
+    // Two prices in 3M, but one is in another unit: it opens on All.
+    expect((await screen.findByLabelText('All prices')).props.accessibilityState).toEqual({
+      selected: true,
+    });
+    fireEvent.press(screen.getByLabelText('3 months'));
     expect(await screen.findByText('Not enough prices in this range')).toBeTruthy();
   });
 
@@ -283,6 +300,18 @@ describe('Headline "Avg · 30d" (PI-01 AC 7)', () => {
 
   it('adds as of the latest price date when it is more than 30 days old', async () => {
     serve([point('2026-01-05', 1.8, 'FreshCo'), point('2026-02-10', 2, 'FreshCo')]);
+    open();
+
+    expect((await screen.findByTestId('headline-price')).props.children).toBe('$2.00');
+    expect(screen.getByText('as of Feb 10, 2026')).toBeTruthy();
+  });
+
+  it('dates as of from the latest like-for-like price, as the average does', async () => {
+    serve([
+      point('2026-01-05', 1.8, 'FreshCo'),
+      point('2026-02-10', 2, 'FreshCo'),
+      { ...point('2026-04-15', 0.5, 'Loblaws', false), unit_of_measure: 'each' },
+    ]);
     open();
 
     expect((await screen.findByTestId('headline-price')).props.children).toBe('$2.00');
