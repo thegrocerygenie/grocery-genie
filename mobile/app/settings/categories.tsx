@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 
 import { PremiumUpgradePrompt } from '@/components/PremiumUpgradePrompt';
-import { getCategoryMetaByName } from '@/constants/categories';
+import { categoryMeta } from '@/constants/categories';
 import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { useMe } from '@/features/auth/hooks/useAuth';
+import {
+  CategoryEditorSheet,
+  type CategoryEditorValue,
+} from '@/features/budget/components/CategoryEditorSheet';
 import {
   CATEGORY_NAME_MAX,
   CATEGORY_STRINGS as S,
@@ -17,11 +21,13 @@ import {
   useCategories,
   useCreateCategory,
   useDeleteCategory,
-  useRenameCategory,
+  useUpdateCategory,
 } from '@/features/budget/hooks/useCategories';
-import type { CategoryResponse } from '@/features/budget/types';
+import type { CategoryInput, CategoryResponse } from '@/features/budget/types';
 import { apiErrorCode } from '@/services/api';
 import { isPremiumRequired } from '@/utils/premium';
+
+type SymbolName = Parameters<typeof SymbolView>[0]['name'];
 
 /** Collapse whitespace as the server does; null when it can't be a name. */
 function cleanName(value: string | undefined): string | null {
@@ -29,71 +35,106 @@ function cleanName(value: string | undefined): string | null {
   return name.length > 0 ? name : null;
 }
 
+/** The sheet's target: a new category, or one of the user's own. */
+type Editing = { mode: 'create' } | { mode: 'edit'; category: CategoryResponse } | null;
+
 /**
- * Settings → Categories (BC-05 AC 3, V11-P1). The eight built-in categories,
- * then up to 10 of the user's own. Adding and renaming are Premium (D2): a free
- * user sees the upgrade prompt in their place. After Premium lapses the user's
- * categories stay, keep their spending, and can still be deleted.
+ * Settings → Categories (BC-05 AC 3, V11-P1; AC 5–8, DA-9), as the design's
+ * "PI · Custom cats": "Built-in" first, each in its icon square; then
+ * "Custom", in round icons, with a "New category" row and the Premium footer.
+ * Edit in the navigation bar renames or deletes custom categories; tapping one
+ * changes its name, colour and icon. Adding and changing are Premium (D2):
+ * after a lapse the categories stay, keep their colour and icon, and can still
+ * be deleted; changing them shows the upgrade prompt (AC 8).
  */
 export default function CategorySettingsScreen() {
   const router = useRouter();
   const { data: profile } = useMe();
   const categories = useCategories();
   const create = useCreateCategory();
-  const rename = useRenameCategory();
+  const update = useUpdateCategory();
   const remove = useDeleteCategory();
+  const [editingList, setEditingList] = useState(false);
+  const [editing, setEditing] = useState<Editing>(null);
+  // The server refused a change in the open sheet: Premium lapsed meanwhile.
+  const [refused, setRefused] = useState(false);
 
   const all = categories.data ?? [];
   const defaults = all.filter((c) => c.is_default);
   const mine = all.filter((c) => !c.is_default);
   // Premium as the backend says; a refused create means it lapsed meanwhile.
-  const premium = profile?.is_premium === true && !isPremiumRequired(create.error);
+  const premium =
+    profile?.is_premium === true &&
+    !isPremiumRequired(create.error) &&
+    !isPremiumRequired(update.error);
   const atLimit = mine.length >= MAX_CUSTOM_CATEGORIES;
+  const listEditing = editingList && mine.length > 0;
+
+  const openPaywall = () => router.push('/paywall');
 
   const onSaveError = (error: unknown) => {
     const code = apiErrorCode(error);
-    if (code === 'premium_required') return; // the upgrade prompt replaces the add row
+    if (code === 'premium_required') {
+      setRefused(true); // the upgrade prompt replaces the editor's Save
+      return;
+    }
     if (code === 'category_name_taken') Alert.alert(S.nameTaken);
     else if (code === 'category_limit_reached') Alert.alert(S.limitReached);
     else Alert.alert(S.failed);
   };
 
-  const askName = (title: string, body: string, initial: string, save: (name: string) => void) =>
+  const openEditor = (next: Editing) => {
+    setRefused(false);
+    setEditing(next);
+  };
+  const closeEditor = () => setEditing(null);
+
+  const onEditorSave = (value: CategoryEditorValue) => {
+    if (!editing) return;
+    if (editing.mode === 'create') {
+      create.mutate(value, {
+        onSuccess: () => {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          closeEditor();
+        },
+        onError: onSaveError,
+      });
+      return;
+    }
+    const cat = editing.category;
+    const changes: CategoryInput = {};
+    if (value.name !== cat.name) changes.name = value.name;
+    if (value.color !== cat.color) changes.color = value.color;
+    if (value.icon !== cat.icon) changes.icon = value.icon;
+    if (Object.keys(changes).length === 0) {
+      closeEditor();
+      return;
+    }
+    update.mutate({ id: cat.id, ...changes }, { onSuccess: closeEditor, onError: onSaveError });
+  };
+
+  const onRename = (cat: CategoryResponse) =>
     Alert.prompt(
-      title,
-      body,
+      S.renamePrompt,
+      '',
       [
         { text: S.cancel, style: 'cancel' },
         {
           text: S.save,
           onPress: (value?: string) => {
             const name = cleanName(value);
-            if (!name) return;
+            if (!name || name === cat.name) return;
             if (name.length > CATEGORY_NAME_MAX) {
               Alert.alert(S.nameInvalid);
               return;
             }
-            save(name);
+            update.mutate({ id: cat.id, name }, { onError: onSaveError });
           },
         },
       ],
       'plain-text',
-      initial,
+      cat.name,
     );
-
-  const onAdd = () =>
-    askName(S.addPrompt, S.addBody, '', (name) =>
-      create.mutate(name, {
-        onSuccess: () => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
-        onError: onSaveError,
-      }),
-    );
-
-  const onRename = (cat: CategoryResponse) =>
-    askName(S.renamePrompt, '', cat.name, (name) => {
-      if (name === cat.name) return;
-      rename.mutate({ id: cat.id, name }, { onError: onSaveError });
-    });
 
   const onDelete = (cat: CategoryResponse) =>
     Alert.alert(S.deleteTitle(cat.name), S.deleteBody, [
@@ -106,27 +147,34 @@ export default function CategorySettingsScreen() {
     ]);
 
   const onRow = (cat: CategoryResponse) => {
-    if (!premium) {
-      onDelete(cat);
-      return;
-    }
-    Alert.alert(S.rowActions(cat.name), undefined, [
-      { text: S.rename, onPress: () => onRename(cat) },
-      { text: S.delete, style: 'destructive', onPress: () => onDelete(cat) },
-      { text: S.cancel, style: 'cancel' },
-    ]);
+    if (listEditing && premium) onRename(cat);
+    else openEditor({ mode: 'edit', category: cat });
   };
+
+  const headerRight =
+    mine.length > 0
+      ? () => (
+          <Pressable
+            onPress={() => setEditingList((v) => !v)}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={listEditing ? S.doneLabel : S.editLabel}
+          >
+            <Text style={[styles.headerButton, listEditing && styles.headerDone]}>
+              {listEditing ? S.done : S.edit}
+            </Text>
+          </Pressable>
+        )
+      : undefined;
 
   return (
     <>
-      <Stack.Screen options={{ title: S.screenTitle, headerBackTitle: S.back }} />
+      <Stack.Screen options={{ title: S.screenTitle, headerBackTitle: S.back, headerRight }} />
       <ScrollView
         style={styles.root}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
       >
-        <Text style={styles.note}>{S.intro}</Text>
-
         {categories.isError ? (
           <View style={styles.card}>
             <Text style={[type.subheadline, styles.errorText]}>{S.loadFailed}</Text>
@@ -141,89 +189,12 @@ export default function CategorySettingsScreen() {
           </View>
         ) : null}
 
-        {premium || mine.length > 0 ? (
-          <View>
-            <View style={styles.headerRow}>
-              <Text style={styles.sectionLabel}>{S.yoursHeader}</Text>
-              <Text style={styles.sectionLabel} accessibilityLabel={S.countLabel(mine.length)}>
-                {S.count(mine.length)}
-              </Text>
-            </View>
-            <View style={styles.card}>
-              {mine.length === 0 ? (
-                <View style={styles.row}>
-                  <Text style={[type.subheadline, styles.secondary]}>{S.empty}</Text>
-                </View>
-              ) : null}
-              {mine.map((cat, i) => (
-                <Pressable
-                  key={cat.id}
-                  onPress={() => onRow(cat)}
-                  style={({ pressed }) => [
-                    styles.row,
-                    i > 0 && styles.divider,
-                    pressed && styles.pressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${cat.name}, ${premium ? S.rowHint : S.delete}`}
-                >
-                  <View style={[styles.icon, styles.customIcon]}>
-                    <SymbolView name="tag.fill" size={14} tintColor={colors.onIconSquare} />
-                  </View>
-                  <Text style={[type.body, styles.flex]} numberOfLines={1}>
-                    {cat.name}
-                  </Text>
-                  <SymbolView
-                    name={premium ? 'ellipsis.circle' : 'trash'}
-                    size={18}
-                    tintColor={premium ? colors.iosLabel3 : colors.red}
-                  />
-                </Pressable>
-              ))}
-              {premium ? (
-                <Pressable
-                  onPress={onAdd}
-                  disabled={atLimit || create.isPending}
-                  style={({ pressed }) => [
-                    styles.row,
-                    mine.length > 0 && styles.divider,
-                    pressed && styles.pressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={S.add}
-                  accessibilityState={{ disabled: atLimit || create.isPending }}
-                >
-                  <SymbolView
-                    name="plus.circle.fill"
-                    size={22}
-                    tintColor={atLimit ? colors.iosLabel3 : colors.tint}
-                  />
-                  <Text style={[type.body, atLimit ? styles.secondary : styles.tint]}>{S.add}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-            {premium && atLimit ? <Text style={styles.note}>{S.limitReached}</Text> : null}
-            {!premium && mine.length > 0 ? <Text style={styles.note}>{S.lapsedNote}</Text> : null}
-          </View>
-        ) : null}
-
-        {!premium ? (
-          <View style={styles.card}>
-            <PremiumUpgradePrompt
-              title={S.upgradeTitle}
-              message={S.upgradeMessage}
-              upgradeLabel={S.upgradeAction}
-              onUpgrade={() => router.push('/paywall')}
-            />
-          </View>
-        ) : null}
-
         {defaults.length > 0 ? (
           <View>
-            <Text style={styles.sectionLabel}>{S.defaultsHeader}</Text>
+            <Text style={styles.sectionLabel}>{S.builtInHeader}</Text>
             <View style={styles.card}>
               {defaults.map((cat, i) => {
-                const meta = getCategoryMetaByName(cat.name);
+                const meta = categoryMeta(cat);
                 return (
                   <View
                     key={cat.id}
@@ -231,9 +202,12 @@ export default function CategorySettingsScreen() {
                     accessible
                     accessibilityLabel={cat.name}
                   >
-                    <View style={[styles.icon, { backgroundColor: meta.color }]}>
+                    <View
+                      testID={`category-icon-${cat.id}`}
+                      style={[styles.icon, styles.square, { backgroundColor: meta.color }]}
+                    >
                       <SymbolView
-                        name={meta.symbol as Parameters<typeof SymbolView>[0]['name']}
+                        name={meta.symbol as SymbolName}
                         size={14}
                         tintColor={colors.onIconSquare}
                       />
@@ -243,10 +217,118 @@ export default function CategorySettingsScreen() {
                 );
               })}
             </View>
-            <Text style={styles.note}>{S.defaultsFooter}</Text>
           </View>
         ) : null}
+
+        <View>
+          <View style={styles.headerRow}>
+            <Text style={styles.sectionLabel}>{S.customHeader}</Text>
+            {premium || mine.length > 0 ? (
+              <Text style={styles.sectionLabel} accessibilityLabel={S.countLabel(mine.length)}>
+                {S.count(mine.length)}
+              </Text>
+            ) : null}
+          </View>
+          <View style={styles.card}>
+            {mine.map((cat, i) => {
+              const meta = categoryMeta(cat);
+              return (
+                <View key={cat.id} style={[styles.rowOuter, i > 0 && styles.divider]}>
+                  {listEditing ? (
+                    <Pressable
+                      onPress={() => onDelete(cat)}
+                      hitSlop={8}
+                      style={styles.deleteButton}
+                      accessibilityRole="button"
+                      accessibilityLabel={S.deleteLabel(cat.name)}
+                    >
+                      <SymbolView name="minus.circle.fill" size={22} tintColor={colors.red} />
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    onPress={() => onRow(cat)}
+                    style={({ pressed }) => [styles.row, styles.flex, pressed && styles.pressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${cat.name}, ${
+                      listEditing && premium ? S.rowRenameHint : S.rowOpenHint
+                    }`}
+                  >
+                    <View
+                      testID={`category-icon-${cat.id}`}
+                      style={[styles.icon, styles.round, { backgroundColor: meta.color }]}
+                    >
+                      <SymbolView
+                        name={meta.symbol as SymbolName}
+                        size={14}
+                        tintColor={colors.onIconSquare}
+                      />
+                    </View>
+                    <Text style={[type.body, styles.flex, styles.customName]} numberOfLines={1}>
+                      {cat.name}
+                    </Text>
+                    {listEditing ? null : (
+                      <SymbolView name="chevron.right" size={13} tintColor={colors.iosLabel3} />
+                    )}
+                  </Pressable>
+                </View>
+              );
+            })}
+            {premium ? (
+              <Pressable
+                onPress={() => openEditor({ mode: 'create' })}
+                disabled={atLimit || create.isPending}
+                style={({ pressed }) => [
+                  styles.row,
+                  mine.length > 0 && styles.divider,
+                  pressed && styles.pressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={S.newCategory}
+                accessibilityState={{ disabled: atLimit || create.isPending }}
+              >
+                <View style={[styles.icon, styles.round, styles.addIcon]}>
+                  <SymbolView
+                    name="plus"
+                    size={14}
+                    tintColor={atLimit ? colors.iosLabel3 : colors.tint}
+                  />
+                </View>
+                <Text
+                  style={[type.body, styles.customName, atLimit ? styles.secondary : styles.tint]}
+                >
+                  {S.newCategory}
+                </Text>
+              </Pressable>
+            ) : (
+              <View style={mine.length > 0 && styles.divider}>
+                <PremiumUpgradePrompt
+                  title={S.upgradeTitle}
+                  message={S.upgradeMessage}
+                  upgradeLabel={S.upgradeAction}
+                  onUpgrade={openPaywall}
+                />
+              </View>
+            )}
+          </View>
+          <Text style={styles.note}>{S.customFooter}</Text>
+          {premium && atLimit ? <Text style={styles.note}>{S.limitReached}</Text> : null}
+          {!premium && mine.length > 0 ? <Text style={styles.note}>{S.lapsedNote}</Text> : null}
+        </View>
       </ScrollView>
+
+      <CategoryEditorSheet
+        visible={editing !== null}
+        mode={editing?.mode ?? 'create'}
+        initial={editing?.mode === 'edit' ? editing.category : undefined}
+        locked={!premium || refused}
+        saving={create.isPending || update.isPending}
+        onSave={onEditorSave}
+        onCancel={closeEditor}
+        onUpgrade={() => {
+          closeEditor();
+          openPaywall();
+        }}
+      />
     </>
   );
 }
@@ -261,6 +343,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  headerButton: { ...type.body, color: colors.tint },
+  headerDone: { fontWeight: '600' },
   sectionLabel: {
     ...type.footnote,
     color: colors.iosLabel2,
@@ -272,6 +356,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.list,
     overflow: 'hidden',
   },
+  rowOuter: { flexDirection: 'row', alignItems: 'center' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -279,6 +364,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
     minHeight: touchTarget.minHeight + 4,
+  },
+  deleteButton: {
+    paddingLeft: 14,
+    minHeight: touchTarget.minHeight,
+    minWidth: touchTarget.minWidth - 8,
+    justifyContent: 'center',
   },
   pressed: { backgroundColor: colors.iosFill3 },
   divider: {
@@ -288,11 +379,13 @@ const styles = StyleSheet.create({
   icon: {
     width: 28,
     height: 28,
-    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  customIcon: { backgroundColor: colors.indigo },
+  square: { borderRadius: 7 },
+  round: { borderRadius: 14 },
+  addIcon: { backgroundColor: colors.tintBg },
+  customName: { fontWeight: '600' },
   flex: { flex: 1 },
   secondary: { color: colors.iosLabel2 },
   tint: { color: colors.tint },

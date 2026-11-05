@@ -5,7 +5,14 @@ from datetime import date, datetime, timedelta
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.models.category_looks import (
+    CUSTOM_COLORS,
+    CUSTOM_ICONS,
+    DEFAULT_COLOR,
+    DEFAULT_ICON,
+)
 
 _CURRENCY_CODE = re.compile(r"^[A-Z]{3}$")
 
@@ -175,6 +182,9 @@ class BudgetCategorySummary(BaseModel):
     remaining: float
     percent: float
     rolled_over: float = 0.0
+    # The category's look, for the dashboard's bars (BC-05 AC 7, DA-9).
+    color: str = DEFAULT_COLOR
+    icon: str = DEFAULT_ICON
 
 
 class BudgetSummaryResponse(BaseModel):
@@ -271,6 +281,9 @@ class CategoryResponse(BaseModel):
     name: str
     is_default: bool
     sort_order: int
+    # BC-05 AC 5 (DA-9): names from app.models.category_looks.
+    color: str
+    icon: str
 
 
 # Longest custom category name; it has to fit a budget row and a chart legend.
@@ -286,18 +299,55 @@ def _category_name(value: str) -> str:
     return name
 
 
+# A custom category's colour and icon (BC-05 AC 5): only names from the
+# allowed sets, so the server never stores what the app cannot draw.
+CategoryColor = Literal[*CUSTOM_COLORS]  # type: ignore[valid-type]
+CategoryIcon = Literal[*CUSTOM_ICONS]  # type: ignore[valid-type]
+
+
 class CategoryCreateRequest(BaseModel):
-    """A custom category (BC-05 AC 3, Premium). Whitespace is collapsed."""
+    """A custom category (BC-05 AC 3, Premium). Whitespace is collapsed.
+
+    ``color`` and ``icon`` default to the first of each set (BC-05 AC 5).
+    """
 
     name: str
+    color: CategoryColor = DEFAULT_COLOR
+    icon: CategoryIcon = DEFAULT_ICON
 
     _check_name = field_validator("name")(_category_name)
 
 
 class CategoryUpdateRequest(BaseModel):
-    name: str
+    """Rename and/or restyle a custom category; send at least one field.
 
-    _check_name = field_validator("name")(_category_name)
+    A field left out keeps its value; ``null`` is refused like any value
+    outside the allowed sets.
+    """
+
+    name: str | None = None
+    color: CategoryColor | None = None
+    icon: CategoryIcon | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _check_name(cls, value: str | None) -> str | None:
+        if value is None:
+            raise ValueError("name must not be null")
+        return _category_name(value)
+
+    @field_validator("color", "icon")
+    @classmethod
+    def _not_null(cls, value: str | None) -> str | None:
+        if value is None:
+            raise ValueError("must not be null")
+        return value
+
+    @model_validator(mode="after")
+    def _something_to_change(self) -> "CategoryUpdateRequest":
+        if not self.model_fields_set:
+            raise ValueError("send a name, a color or an icon")
+        return self
 
 
 # --- Common ---

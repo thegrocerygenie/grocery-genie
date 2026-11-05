@@ -35,7 +35,7 @@ MVP notes on the table below:
 | `waitlist_offer_matched` | source (social_sign_in/verify_email/email_change/backfill/claim) | Waitlist free year (V11-P5): how waitlist members find their offer. Sent by the server when a waitlist email is matched to an account |
 | `waitlist_offer_granted` | source (as above), attempts (RevenueCat calls it took) | Waitlist conversion into Premium, and how often RevenueCat had to be retried. Sent by the server when RevenueCat accepts the promotional grant |
 | `waitlist_claim_requested` | none | "Claim your waitlist offer" use (Hide My Email and other emails). Sent by the server on each accepted claim request, whether or not the email is on the waitlist |
-| `custom_category_changed` | action (created/renamed/deleted), custom_count (after the change) | Custom category adoption (BC-05 AC 3, Premium): how many users make their own, and how many they keep |
+| `custom_category_changed` | action (created/renamed/deleted), custom_count (after the change); a colour or icon change alone (DA-9) sends none | Custom category adoption (BC-05 AC 3, Premium): how many users make their own, and how many they keep |
 | `data_exported` | format (json/csv), receipt_count, line_item_count, budget_count, price_observation_count | Data export use (NFR Privacy 2, Premium): sent by the server when an export is built, not for a refused free user |
 | `item_match_resolved` | decision (accepted/rejected), method (fuzzy/semantic), confidence | Item matching precision against user-confirmed matches |
 | `recipe_suggestion_viewed` | recipe_id, match_score, had_expiring_ingredient | Recipe relevance |

@@ -16,7 +16,7 @@ import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
-import { DEFAULT_CATEGORIES, getCategoryMetaByName } from '@/constants/categories';
+import { DEFAULT_CATEGORIES, categoryMeta } from '@/constants/categories';
 import { PremiumUpgradePrompt } from '@/components/PremiumUpgradePrompt';
 import { ROLLOVER_STRINGS } from '@/features/budget/content/rollover';
 import {
@@ -122,8 +122,8 @@ export default function BudgetSettingsScreen() {
   const categories =
     serverCategories && serverCategories.length > 0
       ? serverCategories.map((c) => {
-          // Server ids are UUIDs; display meta is keyed by the category name.
-          const meta = getCategoryMetaByName(c.name);
+          // The category's own colour and icon (BC-05 AC 5), else by name.
+          const meta = categoryMeta(c);
           return {
             id: c.id,
             name: c.name,
