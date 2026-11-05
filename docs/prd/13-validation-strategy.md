@@ -708,11 +708,41 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-01 | 9 | Store rows lead with a coloured square, stable per store | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "leads each price row and comparison row with the store’s own colour" | Pass |
 | PI-01 | 10 | Back label names the opener; largest text size holds | Unit | `mobile/src/features/price-intelligence/__tests__/itemBackTitle.test.ts` "names the screen that opened the item: Items, Receipt, Price alerts (PI-01 AC 10)" | Pass |
 | PI-01 | 10 | Back label names the opener; largest text size holds | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "lets the range control wrap and keeps the headline price whole" | Pass |
-| PI-03 | 5 | Price alerts list: newest first, This week / Earlier, arrow, signed percent, was/now (drops add "stock-up worth it"), sparkline, tap opens item; opens from Settings → Alerts and the Budget dashboard bell (label "Price alerts") | Component | Not yet implemented (DA-4) | Pending |
-| PI-03 | 6 | Empty Price alerts list says "No price alerts yet" | Component | Not yet implemented (DA-4) | Pending |
-| PI-03 | 7 | Settings group: Threshold and Cooldown rows, footer from the user's settings | Component | Not yet implemented (DA-4) | Pending |
-| PI-03 | 8 | Cooldown user setting 1–30 days (null default, 422 otherwise), used by the alert check | Integration | Not yet implemented (DA-4) | Pending |
-| PI-03 | 9 | Alert title and body per design (a drop adds "stock-up worth it", push and in-app alike), still naming item, store, old average, new price, percent | Integration | Not yet implemented (DA-4) | Pending |
+| PI-03 | 5 | Price alerts list: This week / Earlier, newest first, arrow, signed percent, was/now, drop adds "stock-up worth it", sparkline | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "groups alerts This week and Earlier, newest first" | Pass |
+| PI-03 | 5 | Price alerts list: tapping a row opens the item | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "opens the item when a row is tapped (EC-PI 11: the id the server keeps current)" | Pass |
+| PI-03 | 5 | Price alerts list opens from the Budget dashboard bell (label "Price alerts") | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "opens from the bell on the Budget dashboard" | Pass |
+| PI-03 | 5 | Price alerts list opens from Settings → Alerts | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "opens from Settings → Alerts" | Pass |
+| PI-03 | 5 | Price alerts list: a failed load says so and retries | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "says so and offers a retry when the list fails to load" | Pass |
+| PI-03 | 5 | Price alerts row: a rise from the alert data | Unit | `mobile/src/features/price-intelligence/utils/priceAlertRows.test.ts` "reads a rise from the alert data" | Pass |
+| PI-03 | 5 | Price alerts row: a drop shows was/now with "stock-up worth it" under it | Unit | `mobile/src/features/price-intelligence/utils/priceAlertRows.test.ts` "shows a drop with was/now and stock-up worth it under it" | Pass |
+| PI-03 | 5 | Price alerts row: an alert sent before DA-4 shows its title and body | Unit | `mobile/src/features/price-intelligence/utils/priceAlertRows.test.ts` "falls back to the title and body of an alert sent before the list" | Pass |
+| PI-03 | 5 | Price alerts row: a malformed item id never becomes a route | Unit | `mobile/src/features/price-intelligence/utils/priceAlertRows.test.ts` "never opens a malformed item id" | Pass |
+| PI-03 | 5 | Price alerts groups: This week (last 7 days) and Earlier | Unit | `mobile/src/features/price-intelligence/utils/priceAlertRows.test.ts` "puts the last 7 days under This week and the rest under Earlier, newest first" | Pass |
+| PI-03 | 5 | The list: only price alerts, newest first | Integration | `backend/tests/api/test_price_alert_list.py::test_the_list_holds_only_price_alerts_newest_first` | Pass |
+| PI-03 | 5 | The list: an unknown order is 422 | Integration | `backend/tests/api/test_price_alert_list.py::test_an_unknown_order_is_422` | Pass |
+| PI-03 | 5 | The list is the caller's own (two users) | Integration | `backend/tests/api/test_price_alert_list.py::test_the_list_is_the_callers_own` | Pass |
+| PI-03 | 5 | Alert data carries what a row shows | Integration | `backend/tests/api/test_price_alert_list.py::test_the_alert_data_carries_what_the_list_row_shows` | Pass |
+| PI-03 | 5 | Alert sparkline: at most the last eight prices | Integration | `backend/tests/api/test_price_alert_list.py::test_the_sparkline_holds_at_most_the_last_eight_prices` | Pass |
+| PI-03 | 6 | Empty Price alerts list says "No price alerts yet" and when one comes | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "says No price alerts yet and when one comes, from the threshold" | Pass |
+| PI-03 | 7 | Settings group: Threshold and Cooldown rows, footer from the user's settings | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "shows Threshold and Cooldown with the footer from the user’s settings" | Pass |
+| PI-03 | 7 | Settings group: the threshold is set from the list | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "sets the threshold from the list" | Pass |
+| PI-03 | 8 | Cooldown choices 1, 3, 7, 14, 30 days, saved (app) | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "offers 1, 3, 7, 14 and 30 days and saves the cooldown" | Pass |
+| PI-03 | 8 | The default cooldown is sent as null (app) | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "sends the default cooldown as null, so a later default applies" | Pass |
+| PI-03 | 8 | Cooldown starts at the default | Integration | `backend/tests/api/test_price_alert_list.py::test_the_cooldown_starts_at_the_default` | Pass |
+| PI-03 | 8 | Default cooldown is a setting | Integration | `backend/tests/api/test_price_alert_list.py::test_the_default_cooldown_is_a_setting` | Pass |
+| PI-03 | 8 | The user sets their own cooldown | Integration | `backend/tests/api/test_price_alert_list.py::test_the_user_can_set_their_own_cooldown` | Pass |
+| PI-03 | 8 | A null cooldown goes back to the default | Integration | `backend/tests/api/test_price_alert_list.py::test_a_null_cooldown_goes_back_to_the_default` | Pass |
+| PI-03 | 8 | Leaving the cooldown out keeps it | Integration | `backend/tests/api/test_price_alert_list.py::test_leaving_the_cooldown_out_keeps_it` | Pass |
+| PI-03 | 8 | Cooldown must be 1–30 days (422) | Integration | `backend/tests/api/test_price_alert_list.py::test_the_cooldown_must_be_1_to_30_days` | Pass |
+| PI-03 | 8 | The alert check uses the user's cooldown | Integration | `backend/tests/api/test_price_alert_list.py::test_the_alert_check_uses_the_users_cooldown` | Pass |
+| PI-03 | 8 | The cooldown is the caller's own (two users) | Integration | `backend/tests/api/test_price_alert_list.py::test_the_cooldown_is_the_callers_own` | Pass |
+| PI-03 | 8 | Migration: existing users keep the default; downgrade and upgrade again | Integration | `backend/tests/migrations/test_0022_price_alert_cooldown.py::test_existing_users_keep_the_default_then_downgrade_and_upgrade_again` | Pass (Postgres only) |
+| PI-03 | 9 | A rise reads "<Item> up N%" and "was $X avg, now $Y" | Integration | `backend/tests/api/test_price_alert_list.py::test_a_rise_reads_was_avg_now` | Pass |
+| PI-03 | 9 | A drop adds "stock-up worth it" | Integration | `backend/tests/api/test_price_alert_list.py::test_a_drop_adds_stock_up_worth_it` | Pass |
+| PI-03 | 9 | A counted price has no unit | Integration | `backend/tests/api/test_price_alert_list.py::test_a_counted_price_has_no_unit` | Pass |
+| PI-03 | 9 | A half-cent average rounds half up, like the sparkline | Integration | `backend/tests/api/test_price_alert_list.py::test_a_half_cent_average_rounds_half_up_like_the_sparkline` | Pass |
+| PI-03 | 9 | Still names item, store, old average, new price, percent | Integration | `backend/tests/api/test_price_alerts.py::test_the_alert_names_item_store_average_new_price_and_percent` | Pass |
+| PI-03 | 9 | The push reads the same as the in-app list | Integration | `backend/tests/tasks/test_push_tasks.py::test_a_price_change_push_opens_its_item` | Pass |
 | PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "shows the receipt line, store, date, match percent and the existing item" | Pass |
 | PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "heads a line from a receipt dated today as from today’s receipt" | Pass |
 | PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "reads each card to VoiceOver as one element" | Pass |
@@ -907,9 +937,14 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Cancel closes the prompt and leaves the rest pending" | Pass |
 | EC-PI | 8 | A range with too few prices | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "says so instead of drawing a chart, with All one tap away" | Pass |
 | EC-PI | 8 | A range with too few prices | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "counts only like-for-like prices as plotted" | Pass |
-| EC-PI | 9 | Cooldown setting changes | Integration | Not yet implemented (DA-4) | Pending |
+| EC-PI | 9 | A longer cooldown counts from the item's last alert | Integration | `backend/tests/api/test_price_alert_list.py::test_a_longer_cooldown_counts_from_the_last_alert` | Pass |
+| EC-PI | 9 | Shortening the cooldown never resends a held-back alert | Integration | `backend/tests/api/test_price_alert_list.py::test_shortening_the_cooldown_never_resends_a_held_back_alert` | Pass |
 | EC-PI | 10 | Store comparison ties | Component | Not yet implemented (DA-10) | Pending |
-| EC-PI | 11 | Price alerts list after a merge or split | Component | Not yet implemented (DA-4) | Pending |
+| EC-PI | 11 | An alert for a merged item opens the item it went into | Integration | `backend/tests/api/test_price_alert_list.py::test_an_alert_for_a_merged_item_opens_the_item_it_went_into` | Pass |
+| EC-PI | 11 | A merge never touches another user's alerts (two users) | Integration | `backend/tests/api/test_price_alert_list.py::test_a_merge_never_touches_another_users_alerts` | Pass |
+| EC-PI | 11 | An alert written during a merge opens the surviving item (race) | Integration | `backend/tests/services/test_merge_price_alert_race.py::test_an_alert_written_during_a_merge_opens_the_surviving_item` | Pass (Postgres only) |
+| EC-PI | 11 | An alert stays listed after its item is split | Integration | `backend/tests/api/test_price_alert_list.py::test_an_alert_stays_listed_after_its_item_is_split` | Pass |
+| EC-PI | 11 | A row opens the item id the server keeps current | Component | `mobile/src/__tests__/priceAlertsList.test.tsx` "opens the item when a row is tapped (EC-PI 11: the id the server keeps current)" | Pass |
 | EC-PREM | 1 | Free trial eligibility, cancel and refund in the trial | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_a_trial_cancelled_in_its_7_days_stays_premium_to_its_end` | Pass |
 | EC-PREM | 1 | Free trial eligibility, cancel and refund in the trial | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_a_refund_in_the_trial_ends_premium_now` | Pass |
 | EC-PREM | 1 | Free trial eligibility, cancel and refund in the trial | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_a_trial_is_premium_until_it_ends` | Pass |

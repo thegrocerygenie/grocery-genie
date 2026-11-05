@@ -13,6 +13,10 @@ from app.models.category_looks import (
     DEFAULT_COLOR,
     DEFAULT_ICON,
 )
+from app.models.database import (
+    PRICE_ALERT_COOLDOWN_MAX_DAYS,
+    PRICE_ALERT_COOLDOWN_MIN_DAYS,
+)
 
 _CURRENCY_CODE = re.compile(r"^[A-Z]{3}$")
 
@@ -913,14 +917,23 @@ class PriceAlertSettingsResponse(BaseModel):
     # The user's threshold, or the default when they have not set one.
     threshold_percent: int
     default_threshold_percent: int
+    # The user's cooldown in days (PI-03 AC 8), or the default.
     cooldown_days: int
+    default_cooldown_days: int
     muted_items: list[ItemRef]
     muted_stores: list[StoreRef]
 
 
 class PriceAlertSettingsUpdate(BaseModel):
-    """Fields left out stay as they are; a null threshold goes back to the
-    default."""
+    """Fields left out stay as they are; a null threshold or cooldown goes
+    back to the default."""
 
     enabled: bool | None = None
     threshold_percent: int | None = Field(default=None, ge=1, le=100)
+    # PI-03 AC 8: 1-30 days (the app offers 1, 3, 7, 14 and 30).
+    cooldown_days: int | None = Field(
+        default=None,
+        strict=True,
+        ge=PRICE_ALERT_COOLDOWN_MIN_DAYS,
+        le=PRICE_ALERT_COOLDOWN_MAX_DAYS,
+    )

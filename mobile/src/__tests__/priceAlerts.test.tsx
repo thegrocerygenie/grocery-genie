@@ -146,6 +146,7 @@ function settings(overrides: Partial<PriceAlertSettings> = {}): PriceAlertSettin
     threshold_percent: 10,
     default_threshold_percent: 10,
     cooldown_days: 7,
+    default_cooldown_days: 7,
     muted_items: [],
     muted_stores: [],
     ...overrides,

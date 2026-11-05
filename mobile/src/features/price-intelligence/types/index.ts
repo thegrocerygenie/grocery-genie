@@ -127,15 +127,30 @@ export interface PriceAlertSettings {
   /** The user's own threshold, or the default when they set none. */
   threshold_percent: number;
   default_threshold_percent: number;
+  /** Days between two alerts for one item: the user's own, or the default (PI-03 AC 8). */
   cooldown_days: number;
+  default_cooldown_days: number;
   muted_items: ItemRef[];
   muted_stores: StoreRef[];
 }
 
-/** A field left out stays; `threshold_percent: null` goes back to the default. */
+/** A field left out stays; `null` threshold or cooldown goes back to the default. */
 export interface PriceAlertSettingsUpdate {
   enabled?: boolean;
   threshold_percent?: number | null;
+  cooldown_days?: number | null;
+}
+
+/** One price change notification from `GET /api/notifications` (PI-03 AC 5). */
+export interface PriceAlertNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  /** A JSON string: the item id and, since DA-4, what a list row shows. */
+  data: string | null;
+  read: boolean;
+  created_at: string;
 }
 
 export interface StorePrice {

@@ -4,6 +4,7 @@ from datetime import date, datetime
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -28,8 +29,20 @@ class Base(DeclarativeBase):
     pass
 
 
+# The cooldown choices the API takes (PI-03 AC 8); the migration copies them.
+PRICE_ALERT_COOLDOWN_MIN_DAYS = 1
+PRICE_ALERT_COOLDOWN_MAX_DAYS = 30
+
+
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "price_alert_cooldown_days BETWEEN "
+            f"{PRICE_ALERT_COOLDOWN_MIN_DAYS} AND {PRICE_ALERT_COOLDOWN_MAX_DAYS}",
+            name="ck_users_price_alert_cooldown_days",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
@@ -111,6 +124,9 @@ class User(Base):
         Boolean, nullable=False, default=True, server_default=text("true")
     )
     price_alert_threshold_percent: Mapped[int | None] = mapped_column(SmallInteger)
+    # Days between two alerts for one item (PI-03 AC 8, DA-4): 1-30, or null
+    # for the server default (settings.price_alert_cooldown_days).
+    price_alert_cooldown_days: Mapped[int | None] = mapped_column(SmallInteger)
     # Premium (V11-P0). Written only from RevenueCat (its webhook or REST
     # API), never from the app. Premium while active and before the expiry
     # (null: no expiry); read it through app.core.entitlements.is_premium.

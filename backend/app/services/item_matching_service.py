@@ -28,6 +28,7 @@ split chosen lines off into new items, and rename an item.
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import re
@@ -52,6 +53,7 @@ from app.models.database import (
     CanonicalItemAlias,
     ItemMatchSuggestion,
     LineItem,
+    Notification,
     PriceAlertItemMute,
     PriceAlertSent,
     PriceObservation,
@@ -59,6 +61,9 @@ from app.models.database import (
 )
 from app.models.types import EMBEDDING_DIMENSIONS
 from app.services.item_qualifiers import qualifiers_compatible, read_qualifiers
+from app.services.price_alert_service import (
+    NOTIFICATION_TYPE as PRICE_CHANGE_NOTIFICATION,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -521,6 +526,11 @@ class ItemMatchingService:
         await self.db.execute(
             delete(CanonicalItem).where(CanonicalItem.id == source.id)
         )
+        # After the DELETE (EC-PI 11): it waits on the key-share lock of a
+        # confirm still writing an alert for the source (its price_alerts_sent
+        # row), so this statement, a new snapshot at READ COMMITTED, sees that
+        # alert once the confirm commits. Before the DELETE it would miss it.
+        await self._move_price_alerts(user_id, source.id, target.id)
         await self.db.flush()
         await self.db.refresh(target, ["aliases"])
         return target
@@ -554,6 +564,30 @@ class ItemMatchingService:
         await self.db.execute(
             delete(PriceAlertSent).where(PriceAlertSent.canonical_item_id == source_id)
         )
+
+    async def _move_price_alerts(
+        self, user_id: uuid.UUID, source_id: uuid.UUID, target_id: uuid.UUID
+    ) -> None:
+        """The user's price alerts for the source open the target from now on
+        (EC-PI 11): in the Price alerts list, and a push still pending. Only
+        the item id in ``data`` changes; the alert's text stays as sent."""
+        rows = await self.db.execute(
+            select(Notification).where(
+                Notification.user_id == user_id,
+                Notification.type == PRICE_CHANGE_NOTIFICATION,
+                Notification.data.contains(str(source_id)),
+            )
+        )
+        for notification in rows.scalars().all():
+            try:
+                data = json.loads(notification.data or "")
+            except ValueError:
+                continue
+            if isinstance(data, dict) and data.get("canonical_item_id") == str(
+                source_id
+            ):
+                data["canonical_item_id"] = str(target_id)
+                notification.data = json.dumps(data)
 
     async def _move_suggestions(
         self, source_id: uuid.UUID, target_id: uuid.UUID

@@ -36,12 +36,27 @@ class NotificationService:
         user_id: uuid.UUID,
         page: int = 1,
         per_page: int = 20,
+        *,
+        type: str | None = None,
+        newest_first: bool = False,
     ) -> tuple[list[Notification], int]:
-        """List notifications for a user, unread first, then by date DESC."""
+        """List the user's notifications, unread first, then by date DESC.
+
+        ``type`` keeps one kind (the Price alerts list: ``price_change``), and
+        ``newest_first`` orders by date alone (PI-03 AC 5).
+        """
+        conditions = [Notification.user_id == user_id]
+        if type is not None:
+            conditions.append(Notification.type == type)
+        order = (
+            (Notification.created_at.desc(), Notification.id.desc())
+            if newest_first
+            else (Notification.read.asc(), Notification.created_at.desc())
+        )
         query = (
             select(Notification)
-            .where(Notification.user_id == user_id)
-            .order_by(Notification.read.asc(), Notification.created_at.desc())
+            .where(*conditions)
+            .order_by(*order)
             .offset((page - 1) * per_page)
             .limit(per_page)
         )
@@ -49,9 +64,7 @@ class NotificationService:
         notifications = list(result.scalars().all())
 
         count_result = await self.db.execute(
-            select(func.count())
-            .select_from(Notification)
-            .where(Notification.user_id == user_id)
+            select(func.count()).select_from(Notification).where(*conditions)
         )
         total = count_result.scalar() or 0
 
