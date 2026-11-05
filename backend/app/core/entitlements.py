@@ -1,8 +1,10 @@
 """Premium entitlement: the one place the backend asks "is this user Premium?".
 
-Premium (decision D2, 2026-11-03) gates only the V1.1 extras: the 12-month
+Premium (decision D2, 2026-11-03) gates the V1.1 extras: the 12-month
 spending trend, custom categories, data export, budget rollover and unlimited
-receipts. A free user who asks for one gets ``403`` with
+receipts. Decision D8 (2026-11-04, PREM-02) adds cross-store comparison and
+muting price alerts; unmuting stays open, so a mute outlives a lapse and can
+still be removed. A free user who asks for one gets ``403`` with
 ``{"code": "premium_required", "feature": ..., "message": ...}`` (see
 ``premium_required``), which the app turns into an upgrade prompt.
 
@@ -30,6 +32,8 @@ FEATURE_BUDGET_ROLLOVER = "budget_rollover"
 FEATURE_CUSTOM_CATEGORIES = "custom_categories"
 FEATURE_DATA_EXPORT = "data_export"
 FEATURE_UNLIMITED_RECEIPTS = "unlimited_receipts"
+FEATURE_PRICE_COMPARISON = "price_comparison"
+FEATURE_PRICE_ALERT_MUTE = "price_alert_mute"
 
 # The free tier's monthly receipt cap. Not premium_required: the scan is not a
 # Premium feature, the month's allowance is spent. The app still answers it

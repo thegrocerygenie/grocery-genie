@@ -18,6 +18,10 @@ from app.core import clock
 from app.models.database import Notification, PriceAlertSent
 from tests.api.test_items import _item_id, _scan_and_confirm
 
+# Comparison and mutes are Premium (D8, PREM-02); these tests are about how
+# they work, so every user is Premium. The gates: test_premium_gating.py.
+pytestmark = pytest.mark.usefixtures("everyone_premium")
+
 NOW = datetime(2026, 3, 20, 12, 0, tzinfo=UTC)
 
 

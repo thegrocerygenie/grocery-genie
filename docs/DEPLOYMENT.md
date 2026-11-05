@@ -526,41 +526,64 @@ Set `EXPO_TOKEN` in GitHub repository secrets (generate at expo.dev → Account 
 ### 2.9 Premium through RevenueCat (V1.1)
 
 Premium is $4.99/month or $39.99/year, each with a 7-day free trial
-(`docs/prd/00-overview.md`, decision D7, replacing $5.99), sold as an App Store
-auto-renewing subscription through RevenueCat. **Changing in DA-1:** until it
-ships the paywall sells only the monthly package; DA-1 adds the yearly product
-and the trial to these steps (PRD PREM-01 AC 7). The app buys and restores with
-`react-native-purchases`; the backend never believes the app about Premium.
-It stores the entitlement from RevenueCat's webhook, and reads RevenueCat's
-REST API after a purchase or restore (`POST /api/users/me/premium/refresh`).
+(`docs/prd/00-overview.md`, decision D7, replacing $5.99), sold as App Store
+auto-renewing subscriptions through RevenueCat. The paywall reads both plans
+and their prices from the RevenueCat offering, never from the code, and shows
+the trial only when RevenueCat says the Apple ID may take it (PRD PREM-01). The
+app buys and restores with `react-native-purchases`; the backend never believes
+the app about Premium. It stores the entitlement from RevenueCat's webhook, and
+reads RevenueCat's REST API after a purchase or restore
+(`POST /api/users/me/premium/refresh`).
 
-1. **App Store Connect:** create an auto-renewable subscription (for example
-   `gg_premium_monthly`, $4.99/month; from DA-1 also `gg_premium_yearly`,
-   $39.99/year, and a 7-day free introductory offer on both) in one
-   subscription group, and an
-   In-App Purchase key (Users and Access → Integrations → In-App Purchase).
+What to create (the tests mock all of it):
+
+| What | Identifier | Setting |
+|---|---|---|
+| Subscription group | `Grocery Genie Premium` | Both products in it, Yearly ranked above Monthly (an upgrade takes effect at once, a downgrade at the next renewal) |
+| Product | `gg_premium_monthly` | Auto-renewable, 1 month, $4.99 (US price tier; App Store Connect sets the rest) |
+| Product | `gg_premium_yearly` | Auto-renewable, 1 year, $39.99 |
+| Introductory offer | on each product | Free trial, 1 week (7 days), new subscribers, all territories |
+| RevenueCat entitlement | `premium` | Both products attached |
+| RevenueCat offering | `default`, marked current | Packages `$rc_annual` → `gg_premium_yearly` and `$rc_monthly` → `gg_premium_monthly` |
+
+1. **App Store Connect:** My Apps → Grocery Genie → Subscriptions: create the
+   subscription group, then the two auto-renewable subscriptions above with
+   their prices, display names and review screenshots. On each, Subscription
+   Prices → Introductory Offers → add a Free trial of 1 week, starting now with
+   no end date. Then Users and Access → Integrations → In-App Purchase: create
+   an In-App Purchase key. Apple allows one trial per Apple ID per group, so a
+   user who had the trial on one plan sees "Subscribe" on both.
 2. **RevenueCat:** create a project with an Apple App Store app for the bundle
-   ID `com.grocerygenie.app`, upload the In-App Purchase key, import the
-   product, and attach it to an entitlement with the identifier `premium`
-   (`GG_REVENUECAT_ENTITLEMENT_ID` if you pick another). Put the product in the
-   current offering as its monthly package: the paywall shows that package
-   and its App Store price.
+   ID `com.grocerygenie.app`, upload the In-App Purchase key, and import both
+   products. Create the entitlement `premium` (`GG_REVENUECAT_ENTITLEMENT_ID` if
+   you pick another) and attach both products. Create the offering `default`,
+   make it current, and add the Annual package (`$rc_annual`) with
+   `gg_premium_yearly` and the Monthly package (`$rc_monthly`) with
+   `gg_premium_monthly`. The paywall shows the Annual package first (selected)
+   and the Monthly one under it, with their App Store prices; an offering with
+   neither shows "Premium can't be loaded right now" and Try Again.
 3. **Webhook:** Project settings → Integrations → Webhooks → add
    `https://api.grocerygenie.app/api/webhooks/revenuecat`. Set the
    Authorization header value to the secret generated for
    `GG_REVENUECAT_WEBHOOK_SECRET` (with or without `Bearer `), and send events
    for both production and sandbox: App Review and TestFlight buy in the
-   sandbox. "Send test event" should answer 200 `{"status": "ignored"}`.
+   sandbox. "Send test event" should answer 200 `{"status": "ignored"}`. A
+   trial arrives as an `INITIAL_PURCHASE` with `period_type` `TRIAL` and the
+   trial's end as its expiry; either product grants Premium.
 4. **API keys:** the secret API key (v1, `sk_...`) goes in
    `GG_REVENUECAT_API_KEY` (1.5). The public Apple SDK key (`appl_...`) goes in
    the build's `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` (2.3).
 5. **Build:** `react-native-purchases` is a native module, so Premium works
    only in a development or EAS build, never in Expo Go (there the paywall
    says purchases need the App Store build).
-6. **Check on a device** with a sandbox Apple ID: buy Premium, see Settings say
-   Premium, open the 12-month trend; delete and reinstall the app, then
-   "Restore purchases". Cancel in the sandbox and wait for the expiry
-   (sandbox months last minutes): the app goes back to the free plan.
+6. **Check on a device** with a new sandbox Apple ID: the paywall shows
+   Yearly $39.99 "/yr · $3.33/mo" with "SAVE 33%", and Monthly $4.99, and
+   reads "Start 7-day free trial". Start the trial on Yearly, see Settings say
+   Premium, open the 12-month trend and a store comparison; delete and
+   reinstall the app, then "Restore purchase". Switch to Monthly in iOS
+   Settings → Subscriptions and check Premium stays on. Cancel in the sandbox
+   and wait for the expiry (sandbox trials and months last minutes): the app
+   goes back to the free plan, and the paywall now reads "Subscribe".
 
 The app logs in to RevenueCat with the user's Grocery Genie id, so webhook
 events name that id. A purchase made before sign-in arrives with the id among

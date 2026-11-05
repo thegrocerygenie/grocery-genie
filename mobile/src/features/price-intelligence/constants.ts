@@ -89,6 +89,16 @@ export const PRICES_COPY = {
   alertsFooter: (threshold: number, days: number) =>
     `You get an alert when a price moves ${threshold}% or more from your 30-day average, at most once every ${days} days.`,
   alertsOff: 'Price alerts are off. Turn them on in Settings → Alerts.',
+
+  // PREM-02 AC 5, 6 (D8): comparison and muting are Premium.
+  upgradeAction: 'See Premium',
+  notNow: 'Not Now',
+  compareUpgradeTitle: 'Compare stores with Premium',
+  compareUpgradeMessage:
+    'See this item’s latest and average price at each store you shop, cheapest first.',
+  muteUpgradeTitle: 'Muting alerts is Premium',
+  muteUpgradeMessage:
+    'Premium lets you mute price alerts for an item or a store. Price alerts themselves stay free.',
 } as const;
 
 /** Settings → Alerts: price change alerts (PI-03 settings). */

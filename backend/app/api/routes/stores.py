@@ -1,5 +1,6 @@
 """The user's stores: list, merge and unmerge (EC Price Intelligence 1,
-decision D3), and price alert mutes (V1.1: PI-03 AC 4).
+decision D3), and price alert mutes (V1.1: PI-03 AC 4; muting is Premium,
+D8, PREM-02).
 
 Stores are shared across users, so a user can act only on a store they have
 a receipt from; any other store answers 404. A merge is the user's own: it
@@ -12,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
+from app.core.entitlements import FEATURE_PRICE_ALERT_MUTE, require_premium
 from app.core.security import get_current_user
 from app.models.database import User
 from app.models.schemas import (
@@ -96,11 +98,12 @@ async def unmerge_store(
 async def mute_store(
     store_id: uuid.UUID,
     db: AsyncSession = Depends(get_db, scope="function"),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_premium(FEATURE_PRICE_ALERT_MUTE)),
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> Response:
     """No price change alerts for prices paid at this store, or at any store
-    the user merged with it. Idempotent."""
+    the user merged with it. Idempotent. Premium (D8, PREM-02 AC 2); unmuting
+    below is open to everyone."""
     try:
         await PriceAlertService(db).mute_store(user.id, store_id)
     except StoreNotFoundError:

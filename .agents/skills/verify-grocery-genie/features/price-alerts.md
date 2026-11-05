@@ -1,6 +1,6 @@
 # Price change alerts (V1.1)
 
-Confirming a receipt compares each price with the item's 30-day rolling average (its earlier prices in the same unit and currency). A change of at least the user's threshold, 10% by default, up or down, sends one `price_change` notification naming the item, store, average, new price and percent, with `data` `{canonical_item_id, store_id}`. An item alerts at most once in 7 days. The user can turn alerts off, set their own threshold, and mute an item or a store (PI-03).
+Confirming a receipt compares each price with the item's 30-day rolling average (its earlier prices in the same unit and currency). A change of at least the user's threshold, 10% by default, up or down, sends one `price_change` notification naming the item, store, average, new price and percent, with `data` `{canonical_item_id, store_id}`. An item alerts at most once in 7 days. The user can turn alerts off, set their own threshold, and mute an item or a store (PI-03). Alerts and their settings are free; muting is Premium (decision D8, PREM-02) and unmuting is open to everyone, so this journey makes its users Premium with `$G premium`. A free user's mute `403` and a mute outliving a lapse are in [premium.md](./premium.md) (`premium-free-features`, `premium-mute-lapse`).
 
 ## Sub-features
 
@@ -25,6 +25,7 @@ Manual entries keep each step to one item and set the dates; the window runs bac
 
 ```bash
 $G signup price-alerts
+$G premium                                                                   # muting is Premium (D8)
 $G api GET /api/items/price-alert-settings                                   # pa.settings: defaults
 $G api PUT /api/items/price-alert-settings '{"threshold_percent":0}'        # pa.settings: 422
 milk() { $G api POST /api/receipts "{\"store_name\":\"FreshCo\",\"date\":\"$1\",\"total\":$2,\"items\":[{\"name\":\"$3\",\"quantity\":1,\"unit_price\":$2,\"total_price\":$2}]}" > /dev/null; }
@@ -63,6 +64,7 @@ milk 2026-11-03 8.00 Butter & milk 2026-11-03 8.00 Butter & wait            # pa
 $G sql "SELECT title FROM notifications WHERE type='price_change' ORDER BY created_at"  # Milk, Eggs, Butter once
 $G sql "SELECT count(*) FROM price_alerts_sent"                              # 3
 $G signup other
+$G premium
 $G api POST /api/items/$bread/mute; $G api POST /api/stores/$store/mute      # pa.isolation: 404, 404
 $G api DELETE /api/items/$bread/mute                                         # pa.isolation: 404
 $G api DELETE /api/stores/$store/mute                                        # 204: removes only their own mute (none)
@@ -76,3 +78,4 @@ $G api DELETE /api/stores/$store/mute                                        # 2
 - The mock scan's items carry `unit_of_measure`; manual entries carry none. The average compares like with like, so a scanned per-lb price and a manual unitless price of the same item are separate series.
 - Pushes go through the existing pipeline (`deliver_pending_pushes`), which needs a Celery worker and an Expo token; the journey checks the notification rows. `backend/tests/tasks/test_push_tasks.py::test_a_price_change_push_opens_its_item` covers the push payload.
 - Verified 2026-11-03 against Postgres 16 (run `20261103-181419`, after the unmute fix); `pa.app-tap` and `pa.app-settings` with the app's calls in run `20261103-183706`.
+- Run in full as Premium users (`$G premium`, decision D8) on 2026-11-04: run `20261104-231631`.
