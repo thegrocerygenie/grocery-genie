@@ -66,10 +66,32 @@ export const PRICES_COPY = {
   actionFailed: 'That didn’t save. Check your connection and try again.',
 
   sameQuestion: (item: string, other: string) => `Is “${item}” the same as “${other}”?`,
-  sameYes: 'Same Item',
-  sameNo: 'Different',
-  sameYesLabel: (item: string, other: string) => `${item} is the same as ${other}`,
-  sameNoLabel: (item: string, other: string) => `${item} is different from ${other}`,
+  // PI-02 AC 7: a suggestion card opens the "Same item?" prompt.
+  reviewMatch: 'Review',
+  reviewMatchLabel: (item: string, other: string) =>
+    `Review whether ${item} is the same as ${other}`,
+  matchPercent: (confidence: number) => `${Math.round(confidence * 100)}% match`,
+
+  // PI-02 AC 5, 6 (DA-5): the full-screen "Same item?" prompt.
+  matchTitle: 'Same item?',
+  matchIntro: 'We think these are the same product. Confirm to merge price history.',
+  matchFromToday: 'From today’s receipt',
+  matchFromReceipt: 'From your receipt',
+  matchExisting: 'Existing item',
+  matchCounts: (purchases: number, stores: number) =>
+    `${purchases} ${purchases === 1 ? 'purchase' : 'purchases'} · ${stores} ${
+      stores === 1 ? 'store' : 'stores'
+    }`,
+  matchAverage: 'Avg unit price',
+  matchMerge: 'Yes, merge',
+  matchMergeLabel: (item: string, other: string) => `Yes, merge ${item} into ${other}`,
+  matchKeep: 'Keep as separate item',
+  matchKeepLabel: (item: string) => `Keep ${item} as a separate item`,
+  matchSkip: 'Skip',
+  matchSkipLabel: 'Skip, decide later',
+  matchCancelLabel: 'Cancel, decide later',
+  matchProgress: (index: number, total: number) => `${index} of ${total}`,
+  matchSaveFailed: 'That didn’t save. Check your connection and try again.',
   matchesTitle: 'Review Matches',
   matchesIntro:
     'These names came close to an item you’ve bought before. Combining them joins their price histories.',

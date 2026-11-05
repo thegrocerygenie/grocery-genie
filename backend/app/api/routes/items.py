@@ -36,6 +36,8 @@ from app.models.schemas import (
     PricePointResponse,
     StorePriceResponse,
     StoreRef,
+    SuggestedItemStats,
+    SuggestionReceiptLine,
 )
 from app.services.analytics_service import AnalyticsService, get_analytics_service
 from app.services.item_matching_service import (
@@ -49,6 +51,7 @@ from app.services.price_service import (
     MIN_TIMELINE_POINTS,
     PriceService,
 )
+from app.services.receipt_service import ReceiptService
 from app.services.store_service import StoreGroup, StoreService
 
 router = APIRouter(prefix="/api/items", tags=["items"])
@@ -82,13 +85,41 @@ async def _store_groups(
     )
 
 
-def _suggestion(suggestion: ItemMatchSuggestion) -> ItemSuggestionResponse:
+async def _suggestion(
+    db: AsyncSession, user_id: uuid.UUID, suggestion: ItemMatchSuggestion
+) -> ItemSuggestionResponse:
+    """A suggestion with what the "Same item?" prompt shows (PI-02 AC 5, 8),
+    all of it the caller's own."""
+    found = await ItemMatchingService(db).suggestion_line(user_id, suggestion.item_id)
+    line = None
+    if found is not None:
+        line_item, receipt = found
+        store = None
+        if receipt.store_name is None and receipt.store_id is not None:
+            store = (await StoreService(db).groups(user_id, {receipt.store_id})).get(
+                receipt.store_id
+            )
+        line = SuggestionReceiptLine(
+            receipt_id=receipt.id,
+            name=line_item.raw_name,
+            store_name=receipt.store_name or (store.name if store else None),
+            date=receipt.date,
+        )
+    stats = await PriceService(db).purchase_stats(user_id, suggestion.suggested_item_id)
     return ItemSuggestionResponse(
         id=suggestion.id,
         item=ItemRef.model_validate(suggestion.item),
         suggested_item=ItemRef.model_validate(suggestion.suggested_item),
         confidence=suggestion.confidence,
         method=suggestion.method,
+        receipt_line=line,
+        suggested_item_stats=SuggestedItemStats(
+            purchase_count=stats.purchase_count,
+            store_count=stats.store_count,
+            avg_unit_price=float(stats.average) if stats.average is not None else None,
+            unit_of_measure=stats.unit_of_measure,
+            currency=stats.currency,
+        ),
     )
 
 
@@ -107,7 +138,7 @@ async def _detail(
         store_count=stores,
         latest_price=_latest(latest, groups),
         aliases=[ItemAliasResponse.model_validate(a) for a in item.aliases],
-        suggestions=[_suggestion(s) for s in suggestions],
+        suggestions=[await _suggestion(db, user_id, s) for s in suggestions],
         alerts_muted=await PriceAlertService(db).is_item_muted(user_id, item.id),
     )
 
@@ -167,12 +198,24 @@ async def list_items(
 
 @router.get("/suggestions", response_model=list[ItemSuggestionResponse])
 async def list_suggestions(
+    receipt_id: uuid.UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> list[ItemSuggestionResponse]:
-    """Possible matches waiting for the user to confirm (PI-02 AC 2)."""
-    suggestions = await ItemMatchingService(db).list_suggestions(user.id)
-    return [_suggestion(s) for s in suggestions]
+    """Possible matches waiting for the user to confirm (PI-02 AC 2).
+
+    ``receipt_id``: only those that receipt's lines raised, for the prompt
+    after a confirm (PI-02 AC 7, 8). Another user's receipt is 404.
+    """
+    if receipt_id is not None:
+        try:
+            await ReceiptService(db=db).get_receipt(receipt_id, user.id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="Receipt not found") from None
+    suggestions = await ItemMatchingService(db).list_suggestions(
+        user.id, receipt_id=receipt_id
+    )
+    return [await _suggestion(db, user.id, s) for s in suggestions]
 
 
 @router.post("/suggestions/{suggestion_id}/accept", response_model=ItemDetailResponse)

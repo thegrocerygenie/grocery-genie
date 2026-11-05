@@ -39,7 +39,7 @@ from datetime import UTC, datetime
 
 from pgvector.sqlalchemy import Vector
 from rapidfuzz.distance import JaroWinkler, Levenshtein
-from sqlalchemy import Float, cast, delete, select, update
+from sqlalchemy import Float, case, cast, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -623,8 +623,19 @@ class ItemMatchingService:
     # --- Suggestions (PI-02 AC 2) -----------------------------------------
 
     async def list_suggestions(
-        self, user_id: uuid.UUID, item_id: uuid.UUID | None = None
+        self,
+        user_id: uuid.UUID,
+        item_id: uuid.UUID | None = None,
+        receipt_id: uuid.UUID | None = None,
     ) -> list[ItemMatchSuggestion]:
+        """The user's pending suggestions, newest first.
+
+        ``receipt_id`` keeps those raised by that receipt's lines (PI-02 AC 7,
+        8): a line there that matching made a new item of (``MATCH_NEW``), the
+        item the suggestion asks about. A later receipt with the same name
+        links to that item by its alias and raises nothing, so it is not
+        asked again. The caller checks the receipt is the user's.
+        """
         query = (
             select(ItemMatchSuggestion)
             .where(
@@ -635,11 +646,44 @@ class ItemMatchingService:
         )
         if item_id is not None:
             query = query.where(ItemMatchSuggestion.item_id == item_id)
+        if receipt_id is not None:
+            raised = select(LineItem.canonical_item_id).where(
+                LineItem.receipt_id == receipt_id,
+                LineItem.match_method == MATCH_NEW,
+            )
+            query = query.where(ItemMatchSuggestion.item_id.in_(raised))
         rows = await self.db.execute(query)
         suggestions = list(rows.scalars().all())
         for suggestion in suggestions:
             await self.db.refresh(suggestion, ["item", "suggested_item"])
         return suggestions
+
+    async def suggestion_line(
+        self, user_id: uuid.UUID, item_id: uuid.UUID
+    ) -> tuple[LineItem, Receipt] | None:
+        """The receipt line a suggestion about ``item_id`` shows (PI-02 AC 5):
+        the line matching made the item from, else its latest line; only on
+        the user's confirmed receipts that are not deleted."""
+        row = (
+            await self.db.execute(
+                select(LineItem, Receipt)
+                .join(Receipt, LineItem.receipt_id == Receipt.id)
+                .where(
+                    LineItem.canonical_item_id == item_id,
+                    Receipt.user_id == user_id,
+                    Receipt.status == "confirmed",
+                    Receipt.deleted_at.is_(None),
+                )
+                .order_by(
+                    case((LineItem.match_method == MATCH_NEW, 0), else_=1),
+                    Receipt.date.desc(),
+                    Receipt.created_at.desc(),
+                    LineItem.position,
+                )
+                .limit(1)
+            )
+        ).first()
+        return (row[0], row[1]) if row else None
 
     async def _get_pending(
         self, user_id: uuid.UUID, suggestion_id: uuid.UUID

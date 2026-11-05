@@ -112,6 +112,10 @@ export default function RootLayout() {
               <Stack.Screen name="items/matches" options={{ title: 'Review Matches' }} />
               <Stack.Screen name="items/merge" options={{ title: 'Combine' }} />
               <Stack.Screen
+                name="items/match"
+                options={{ title: 'Same item?', presentation: 'fullScreenModal' }}
+              />
+              <Stack.Screen
                 name="email-change"
                 options={{ title: 'Change Email', presentation: 'modal' }}
               />

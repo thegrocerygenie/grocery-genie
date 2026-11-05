@@ -14,12 +14,13 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { TINT_HEX, colors, radii, spacing, type } from '@/constants/theme';
 import { resolveCategoryMeta } from '@/constants/categories';
 import { CategoryPickerSheet } from '@/components/CategoryPickerSheet';
+import { promptMatchesAfterConfirm } from '@/features/price-intelligence/services/postConfirmMatches';
 import { useReceiptConfirm } from '@/features/receipt-capture/hooks/useReceiptReview';
 import { getReceipt } from '@/features/receipt-capture/services/receiptApi';
 import { useCategories } from '@/features/budget/hooks/useCategories';
@@ -53,6 +54,7 @@ export default function ReviewScreen() {
   const { receiptId, edit } = useLocalSearchParams<{ receiptId?: string; edit?: string }>();
   const { capturedImageUri, activeScanResponse, clearScanSession } = useReceiptStore();
   const confirmMutation = useReceiptConfirm();
+  const queryClient = useQueryClient();
   const analytics = useAnalytics();
   const budgetCurrency = useBudgetCurrency();
   const { data: categories } = useCategories();
@@ -194,6 +196,9 @@ export default function ReviewScreen() {
           } else {
             router.back();
           }
+          // PI-02 AC 7: once confirmed, ask about the matches this receipt
+          // raised. Not awaited: the save is done and never waits on it.
+          if (!alreadyConfirmed) void promptMatchesAfterConfirm(editingReceiptId, queryClient);
         },
         onError: (error) => {
           Alert.alert('Save Failed', error.message, [{ text: 'OK' }]);

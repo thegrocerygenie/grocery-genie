@@ -15,10 +15,11 @@ Confirming a receipt links each line to a canonical item (PI-02) and records its
 - `pi.range`: item detail (PI-01 AC 5, DA-3) asks `GET /api/items/{id}/prices` once, with no filter, and its range control (1M/3M/6M/1Y/All, counted back from today, opening on 3M or the smallest range with prices) filters that history in the app, so opening an item records exactly one `price_history_viewed` and a range tap records none. The API's own `from` filter still answers (has_timeline and store_count for the range alone), but the app does not use it. Each price's `store_id` is the same store id `/compare` gives, which the app colours its store squares by (PI-01 AC 9). Another user's item answers 404.
 - `pi.split` / `pi.merge` / `pi.rename`: unlink a name, link two items, rename.
 - `pi.isolation`: another user's list is empty and the item answers 404.
+- `pi.match-prompt`: the "Same item?" prompt's data (PI-02 AC 5-9, DA-5). Every suggestion carries `receipt_line` (the line as printed, its receipt's store and date) and `suggested_item_stats` (the caller's purchases, stores and average unit price of the existing item). `GET /api/items/suggestions?receipt_id=` gives only the suggestions that receipt's lines raised, which the app asks right after a confirm: `[]` for a receipt that raised none or once they are resolved, 404 for an unknown or another user's receipt. A second reject answers 409, which the prompt passes over.
 
 ## How to get to it (user POV)
 
-Budget tab → Items → an item. Also: History → a receipt → tap a line. Possible matches: the banner at the top of Items, or the question card on the item.
+Budget tab → Items → an item. Also: History → a receipt → tap a line. Possible matches: the banner at the top of Items (Review Matches), or the question card on the item; each card's Review opens the full-screen "Same item?" prompt, which also opens by itself right after a confirm that raised suggestions (DA-5).
 
 ## Driving it with gg-verify
 
@@ -49,6 +50,23 @@ $G api POST /api/receipts '{"store_name":"IGA","date":"2026-03-20","total":8.98,
 $G api POST /api/receipts '{"store_name":"IGA","date":"2026-03-27","total":8.78,"items":[{"name":"WHL WHT BREAD","quantity":1,"unit_price":3.29,"total_price":3.29},{"name":"Lait écrémé 2 L","quantity":1,"unit_price":5.49,"total_price":5.49}]}'
 $G api GET /api/items | jq '{pending_suggestions, items: [.items[] | {canonical_name, observation_count}]}'  # pi.abbrev-french: Whole Wheat Bread 2, each milk 1, pending 1
 $G signup other && $G api GET /api/items/$mid/prices                        # pi.isolation: 404
+$G signup prompt                                                             # pi.match-prompt
+r1=$($G api POST /api/receipts '{"store_name":"FreshCo","date":"2026-03-01","total":9.0,"items":[{"name":"CHKN BRST","quantity":1,"unit_price":9.0,"total_price":9.0}]}' | jq -r .id)
+$G api POST /api/receipts '{"store_name":"Metro","date":"2026-03-04","total":17.0,"items":[{"name":"CHKN BRST","quantity":2,"unit_price":8.5,"total_price":17.0}]}'
+rid=$($G scan | jq -r .receipt_id)
+lid=$($G api GET /api/receipts/$rid | jq -r '.items[0].id')
+$G api PATCH /api/receipts/$rid "{\"status\":\"confirmed\",\"items\":[{\"id\":\"$lid\",\"name\":\"Chicken Breast\"}]}"   # the review's name correction, then confirm
+$G api GET "/api/items/suggestions?receipt_id=$rid" | jq -c '[.[] | {confidence, receipt_line, suggested_item_stats}]'   # one: Chicken Breast, Test Grocery Store, 2026-03-15; 2 purchases, 2 stores, avg 8.75
+$G api GET "/api/items/suggestions?receipt_id=$r1"                           # []
+$G api GET "/api/items/suggestions?receipt_id=00000000-0000-0000-0000-000000000000" || true   # 404
+sid=$($G api GET "/api/items/suggestions?receipt_id=$rid" | jq -r '.[0].id')
+$G api POST /api/items/suggestions/$sid/reject                               # 204
+$G api POST /api/items/suggestions/$sid/reject || true                       # 409: the prompt passes over it
+$G api GET "/api/items/suggestions?receipt_id=$rid"                          # []
+$G sql "SELECT event_name, properties->>'decision' FROM analytics_events WHERE event_name = 'item_match_resolved'"   # one row, rejected
+$G signup promptother
+$G api GET "/api/items/suggestions?receipt_id=$rid" || true                  # 404
+$G api GET /api/items/suggestions                                            # []
 $G signup range                                                              # pi.range
 $G api POST /api/receipts '{"store_name":"FreshCo","date":"2026-02-10","total":2.0,"items":[{"name":"Avocado","quantity":1,"unit_price":2.0,"total_price":2.0}]}'
 $G api POST /api/receipts '{"store_name":"Loblaws","date":"2026-08-15","total":2.2,"items":[{"name":"Avocado","quantity":1,"unit_price":2.2,"total_price":2.2}]}'
@@ -64,8 +82,9 @@ $G signup rangeother && $G api GET "/api/items/$av/prices" || true          # 40
 ## Gotchas
 
 - Debug mode mocks only the LLM extractor. Matching runs the real local embedding model (`GG_EMBEDDING_MODEL`), which loads on the first confirm (a few seconds, and a download on a host that has never fetched it). `GG_EMBEDDINGS_ENABLED=false` matches on aliases and fuzzy similarity only, and aliases keep a null embedding.
+- `pi.match-prompt` with the real embedding model: "CUCUMBERS ENG" after "Cucumber" links semantically (about 0.81), so it asks only in pytest, which runs without the model; "Chicken Breast" after "CHKN BRST" asks under both. Skip and Cancel are app-only (they save nothing). The full-screen prompt, its opening after a confirm, and its inline error need a Simulator check.
 - The ranges count back from today on the phone and filter in the app; the API sees only the one plain request.
 - Manual entries carry no `unit_of_measure`, so their history's `unit_of_measure` is null and prices show without a unit. A scan's extraction supplies it.
 - Exact confidences depend on the model version; the journey checks which pairs link, ask, or stay apart, not the score.
 - Qualifier words and their receipt abbreviations are listed in `backend/app/services/item_qualifiers.py`. If an abbreviation is missing there, a true match asks instead of linking. This journey found "WHL" (whole) missing at first, and the device check "WHL WHT" (whole wheat). French words match without accents ("ECREME" is écrémé).
-- Verified 2026-11-03 against Postgres 16 with pgvector 0.6 (run `20261103-053414`), and with the qualifier steps the same day (run `20261103-220037`). The WHL WHT and French steps verified 2026-11-04 (run `20261104-040224`). `pi.range` verified 2026-11-05 (run `20261105-042923`), and with the single request (run `20261105-045304`).
+- Verified 2026-11-03 against Postgres 16 with pgvector 0.6 (run `20261103-053414`), and with the qualifier steps the same day (run `20261103-220037`). The WHL WHT and French steps verified 2026-11-04 (run `20261104-040224`). `pi.range` verified 2026-11-05 (run `20261105-042923`), and with the single request (run `20261105-045304`). `pi.match-prompt` verified 2026-11-05 (run `20261105-055716`).

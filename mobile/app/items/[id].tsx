@@ -208,15 +208,9 @@ export default function ItemDetailScreen() {
         </View>
         {prices.has_timeline ? <RangeControl value={range} onChange={setPicked} /> : null}
 
+        {/* PI-02 AC 7: each pending suggestion opens the "Same item?" prompt. */}
         {detail.suggestions.map((s) => (
-          <SuggestionCard
-            key={s.id}
-            suggestion={s}
-            onAccepted={(mergedId) =>
-              mergedId !== id &&
-              router.replace({ pathname: '/items/[id]', params: { id: mergedId } })
-            }
-          />
+          <SuggestionCard key={s.id} suggestion={s} itemId={id} />
         ))}
 
         {compareLocked ? (

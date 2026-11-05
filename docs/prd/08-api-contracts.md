@@ -454,10 +454,26 @@ Price observations for a canonical item, oldest first.
 201 with the new item: the alias, its lines and their prices. 409 when it is the item's only alias.
 
 ### GET /api/items/suggestions
-Pending suggestions: `[{ "id", "item": {id, canonical_name}, "suggested_item": {id, canonical_name}, "confidence", "method" }]`.
+Pending suggestions, newest first:
+
+```json
+[{
+  "id": "uuid",
+  "item": { "id": "uuid", "canonical_name": "BNLS CHKN BRST 2LB" },
+  "suggested_item": { "id": "uuid", "canonical_name": "Chicken breast, boneless" },
+  "confidence": 0.72,
+  "method": "fuzzy",
+  "receipt_line": { "receipt_id": "uuid", "name": "BNLS CHKN BRST 2LB", "store_name": "Costco", "date": "2026-04-19" },
+  "suggested_item_stats": { "purchase_count": 14, "store_count": 3, "avg_unit_price": 8.99, "unit_of_measure": "lb", "currency": "USD" }
+}]
+```
+
+[V1.1] (DA-5, PI-02 AC 5, 8) `receipt_line` and `suggested_item_stats` are what the "Same item?" prompt shows; item detail's `suggestions` carry them too. `receipt_line` is the line that raised the suggestion (the one matching made the new item from, else the item's latest line), as printed, with its receipt's store and date; `null` when the item has no line on a confirmed receipt the user can see. `suggested_item_stats` counts only the caller's prices on receipts not deleted: purchases, stores as the user groups them, and the mean unit price in the unit and currency most of them are in (`avg_unit_price` `null` with no price).
+
+`?receipt_id=<uuid>`: only the suggestions that receipt's lines raised (a line there made the new item the suggestion asks about), for the prompt after a confirm (PI-02 AC 7). A later receipt that repeats the name links to that item by its alias and raises nothing. 404 for an unknown, deleted or another user's receipt; `[]` for a receipt that raised none. The confirm matches its lines inline, so its suggestions are there once the confirm answers.
 
 ### POST /api/items/suggestions/{id}/accept
-Same product: merges `item` into `suggested_item` and returns it. 409 when already resolved.
+Same product: merges `item` into `suggested_item` and returns it. 409 when already resolved; 404 once accepted (the merge drops the suggestion). The prompt treats both as resolved elsewhere and moves on (PI-02 AC 9).
 
 ### POST /api/items/suggestions/{id}/reject
 204. Different products: both items stay.

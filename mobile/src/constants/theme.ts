@@ -33,6 +33,7 @@ export const colors = {
   iosBg2: system('secondarySystemGroupedBackground'),
   iosBg3: system('tertiarySystemGroupedBackground'),
   iosFill1: system('systemFill'),
+  iosFill2: system('secondarySystemFill'),
   iosFill3: system('tertiarySystemFill'),
   iosSeparator: system('separator'),
   iosLabel: system('label'),

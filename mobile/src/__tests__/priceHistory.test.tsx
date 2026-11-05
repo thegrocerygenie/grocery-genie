@@ -11,6 +11,7 @@ import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testi
 
 import ItemDetailScreen from '../../app/items/[id]';
 import PricesScreen from '../../app/items/index';
+import MatchPromptScreen from '../../app/items/match';
 import MatchesScreen from '../../app/items/matches';
 import MergeScreen from '../../app/items/merge';
 import ReceiptDetailScreen from '../../app/receipt/[id]';
@@ -131,6 +132,7 @@ function open(path: string) {
       'items/index': PricesScreen,
       'items/[id]': ItemDetailScreen,
       'items/matches': MatchesScreen,
+      'items/match': MatchPromptScreen,
       'items/merge': MergeScreen,
       'receipt/[id]': ReceiptDetailScreen,
     },
@@ -323,11 +325,16 @@ describe('Possible matches (PI-02 AC 2)', () => {
     mockApi.getItem.mockResolvedValue(
       detail({ id: 'i-2', canonical_name: 'ORG BANANAS', suggestions: [suggestion] }),
     );
+    mockApi.listSuggestions.mockResolvedValue([suggestion]);
     mockApi.acceptSuggestion.mockResolvedValue(detail());
     const routerScreen = open('/items/i-2');
 
     expect(await screen.findByText('Is “ORG BANANAS” the same as “Organic Bananas”?')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('ORG BANANAS is the same as Organic Bananas'));
+    // PI-02 AC 7: the card opens the "Same item?" prompt, where Yes merges.
+    fireEvent.press(
+      screen.getByLabelText('Review whether ORG BANANAS is the same as Organic Bananas'),
+    );
+    fireEvent.press(await screen.findByLabelText('Yes, merge ORG BANANAS into Organic Bananas'));
 
     await waitFor(() => expect(mockApi.acceptSuggestion).toHaveBeenCalledWith('sg-1'));
     // The asked-about item is gone; the screen shows the combined one.
@@ -339,7 +346,10 @@ describe('Possible matches (PI-02 AC 2)', () => {
     mockApi.rejectSuggestion.mockResolvedValue(undefined);
     open('/items/matches');
 
-    fireEvent.press(await screen.findByLabelText('ORG BANANAS is different from Organic Bananas'));
+    fireEvent.press(
+      await screen.findByLabelText('Review whether ORG BANANAS is the same as Organic Bananas'),
+    );
+    fireEvent.press(await screen.findByLabelText('Keep ORG BANANAS as a separate item'));
 
     await waitFor(() => expect(mockApi.rejectSuggestion).toHaveBeenCalledWith('sg-1'));
     expect(mockApi.acceptSuggestion).not.toHaveBeenCalled();
