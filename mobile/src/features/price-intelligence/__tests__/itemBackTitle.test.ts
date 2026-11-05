@@ -10,6 +10,13 @@ describe('itemBackTitle', () => {
     expect(itemBackTitle({ name: '(tabs)' })).toBe('Budget');
   });
 
+  it('names the screen that opened the item: Prices, Receipt, Price alerts (PI-01 AC 10)', () => {
+    expect(itemBackTitle({ name: 'items/index' })).toBe('Prices');
+    expect(itemBackTitle({ name: 'receipt/[id]' })).toBe('Receipt');
+    // DA-4's Price alerts list, at the route `price-alerts`.
+    expect(itemBackTitle({ name: 'price-alerts' })).toBe('Price alerts');
+  });
+
   it('leaves the iOS default for any other screen', () => {
     expect(itemBackTitle({ name: 'items/matches' })).toBeUndefined();
   });

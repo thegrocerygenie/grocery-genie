@@ -12,6 +12,7 @@ Confirming a receipt links each line to a canonical item (PI-02) and records its
 - `pi.accept`: accepting merges the two items and their prices.
 - `pi.reject`: rejecting keeps both; the suggestion row ends `rejected`, and the next scan of that name links to its own item by alias, with no new question.
 - `pi.history`: `GET /api/items/{id}/prices` lists every price oldest first with date and store; `has_timeline` is true from 2 prices.
+- `pi.range`: item detail's range control (PI-01 AC 5, DA-3) asks `GET /api/items/{id}/prices?from=<today minus 1, 3, 6 or 12 months>` for the chart and the plain `/prices` for the list and for All. `from` keeps only prices dated on or after it, with `has_timeline` and `store_count` for those alone, and the same `unit_of_measure` and `currency` as the full history. A range with one price has `has_timeline` false ("Not enough prices in this range" in the app). Each price's `store_id` is the same store id `/compare` gives, which the app colours its store squares by (PI-01 AC 9). Another user's item answers 404 with `from` too.
 - `pi.split` / `pi.merge` / `pi.rename`: unlink a name, link two items, rename.
 - `pi.isolation`: another user's list is empty and the item answers 404.
 
@@ -48,12 +49,24 @@ $G api POST /api/receipts '{"store_name":"IGA","date":"2026-03-20","total":8.98,
 $G api POST /api/receipts '{"store_name":"IGA","date":"2026-03-27","total":8.78,"items":[{"name":"WHL WHT BREAD","quantity":1,"unit_price":3.29,"total_price":3.29},{"name":"Lait écrémé 2 L","quantity":1,"unit_price":5.49,"total_price":5.49}]}'
 $G api GET /api/items | jq '{pending_suggestions, items: [.items[] | {canonical_name, observation_count}]}'  # pi.abbrev-french: Whole Wheat Bread 2, each milk 1, pending 1
 $G signup other && $G api GET /api/items/$mid/prices                        # pi.isolation: 404
+$G signup range                                                              # pi.range (today 2026-11-05: 3M is from 2026-08-05)
+$G api POST /api/receipts '{"store_name":"FreshCo","date":"2026-02-10","total":2.0,"items":[{"name":"Avocado","quantity":1,"unit_price":2.0,"total_price":2.0}]}'
+$G api POST /api/receipts '{"store_name":"Loblaws","date":"2026-08-15","total":2.2,"items":[{"name":"Avocado","quantity":1,"unit_price":2.2,"total_price":2.2}]}'
+$G api POST /api/receipts '{"store_name":"FreshCo","date":"2026-10-20","total":2.6,"items":[{"name":"Avocado","quantity":1,"unit_price":2.6,"total_price":2.6}]}'
+av=$($G api GET /api/items | jq -r '.items[0].id')
+$G api GET "/api/items/$av/prices?from=2026-08-05" | jq -c '{has_timeline, store_count, points: [.observations[] | [.date, .store_name, .store_id[0:8], .unit_price]]}'  # true, 2: Aug 15 Loblaws, Oct 20 FreshCo
+$G api GET "/api/items/$av/prices?from=2026-10-05" | jq -c '{has_timeline, n: (.observations | length)}'   # 1M: false, 1
+$G api GET "/api/items/$av/prices" | jq -c '[.observations[] | [.date, .store_id[0:8]]]'                  # All: 3, FreshCo's id on both of its prices
+$G api POST /api/receipts '{"store_name":"FreshCo","date":"2026-10-28","total":2.4,"items":[{"name":"Avocado","quantity":1,"unit_price":2.4,"total_price":2.4}]}'   # a 3rd FreshCo price; Loblaws has 1, below the compare minimum
+$G premium && $G api GET "/api/items/$av/compare" | jq -c '[.stores[] | [.store_name, .store_id[0:8]]]'  # FreshCo, with the same id as on /prices
+$G signup rangeother && $G api GET "/api/items/$av/prices?from=2026-08-05" || true                       # 404
 ```
 
 ## Gotchas
 
 - Debug mode mocks only the LLM extractor. Matching runs the real local embedding model (`GG_EMBEDDING_MODEL`), which loads on the first confirm (a few seconds, and a download on a host that has never fetched it). `GG_EMBEDDINGS_ENABLED=false` matches on aliases and fuzzy similarity only, and aliases keep a null embedding.
+- The range's start is counted from today on the phone, so `pi.range`'s dates assume 2026-11-05; on another day pick `from` values that split the three receipts the same way.
 - Manual entries carry no `unit_of_measure`, so their history's `unit_of_measure` is null and prices show without a unit. A scan's extraction supplies it.
 - Exact confidences depend on the model version; the journey checks which pairs link, ask, or stay apart, not the score.
 - Qualifier words and their receipt abbreviations are listed in `backend/app/services/item_qualifiers.py`. If an abbreviation is missing there, a true match asks instead of linking. This journey found "WHL" (whole) missing at first, and the device check "WHL WHT" (whole wheat). French words match without accents ("ECREME" is écrémé).
-- Verified 2026-11-03 against Postgres 16 with pgvector 0.6 (run `20261103-053414`), and with the qualifier steps the same day (run `20261103-220037`). The WHL WHT and French steps verified 2026-11-04 (run `20261104-040224`).
+- Verified 2026-11-03 against Postgres 16 with pgvector 0.6 (run `20261103-053414`), and with the qualifier steps the same day (run `20261103-220037`). The WHL WHT and French steps verified 2026-11-04 (run `20261104-040224`). `pi.range` verified 2026-11-05 (run `20261105-042923`).

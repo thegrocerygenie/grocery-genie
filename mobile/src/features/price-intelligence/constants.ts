@@ -1,3 +1,5 @@
+import type { PriceRange } from './utils/priceTrend';
+
 /** User-facing text for price history and item matching (PI-01, PI-02). */
 export const PRICES_COPY = {
   listTitle: 'Prices',
@@ -19,10 +21,26 @@ export const PRICES_COPY = {
   backBudget: 'Budget',
   backHistory: 'History',
   backScan: 'Scan',
-  latest: 'Latest price',
-  since: (percent: string, date: string) => `${percent} since ${date}`,
-  noChange: (date: string) => `Same as ${date}`,
-  timelineHeader: 'Price history',
+  backPriceAlerts: 'Price alerts',
+  // PI-01 AC 7: the headline, the 30-day average and its change.
+  average30: 'Avg · 30d',
+  average30Label: (price: string, change: string | null) =>
+    `Average over 30 days, ${price}${change ? `, ${change} on the 30 days before` : ''}`,
+  latestLine: (price: string, store: string, date: string) =>
+    `Latest ${price} · ${store} · ${date}`,
+  // PI-01 AC 5, 6: the chart's range control.
+  rangeLabels: {
+    '1M': '1 month',
+    '3M': '3 months',
+    '6M': '6 months',
+    '1Y': '1 year',
+    All: 'All prices',
+  } satisfies Record<PriceRange, string>,
+  rangeControlLabel: 'Chart range',
+  rangeTooFew: 'Not enough prices in this range',
+  rangeLoadFailed: 'Couldn’t load this range',
+  showAll: 'Show All',
+  showAllLabel: 'Show all prices',
   needMorePrices: (min: number) =>
     `Buy it again to see its price trend. A trend needs ${min} prices.`,
   pricesHeader: (count: number) => `Prices · ${count}`,

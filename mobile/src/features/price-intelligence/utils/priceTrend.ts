@@ -1,3 +1,4 @@
+import { toIsoDate } from '@/features/receipt-capture/utils/receiptDate';
 import { formatMoney } from '@/utils/money';
 import type { PriceHistory, PricePoint } from '../types';
 
@@ -18,23 +19,6 @@ export function timelinePoints(history: PriceHistory): PricePoint[] {
   return history.observations.filter((p) => p.in_timeline);
 }
 
-export interface PriceChange {
-  /** Whole percent, latest against the first comparable price. */
-  percent: number;
-  sinceDate: string;
-}
-
-export function priceChange(points: PricePoint[]): PriceChange | null {
-  if (points.length < 2) return null;
-  const first = points[0];
-  const last = points[points.length - 1];
-  if (first.unit_price <= 0) return null;
-  return {
-    percent: Math.round(((last.unit_price - first.unit_price) / first.unit_price) * 100),
-    sinceDate: first.date,
-  };
-}
-
 /** "+8%", "−5%" (a real minus sign, which VoiceOver reads as "minus"), "0%". */
 export function formatPercent(percent: number): string {
   if (percent > 0) return `+${percent}%`;
@@ -46,6 +30,134 @@ export function formatPercent(percent: number): string {
 function dayNumber(iso: string): number {
   const [y, m, d] = iso.split('-').map(Number);
   return Date.UTC(y, m - 1, d) / 86_400_000;
+}
+
+/** PI-01 AC 7: the headline's unit, "/ ea" for a count, "/ lb" for a measure. */
+export function unitSuffix(unit: string | null): string {
+  const normalized = unit?.trim().toLowerCase();
+  if (!normalized) return '';
+  return EACH_UNITS.has(normalized) ? '/ ea' : `/ ${normalized}`;
+}
+
+export interface ThirtyDayAverage {
+  average: number;
+  /** Whole percent against the 30 days before; null with no price there. */
+  percent: number | null;
+}
+
+const WINDOW_DAYS = 30;
+
+const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.length;
+
+/**
+ * PI-01 AC 7: the mean of the like-for-like prices dated in the 30 days up to
+ * the latest one (its day and the 29 before), and the change from the mean of
+ * the 30 days before that window.
+ */
+export function thirtyDayAverage(points: PricePoint[]): ThirtyDayAverage | null {
+  const comparable = points.filter((p) => p.in_timeline);
+  if (comparable.length === 0) return null;
+  const days = comparable.map((p) => dayNumber(p.date));
+  const latest = Math.max(...days);
+  const recent: number[] = [];
+  const before: number[] = [];
+  comparable.forEach((p, i) => {
+    const ago = latest - days[i];
+    if (ago < WINDOW_DAYS) recent.push(p.unit_price);
+    else if (ago < WINDOW_DAYS * 2) before.push(p.unit_price);
+  });
+  const average = mean(recent);
+  const earlier = before.length > 0 ? mean(before) : 0;
+  return {
+    average,
+    percent: earlier > 0 ? Math.round(((average - earlier) / earlier) * 100) : null,
+  };
+}
+
+/** PI-01 AC 5: the chart's ranges, 3M first. */
+export const PRICE_RANGES = ['1M', '3M', '6M', '1Y', 'All'] as const;
+export type PriceRange = (typeof PRICE_RANGES)[number];
+export const DEFAULT_PRICE_RANGE: PriceRange = '3M';
+
+const RANGE_MONTHS: Record<PriceRange, number | null> = {
+  '1M': 1,
+  '3M': 3,
+  '6M': 6,
+  '1Y': 12,
+  All: null,
+};
+
+/**
+ * The first day of `range`, counted back in calendar months from today (a
+ * day past the end of a shorter month clamps to its last day); All has none.
+ */
+export function rangeFrom(range: PriceRange, now: Date): string | undefined {
+  const months = RANGE_MONTHS[range];
+  if (months === null) return undefined;
+  const year = now.getFullYear();
+  const month = now.getMonth() - months;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return toIsoDate(new Date(year, month, Math.min(now.getDate(), lastDay)));
+}
+
+export interface MonthTick {
+  x: number;
+  label: string;
+}
+
+const MONTH_SHORT = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/**
+ * PI-01 AC 8: a label at the first of each month the chart spans, placed on
+ * the same calendar x as chartGeometry; every few months over a long span,
+ * at most `max`. Prices all in one month label that month at the start.
+ */
+export function monthTicks(
+  points: PricePoint[],
+  width: number,
+  inset: number,
+  max = 6,
+): MonthTick[] {
+  if (points.length === 0 || width <= 0) return [];
+  const times = points.map((p) => dayNumber(p.date));
+  const start = Math.min(...times);
+  const end = Math.max(...times);
+  const span = end - start;
+  const innerW = Math.max(width - inset * 2, 0);
+  const xOf = (day: number) => inset + (span > 0 ? ((day - start) / span) * innerW : innerW / 2);
+
+  const first = new Date(start * 86_400_000);
+  let y = first.getUTCFullYear();
+  let m = first.getUTCMonth();
+  if (first.getUTCDate() !== 1) m += 1;
+  const ticks: MonthTick[] = [];
+  for (;;) {
+    const day = Date.UTC(y, m, 1) / 86_400_000;
+    if (day > end) break;
+    const at = new Date(day * 86_400_000);
+    ticks.push({ x: xOf(day), label: MONTH_SHORT[at.getUTCMonth()] });
+    m += 1;
+    if (m > 11) {
+      m = 0;
+      y += 1;
+    }
+  }
+  if (ticks.length === 0) return [{ x: xOf(start), label: MONTH_SHORT[first.getUTCMonth()] }];
+  const step = Math.ceil(ticks.length / max);
+  return ticks.filter((_, i) => i % step === 0);
 }
 
 export interface ChartPoint {

@@ -199,13 +199,14 @@ describe('Item price history (PI-01)', () => {
     expect(screen.queryByText(/Buy it again/)).toBeNull();
   });
 
-  it('shows unit prices and the change since the first price (AC 3)', async () => {
+  it('shows unit prices in the list and the headline (AC 3)', async () => {
     open('/items/i-1');
 
-    expect(await screen.findByText('+10% since Mar 1, 2026')).toBeTruthy();
-    // The latest-price card, and the newest row of the price list.
-    expect(screen.getAllByText('$0.77/lb')).toHaveLength(2);
+    expect(await screen.findByText('$0.77/lb')).toBeTruthy();
     expect(screen.getByText('$0.70/lb')).toBeTruthy();
+    // The headline's 30-day average is per lb too, and names the latest price.
+    expect(screen.getByText('/ lb')).toBeTruthy();
+    expect(screen.getByText('Latest $0.77/lb · Loblaws · Mar 20, 2026')).toBeTruthy();
   });
 
   it('waits for a second price before showing a trend (AC 4)', async () => {
@@ -216,7 +217,7 @@ describe('Item price history (PI-01)', () => {
       await screen.findByText('Buy it again to see its price trend. A trend needs 2 prices.'),
     ).toBeTruthy();
     expect(screen.queryByTestId('price-chart')).toBeNull();
-    expect(screen.queryByText(/since/)).toBeNull();
+    expect(screen.queryByTestId('headline-change')).toBeNull();
   });
 
   it('lists a price in another unit but leaves it out of the chart', async () => {

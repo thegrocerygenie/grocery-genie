@@ -438,6 +438,8 @@ Price observations for a canonical item, oldest first.
 ```
 `unit_of_measure` and `currency` are those of most of the item's prices; a price in another unit or currency has `in_timeline: false` (listed, not plotted). `has_timeline` is false until the timeline has `min_points` prices (PI-01 AC 4).
 
+`from` and `to` (inclusive) keep the prices dated in that range; `has_timeline` and `store_count` then count those alone, while `unit_of_measure` and `currency` stay the full history's, so a range never changes which series is plotted. Item detail's range control (PI-01 AC 5) asks with `from` set to today less 1, 3, 6 or 12 months, and the plain request for All and for the price list. The 30-day headline (AC 7) is computed in the app from the full history.
+
 ### PATCH /api/items/{canonical_id}
 **Request:** `{ "canonical_name": "Organic Bananas" }` → item detail.
 

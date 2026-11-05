@@ -2,8 +2,11 @@ import type { PricePoint } from '../types';
 import {
   chartGeometry,
   formatPercent,
+  monthTicks,
+  rangeFrom,
+  thirtyDayAverage,
+  unitSuffix,
   formatUnitPrice,
-  priceChange,
   timelinePoints,
 } from './priceTrend';
 
@@ -35,19 +38,7 @@ describe('formatUnitPrice (PI-01 AC 3)', () => {
   });
 });
 
-describe('priceChange', () => {
-  it('compares the latest price with the first', () => {
-    expect(priceChange([point('2026-03-01', 0.7), point('2026-03-20', 0.77)])).toEqual({
-      percent: 10,
-      sinceDate: '2026-03-01',
-    });
-  });
-
-  it('needs two prices', () => {
-    expect(priceChange([point('2026-03-01', 0.7)])).toBeNull();
-    expect(priceChange([])).toBeNull();
-  });
-
+describe('formatPercent', () => {
   it('formats up, down and flat', () => {
     expect(formatPercent(10)).toBe('+10%');
     expect(formatPercent(-5)).toBe('−5%');
@@ -111,5 +102,84 @@ describe('chartGeometry (PI-01 AC 2)', () => {
     const geo = chartGeometry([point('2026-03-01', 2), point('2026-03-02', 3)], 0, 120, 10);
     expect(geo.points).toEqual([]);
     expect([geo.low, geo.high]).toEqual([2, 3]);
+  });
+});
+
+describe('thirtyDayAverage (PI-01 AC 7)', () => {
+  it('averages the 30 days up to the latest price and compares the 30 days before', () => {
+    const avg = thirtyDayAverage([
+      point('2026-01-20', 9), // before both windows: ignored
+      point('2026-02-10', 2),
+      point('2026-03-01', 2), // 30 days before the latest: the earlier window
+      point('2026-03-02', 2.2), // 29 days before: the latest window
+      point('2026-03-31', 2.6),
+    ]);
+    expect(avg?.average).toBeCloseTo(2.4);
+    expect(avg?.percent).toBe(20);
+  });
+
+  it('uses like-for-like prices only', () => {
+    const avg = thirtyDayAverage([
+      point('2026-03-01', 2),
+      point('2026-03-10', 0.25, false),
+      point('2026-03-20', 4),
+    ]);
+    expect(avg).toEqual({ average: 3, percent: null });
+  });
+
+  it('gives no percent with no price in the earlier window, and a fall as negative', () => {
+    expect(thirtyDayAverage([point('2026-03-20', 4)])).toEqual({ average: 4, percent: null });
+    expect(thirtyDayAverage([point('2026-02-01', 4), point('2026-03-20', 3)])).toEqual({
+      average: 3,
+      percent: -25,
+    });
+  });
+
+  it('is null with no comparable price', () => {
+    expect(thirtyDayAverage([point('2026-03-20', 4, false)])).toBeNull();
+  });
+});
+
+describe('unitSuffix (PI-01 AC 7)', () => {
+  it('reads / ea for a count and / lb for a measure', () => {
+    expect(unitSuffix('each')).toBe('/ ea');
+    expect(unitSuffix('lb')).toBe('/ lb');
+    expect(unitSuffix('KG')).toBe('/ kg');
+    expect(unitSuffix(null)).toBe('');
+  });
+});
+
+describe('rangeFrom (PI-01 AC 5)', () => {
+  const now = new Date(2026, 10, 5);
+  it('counts calendar months back from today, and All has no start', () => {
+    expect(rangeFrom('1M', now)).toBe('2026-10-05');
+    expect(rangeFrom('3M', now)).toBe('2026-08-05');
+    expect(rangeFrom('6M', now)).toBe('2026-05-05');
+    expect(rangeFrom('1Y', now)).toBe('2025-11-05');
+    expect(rangeFrom('All', now)).toBeUndefined();
+  });
+
+  it('clamps to the end of a shorter month', () => {
+    expect(rangeFrom('1M', new Date(2026, 2, 31))).toBe('2026-02-28');
+  });
+});
+
+describe('monthTicks (PI-01 AC 8)', () => {
+  it('labels each month the chart spans, placed by date', () => {
+    const ticks = monthTicks([point('2026-01-01', 2), point('2026-03-01', 3)], 69, 5);
+    expect(ticks.map((t) => t.label)).toEqual(['Jan', 'Feb', 'Mar']);
+    // 59 days over 59 px: Feb 1 is day 31.
+    expect(ticks.map((t) => t.x)).toEqual([5, 36, 64]);
+  });
+
+  it('labels the one month when every price falls inside it', () => {
+    const ticks = monthTicks([point('2026-03-04', 2), point('2026-03-20', 3)], 100, 10);
+    expect(ticks.map((t) => t.label)).toEqual(['Mar']);
+  });
+
+  it('thins the labels out over a long span', () => {
+    const ticks = monthTicks([point('2025-01-15', 2), point('2026-03-01', 3)], 300, 10, 5);
+    expect(ticks.length).toBeLessThanOrEqual(5);
+    expect(ticks[0].label).toBe('Feb');
   });
 });

@@ -220,13 +220,13 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-01 | 2 | Line chart, a point per purchase | Component | `mobile/src/__tests__/priceHistory.test.tsx` "plots a line chart once there are two prices (AC 2)" | Pass |
 | PI-01 | 2 | Line chart, a point per purchase | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "places one dot per purchase: x by date, y by price" | Pass |
 | PI-01 | 3 | Unit price (per item, kg, lb) | Integration | `backend/tests/api/test_items.py::test_prices_are_unit_prices` | Pass |
-| PI-01 | 3 | Unit price (per item, kg, lb) | Component | `mobile/src/__tests__/priceHistory.test.tsx` "shows unit prices and the change since the first price (AC 3)" | Pass |
+| PI-01 | 3 | Unit price (per item, kg, lb) | Component | `mobile/src/__tests__/priceHistory.test.tsx` "shows unit prices in the list and the headline (AC 3)" | Pass |
 | PI-01 | 4 | Timeline needs 2 data points | Integration | `backend/tests/api/test_items.py::test_one_price_is_not_yet_a_timeline` | Pass |
 | PI-01 | FR | Filter the history by store and date range | Integration | `backend/tests/api/test_items.py::test_store_and_date_filters` | Pass |
 | PI-01 | 4 | Timeline needs 2 data points | Component | `mobile/src/__tests__/priceHistory.test.tsx` "waits for a second price before showing a trend (AC 4)" | Pass |
 | PI-01 | 1 | Every recorded price with date and store (app, at AX5: device check BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "stacks each price under its date and store at AX5" | Pass |
 | PI-01 | 1 | Every recorded price with date and store (app, Prices list at AX5: BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "stacks the price under the name at AX5, and lets the name wrap" | Pass |
-| PI-01 | 3 | Unit price (per item, kg, lb) (app, latest price at AX5: BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "keeps the latest price on one line, shrinking it to fit" | Pass |
+| PI-01 | 3 | Unit price (per item, kg, lb) (app, headline price at AX5: BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "keeps the headline price on one line, shrinking it to fit" | Pass |
 | PI-02 | 1 | Hybrid: embedding similarity + fuzzy strings | Integration | `backend/tests/services/test_item_matching.py::test_high_semantic_similarity_auto_links` | Pass |
 | PI-02 | 1 | Hybrid: embedding similarity + fuzzy strings | Integration | `backend/tests/services/test_item_matching.py::test_high_fuzzy_score_auto_links_and_learns_the_alias` | Pass |
 | PI-02 | FR | Matching order: an exact alias links first, at confidence 1.0 | Integration | `backend/tests/services/test_item_matching.py::test_exact_alias_links_to_the_same_item` | Pass |
@@ -679,12 +679,28 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PREM-03 | 4 | Premium model failure falls back to the default model, then the usual failed-scan path (503, the app's offline retry, manual entry); the scan never fails because of it | Integration | `backend/tests/api/test_priority_ocr.py::test_when_both_models_fail_the_scan_fails_as_any_scan_does` | Pass |
 | PREM-03 | 5 | receipt_extraction_completed carries extraction_tier | Integration | `backend/tests/api/test_priority_ocr.py::test_extraction_completed_carries_the_tier` | Pass |
 | PREM-03 | 6 | validate-extraction on the Premium model: accuracy not below default, cost recorded, user approval | Manual | `docs/device-checklist.md` §8: Priority OCR (`run extract --premium`; harness tested by `backend/tests/llm_validation/test_harness.py::test_premium_runs_score_the_premium_model`) | Manual |
-| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Component | Not yet implemented (DA-3) | Pending |
-| PI-01 | 6 | Fewer than 2 plotted prices in a range: "Not enough prices in this range", no chart | Component | Not yet implemented (DA-3) | Pending |
-| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Unit | Not yet implemented (DA-3) | Pending |
-| PI-01 | 8 | Chart: shaded area, month labels, a dot per purchase | Component | Not yet implemented (DA-3) | Pending |
-| PI-01 | 9 | Store rows lead with a coloured square, stable per store | Unit | Not yet implemented (DA-3) | Pending |
-| PI-01 | 10 | Back label names the opener; largest text size holds | Component | Not yet implemented (DA-3) | Pending |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "offers 1M to All under the chart with 3M selected, and plots only that range" | Pass |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "follows the chosen range, and All plots every price" | Pass |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "counts calendar months back from today, and All has no start" | Pass |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "clamps to the end of a shorter month" | Pass |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "offers a retry when a range cannot load, keeping the list" | Pass |
+| PI-01 | 6 | Fewer than 2 plotted prices in a range: "Not enough prices in this range", no chart | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "says so instead of drawing a chart, with All one tap away" | Pass |
+| PI-01 | 6 | Fewer than 2 plotted prices in a range: "Not enough prices in this range", no chart | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "shows no range control for an item with fewer than 2 prices" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "averages the 30 days up to the latest price and compares the 30 days before" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "uses like-for-like prices only" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "gives no percent with no price in the earlier window, and a fall as negative" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "reads / ea for a count and / lb for a measure" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "shows the 30-day mean with its unit and a rise in red with a plus" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "shows a fall in green with a minus sign" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "shows no percent with no price in the 30 days before" | Pass |
+| PI-01 | 8 | Chart: shaded area, month labels, a dot per purchase | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "draws a shaded area under the line, month labels, and a dot per purchase" | Pass |
+| PI-01 | 8 | Chart: shaded area, month labels, a dot per purchase | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "labels each month the chart spans, placed by date" | Pass |
+| PI-01 | 8 | Chart: shaded area, month labels, a dot per purchase | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "thins the labels out over a long span" | Pass |
+| PI-01 | 9 | Store rows lead with a coloured square, stable per store | Unit | `mobile/src/features/price-intelligence/utils/storeColor.test.ts` "gives a store the same colour every time, from its id alone" | Pass |
+| PI-01 | 9 | Store rows lead with a coloured square, stable per store | Unit | `mobile/src/features/price-intelligence/utils/storeColor.test.ts` "spreads stores over the whole palette" | Pass |
+| PI-01 | 9 | Store rows lead with a coloured square, stable per store | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "leads each price row and comparison row with the store’s own colour" | Pass |
+| PI-01 | 10 | Back label names the opener; largest text size holds | Unit | `mobile/src/features/price-intelligence/__tests__/itemBackTitle.test.ts` "names the screen that opened the item: Prices, Receipt, Price alerts (PI-01 AC 10)" | Pass |
+| PI-01 | 10 | Back label names the opener; largest text size holds | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "lets the range control wrap and keeps the headline price whole" | Pass |
 | PI-03 | 5 | Price alerts list: newest first, This week / Earlier, arrow, signed percent, was/now (drops add "stock-up worth it"), sparkline, tap opens item; opens from Settings → Alerts and the Budget dashboard bell (label "Price alerts") | Component | Not yet implemented (DA-4) | Pending |
 | PI-03 | 6 | Empty Price alerts list says "No price alerts yet" | Component | Not yet implemented (DA-4) | Pending |
 | PI-03 | 7 | Settings group: Threshold and Cooldown rows, footer from the user's settings | Component | Not yet implemented (DA-4) | Pending |
@@ -732,7 +748,8 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | EC-PI | 5 | Lapsed Premium with existing mutes | Integration | Not yet implemented (DA-1, DA-7) | Pending |
 | EC-PI | 6 | Split with one line, or of every line | Integration | Not yet implemented (DA-6) | Pending |
 | EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | Not yet implemented (DA-5) | Pending |
-| EC-PI | 8 | A range with too few prices | Component | Not yet implemented (DA-3) | Pending |
+| EC-PI | 8 | A range with too few prices | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "says so instead of drawing a chart, with All one tap away" | Pass |
+| EC-PI | 8 | A range with too few prices | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "counts only like-for-like prices as plotted" | Pass |
 | EC-PI | 9 | Cooldown setting changes | Integration | Not yet implemented (DA-4) | Pending |
 | EC-PI | 10 | Store comparison ties | Component | Not yet implemented (DA-10) | Pending |
 | EC-PI | 11 | Price alerts list after a merge or split | Component | Not yet implemented (DA-4) | Pending |
