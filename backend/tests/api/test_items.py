@@ -451,8 +451,9 @@ async def test_item_list_is_most_recent_first_and_searchable(
 
 
 async def test_items_are_private_to_their_user(client_user_b, db_session):
-    """User B gets 404 for every route on user A's item, and A's item is
-    unchanged. A's rows are stored directly; B uses the API."""
+    """User B gets 404 for every route on user A's item and suggestion, and
+    A's item and suggestion are unchanged. A's rows are stored directly; B
+    uses the API."""
     from app.services.item_matching_service import ItemMatchingService
     from tests.conftest import DEV_USER_ID
     from tests.services.test_item_matching import _receipt
@@ -463,6 +464,12 @@ async def test_items_are_private_to_their_user(client_user_b, db_session):
     item = await service.get_item(DEV_USER_ID, lines[0].canonical_item_id)
     await db_session.refresh(item, ["aliases"])
     item_id, alias_id = item.id, item.aliases[0].id
+    _, first = await _receipt(db_session, "Cucumber", user_id=DEV_USER_ID)
+    await service.match_line_items(DEV_USER_ID, first)
+    _, second = await _receipt(db_session, "CUCUMBERS ENG", user_id=DEV_USER_ID)
+    await service.match_line_items(DEV_USER_ID, second)
+    [suggestion] = await service.list_suggestions(DEV_USER_ID)
+    await db_session.commit()
     b_item = (
         await client_user_b.post(
             "/api/receipts",
@@ -492,6 +499,8 @@ async def test_items_are_private_to_their_user(client_user_b, db_session):
         ("POST", f"/api/items/{item_id}/merge", {"into_item_id": b_item}),
         ("POST", f"/api/items/{b_item}/merge", {"into_item_id": str(item_id)}),
         ("POST", f"/api/items/{item_id}/aliases/{alias_id}/split", None),
+        ("POST", f"/api/items/suggestions/{suggestion.id}/accept", None),
+        ("POST", f"/api/items/suggestions/{suggestion.id}/reject", None),
     ]:
         resp = await client_user_b.request(method, url, json=body)
         assert resp.status_code == 404, (method, url, resp.text)
@@ -499,6 +508,10 @@ async def test_items_are_private_to_their_user(client_user_b, db_session):
     db_session.expire_all()
     item = await service.get_item(DEV_USER_ID, item_id)
     assert item.canonical_name == "Limes"
+    # A's suggestion is still pending: B's answers changed nothing.
+    assert [s.id for s in await service.list_suggestions(DEV_USER_ID)] == [
+        suggestion.id
+    ]
 
 
 async def test_unknown_item_is_404(client):

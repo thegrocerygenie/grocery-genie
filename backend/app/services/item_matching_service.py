@@ -61,6 +61,7 @@ from app.models.database import (
     Receipt,
 )
 from app.models.types import EMBEDDING_DIMENSIONS
+from app.services.item_locks import ItemNotFoundError, lock_items
 from app.services.item_qualifiers import qualifiers_compatible, read_qualifiers
 from app.services.price_alert_service import (
     NOTIFICATION_TYPE as PRICE_CHANGE_NOTIFICATION,
@@ -83,10 +84,6 @@ _SEMANTIC_CANDIDATES = 5
 _SIMILAR_LINKS = 5
 
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
-
-
-class ItemNotFoundError(Exception):
-    """No canonical item (or alias, or suggestion) with that id for this user."""
 
 
 class SplitLineError(Exception):
@@ -965,18 +962,14 @@ class ItemMatchingService:
         """Lock canonical item rows, in id order, for a merge.
 
         Lock order (DA-5): items first, in id order, then suggestion rows.
-        merge() and accept_suggestion() both follow it, and reject_suggestion
-        locks only its one suggestion, so no two answers or merges can wait
-        on each other in a cycle. FOR NO KEY UPDATE: it does not block a
-        confirm linking new lines to the item (their foreign keys take KEY
+        merge() and accept_suggestion() both follow it, reject_suggestion
+        locks only its one suggestion, and a mute or unmute locks only its
+        one item (item_locks, DA-11), so no two answers, merges or mutes can
+        wait on each other in a cycle. FOR NO KEY UPDATE: it does not block
+        a confirm linking new lines to the item (their foreign keys take KEY
         SHARE).
         """
-        await self.db.execute(
-            select(CanonicalItem.id)
-            .where(CanonicalItem.id.in_(sorted(set(item_ids))))
-            .order_by(CanonicalItem.id)
-            .with_for_update(key_share=True)
-        )
+        await lock_items(self.db, *item_ids)
 
     async def _get_pending(
         self,

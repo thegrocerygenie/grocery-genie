@@ -44,6 +44,7 @@ from app.models.database import (
     Receipt,
     User,
 )
+from app.services.item_locks import ItemNotFoundError, lock_items
 from app.services.price_service import (
     LONG_WINDOW_DAYS,
     SHORT_WINDOW_DAYS,
@@ -116,6 +117,11 @@ def later_end(a: datetime | None, b: datetime | None) -> datetime | None:
     if a is None or b is None:
         return None
     return max(utc(a), utc(b))
+
+
+async def _lock_item(db: AsyncSession, item_id: uuid.UUID) -> None:
+    if item_id not in await lock_items(db, item_id):
+        raise ItemNotFoundError(item_id)
 
 
 def mute_event(scope: str, muted_until: datetime | None) -> dict:
@@ -208,7 +214,13 @@ class PriceAlertService:
         muted_until: datetime | None = None,
     ) -> None:
         """Mute until ``muted_until`` (None: forever). Muting again replaces
-        the time, an ended mute's too (PI-03 AC 11)."""
+        the time, an ended mute's too (PI-03 AC 11).
+
+        The item row is locked first (item_locks): a merge of the item
+        runs wholly before or after, so it moves this mute or keeps the
+        later end, never racing it on the unique key (DA-11). An item a
+        merge deleted meanwhile is ItemNotFoundError."""
+        await _lock_item(self.db, item_id)
         statement = _insert(self.db)(PriceAlertItemMute).values(
             id=uuid.uuid4(),
             user_id=user_id,
@@ -223,6 +235,8 @@ class PriceAlertService:
         )
 
     async def unmute_item(self, user_id: uuid.UUID, item_id: uuid.UUID) -> None:
+        """Idempotent. Locks the item first, as mute_item does."""
+        await _lock_item(self.db, item_id)
         await self.db.execute(
             delete(PriceAlertItemMute).where(
                 PriceAlertItemMute.user_id == user_id,
