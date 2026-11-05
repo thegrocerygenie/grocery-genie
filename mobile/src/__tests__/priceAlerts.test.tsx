@@ -262,15 +262,15 @@ describe('Store comparison on item detail (PI-04 AC 4)', () => {
   it('shows the latest and average price at each store, cheapest first (AC 4)', async () => {
     open('/items/i-1');
     const freshco = await screen.findByLabelText(
-      'FreshCo, cheapest, average $0.70/lb, latest $0.71/lb on Mar 5, 2026',
+      'FreshCo, cheapest, latest $0.71/lb, average $0.70/lb, 2 purchases',
     );
     const loblaws = screen.getByLabelText(
-      'Loblaws, average $0.80/lb, latest $0.81/lb on Mar 6, 2026',
+      'Loblaws, latest $0.81/lb, average $0.80/lb, 2 purchases',
     );
     expect(freshco).toBeTruthy();
     expect(loblaws).toBeTruthy();
     expect(mockApi.getPriceComparison).toHaveBeenCalledWith('i-1');
-    const rows = screen.getAllByLabelText(/, average /);
+    const rows = screen.getAllByLabelText(/, latest .*, average /);
     expect(rows.map((r) => r.props.accessibilityLabel.split(',')[0])).toEqual([
       'FreshCo',
       'Loblaws',

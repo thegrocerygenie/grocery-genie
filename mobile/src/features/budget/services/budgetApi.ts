@@ -44,8 +44,12 @@ export async function setBudgetRollover(
   });
 }
 
-/** How many months the dashboard trend covers (V1.1: 12 is Premium, D2). */
-export type TrendMonths = 3 | 12;
+/**
+ * How many months the dashboard trend covers: the Trend screen's range chips
+ * (BC-04 AC 6). `all` is every month since the first receipt. Over 3 is
+ * Premium (D2, D11); the server answers a free user `403 premium_required`.
+ */
+export type TrendMonths = 1 | 3 | 6 | 12 | 'all';
 
 export async function getDashboardSpending(
   period?: string,

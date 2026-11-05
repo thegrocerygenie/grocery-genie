@@ -148,13 +148,16 @@ Spending dashboard (BC-04): the budget summary above, the top 10 items, a 3-mont
   "category_changes": [
     { "category_id": "uuid", "name": "Groceries", "spent": 30.0, "previous_spent": 20.0 }
   ],
-  "has_receipts": true
+  "has_receipts": true,
+  "current_period": "2026-03"
 }
 ```
 
-**`months` [V1.1].** `?months=3|12` sets the trend length (default `3`; `GET /api/dashboard/spending?period=2026-03&months=12`). With `12`, `trend` holds the 12 months ending at `period`, oldest first, and `prior_average` covers the 12 months before them; the rest of the response is unchanged. Any other value returns `422`.
+**`months` [V1.1].** `?months=1|3|6|12|all` sets the trend length, one per range chip on Trend (BC-04 AC 6, DA-10; default `3`; `GET /api/dashboard/spending?period=2026-03&months=12`). With a number N, `trend` holds the N months ending at `period`, oldest first, and `prior_average` covers the N months before them. With `all`, `trend` starts at the period holding the user's first receipt that counts toward spend (confirmed, not in Recently Deleted, in the budget currency; another user's never), and is just `period` when there is none on or before it; `prior_average` is `0.0`, since nothing comes before the first receipt. The rest of the response is unchanged. Any other value (`2`, `24`, `ALL`) returns `422`.
 
-The 12-month trend is Premium (decision D2). A free user asking for `months=12` gets `403`, which the app turns into an upgrade prompt, never an error screen:
+`current_period` is the period holding today in the user's time zone, whichever `period` was asked for; Trend tints that month's bar and marks it "in progress" (BC-04 AC 8, 9).
+
+`1` and `3` are free; `6`, `12` and `all` are Premium (decisions D2 and D11), checked on the server against the stored entitlement, never the app's. A free user asking for one gets `403` (`feature` stays `trend_12_months` for all three), which the app turns into an upgrade prompt, never an error screen:
 
 ```json
 { "detail": { "code": "premium_required", "feature": "trend_12_months", "message": "This feature is part of Grocery Genie Premium." } }
@@ -261,7 +264,7 @@ Deletes the signed-in account and everything it owns, at once and for good (App 
 
 ## Premium [V1.1]
 
-Premium ($4.99/month or $39.99/year, each with a 7-day free trial: decision D7, 2026-11-04, replacing D1's $5.99; PREM-01) is an App Store subscription sold through RevenueCat: products `gg_premium_monthly` and `gg_premium_yearly`, in the current offering's Monthly and Annual packages (`docs/DEPLOYMENT.md` 2.9). Either product grants Premium; a trial (RevenueCat `period_type` `TRIAL`) is Premium until it ends, and converts or changes plan with no gap. The backend trusts only RevenueCat for it: the webhook below and RevenueCat's REST API, never the app. Premium gates the V1.1 extras (D2): the 12-month trend, custom categories, data export, budget rollover, and unlimited receipts, and (decision D8, PREM-02) cross-store comparison and muting price alerts (below). A free user asking for the trend, custom categories, export, rollover, comparison or a mute gets `403 premium_required` (above), with `feature` one of `trend_12_months`, `custom_categories`, `data_export`, `budget_rollover`, `price_comparison`, `price_alert_mute`. The receipt cap is the one exception: a free user past it gets `429 receipt_quota_exceeded` (below), because the scan itself stays free. Custom categories: [Categories](#categories-v11).
+Premium ($4.99/month or $39.99/year, each with a 7-day free trial: decision D7, 2026-11-04, replacing D1's $5.99; PREM-01) is an App Store subscription sold through RevenueCat: products `gg_premium_monthly` and `gg_premium_yearly`, in the current offering's Monthly and Annual packages (`docs/DEPLOYMENT.md` 2.9). Either product grants Premium; a trial (RevenueCat `period_type` `TRIAL`) is Premium until it ends, and converts or changes plan with no gap. The backend trusts only RevenueCat for it: the webhook below and RevenueCat's REST API, never the app. Premium gates the V1.1 extras (D2): trends over 3 months (6M, 1Y, All; D11), custom categories, data export, budget rollover, and unlimited receipts, and (decision D8, PREM-02) cross-store comparison and muting price alerts (below). A free user asking for the trend, custom categories, export, rollover, comparison or a mute gets `403 premium_required` (above), with `feature` one of `trend_12_months`, `custom_categories`, `data_export`, `budget_rollover`, `price_comparison`, `price_alert_mute`. The receipt cap is the one exception: a free user past it gets `429 receipt_quota_exceeded` (below), because the scan itself stays free. Custom categories: [Categories](#categories-v11).
 
 The profile (`/api/auth/me`, `/api/users/me`, and every route that returns it) carries the entitlement:
 ```json
@@ -597,7 +600,7 @@ The user's stores, as their prices group them, by name. Only stores on receipts 
 204. Undo the merge of this store (an id from `merged_stores`): its prices group on their own again. Stores merged into it before it was merged moved to the target then, and stay there. Idempotent, and never 404: it removes only the user's own merge. Records `store_unmerged`.
 
 ### GET /api/items/{canonical_id}/compare
-Cross-store comparison (PI-04): the item's latest and average unit price at each store the user has bought it from, cheapest first. Premium (D8, PREM-02 AC 1): a free user gets `403 premium_required` (`feature` `price_comparison`).
+Cross-store comparison (PI-04): the item's latest and average unit price at each store the user has bought it from, cheapest first. The app re-orders the rows by latest price (ties: average, then name), badges the first CHEAPEST, and shows "Save by switching", the highest latest price less the lowest, when 2 or more stores differ (PI-04 AC 5–7, EC-PI 10, DA-10). Premium (D8, PREM-02 AC 1): a free user gets `403 premium_required` (`feature` `price_comparison`).
 
 **Response:**
 ```json

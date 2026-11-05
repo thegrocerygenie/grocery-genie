@@ -244,14 +244,18 @@ class DashboardSpendingResponse(BaseModel):
     categories: list[BudgetCategorySummary]
     top_items: list[DashboardTopItem]
     trend: list[DashboardTrendMonth]
-    # Mean monthly spend over the 3 months before the trend window, so the
-    # trend's average can be compared with it. 0.0 when there was none.
+    # Mean monthly spend over the same number of months before the trend
+    # window, so the trend's average can be compared with it. 0.0 when there
+    # was none, and for "All" (nothing is before the first receipt).
     prior_average: float = 0.0
     previous_period: str
     category_changes: list[DashboardCategoryChange]
     # Whether the user has any receipt (not in Recently Deleted), in any
     # period. The app's "Scan your first receipt" state is for new accounts.
     has_receipts: bool = False
+    # The period holding today in the user's time zone, whichever ``period``
+    # was asked for: the Trend screen marks it "in progress" (BC-04 AC 8).
+    current_period: str
 
 
 # --- Notification ---

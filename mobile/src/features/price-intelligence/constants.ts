@@ -137,18 +137,25 @@ export const PRICES_COPY = {
   chartLabel: (count: number, low: string, high: string, latest: string) =>
     `Price chart, ${count} prices from ${low} to ${high}, latest ${latest}`,
 
-  // PI-04 AC 4: store comparison on item detail.
+  // PI-04 AC 4-8: store comparison on item detail.
   compareHeader: 'Compare stores',
-  cheapest: 'Cheapest',
-  average: 'average',
-  compareLatest: (price: string, date: string) => `Latest ${price} · ${date}`,
+  cheapest: 'CHEAPEST',
+  saveBySwitching: 'Save by switching',
+  /** "$2.00 / unit", "$0.10 / lb". */
+  savingsAmount: (amount: string, unit: string) => `${amount} / ${unit}`,
+  savingsUnit: 'unit',
+  savingsStores: (cheapest: string, priciest: string) => `${cheapest} vs. ${priciest}`,
+  savingsLabel: (amount: string, stores: string) => `Save by switching: ${amount}, ${stores}`,
+  comparePurchases: (count: number, average: string) =>
+    `${count} ${count === 1 ? 'purchase' : 'purchases'} · avg ${average}`,
   compareRowLabel: (
     store: string,
     cheapest: boolean,
-    average: string,
     latest: string,
-    date: string,
-  ) => `${store}${cheapest ? ', cheapest' : ''}, average ${average}, latest ${latest} on ${date}`,
+    average: string,
+    count: number,
+  ) =>
+    `${store}${cheapest ? ', cheapest' : ''}, latest ${latest}, average ${average}, ${count} ${count === 1 ? 'purchase' : 'purchases'}`,
   compareEmpty: (min: number) => `Buy it ${min} times at a store to compare that store’s price.`,
   compareBelowMinimum: (count: number, min: number) =>
     `${count} more ${count === 1 ? 'store needs' : 'stores need'} ${min} prices of this item to compare.`,
