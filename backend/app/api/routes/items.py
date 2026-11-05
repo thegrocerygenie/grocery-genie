@@ -118,6 +118,7 @@ def _settings(settings: PriceAlertSettings) -> PriceAlertSettingsResponse:
         threshold_percent=settings.threshold_percent,
         default_threshold_percent=settings.default_threshold_percent,
         cooldown_days=settings.cooldown_days,
+        default_cooldown_days=settings.default_cooldown_days,
         muted_items=[ItemRef.model_validate(i) for i in settings.muted_items],
         muted_stores=[StoreRef.model_validate(s) for s in settings.muted_stores],
     )
@@ -244,7 +245,8 @@ async def update_price_alert_settings(
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> PriceAlertSettingsResponse:
-    """Fields left out stay as they are; ``threshold_percent: null`` resets it."""
+    """Fields left out stay as they are; ``threshold_percent: null`` and
+    ``cooldown_days: null`` reset them to the default."""
     changes = body.model_dump(exclude_unset=True)
     return _settings(await PriceAlertService(db).update_settings(user, changes))
 

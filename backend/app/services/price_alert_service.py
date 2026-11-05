@@ -4,8 +4,14 @@ When a receipt is confirmed, each of its prices is compared with the item's
 30-day rolling average: earlier prices of the same item in the same unit and
 currency. A change of at least the user's threshold (10% by default) is a
 PriceChangeDetected, unless the item or the store is muted or alerts are off.
-claim() then lets each item alert at most once per cooldown (7 days by
-default), and the caller writes the notification in the same transaction.
+claim() then lets each item alert at most once per the user's cooldown (7
+days by default, PI-03 AC 8), and the caller writes the notification in the
+same transaction.
+
+The copy follows the design (PI-03 AC 9): "<Item> up 20%", "<Item> at
+<Store>: was $0.65/lb avg, now $0.78/lb", and a drop adds "stock-up worth
+it". The push and the in-app Price alerts list both read the notification's
+title and body; its data carries the parts a list row shows (AC 5).
 """
 
 from __future__ import annotations
@@ -41,6 +47,9 @@ from app.services.price_service import (
 from app.services.store_service import StoreGroup, StoreService
 
 NOTIFICATION_TYPE = "price_change"
+STOCK_UP = "stock-up worth it"
+# Prices on a list row's sparkline: the alerted one and up to 7 before it.
+SPARKLINE_PRICES = 8
 
 # Units that are a count, not a measure: "$0.78" rather than "$0.78/each".
 _COUNT_UNITS = {"each", "ea", "unit", "units", "item", "items", "pc", "pcs"}
@@ -52,6 +61,7 @@ class PriceAlertSettings:
     threshold_percent: int
     default_threshold_percent: int
     cooldown_days: int
+    default_cooldown_days: int
     muted_items: list[CanonicalItem]
     # One entry per muted store group, as the user's merges group stores.
     muted_stores: list[StoreGroup]
@@ -67,6 +77,11 @@ class PriceAlert:
 
 def _insert(db: AsyncSession):
     return pg_insert if db.bind.dialect.name == "postgresql" else sqlite_insert
+
+
+def cooldown_days(user: User) -> int:
+    """The user's cooldown, or the server default when they set none."""
+    return user.price_alert_cooldown_days or get_settings().price_alert_cooldown_days
 
 
 def _price_text(amount: Decimal, currency: str, unit: str | None) -> str:
@@ -108,17 +123,21 @@ class PriceAlertService:
             enabled=user.price_alerts_enabled,
             threshold_percent=user.price_alert_threshold_percent or default,
             default_threshold_percent=default,
-            cooldown_days=get_settings().price_alert_cooldown_days,
+            cooldown_days=cooldown_days(user),
+            default_cooldown_days=get_settings().price_alert_cooldown_days,
             muted_items=list(muted_items),
             muted_stores=list(muted_stores),
         )
 
     async def update_settings(self, user: User, changes: dict) -> PriceAlertSettings:
-        """Apply the fields the request set. A null threshold is the default."""
+        """Apply the fields the request set. A null threshold or cooldown is
+        the default."""
         if "enabled" in changes and changes["enabled"] is not None:
             user.price_alerts_enabled = changes["enabled"]
         if "threshold_percent" in changes:
             user.price_alert_threshold_percent = changes["threshold_percent"]
+        if "cooldown_days" in changes:
+            user.price_alert_cooldown_days = changes["cooldown_days"]
         await self.db.flush()
         return await self.get_settings(user)
 
@@ -270,6 +289,15 @@ class PriceAlertService:
                 user.id, item_id, days=SHORT_WINDOW_DAYS, **window
             )
             seen_items.add(item_id)
+            recent = await prices.recent_prices(
+                user.id,
+                item_id,
+                unit_of_measure=unit,
+                currency=currency,
+                as_of=receipt.date,
+                limit=SPARKLINE_PRICES - 1,
+                exclude_receipt_id=receipt.id,
+            )
             item = await self.db.get(CanonicalItem, item_id)
             event = PriceChangeDetected(
                 user_id=user.id,
@@ -291,6 +319,7 @@ class PriceAlertService:
                     long.average,
                     new_price,
                     change,
+                    [*recent, new_price],
                 )
             )
         return alerts
@@ -303,31 +332,44 @@ class PriceAlertService:
         average: Decimal,
         new_price: Decimal,
         change: Decimal,
+        recent: list[Decimal],
     ) -> PriceAlert:
         percent = int(abs(change).quantize(Decimal(1), rounding=ROUND_HALF_UP))
         direction = "up" if change > 0 else "down"
         new_text = _price_text(new_price, event.currency, event.unit_of_measure)
         old_text = _price_text(average, event.currency, event.unit_of_measure)
         where = f" at {store_name}" if store_name else ""
-        title = f"{item_name} price {direction} {percent}%"
-        body = (
-            f"{item_name}: {new_text}{where}, {direction} {percent}% from your "
-            f"30-day average of {old_text}."
-        )
+        title = f"{item_name} {direction} {percent}%"
+        body = f"{item_name}{where}: was {old_text} avg, now {new_text}"
+        if direction == "down":
+            body += f" · {STOCK_UP}"
         return PriceAlert(
             event=event,
             title=title[:255],
-            body=body,
+            body=body[:2000],
             data={
                 "canonical_item_id": str(event.canonical_item_id),
                 "store_id": str(event.store_id) if event.store_id else None,
+                # What a Price alerts row shows (PI-03 AC 5), as it was sent.
+                "item_name": item_name[:255],
+                "store_name": store_name[:255] if store_name else None,
+                "direction": direction,
+                "percent": percent if direction == "up" else -percent,
+                "old_average": old_text,
+                "new_price": new_text,
+                "recent_prices": [
+                    float(p.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+                    for p in recent
+                ],
             },
         )
 
     async def claim(
         self, user_id: uuid.UUID, item_id: uuid.UUID, now: datetime
     ) -> bool:
-        """Record an alert for the item now, unless one was sent in the cooldown.
+        """Record an alert for the item now, unless one was sent in the user's
+        cooldown (PI-03 AC 8). The cooldown is read when the claim runs, so a
+        changed one counts from the item's last alert (EC-PI 9).
 
         One upsert on the item's unique ledger row: it inserts the row, or
         moves alerted_at when the last alert is a cooldown old, and otherwise
@@ -335,7 +377,14 @@ class PriceAlertService:
         waits on the row lock and then sees the new alerted_at, so two
         confirms cannot both alert.
         """
-        cutoff = now - timedelta(days=get_settings().price_alert_cooldown_days)
+        # A plain read of the user row, no lock: the ledger row is the claim.
+        user = await self.db.get(User, user_id)
+        days = (
+            cooldown_days(user)
+            if user is not None
+            else get_settings().price_alert_cooldown_days
+        )
+        cutoff = now - timedelta(days=days)
         insert = _insert(self.db)
         statement = insert(PriceAlertSent).values(
             id=uuid.uuid4(),
