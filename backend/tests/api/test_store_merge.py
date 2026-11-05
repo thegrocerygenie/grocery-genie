@@ -320,7 +320,7 @@ async def test_a_price_alert_names_the_merged_store(client, db_session):
     await _manual(client, "FreshCo", "2026-03-04", "Limes", 1.5)
 
     [alert] = await _alerts(db_session)
-    assert " at Loblaws," in alert.body
+    assert " at Loblaws:" in alert.body
 
 
 # --- names never cross accounts ----------------------------------------------
@@ -447,7 +447,7 @@ async def test_a_merge_target_purged_keeps_the_users_name(client, db_session):
     # A price alert from the merged store names the user's store too.
     await _manual(client, "Superstore", "2026-03-04", "Limes", 2.0)
     [alert] = await _alerts(db_session)
-    assert " at Loblaws," in alert.body
+    assert " at Loblaws:" in alert.body
 
 
 async def test_a_mute_outliving_its_receipts_keeps_the_users_name(client, db_session):

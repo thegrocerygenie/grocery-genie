@@ -19,12 +19,21 @@ router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 async def list_notifications(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
+    # One kind only, e.g. "price_change" for the Price alerts list (PI-03 AC 5).
+    type: str | None = Query(None, max_length=50),
+    # "unread" (the default): unread first, then newest; "newest": by date.
+    order: Literal["unread", "newest"] = Query("unread"),
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> NotificationListResponse:
+    """The caller's own notifications."""
     service = NotificationService(db)
     notifications, total = await service.list_notifications(
-        user.id, page=page, per_page=per_page
+        user.id,
+        page=page,
+        per_page=per_page,
+        type=type,
+        newest_first=order == "newest",
     )
     return NotificationListResponse(
         items=[NotificationResponse.model_validate(n) for n in notifications],

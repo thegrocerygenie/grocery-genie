@@ -68,7 +68,7 @@ $G api DELETE /api/stores/$lob/mute
 $G api GET /api/items/price-alert-settings | jq -c '.muted_stores'      # []
 # store.alert-name: a price change at the merged Superstore names Loblaws
 lime "REAL CANADIAN SUPERSTORE" 2026-03-12 2.50 > /dev/null
-$G api GET '/api/notifications?per_page=100' | jq -r '.items[] | select(.type=="price_change") | .body'   # "... at Loblaws, up ..."
+$G api GET '/api/notifications?per_page=100' | jq -r '.items[] | select(.type=="price_change") | .body'   # "Limes at Loblaws: was ... avg, now ..."
 $G api DELETE /api/stores/$rcss/merge; $G api DELETE /api/stores/$rcss/merge                          # store.unmerge: 204 twice
 $G api GET /api/items/$iid/compare | jq -c '[.stores[].store_name] | sort'   # ["Loblaws","REAL CANADIAN SUPERSTORE"]
 $G sql "SELECT u.email, count(a.id) FROM users u LEFT JOIN user_store_aliases a ON a.user_id = u.id WHERE u.email LIKE 'store-%' GROUP BY 1 ORDER BY 1"
