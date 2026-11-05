@@ -506,6 +506,7 @@ class ReceiptService:
         logged and undone, and never fails the confirm or the edit. The
         nightly sweep (app/tasks/item_matching_tasks.py) matches what it left.
         """
+        receipt_id = receipt.id
         try:
             async with self.db.begin_nested():
                 unmatched = [
@@ -517,7 +518,17 @@ class ReceiptService:
                     )
                 await PriceService(self.db).sync_receipt(receipt)
         except Exception:
-            logger.exception("Item matching failed for receipt %s", receipt.id)
+            logger.exception("Item matching failed for receipt %s", receipt_id)
+            # The rollback expired what the savepoint changed, such as the
+            # lines it linked. Load them again here: a later read of an
+            # expired attribute would load it outside await and raise
+            # MissingGreenlet, failing the request after all.
+            await self.db.execute(
+                select(Receipt)
+                .options(selectinload(Receipt.line_items), selectinload(Receipt.store))
+                .where(Receipt.id == receipt_id)
+                .execution_options(populate_existing=True)
+            )
 
     async def _alert_on_thresholds(self, user_id: uuid.UUID, dates: set[date]) -> None:
         """Notify for each budget threshold crossed in the periods holding ``dates``.
