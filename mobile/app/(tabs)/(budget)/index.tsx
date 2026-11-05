@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 
 import { BudgetRing } from '@/components/BudgetRing';
 import { headerBlurFor } from '@/utils/headerBlur';
+import { PRICES_COPY } from '@/features/price-intelligence/constants';
 import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { categoryMeta } from '@/constants/categories';
 import { ROLLOVER_STRINGS } from '@/features/budget/content/rollover';
@@ -402,11 +403,11 @@ function FilledState({ data, onSetBudget, onTopItems, onTrend, onPrices }: Fille
         onPress={onPrices}
         style={({ pressed }) => [styles.trendBtn, pressed && styles.trendBtnPressed]}
         accessibilityRole="button"
-        accessibilityLabel="Price history"
-        accessibilityHint="What you paid for each item over time"
+        accessibilityLabel={PRICES_COPY.dashboardEntry}
+        accessibilityHint={PRICES_COPY.dashboardEntryHint}
       >
         <SymbolView name="chart.line.uptrend.xyaxis" size={16} tintColor={colors.tint} />
-        <Text style={styles.trendLabel}>Price history</Text>
+        <Text style={styles.trendLabel}>{PRICES_COPY.dashboardEntry}</Text>
       </Pressable>
     </View>
   );

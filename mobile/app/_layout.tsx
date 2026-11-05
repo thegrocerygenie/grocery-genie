@@ -107,7 +107,7 @@ export default function RootLayout() {
               />
               <Stack.Screen name="top-items" options={{ title: 'Top Items' }} />
               <Stack.Screen name="trend" options={{ title: 'Trend' }} />
-              <Stack.Screen name="items/index" options={{ title: 'Prices' }} />
+              <Stack.Screen name="items/index" options={{ title: 'Items' }} />
               <Stack.Screen name="items/[id]" options={{ title: 'Item' }} />
               <Stack.Screen name="items/matches" options={{ title: 'Review Matches' }} />
               <Stack.Screen name="items/merge" options={{ title: 'Combine' }} />

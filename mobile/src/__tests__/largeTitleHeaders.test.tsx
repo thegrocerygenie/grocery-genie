@@ -52,7 +52,7 @@ function headerOf(screen: React.ComponentType): HeaderOptions {
 }
 
 const SCREENS: [string, React.ComponentType][] = [
-  ['Prices', PricesScreen],
+  ['Items', PricesScreen],
   ['Trend', TrendScreen],
   ['Top items', TopItemsScreen],
 ];
