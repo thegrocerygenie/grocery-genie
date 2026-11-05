@@ -68,6 +68,8 @@ jest.mock('@/features/price-intelligence/services/itemsApi', () => ({
 function point(date: string, price: number, store: string): PricePoint {
   return {
     receipt_id: `r-${date}`,
+    line_item_id: `l-${date}`,
+    line_name: 'Organic Bananas',
     date,
     store_id: `s-${store}`,
     store_name: store,

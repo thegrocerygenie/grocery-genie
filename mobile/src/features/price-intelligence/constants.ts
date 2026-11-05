@@ -59,8 +59,45 @@ export const PRICES_COPY = {
   rename: 'Rename',
   renamePrompt: 'Rename item',
   renameBody: 'The name shown in Items. Receipts keep their own names.',
-  combine: 'Combine with Another Item…',
+  combine: 'Link Items…',
   combineHint: 'Choose an item that is the same product',
+  // PI-02 AC 10-13 (DA-6): split by line.
+  splitByLine: 'Split Into Separate Items…',
+  splitByLineHint: 'Move some of its purchases to a new item',
+  splitTitle: (count: number) => `Split into ${count} items`,
+  splitWarning:
+    'We grouped these as one item but the unit price varies a lot. Split if these are different products.',
+  splitOriginal: 'Original',
+  splitInto: 'Split into',
+  splitLines: 'Purchases',
+  splitLinesFooter: 'Tap a purchase to choose which item it belongs to.',
+  splitNamePlaceholder: 'Item name',
+  splitNameLabel: (index: number) => `Name of new item ${index}`,
+  splitNewItem: (index: number) => `New item ${index}`,
+  splitAddAnother: '+ Add another split',
+  splitAddAnotherLabel: 'Add another split',
+  splitRemove: 'Remove',
+  splitRemoveLabel: (name: string) => `Remove ${name}`,
+  splitMoveTitle: 'Move this purchase to',
+  splitLineLabel: (date: string, store: string, price: string, name: string, item: string) =>
+    `${date}, ${store}, ${price}, ${name}, in ${item}`,
+  splitLineHint: 'Choose which item this purchase belongs to',
+  splitStats: (count: number, average: string | null) =>
+    `${count} ${count === 1 ? 'purchase' : 'purchases'}${average ? ` · ${average} avg` : ''}`,
+  splitSaveLabel: 'Save the split',
+  // PI-02 AC 15 (DA-6): the Link items sheet.
+  linkTitle: 'Link items',
+  linkAction: 'Link',
+  linkActionLabel: 'Link the items',
+  linkIntro: (name: string) => `Pick an existing item to merge “${name}” into.`,
+  linkSuggested: 'Suggested',
+  linkAll: 'All items',
+  linkEmpty: 'No other items yet.',
+  linkConfirmTitle: (from: string, into: string) => `Merge “${from}” into “${into}”?`,
+  linkConfirmBody: 'Its prices and names move to that item.',
+  linkConfirmAction: 'Merge',
+  linkRowLabel: (name: string, stats: string, selected: boolean) =>
+    `${name}, ${stats}${selected ? ', selected' : ''}`,
   cancel: 'Cancel',
   save: 'Save',
   actionFailed: 'That didn’t save. Check your connection and try again.',
@@ -96,13 +133,6 @@ export const PRICES_COPY = {
   matchesIntro:
     'These names came close to an item you’ve bought before. Combining them joins their price histories.',
   matchesEmpty: 'No matches to review.',
-
-  combineTitle: 'Combine',
-  combineIntro: (name: string) =>
-    `Choose the item “${name}” is the same as. Its prices move there.`,
-  combineConfirmTitle: (from: string, into: string) => `Combine “${from}” into “${into}”?`,
-  combineConfirmBody: 'Its prices and names move to that item.',
-  combineAction: 'Combine',
 
   chartLabel: (count: number, low: string, high: string, latest: string) =>
     `Price chart, ${count} prices from ${low} to ${high}, latest ${latest}`,

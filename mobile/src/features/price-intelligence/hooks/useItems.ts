@@ -5,6 +5,7 @@ import { isPremiumRequired } from '@/utils/premium';
 import {
   acceptSuggestion,
   getItem,
+  getLinkCandidates,
   getPriceAlertSettings,
   getPriceComparison,
   getPriceHistory,
@@ -16,11 +17,12 @@ import {
   rejectSuggestion,
   renameItem,
   splitAlias,
+  splitItem,
   unmuteItem,
   unmuteStore,
   updatePriceAlertSettings,
 } from '../services/itemsApi';
-import type { PriceAlertSettingsUpdate } from '../types';
+import type { ItemSplitPart, PriceAlertSettingsUpdate } from '../types';
 
 export const ITEMS_KEY = ['items'] as const;
 
@@ -37,6 +39,16 @@ export function useItem(id: string | undefined) {
     queryKey: [...ITEMS_KEY, 'detail', id],
     queryFn: () => getItem(id as string),
     enabled: !!id,
+  });
+}
+
+/** PI-02 AC 15: the Link items sheet's groups, narrowed by `query`. */
+export function useLinkCandidates(id: string | undefined, query: string) {
+  return useQuery({
+    queryKey: [...ITEMS_KEY, 'link-candidates', id, query.trim()],
+    queryFn: () => getLinkCandidates(id as string, query),
+    enabled: !!id,
+    staleTime: 30_000,
   });
 }
 
@@ -134,6 +146,15 @@ export function useSplitAlias() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, aliasId }: { id: string; aliasId: string }) => splitAlias(id, aliasId),
+    onSuccess: () => invalidate(qc),
+  });
+}
+
+/** PI-02 AC 13, 14 (DA-6): split by line. */
+export function useSplitItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, splits }: { id: string; splits: ItemSplitPart[] }) => splitItem(id, splits),
     onSuccess: () => invalidate(qc),
   });
 }

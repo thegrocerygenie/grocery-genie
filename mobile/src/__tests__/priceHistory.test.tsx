@@ -46,6 +46,7 @@ const mockApi = {
   renameItem: jest.fn(),
   mergeItem: jest.fn(),
   splitAlias: jest.fn(),
+  getLinkCandidates: jest.fn(),
   listSuggestions: jest.fn(),
   acceptSuggestion: jest.fn(),
   rejectSuggestion: jest.fn(),
@@ -61,6 +62,7 @@ jest.mock('@/features/price-intelligence/services/itemsApi', () => ({
   renameItem: (...a: unknown[]) => mockApi.renameItem(...a),
   mergeItem: (...a: unknown[]) => mockApi.mergeItem(...a),
   splitAlias: (...a: unknown[]) => mockApi.splitAlias(...a),
+  getLinkCandidates: (...a: unknown[]) => mockApi.getLinkCandidates(...a),
   listSuggestions: (...a: unknown[]) => mockApi.listSuggestions(...a),
   acceptSuggestion: (...a: unknown[]) => mockApi.acceptSuggestion(...a),
   rejectSuggestion: (...a: unknown[]) => mockApi.rejectSuggestion(...a),
@@ -69,6 +71,8 @@ jest.mock('@/features/price-intelligence/services/itemsApi', () => ({
 function point(date: string, price: number, store: string, inTimeline = true): PricePoint {
   return {
     receipt_id: `r-${date}`,
+    line_item_id: `l-${date}`,
+    line_name: 'Organic Bananas',
     date,
     store_id: `s-${store}`,
     store_name: store,
@@ -286,9 +290,9 @@ describe('Item names and combining (PI-02 AC 3)', () => {
   });
 
   it('combines the item into another one and opens the result', async () => {
-    mockApi.listItems.mockResolvedValue({
+    mockApi.getLinkCandidates.mockResolvedValue({
+      suggested: [],
       items: [
-        { ...detail(), aliases: undefined, suggestions: undefined },
         {
           id: 'i-3',
           canonical_name: 'Bananas',
@@ -296,24 +300,20 @@ describe('Item names and combining (PI-02 AC 3)', () => {
           observation_count: 4,
           store_count: 1,
           latest_price: null,
+          avg_unit_price: 0.69,
         },
       ],
-      total: 2,
-      page: 1,
-      per_page: 100,
-      pending_suggestions: 0,
-    } as ItemList);
+    });
     mockApi.mergeItem.mockResolvedValue(detail({ id: 'i-3', canonical_name: 'Bananas' }));
-    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const routerScreen = open('/items/i-1');
 
-    fireEvent.press(await screen.findByLabelText('Combine with Another Item…'));
+    // PI-02 AC 15 (DA-6): the Link items sheet.
+    fireEvent.press(await screen.findByLabelText('Link Items…'));
     expect(routerScreen.getPathname()).toBe('/items/merge');
-    // The item itself is not offered as a target.
-    fireEvent.press(await screen.findByLabelText('Bananas'));
-    expect(screen.queryByLabelText('Organic Bananas')).toBeNull();
-    expect(alert.mock.calls[0][0]).toBe('Combine “Organic Bananas” into “Bananas”?');
-    choose(alert, 'Combine');
+    fireEvent.press(await screen.findByLabelText('Bananas, 4 purchases · $0.69 avg'));
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    fireEvent.press(screen.getByLabelText('Link the items'));
+    choose(alert, 'Merge');
 
     await waitFor(() => expect(mockApi.mergeItem).toHaveBeenCalledWith('i-1', 'i-3'));
     await waitFor(() => expect(routerScreen.getPathname()).toBe('/items/i-3'));

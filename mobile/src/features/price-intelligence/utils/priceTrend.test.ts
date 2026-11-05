@@ -16,6 +16,8 @@ import {
 function point(date: string, unitPrice: number, inTimeline = true): PricePoint {
   return {
     receipt_id: `r-${date}`,
+    line_item_id: `l-${date}`,
+    line_name: 'Organic Bananas',
     date,
     store_id: 's-1',
     store_name: 'FreshCo',

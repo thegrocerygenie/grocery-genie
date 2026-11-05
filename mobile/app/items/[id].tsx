@@ -44,6 +44,7 @@ import {
   unitSuffix,
   type PriceRange,
 } from '@/features/price-intelligence/utils/priceTrend';
+import { unitPriceVaries } from '@/features/price-intelligence/utils/split';
 import { formatLongDate } from '@/features/receipt-capture/utils/receiptDate';
 import { formatMoney } from '@/utils/money';
 import { isPremiumRequired } from '@/utils/premium';
@@ -54,7 +55,9 @@ import { today } from '@/utils/today';
  * a line chart once there are enough prices (AC 2, AC 4, AC 8) over the range
  * the user picks (AC 5, AC 6), and every price with its date and store
  * (AC 1), each store with its square (AC 9). PI-02 AC 3: the names receipts gave it, which
- * the user can split off, and combining it with another item. PI-04 AC 4:
+ * the user can split off, and combining it with another item (the Link items
+ * sheet, AC 15). PI-02 AC 10, 12 (DA-6): split by line, and a warning when
+ * its unit price varies a lot. PI-04 AC 4:
  * its price at each store. PI-03 AC 4: muting its price alerts, or a store's.
  * Comparison and muting are Premium (D8, PREM-02): a free user sees an
  * upgrade prompt in their place. A price change alert opens this screen.
@@ -208,6 +211,13 @@ export default function ItemDetailScreen() {
         </View>
         {prices.has_timeline ? <RangeControl value={range} onChange={setPicked} /> : null}
 
+        {/* PI-02 AC 12 (DA-6): one item, maybe several products. */}
+        {unitPriceVaries(prices.observations) ? (
+          <View style={styles.warning} accessibilityRole="alert">
+            <Text style={styles.warningText}>{PRICES_COPY.splitWarning}</Text>
+          </View>
+        ) : null}
+
         {/* PI-02 AC 7: each pending suggestion opens the "Same item?" prompt. */}
         {detail.suggestions.map((s) => (
           <SuggestionCard key={s.id} suggestion={s} itemId={id} />
@@ -289,6 +299,19 @@ export default function ItemDetailScreen() {
           ))}
         </View>
         <Text style={styles.footer}>{PRICES_COPY.namesFooter}</Text>
+
+        {/* PI-02 AC 10, EC-PI 6: one purchase has nothing to split. */}
+        {prices.observations.length > 1 ? (
+          <Pressable
+            onPress={() => router.push({ pathname: '/items/split', params: { id } })}
+            style={({ pressed }) => [styles.listCard, styles.actionRow, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel={PRICES_COPY.splitByLine}
+            accessibilityHint={PRICES_COPY.splitByLineHint}
+          >
+            <Text style={styles.link}>{PRICES_COPY.splitByLine}</Text>
+          </Pressable>
+        ) : null}
 
         <Pressable
           onPress={() => router.push({ pathname: '/items/merge', params: { id } })}
@@ -481,4 +504,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   pressed: { opacity: 0.6 },
+  warning: { backgroundColor: colors.orangeBg, borderRadius: radii.card, padding: spacing.md },
+  warningText: { ...type.footnote, color: colors.iosLabel2 },
 });

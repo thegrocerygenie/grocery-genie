@@ -23,6 +23,8 @@ export interface ItemSummary {
   observation_count: number;
   store_count: number;
   latest_price: LatestPrice | null;
+  /** PI-02 AC 11, 15 (DA-6): like-for-like mean unit price; null with none. */
+  avg_unit_price?: number | null;
 }
 
 export interface ItemList {
@@ -76,6 +78,10 @@ export interface ItemDetail extends ItemSummary {
 
 export interface PricePoint {
   receipt_id: string;
+  /** PI-02 AC 10 (DA-6): the receipt line a split by line moves. */
+  line_item_id: string;
+  /** The line's name as the receipt printed it. */
+  line_name: string;
   date: string;
   store_id: string | null;
   store_name: string | null;
@@ -96,6 +102,18 @@ export interface PriceHistory {
   min_points: number;
   store_count: number;
   observations: PricePoint[];
+}
+
+/** PI-02 AC 14: one new item of `POST /api/items/{id}/split`. */
+export interface ItemSplitPart {
+  name: string;
+  line_item_ids: string[];
+}
+
+/** PI-02 AC 15: `GET /api/items/{id}/link-candidates`, for Link items. */
+export interface LinkCandidates {
+  suggested: ItemSummary[];
+  items: ItemSummary[];
 }
 
 export interface StoreRef {
