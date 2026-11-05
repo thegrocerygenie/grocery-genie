@@ -13,6 +13,7 @@ import asyncio
 import os
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import date
 
 import pytest
 from fastapi import Request
@@ -21,7 +22,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import get_settings
 from app.core.rate_limit import reset_ip_state
-from app.models.database import User
+from app.models.database import (
+    CanonicalItem,
+    LineItem,
+    PriceObservation,
+    Receipt,
+    Store,
+    User,
+)
 from tests.conftest import _create_test_client, consented
 
 EXPORT = "/api/users/me/export"
@@ -247,3 +255,152 @@ async def test_postgres_slot_is_released_on_error(pg_client, monkeypatch):
 
     assert failed.status_code == 500
     assert again.status_code == 200
+
+
+# --- a build whose client has gone stops before its next page ----------------------
+
+
+async def _user_with_priced_receipts(db_session, n: int) -> User:
+    """A user with ``n`` receipts, each with one line and its price."""
+    user = User(
+        email=f"export-pages-{uuid.uuid4().hex[:8]}@test.com",
+        name="Pages",
+        premium_active=True,
+        **consented(),
+    )
+    store = Store(name="FreshCo", normalized_name="freshco")
+    db_session.add_all([user, store])
+    await db_session.flush()
+    for day in range(1, n + 1):
+        receipt = Receipt(
+            user_id=user.id,
+            store_id=store.id,
+            store_name="FreshCo",
+            date=date(2026, 3, day),
+            status="confirmed",
+            currency="USD",
+            total=1.0,
+        )
+        item = CanonicalItem(user_id=user.id, canonical_name=f"Item {day}")
+        db_session.add_all([receipt, item])
+        await db_session.flush()
+        line = LineItem(
+            receipt_id=receipt.id,
+            raw_name=f"ITEM {day}",
+            quantity=1,
+            unit_price=1.0,
+            total_price=1.0,
+            position=0,
+            canonical_item_id=item.id,
+        )
+        db_session.add(line)
+        await db_session.flush()
+        db_session.add(
+            PriceObservation(
+                user_id=user.id,
+                canonical_item_id=item.id,
+                receipt_id=receipt.id,
+                line_item_id=line.id,
+                store_id=store.id,
+                date=receipt.date,
+                unit_price=1.0,
+                quantity=1,
+                currency="USD",
+            )
+        )
+    await db_session.flush()
+    return user
+
+
+@pytest.mark.parametrize(
+    ("fmt", "include"),
+    [
+        ("json", None),  # receipt pages
+        ("csv", None),
+        ("pdf", None),
+        ("json", "images"),  # receipt pages, read for their images
+        ("csv", "prices"),  # price pages
+    ],
+)
+async def test_build_stops_before_the_next_page_once_its_client_is_gone(
+    db_session, monkeypatch, tmp_path, fmt, include
+):
+    """``should_stop`` (the route passes ``request.is_disconnected``) is asked
+    before each page. The client goes after the first page, so the build
+    raises ``ExportCancelledError`` instead of reading the second, and every
+    spooled file is closed."""
+    from app.image.storage import LocalFileStorage
+    from app.services import export_service
+    from app.services.export_service import (
+        ExportCancelledError,
+        ExportFormat,
+        ExportOptions,
+        ExportService,
+        parse_includes,
+    )
+
+    monkeypatch.setattr(export_service, "BATCH_SIZE", 1)
+    spools: list = []
+    real_spool = export_service._spool
+
+    def tracking_spool():
+        spool = real_spool()
+        spools.append(spool)
+        return spool
+
+    monkeypatch.setattr(export_service, "_spool", tracking_spool)
+
+    pages: list = []
+
+    def counted(read_pages):
+        async def pages_of(self, user_id, options):
+            async for page in read_pages(self, user_id, options):
+                pages.append(page)
+                yield page
+
+        return pages_of
+
+    for name in ("_receipt_batches", "_price_batches"):
+        monkeypatch.setattr(ExportService, name, counted(getattr(ExportService, name)))
+
+    user = await _user_with_priced_receipts(db_session, 3)
+
+    async def gone_after_one_page() -> bool:
+        return len(pages) >= 1
+
+    service = ExportService(
+        db_session,
+        storage=LocalFileStorage(str(tmp_path)),
+        should_stop=gone_after_one_page,
+    )
+    options = ExportOptions(fmt=ExportFormat(fmt), includes=parse_includes(include))
+
+    with pytest.raises(ExportCancelledError):
+        await service.build(user, options)
+
+    assert len(pages) == 1
+    assert spools
+    assert all(spool.closed for spool in spools)
+
+
+async def test_build_reads_every_page_while_its_client_stays(db_session, monkeypatch):
+    from app.services import export_service
+    from app.services.export_service import ExportOptions, ExportService
+
+    monkeypatch.setattr(export_service, "BATCH_SIZE", 1)
+    user = await _user_with_priced_receipts(db_session, 3)
+    asked: list[None] = []
+
+    async def still_here() -> bool:
+        asked.append(None)
+        return False
+
+    export = await ExportService(db_session, should_stop=still_here).build(
+        user, ExportOptions()
+    )
+    try:
+        assert export.counts.receipt_count == 3
+        assert export.counts.price_observation_count == 3
+        assert asked  # the build did ask
+    finally:
+        export.close()

@@ -111,6 +111,7 @@ export default function RootLayout() {
               <Stack.Screen name="trend" options={{ title: 'Trend' }} />
               <Stack.Screen name="items/index" options={{ title: 'Items' }} />
               <Stack.Screen name="items/[id]" options={{ title: 'Item' }} />
+              <Stack.Screen name="items/alerts" options={{ title: 'Alerts' }} />
               <Stack.Screen
                 name="price-alerts"
                 options={{ title: 'Price alerts', headerBackTitle: 'Budget' }}

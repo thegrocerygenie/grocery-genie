@@ -17,13 +17,14 @@ from app.core.entitlements import FEATURE_PRICE_ALERT_MUTE, require_premium
 from app.core.security import get_current_user
 from app.models.database import User
 from app.models.schemas import (
+    MuteRequest,
     StoreListResponse,
     StoreMergeRequest,
     StoreRef,
     StoreSummaryResponse,
 )
 from app.services.analytics_service import AnalyticsService, get_analytics_service
-from app.services.price_alert_service import PriceAlertService
+from app.services.price_alert_service import PriceAlertService, mute_event
 from app.services.store_service import (
     StoreAlreadyMergedError,
     StoreNotFoundError,
@@ -97,18 +98,21 @@ async def unmerge_store(
 @router.post("/{store_id}/mute", status_code=204)
 async def mute_store(
     store_id: uuid.UUID,
+    body: MuteRequest | None = None,
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(require_premium(FEATURE_PRICE_ALERT_MUTE)),
     analytics: AnalyticsService = Depends(get_analytics_service),
 ) -> Response:
     """No price change alerts for prices paid at this store, or at any store
-    the user merged with it. Idempotent. Premium (D8, PREM-02 AC 2); unmuting
-    below is open to everyone."""
+    the user merged with it, until ``until`` or forever (PI-03 AC 11). Muting
+    again replaces the time. Premium (D8, PREM-02 AC 2); unmuting below is
+    open to everyone."""
+    until = body.until if body else None
     try:
-        await PriceAlertService(db).mute_store(user.id, store_id)
+        await PriceAlertService(db).mute_store(user.id, store_id, until)
     except StoreNotFoundError:
         raise HTTPException(status_code=404, detail=STORE_NOT_FOUND) from None
-    analytics.emit("price_alert_muted", {"scope": "store"}, user.id)
+    analytics.emit("price_alert_muted", mute_event("store", until), user.id)
     return Response(status_code=204)
 
 

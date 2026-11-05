@@ -8,9 +8,9 @@ from typing import Protocol
 from fastapi import HTTPException
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.core.config import Settings, get_settings
 from app.core.security import decode_token
@@ -158,7 +158,7 @@ def _too_many(detail: str, retry_after: str) -> JSONResponse:
     )
 
 
-class RateLimitMiddleware(BaseHTTPMiddleware):
+class RateLimitMiddleware:
     """Sliding window rate limiter.
 
     Five tiers:
@@ -177,7 +177,26 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     Skips rate limiting for /health. Counts live in Redis by default, so all
     API workers share them (GG_RATE_LIMIT_STORAGE).
+
+    Plain ASGI, not Starlette's BaseHTTPMiddleware: the app gets the server's
+    own ``receive``, so a route sees its client disconnect
+    (``request.is_disconnected()``, which stops an export build). Behind a
+    BaseHTTPMiddleware that check never reports it. Lifespan and websocket
+    scopes pass through untouched.
     """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        refusal = await self._refusal(Request(scope))
+        if refusal is not None:
+            await refusal(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
 
     def _extract_token(self, request: Request) -> str | None:
         auth = request.headers.get("authorization", "")
@@ -197,11 +216,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         except HTTPException:
             return f"token:{token}"
 
-    async def dispatch(self, request: Request, call_next):
+    async def _refusal(self, request: Request) -> JSONResponse | None:
+        """The 429 for a request past its limit, or None to let it through."""
         path = request.url.path
 
         if path == "/health":
-            return await call_next(request)
+            return None
 
         token = self._extract_token(request)
         # Read settings each request — supports tests overriding limits
@@ -243,7 +263,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 )
                 if not allowed:
                     return _too_many("Rate limit exceeded. Try again later.", "10")
-            return await call_next(request)
+            return None
 
         # Unauthenticated request — enforce per-IP limit on /api/auth/* POSTs.
         # These endpoints make outbound HTTP calls (Apple/Google JWKS, token
@@ -259,4 +279,4 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             if not allowed:
                 return _too_many("Too many requests. Try again later.", "60")
 
-        return await call_next(request)
+        return None

@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.core import clock
 from app.models.category_looks import (
     CUSTOM_COLORS,
     CUSTOM_ICONS,
@@ -774,8 +775,12 @@ class ItemDetailResponse(ItemSummaryResponse):
     aliases: list[ItemAliasResponse]
     # "Is this the same as …?" questions about this item.
     suggestions: list[ItemSuggestionResponse]
-    # PI-03 AC 4: the user muted price change alerts for this item.
+    # PI-03 AC 4: the user muted price change alerts for this item (a live
+    # mute: one that has ended is not muted, AC 12).
     alerts_muted: bool = False
+    # PI-03 AC 11 (DA-7): when the mute ends, in UTC; null when it is
+    # forever or the item is not muted.
+    muted_until: datetime | None = None
 
 
 class PricePointResponse(BaseModel):
@@ -912,6 +917,37 @@ class StoreMergeRequest(BaseModel):
     into_store_id: uuid.UUID
 
 
+class MutedItemResponse(ItemRef):
+    # PI-03 AC 11 (DA-7): when the mute ends (UTC); null is forever.
+    muted_until: datetime | None = None
+
+
+class MutedStoreResponse(StoreRef):
+    muted_until: datetime | None = None
+
+
+class MuteRequest(BaseModel):
+    """PI-03 AC 11 (DA-7): the body of a mute POST, which is optional. No
+    ``until``, or null, is forever. A time with no offset is taken as UTC;
+    one not in the future is 422."""
+
+    until: datetime | None = None
+
+    @field_validator("until")
+    @classmethod
+    def _in_the_future(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        value = (
+            value.replace(tzinfo=dt.UTC)
+            if value.tzinfo is None
+            else value.astimezone(dt.UTC)
+        )
+        if value <= clock.now():
+            raise ValueError("until must be in the future")
+        return value
+
+
 class PriceAlertSettingsResponse(BaseModel):
     enabled: bool
     # The user's threshold, or the default when they have not set one.
@@ -920,8 +956,9 @@ class PriceAlertSettingsResponse(BaseModel):
     # The user's cooldown in days (PI-03 AC 8), or the default.
     cooldown_days: int
     default_cooldown_days: int
-    muted_items: list[ItemRef]
-    muted_stores: list[StoreRef]
+    # Live mutes only, each with its end (PI-03 AC 11, 12).
+    muted_items: list[MutedItemResponse]
+    muted_stores: list[MutedStoreResponse]
 
 
 class PriceAlertSettingsUpdate(BaseModel):

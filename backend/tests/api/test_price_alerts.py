@@ -384,7 +384,9 @@ async def test_a_muted_store_does_not_alert(client, mock_extractor, test_image_b
     resp = await client.post(f"/api/stores/{store_id}/mute")
     assert resp.status_code == 204, resp.text
     settings = (await client.get("/api/items/price-alert-settings")).json()
-    assert settings["muted_stores"] == [{"id": store_id, "name": "Loblaws"}]
+    assert settings["muted_stores"] == [
+        {"id": store_id, "name": "Loblaws", "muted_until": None}
+    ]
 
     await _buy(client, mock_extractor, test_image_bytes, "2026-03-15", 1.50)
     assert await _price_alerts(client) == []
@@ -410,7 +412,7 @@ async def test_muting_twice_is_fine(client, mock_extractor, test_image_bytes):
     assert (await client.post(f"/api/items/{item_id}/mute")).status_code == 204
     settings = (await client.get("/api/items/price-alert-settings")).json()
     assert settings["muted_items"] == [
-        {"id": item_id, "canonical_name": "Organic Bananas"}
+        {"id": item_id, "canonical_name": "Organic Bananas", "muted_until": None}
     ]
     assert (await client.delete(f"/api/items/{item_id}/mute")).status_code == 204
     assert (await client.delete(f"/api/items/{item_id}/mute")).status_code == 204
@@ -672,14 +674,17 @@ async def test_an_alert_emits_price_alert_triggered(
 async def test_muting_emits_price_alert_muted(
     client, mock_extractor, test_image_bytes, analytics_spy
 ):
-    """12-analytics.md: price_alert_muted {scope: item|store}; unmuting and a
-    404 send nothing."""
+    """12-analytics.md: price_alert_muted {scope: item|store, duration:
+    forever|timed} (DA-7); unmuting and a 404 send nothing."""
     await _history(client, mock_extractor, test_image_bytes, 1.00)
     item_id = await _item_id(client, "Organic Bananas")
     store_id = await _store_id(client)
 
     assert (await client.post(f"/api/items/{item_id}/mute")).status_code == 204
     assert (await client.post(f"/api/stores/{store_id}/mute")).status_code == 204
+    timed = {"until": "2026-04-20T12:00:00Z"}
+    resp = await client.post(f"/api/items/{item_id}/mute", json=timed)
+    assert resp.status_code == 204, resp.text
     assert (await client.delete(f"/api/items/{item_id}/mute")).status_code == 204
     assert (await client.delete(f"/api/stores/{store_id}/mute")).status_code == 204
     unknown = uuid.uuid4()
@@ -687,6 +692,7 @@ async def test_muting_emits_price_alert_muted(
     assert (await client.post(f"/api/stores/{unknown}/mute")).status_code == 404
 
     assert _sent(analytics_spy, "price_alert_muted") == [
-        {"scope": "item"},
-        {"scope": "store"},
+        {"scope": "item", "duration": "forever"},
+        {"scope": "store", "duration": "forever"},
+        {"scope": "item", "duration": "timed"},
     ]

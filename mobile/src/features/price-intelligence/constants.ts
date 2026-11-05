@@ -153,14 +153,7 @@ export const PRICES_COPY = {
   compareBelowMinimum: (count: number, min: number) =>
     `${count} more ${count === 1 ? 'store needs' : 'stores need'} ${min} prices of this item to compare.`,
 
-  // PI-03 AC 4: mute price alerts for the item, or at a store.
-  alertsHeader: 'Price alerts',
-  alertsItem: 'This item',
-  alertsItemLabel: (name: string) => `Price alerts for ${name}`,
-  alertsStore: (store: string) => `At ${store}`,
-  alertsStoreLabel: (store: string) => `Price alerts at ${store}`,
-  alertsFooter: (threshold: number, days: number) =>
-    `You get an alert when a price moves ${threshold}% or more from your 30-day average, at most once every ${days} days.`,
+  // PI-03 AC 4: muting lives on the item's Alerts screen (MUTE_COPY).
   alertsOff: 'Price alerts are off. Turn them on in Settings → Alerts.',
 
   // PREM-02 AC 5, 6 (D8): comparison and muting are Premium.
@@ -174,6 +167,39 @@ export const PRICES_COPY = {
     'Premium lets you mute price alerts for an item or a store. Price alerts themselves stay free.',
 } as const;
 
+/**
+ * PI-03 AC 10, 13, 14 (DA-7): the item's Alerts screen, as in the design
+ * ("PI-03 · Mute alerts"), with every switch on = alerts on, and timed mutes.
+ */
+export const MUTE_COPY = {
+  // Item detail's row that pushes the Alerts screen.
+  row: 'Alerts',
+  rowOn: 'On',
+  rowMuted: 'Muted',
+  rowMutedUntil: (date: string) => `Muted until ${date}`,
+  rowLabel: (value: string) => `Alerts: ${value}`,
+
+  title: 'Alerts',
+  itemHeader: 'Item-level',
+  itemSwitch: 'Price alerts',
+  itemSubtitle: (name: string) => `For ${name} across all stores`,
+  itemSwitchLabel: (name: string) => `Price alerts for ${name}`,
+  storeHeader: 'Per store',
+  storeSwitchLabel: (store: string) => `Price alerts at ${store}`,
+  storeNote: 'A store mute covers every item you buy there.',
+  footer: 'You’ll still see price changes in the item detail — just no notifications.',
+
+  muteUntil: 'Mute until',
+  muteUntilLabel: (value: string) => `Mute until: ${value}`,
+  // PI-03 AC 10: Forever first (the user's choice, D11).
+  choices: ['Forever', '1 week', '1 month', '3 months'],
+  forever: 'Forever',
+  until: (date: string) => `Until ${date}`,
+
+  // Settings → Alerts (AC 14).
+  unmuteFailed: 'Couldn’t unmute. Check your connection and try again.',
+} as const;
+
 /** Settings → Alerts: price change alerts (PI-03 settings). */
 export const PRICE_ALERT_SETTINGS_COPY = {
   header: 'PRICE ALERTS',
@@ -184,7 +210,7 @@ export const PRICE_ALERT_SETTINGS_COPY = {
   footer: (days: number) =>
     `Compared with your 30-day average for the item, up or down. At most one alert per item every ${days} days.`,
   mutedHeader: 'MUTED PRICE ALERTS',
-  mutedFooter: 'Mute an item or a store from the item’s price history.',
+  mutedFooter: 'Mute an item or a store from the item’s Alerts.',
   unmute: 'Unmute',
   unmuteLabel: (name: string) => `Unmute ${name}`,
   store: 'Store',

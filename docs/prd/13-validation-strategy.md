@@ -287,7 +287,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "sets the price change threshold" | Pass |
 | PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "goes back to the default threshold" | Pass |
 | PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "turns price change alerts off" | Pass |
-| PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "says what size of change sends an alert, and when alerts are off" | Pass |
+| PI-03 | 1 | Configurable threshold (app, Settings → Alerts) | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "sets the price change threshold" | Pass |
 | PI-04 | 1 | Side-by-side pricing across all stores with prices | Integration | `backend/tests/api/test_price_comparison.py::test_side_by_side_latest_and_average_per_store` | Pass |
 | PI-04 | 1 | Side-by-side pricing across all stores with prices | Integration | `backend/tests/api/test_price_comparison.py::test_stores_are_cheapest_first_by_average` | Pass |
 | PI-04 | 2 | Most recent and average price per store | Integration | `backend/tests/api/test_price_comparison.py::test_side_by_side_latest_and_average_per_store` | Pass |
@@ -834,12 +834,36 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-02 | 15 | Link asks "Merge X into Y?" before merging | Component | `mobile/src/__tests__/itemSplit.test.tsx` "enables Link once a radio is picked, then merges and opens the result" | Pass |
 | PI-02 | 15 | Link asks "Merge X into Y?" before merging | Component | `mobile/src/__tests__/itemSplit.test.tsx` "Cancel on the confirm merges nothing" | Pass |
 | PI-02 | 15 | Search waits for a pause in typing (about 300 ms) | Component | `mobile/src/__tests__/itemSplit.test.tsx` "searches as the user types" | Pass |
-| PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | Not yet implemented (DA-7) | Pending |
-| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | Not yet implemented (DA-7) | Pending |
-| PI-03 | 12 | A timed mute ends by itself; nothing sent for prices during it; ended mute not listed | Integration | Not yet implemented (DA-7) | Pending |
-| PI-03 | 12 | verify-budget-alerts rechecked for the expiry in _alert_on_price_changes | Formal | Not yet implemented (DA-7) | Pending |
-| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | Not yet implemented (DA-7) | Pending |
-| PI-03 | 14 | Settings lists mutes with Until/Forever; failed unmute keeps the row and says so | Component | Not yet implemented (DA-7) | Pending |
+| PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | `mobile/src/__tests__/timedMutes.test.tsx` "offers Forever first, then 1 week, 1 month and 3 months" | Pass |
+| PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | `mobile/src/__tests__/timedMutes.test.tsx` "turns a choice into the end time, null for Forever" | Pass |
+| PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | `mobile/src/__tests__/timedMutes.test.tsx` "Mute until changes the time of the item mute" | Pass |
+| PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | `mobile/src/__tests__/timedMutes.test.tsx` "turning a store off asks Mute until, then mutes it for that long" | Pass |
+| PI-03 | 10 | Mute until: Forever, 1 week, 1 month, 3 months on item and store mutes | Component | `mobile/src/__tests__/timedMutes.test.tsx` "Forever on the store sheet mutes with no end" | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/api/test_timed_mutes.py::test_a_mute_takes_an_until_and_returns_it` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/api/test_timed_mutes.py::test_no_body_or_a_null_until_is_forever` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/api/test_timed_mutes.py::test_an_until_not_in_the_future_is_422` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/api/test_timed_mutes.py::test_muting_again_replaces_the_time` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/api/test_timed_mutes.py::test_an_until_with_an_offset_is_kept_in_utc` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/api/test_timed_mutes.py::test_a_store_mute_again_replaces_the_time_across_the_group` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/api/test_item_split.py::test_new_items_keep_the_originals_mute_time` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned | Integration | `backend/tests/migrations/test_0023_timed_mutes.py::test_existing_mutes_become_forever_then_downgrade_and_upgrade_again` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned: two users, a timed item mute is the caller's own (listings, merge, split) | Integration | `backend/tests/api/test_timed_mutes.py::test_timed_mutes_are_the_callers_own` | Pass |
+| PI-03 | 11 | Mute POST takes until (null forever, past 422, replaces); muted_until returned: two users, a timed store mute is the caller's own | Integration | `backend/tests/api/test_timed_mutes.py::test_store_mutes_are_the_callers_own` | Pass |
+| PI-03 | 12 | A timed mute ends by itself; nothing sent for prices during it; ended mute not listed | Integration | `backend/tests/api/test_timed_mutes.py::test_a_timed_item_mute_ends_by_itself` | Pass |
+| PI-03 | 12 | A timed mute ends by itself; nothing sent for prices during it; ended mute not listed | Integration | `backend/tests/api/test_timed_mutes.py::test_a_timed_store_mute_ends_by_itself` | Pass |
+| PI-03 | 12 | A timed mute ends by itself; nothing sent for prices during it; ended mute not listed | Integration | `backend/tests/api/test_timed_mutes.py::test_muting_an_ended_mute_again_starts_a_new_one` | Pass |
+| PI-03 | 12 | verify-budget-alerts rechecked for the expiry in _alert_on_price_changes | Formal | `formal/budget_alerts/run.sh`: every config as expected; coverage record synced (DA-7) | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "reads On, Muted, or Muted until the date" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "pushes the Alerts screen, whose Back button names the item" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "no longer has the mute switches on item detail" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "lays out the item and store groups, the store note and the footer" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "every switch reads on = alerts on" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "turning the item off mutes it forever and shows Mute until under it" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "closing the store sheet leaves the store on" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/timedMutes.test.tsx` "a timed store mute shows its end under the store" | Pass |
+| PI-03 | 13 | Mutes on their own Alerts screen pushed from item detail (back label: the item); every switch on = alerts on; store mute covers every item | Component | `mobile/src/__tests__/priceAlerts.test.tsx` "mutes and unmutes price alerts at each store the item was bought from" | Pass |
+| PI-03 | 14 | Settings lists mutes with Until/Forever; failed unmute keeps the row and says so | Component | `mobile/src/__tests__/timedMutes.test.tsx` "lists each mute with Until <date> or Forever" | Pass |
+| PI-03 | 14 | Settings lists mutes with Until/Forever; failed unmute keeps the row and says so | Component | `mobile/src/__tests__/timedMutes.test.tsx` "a failed unmute keeps the row, says so, and can be tried again" | Pass |
 | PREM-04 | 1 | Range: Last 12 months first, All time and other presets, From/To months; export holds receipts in range | Integration | `backend/tests/api/test_data_export_options.py::test_export_holds_only_receipts_dated_in_the_range` | Pass |
 | PREM-04 | 1 | Range: Last 12 months first, All time and other presets, From/To months; export holds receipts in range | Integration | `backend/tests/api/test_data_export_options.py::test_range_bounds_are_inclusive_and_open_ended` | Pass |
 | PREM-04 | 1 | Range: Last 12 months first, All time and other presets, From/To months; export holds receipts in range | Integration | `backend/tests/api/test_data_export_options.py::test_csv_export_honours_the_range` | Pass |
@@ -891,6 +915,11 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PREM-04 | 6 | Export limits: GG_MAX_EXPORTS_PER_HOUR, one export at a time per user (advisory lock), 429 with code and Retry-After | Integration | `backend/tests/api/test_data_export_limits.py::test_the_slot_is_released_when_the_build_fails` | Pass |
 | PREM-04 | 6 | Export limits: GG_MAX_EXPORTS_PER_HOUR, one export at a time per user (advisory lock), 429 with code and Retry-After | Integration | `backend/tests/api/test_data_export_limits.py::test_parallel_exports_on_postgres_build_one_at_a_time` | Pass |
 | PREM-04 | 6 | Export limits: GG_MAX_EXPORTS_PER_HOUR, one export at a time per user (advisory lock), 429 with code and Retry-After | Integration | `backend/tests/api/test_data_export_limits.py::test_postgres_slot_is_released_on_error` | Pass |
+| PREM-04 | 6 | Export: a build whose client disconnects stops before its next page (file closed, session ended, slot free, no event) | Integration | `backend/tests/api/test_data_export_disconnect.py::test_export_stops_when_its_client_disconnects` | Pass |
+| PREM-04 | 6 | Export: a build whose client disconnects stops before its next page (file closed, session ended, slot free, no event) | Integration | `backend/tests/api/test_data_export_limits.py::test_build_stops_before_the_next_page_once_its_client_is_gone` | Pass |
+| PREM-04 | 6 | Export: a build whose client disconnects stops before its next page (file closed, session ended, slot free, no event) | Integration | `backend/tests/api/test_data_export_limits.py::test_build_reads_every_page_while_its_client_stays` | Pass |
+| PREM-04 | 6 | Export: a build whose client disconnects stops before its next page (file closed, session ended, slot free, no event) | Unit | `backend/tests/core/test_rate_limit_asgi.py::test_a_route_behind_the_middleware_sees_its_client_disconnect` | Pass |
+| PREM-04 | 6 | Export: a build whose client disconnects stops before its next page (file closed, session ended, slot free, no event) | Unit | `backend/tests/core/test_rate_limit_asgi.py::test_lifespan_and_websocket_scopes_pass_through_untouched` | Pass |
 | PREM-04 | 6 | Export limits: GG_MAX_EXPORTS_PER_HOUR, one export at a time per user (advisory lock), 429 with code and Retry-After | Unit | `mobile/src/features/settings/__tests__/exportApi.test.ts` "a 429 from the download is export_busy (rate limited, or one already running)" | Pass |
 | PREM-04 | 6 | Export limits: GG_MAX_EXPORTS_PER_HOUR, one export at a time per user (advisory lock), 429 with code and Retry-After | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "a 429 (too many exports, or one already running) says to try again later" | Pass |
 | BC-05 | 5 | Built-ins have their fixed colour and icon | Integration | `backend/tests/api/test_category_looks.py::test_built_in_categories_have_their_fixed_colour_and_icon` | Pass |
@@ -932,8 +961,17 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | BC-04 | 8 | Highlights: Highest, Lowest (in progress), Trend | Component | Not yet implemented (DA-10) | Pending |
 | BC-04 | 9 | Grey bars, current month tinted, VoiceOver per bar | Component | Not yet implemented (DA-10) | Pending |
 | BC-04 | 10 | Trend strings externalized | Component | Not yet implemented (DA-10) | Pending |
-| EC-PI | 4 | Timed mute expiry | Integration | Not yet implemented (DA-7) | Pending |
-| EC-PI | 5 | Lapsed Premium with existing mutes | Integration | Not yet implemented (DA-1, DA-7) | Pending |
+| EC-PI | 4 | Timed mute expiry | Integration | `backend/tests/api/test_timed_mutes.py::test_a_timed_item_mute_ends_by_itself` | Pass |
+| EC-PI | 4 | Timed mute expiry | Integration | `backend/tests/api/test_timed_mutes.py::test_an_until_with_an_offset_is_kept_in_utc` | Pass |
+| EC-PI | 4 | Timed mute expiry | Integration | `backend/tests/api/test_timed_mutes.py::test_an_ended_mute_can_still_be_removed` | Pass |
+| EC-PI | 4 | Timed mute expiry | Integration | `backend/tests/api/test_timed_mutes.py::test_muting_an_ended_mute_again_starts_a_new_one` | Pass |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Integration | `backend/tests/api/test_premium_gating.py::test_a_mute_outlives_a_premium_lapse` | Pass |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Integration | `backend/tests/api/test_timed_mutes.py::test_a_timed_mute_runs_to_its_end_after_a_premium_lapse` | Pass |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Integration | `backend/tests/api/test_timed_mutes.py::test_a_merge_keeps_the_longer_mute` | Pass |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Integration | `backend/tests/api/test_timed_mutes.py::test_a_merge_into_an_item_whose_mute_ended_takes_the_live_one` | Pass |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Integration | `backend/tests/api/test_timed_mutes.py::test_a_merge_of_an_ended_mute_mutes_nothing` | Pass |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Component | `mobile/src/__tests__/timedMutes.test.tsx` "a lapsed user changing Mute until gets the upgrade prompt, and can unmute" | Pass |
+| EC-PI | 5 | Lapsed Premium with existing mutes | Component | `mobile/src/__tests__/timedMutes.test.tsx` "a 403 on a new time shows the upgrade prompt" | Pass |
 | EC-PI | 6 | Split with one line, or of every line | Integration | `backend/tests/api/test_item_split.py::test_the_original_must_keep_a_line` | Pass |
 | EC-PI | 6 | Split with one line, or of every line | Component | `mobile/src/__tests__/itemSplit.test.tsx` "offers no split for an item with one purchase (EC-PI 6)" | Pass |
 | EC-PI | 6 | Split with one line, or of every line | Integration | `backend/tests/api/test_item_split.py::test_a_name_split_across_two_new_items_stays_with_the_original` | Pass |

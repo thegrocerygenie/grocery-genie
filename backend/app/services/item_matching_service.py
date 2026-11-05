@@ -44,6 +44,7 @@ from rapidfuzz.distance import JaroWinkler, Levenshtein
 from sqlalchemy import Float, case, cast, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import clock
 from app.core.config import Settings, get_settings
 from app.events.dispatcher import dispatcher
 from app.events.types import ItemMatched
@@ -64,6 +65,7 @@ from app.services.item_qualifiers import qualifiers_compatible, read_qualifiers
 from app.services.price_alert_service import (
     NOTIFICATION_TYPE as PRICE_CHANGE_NOTIFICATION,
 )
+from app.services.price_alert_service import later_end, live
 
 logger = logging.getLogger(__name__)
 
@@ -556,23 +558,37 @@ class ItemMatchingService:
     async def _move_price_alert_state(
         self, user_id: uuid.UUID, source_id: uuid.UUID, target_id: uuid.UUID
     ) -> None:
-        """A muted item stays muted once merged (PI-03 AC 4). The source's
-        cooldown row goes with it; the target keeps its own."""
-        source_muted = await self.db.scalar(
-            select(PriceAlertItemMute.id).where(
+        """A muted item stays muted once merged (PI-03 AC 4): its live mute
+        moves to the target. When the target has a mute too, the later end
+        stays (forever is the latest; DA-7, EC-PI 5), and a target whose mute
+        has ended takes the source's. The source's cooldown row goes with it;
+        the target keeps its own."""
+        now = clock.now()
+        source_mute = await self.db.scalar(
+            select(PriceAlertItemMute).where(
                 PriceAlertItemMute.user_id == user_id,
                 PriceAlertItemMute.canonical_item_id == source_id,
+                live(PriceAlertItemMute.muted_until, now),
             )
         )
-        target_muted = await self.db.scalar(
-            select(PriceAlertItemMute.id).where(
+        target_mute = await self.db.scalar(
+            select(PriceAlertItemMute).where(
                 PriceAlertItemMute.user_id == user_id,
                 PriceAlertItemMute.canonical_item_id == target_id,
             )
         )
-        if source_muted is not None and target_muted is None:
+        if source_mute is not None and target_mute is None:
             self.db.add(
-                PriceAlertItemMute(user_id=user_id, canonical_item_id=target_id)
+                PriceAlertItemMute(
+                    user_id=user_id,
+                    canonical_item_id=target_id,
+                    muted_until=source_mute.muted_until,
+                )
+            )
+        elif source_mute is not None:
+            # An ended target mute is earlier than any live one.
+            target_mute.muted_until = later_end(
+                source_mute.muted_until, target_mute.muted_until
             )
         await self.db.execute(
             delete(PriceAlertItemMute).where(
@@ -804,16 +820,23 @@ class ItemMatchingService:
                 )
                 .values(canonical_item_id=target)
             )
-        # A muted item's new items stay muted (the user's answer, 2026-11-05).
-        if await self.db.scalar(
-            select(PriceAlertItemMute.id).where(
+        # A muted item's new items stay muted (the user's answer, 2026-11-05),
+        # until the same time (DA-7). An ended mute is not copied.
+        mute = await self.db.scalar(
+            select(PriceAlertItemMute).where(
                 PriceAlertItemMute.user_id == user_id,
                 PriceAlertItemMute.canonical_item_id == item.id,
+                live(PriceAlertItemMute.muted_until, clock.now()),
             )
-        ):
+        )
+        if mute is not None:
             for new_item in new_items:
                 self.db.add(
-                    PriceAlertItemMute(user_id=user_id, canonical_item_id=new_item.id)
+                    PriceAlertItemMute(
+                        user_id=user_id,
+                        canonical_item_id=new_item.id,
+                        muted_until=mute.muted_until,
+                    )
                 )
         await self.db.flush()
         await self.db.refresh(item, ["aliases"])
