@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.category_looks import DEFAULT_LOOKS
 from app.models.database import Category
 
 DEFAULT_CATEGORIES = [
@@ -28,6 +29,8 @@ async def seed_default_categories(db: AsyncSession) -> None:
             sort_order=cat_data["sort_order"],
             is_default=True,
             user_id=None,
+            color=DEFAULT_LOOKS[cat_data["name"]][0],
+            icon=DEFAULT_LOOKS[cat_data["name"]][1],
         )
         db.add(category)
     await db.commit()

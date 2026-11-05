@@ -1,6 +1,11 @@
+import type { PriceRange } from './utils/priceTrend';
+
 /** User-facing text for price history and item matching (PI-01, PI-02). */
 export const PRICES_COPY = {
-  listTitle: 'Prices',
+  listTitle: 'Items',
+  // The Budget dashboard's row that opens the list.
+  dashboardEntry: 'Items',
+  dashboardEntryHint: 'What you paid for each item over time',
   searchPlaceholder: 'Search items',
   emptyTitle: 'No prices yet',
   emptyBody: 'Confirm a receipt and every item on it starts a price history.',
@@ -14,18 +19,34 @@ export const PRICES_COPY = {
   matchesBannerHint: 'Opens the list of items that may be the same product',
 
   // Item detail's Back label names the screen it returns to (itemBackTitle).
-  detailBack: 'Prices',
+  detailBack: 'Items',
   backReceipt: 'Receipt',
   backBudget: 'Budget',
   backHistory: 'History',
   backScan: 'Scan',
-  latest: 'Latest price',
-  since: (percent: string, date: string) => `${percent} since ${date}`,
-  noChange: (date: string) => `Same as ${date}`,
-  timelineHeader: 'Price history',
+  backPriceAlerts: 'Price alerts',
+  // PI-01 AC 7: the headline, the 30-day average and its change.
+  average30: 'Avg · 30d',
+  asOf: (date: string) => `as of ${date}`,
+  average30Label: (price: string, change: string | null) =>
+    `Average over 30 days, ${price}${change ? `, ${change} on the 30 days before` : ''}`,
+  latestLine: (price: string, store: string, date: string) =>
+    `Latest ${price} · ${store} · ${date}`,
+  // PI-01 AC 5, 6: the chart's range control.
+  rangeLabels: {
+    '1M': '1 month',
+    '3M': '3 months',
+    '6M': '6 months',
+    '1Y': '1 year',
+    All: 'All prices',
+  } satisfies Record<PriceRange, string>,
+  rangeControlLabel: 'Chart range',
+  rangeTooFew: 'Not enough prices in this range',
+  showAll: 'Show All',
+  showAllLabel: 'Show all prices',
   needMorePrices: (min: number) =>
     `Buy it again to see its price trend. A trend needs ${min} prices.`,
-  pricesHeader: (count: number) => `Prices · ${count}`,
+  pricesHeader: (count: number) => `Purchases · ${count}`,
   otherUnit: 'Not in chart: another unit',
   unknownStore: 'Unknown store',
   namesHeader: 'Names on receipts',
@@ -37,7 +58,7 @@ export const PRICES_COPY = {
   splitConfirmBody: 'It becomes its own item, with its own prices.',
   rename: 'Rename',
   renamePrompt: 'Rename item',
-  renameBody: 'The name shown in Prices. Receipts keep their own names.',
+  renameBody: 'The name shown in Items. Receipts keep their own names.',
   combine: 'Combine with Another Item…',
   combineHint: 'Choose an item that is the same product',
   cancel: 'Cancel',
@@ -45,10 +66,32 @@ export const PRICES_COPY = {
   actionFailed: 'That didn’t save. Check your connection and try again.',
 
   sameQuestion: (item: string, other: string) => `Is “${item}” the same as “${other}”?`,
-  sameYes: 'Same Item',
-  sameNo: 'Different',
-  sameYesLabel: (item: string, other: string) => `${item} is the same as ${other}`,
-  sameNoLabel: (item: string, other: string) => `${item} is different from ${other}`,
+  // PI-02 AC 7: a suggestion card opens the "Same item?" prompt.
+  reviewMatch: 'Review',
+  reviewMatchLabel: (item: string, other: string) =>
+    `Review whether ${item} is the same as ${other}`,
+  matchPercent: (confidence: number) => `${Math.round(confidence * 100)}% match`,
+
+  // PI-02 AC 5, 6 (DA-5): the full-screen "Same item?" prompt.
+  matchTitle: 'Same item?',
+  matchIntro: 'We think these are the same product. Confirm to merge price history.',
+  matchFromToday: 'From today’s receipt',
+  matchFromReceipt: 'From your receipt',
+  matchExisting: 'Existing item',
+  matchCounts: (purchases: number, stores: number) =>
+    `${purchases} ${purchases === 1 ? 'purchase' : 'purchases'} · ${stores} ${
+      stores === 1 ? 'store' : 'stores'
+    }`,
+  matchAverage: 'Avg unit price',
+  matchMerge: 'Yes, merge',
+  matchMergeLabel: (item: string, other: string) => `Yes, merge ${item} into ${other}`,
+  matchKeep: 'Keep as separate item',
+  matchKeepLabel: (item: string) => `Keep ${item} as a separate item`,
+  matchSkip: 'Skip',
+  matchSkipLabel: 'Skip, decide later',
+  matchCancelLabel: 'Cancel, decide later',
+  matchProgress: (index: number, total: number) => `${index} of ${total}`,
+  matchSaveFailed: 'That didn’t save. Check your connection and try again.',
   matchesTitle: 'Review Matches',
   matchesIntro:
     'These names came close to an item you’ve bought before. Combining them joins their price histories.',

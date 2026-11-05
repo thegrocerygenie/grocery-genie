@@ -19,6 +19,7 @@ export async function getItem(id: string): Promise<ItemDetail> {
   return apiClient<ItemDetail>(`/api/items/${id}`);
 }
 
+/** PI-01: every price; item detail's range control filters it (AC 5). */
 export async function getPriceHistory(id: string): Promise<PriceHistory> {
   return apiClient<PriceHistory>(`/api/items/${id}/prices`);
 }
@@ -47,6 +48,12 @@ export async function splitAlias(id: string, aliasId: string): Promise<ItemDetai
 
 export async function listSuggestions(): Promise<ItemSuggestion[]> {
   return apiClient<ItemSuggestion[]>('/api/items/suggestions');
+}
+
+/** PI-02 AC 7, 8: only the suggestions that one receipt's lines raised. */
+export async function listReceiptSuggestions(receiptId: string): Promise<ItemSuggestion[]> {
+  const params = new URLSearchParams({ receipt_id: receiptId });
+  return apiClient<ItemSuggestion[]>(`/api/items/suggestions?${params.toString()}`);
 }
 
 export async function acceptSuggestion(id: string): Promise<ItemDetail> {

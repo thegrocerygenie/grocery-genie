@@ -182,18 +182,22 @@ An item's `category_id`, when given, must be a default category or one of the us
 
 The eight default categories, plus up to 10 custom categories per user (BC-05 AC 3). A custom category belongs to one user (Category has no household in the data model). Custom categories work everywhere a default does: correcting an item (and the item mapping it teaches the next scan, BC-05 AC 4), budgets, the budget summary and the dashboard. **Known limitation (decided in V11-P1):** the LLM category prompt lists only the eight defaults, so a scan never assigns a custom category by itself. A custom category reaches a new scan only through the user's corrections: correcting an item teaches its item mapping, and the next scan of that item lands there (BC-05 AC 4). Teaching the prompt the user's custom names would change extraction and need the `validate-extraction` harness, so it is left for later.
 
-Creating and renaming are Premium (decision D2): a free user gets `403 premium_required` with `feature: "custom_categories"`. **When Premium lapses** the user's categories stay: they list, keep their items, still take corrections and budgets, and can be deleted; only create and rename return 403 until Premium is back.
+Creating and renaming are Premium (decision D2): a free user gets `403 premium_required` with `feature: "custom_categories"`. **When Premium lapses** the user's categories stay: they list, keep their items, colour and icon, still take corrections and budgets, and can be deleted; only create and change (name, colour, icon) return 403 until Premium is back.
+
+**Colour and icon (BC-05 AC 5, DA-9).** Every category has a `color` and an `icon`, both names (never hex codes or SF Symbol names; the app maps them, `backend/app/models/category_looks.py`). The eight built-ins have fixed ones: Groceries `green`/`cart`, Household `blue`/`house`, Personal Care `pink`/`heart`, Beverages `indigo`/`cup`, Snacks & Treats `orange`/`cake`, Baby & Kids `yellow`/`family`, Pet `teal`/`paw`, Other `gray`/`tag`. A custom category takes a colour from `indigo, purple, pink, red, orange, yellow, green, mint, teal, cyan, blue, brown` and an icon from `tag, leaf, gift, sparkles, fork-knife, wineglass, dumbbell, pills, book, gamecontroller, wrench, airplane`; the first of each (`indigo`, `tag`) when none is chosen, and for every custom category made before DA-9. Any other value, `null` included, is a 422. Changing them is Premium like a rename; after a lapse they stay (AC 8).
 
 ### GET /api/categories
-Defaults first (by `sort_order`), then the user's own in the order they were made. Each: `{ "id", "name", "is_default", "sort_order" }`. Another user's categories never list.
+Defaults first (by `sort_order`), then the user's own in the order they were made. Each: `{ "id", "name", "is_default", "sort_order", "color", "icon" }`. Another user's categories never list.
+
+The budget summary (`GET /api/budgets/summary`) and the dashboard (`GET /api/dashboard/spending`) carry each category's `color` and `icon` in `categories[]` too, for the dashboard's bars (AC 7).
 
 ### POST /api/categories
-Request `{ "name": "Garden" }`; whitespace is collapsed, and the name must be 1–40 characters (422 otherwise). Returns `201` with the category.
+Request `{ "name": "Garden", "color": "mint", "icon": "leaf" }`; `color` and `icon` are optional (default `indigo`, `tag`). Whitespace in the name is collapsed, and it must be 1–40 characters (422 otherwise). Returns `201` with the category.
 - `409 { "detail": { "code": "category_limit_reached", "limit": 10, "message": … } }` when the user already has 10.
 - `409 { "detail": { "code": "category_name_taken", "message": … } }` when a default or one of the user's own categories has the name, ignoring case. Two users may use the same name.
 
 ### PATCH /api/categories/{id}
-Rename: `{ "name": "Yard" }`, same rules and errors as POST. Premium. A default category or another user's returns 404.
+Rename or restyle: any of `{ "name": "Yard", "color": "green", "icon": "gift" }`, same rules and errors as POST; a field left out keeps its value, and a body with none is a 422. Premium (a lapsed user gets `403 premium_required`). A default category or another user's returns 404.
 
 ### DELETE /api/categories/{id}
 Returns `204`. Not Premium-gated, so a lapsed user can still remove what they made. The spending it held is kept:
@@ -463,6 +467,8 @@ Price observations for a canonical item, oldest first.
 ```
 `unit_of_measure` and `currency` are those of most of the item's prices; a price in another unit or currency has `in_timeline: false` (listed, not plotted). `has_timeline` is false until the timeline has `min_points` prices (PI-01 AC 4).
 
+`from` and `to` (inclusive) keep the prices dated in that range; `has_timeline` and `store_count` then count those alone, while `unit_of_measure` and `currency` stay the full history's, so a range never changes which series is plotted. Item detail asks once, with no filter: its range control (PI-01 AC 5) and the 30-day headline (AC 7) work from that full history in the app, so opening an item records one `price_history_viewed` and a range tap records none.
+
 ### PATCH /api/items/{canonical_id}
 **Request:** `{ "canonical_name": "Organic Bananas" }` → item detail.
 
@@ -473,10 +479,26 @@ Price observations for a canonical item, oldest first.
 201 with the new item: the alias, its lines and their prices. 409 when it is the item's only alias.
 
 ### GET /api/items/suggestions
-Pending suggestions: `[{ "id", "item": {id, canonical_name}, "suggested_item": {id, canonical_name}, "confidence", "method" }]`.
+Pending suggestions, newest first:
+
+```json
+[{
+  "id": "uuid",
+  "item": { "id": "uuid", "canonical_name": "BNLS CHKN BRST 2LB" },
+  "suggested_item": { "id": "uuid", "canonical_name": "Chicken breast, boneless" },
+  "confidence": 0.72,
+  "method": "fuzzy",
+  "receipt_line": { "receipt_id": "uuid", "name": "BNLS CHKN BRST 2LB", "store_name": "Costco", "date": "2026-04-19" },
+  "suggested_item_stats": { "purchase_count": 14, "store_count": 3, "avg_unit_price": 8.99, "unit_of_measure": "lb", "currency": "USD" }
+}]
+```
+
+[V1.1] (DA-5, PI-02 AC 5, 8) `receipt_line` and `suggested_item_stats` are what the "Same item?" prompt shows; item detail's `suggestions` carry them too. `receipt_line` is the line that raised the suggestion (the one matching made the new item from, else the item's latest line), as printed, with its receipt's store and date; `null` when the item has no line on a confirmed receipt the user can see. `suggested_item_stats` counts only the caller's prices on receipts not deleted: purchases, stores as the user groups them, and the mean unit price in the unit and currency most of them are in (`avg_unit_price` `null` with no price).
+
+`?receipt_id=<uuid>`: only the suggestions that receipt's lines raised (a line there made the new item the suggestion asks about), for the prompt after a confirm (PI-02 AC 7). A later receipt that repeats the name links to that item by its alias and raises nothing. 404 for an unknown, deleted or another user's receipt; `[]` for a receipt that raised none. The confirm matches its lines inline, so its suggestions are there once the confirm answers.
 
 ### POST /api/items/suggestions/{id}/accept
-Same product: merges `item` into `suggested_item` and returns it. 409 when already resolved.
+Same product: merges `item` into `suggested_item` and returns it. 409 when already resolved; 404 once accepted (the merge drops the suggestion). Accept and reject lock the suggestion (accept locks its two items first, in id order, as a merge does), so of two answers at once the second waits and gets 409. The prompt treats both as resolved elsewhere and moves on (PI-02 AC 9).
 
 ### POST /api/items/suggestions/{id}/reject
 204. Different products: both items stay.

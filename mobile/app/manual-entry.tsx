@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { colors, radii, spacing, type } from '@/constants/theme';
+import { promptMatchesAfterConfirm } from '@/features/price-intelligence/services/postConfirmMatches';
 import { createManualReceipt } from '@/features/receipt-capture/services/receiptApi';
 
 interface ManualLineItem {
@@ -80,7 +81,7 @@ export default function ManualEntryScreen() {
   const onSave = async () => {
     if (!canSave) return;
     try {
-      await createMutation.mutateAsync({
+      const receipt = await createMutation.mutateAsync({
         store_name: storeName.trim(),
         date,
         total,
@@ -96,6 +97,8 @@ export default function ManualEntryScreen() {
       });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
+      // PI-02 AC 7: a manual entry is saved confirmed; ask about its matches.
+      void promptMatchesAfterConfirm(receipt.id, qc);
     } catch {
       Alert.alert('Save failed', 'Please try again in a moment.');
     }

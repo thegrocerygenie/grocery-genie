@@ -7,12 +7,14 @@ import { formatLongDate } from '@/features/receipt-capture/utils/receiptDate';
 import { PRICES_COPY } from '../constants';
 import type { PriceComparison } from '../types';
 import { formatUnitPrice } from '../utils/priceTrend';
+import { StoreSquare } from './StoreSquare';
 
 /**
  * PI-04 AC 4: the item's average and latest price at each store, cheapest
  * first (the server's order). The cheapest store is named in words, not only
  * marked, and stores with too few prices are counted so none goes missing
- * without a reason.
+ * without a reason. Each row leads with the store's square, the colour it
+ * has on the price list too (PI-01 AC 9).
  */
 export function StoreComparison({ comparison }: { comparison: PriceComparison }) {
   const { stores, stores_below_minimum: below, min_observations: min } = comparison;
@@ -45,6 +47,7 @@ export function StoreComparison({ comparison }: { comparison: PriceComparison })
                   date,
                 )}
               >
+                <StoreSquare storeId={s.store_id} />
                 <View style={styles.rowText}>
                   <View style={styles.nameLine}>
                     <Text style={[type.body, styles.storeName]} numberOfLines={1}>

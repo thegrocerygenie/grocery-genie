@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -19,6 +19,8 @@ import { colors, fontScale, radii, spacing, touchTarget, type } from '@/constant
 import { useMe } from '@/features/auth/hooks/useAuth';
 import { PriceAlertControls } from '@/features/price-intelligence/components/PriceAlertControls';
 import { PriceChart } from '@/features/price-intelligence/components/PriceChart';
+import { RangeControl } from '@/features/price-intelligence/components/RangeControl';
+import { StoreSquare } from '@/features/price-intelligence/components/StoreSquare';
 import { StoreComparison } from '@/features/price-intelligence/components/StoreComparison';
 import { SuggestionCard } from '@/features/price-intelligence/components/SuggestionCard';
 import { PRICES_COPY } from '@/features/price-intelligence/constants';
@@ -34,16 +36,24 @@ import type { ItemAlias, PriceHistory, StoreRef } from '@/features/price-intelli
 import {
   formatPercent,
   formatUnitPrice,
-  priceChange,
+  isStale,
+  openingRange,
+  pointsInRange,
+  thirtyDayAverage,
   timelinePoints,
+  unitSuffix,
+  type PriceRange,
 } from '@/features/price-intelligence/utils/priceTrend';
 import { formatLongDate } from '@/features/receipt-capture/utils/receiptDate';
+import { formatMoney } from '@/utils/money';
 import { isPremiumRequired } from '@/utils/premium';
+import { today } from '@/utils/today';
 
 /**
- * PI-01: one item's price history — the latest unit price and its change, a
- * line chart once there are enough prices (AC 2, AC 4), and every price with
- * its date and store (AC 1). PI-02 AC 3: the names receipts gave it, which
+ * PI-01: one item's price history — the 30-day average and its change (AC 7),
+ * a line chart once there are enough prices (AC 2, AC 4, AC 8) over the range
+ * the user picks (AC 5, AC 6), and every price with its date and store
+ * (AC 1), each store with its square (AC 9). PI-02 AC 3: the names receipts gave it, which
  * the user can split off, and combining it with another item. PI-04 AC 4:
  * its price at each store. PI-03 AC 4: muting its price alerts, or a store's.
  * Comparison and muting are Premium (D8, PREM-02): a free user sees an
@@ -64,6 +74,8 @@ export default function ItemDetailScreen() {
   const backTitle = useBackTitle();
   const item = useItem(id);
   const history = usePriceHistory(id);
+  // PI-01 AC 5: the range the user picked; until then the opening range.
+  const [picked, setPicked] = useState<PriceRange | null>(null);
   // Premium (PREM-02 AC 1) as the server last said; undefined while loading.
   const me = useMe().data;
   const premium = me?.is_premium === true;
@@ -161,6 +173,13 @@ export default function ItemDetailScreen() {
   const prices = history.data;
   const newestFirst = [...prices.observations].reverse();
   const stores = storesOf(newestFirst);
+  // PI-01 AC 5: the chart filters the one full history by date, so a range
+  // costs no request (and no price_history_viewed). 3M first, or the
+  // smallest range with prices when 3M has none.
+  const now = today();
+  const plottable = timelinePoints(prices);
+  const range = picked ?? openingRange(plottable, now);
+  const chartPoints = pointsInRange(plottable, range, now);
 
   return (
     <>
@@ -170,17 +189,28 @@ export default function ItemDetailScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
       >
-        <LatestCard history={prices} />
+        <View style={styles.card}>
+          <Headline history={prices} />
+          {prices.has_timeline ? (
+            <RangeChart
+              points={chartPoints}
+              currency={prices.currency ?? 'USD'}
+              onShowAll={() => setPicked('All')}
+            />
+          ) : (
+            <View style={styles.needMore}>
+              <SymbolView name="chart.xyaxis.line" size={26} tintColor={colors.iosLabel3} />
+              <Text style={styles.needMoreText}>
+                {PRICES_COPY.needMorePrices(prices.min_points)}
+              </Text>
+            </View>
+          )}
+        </View>
+        {prices.has_timeline ? <RangeControl value={range} onChange={setPicked} /> : null}
 
+        {/* PI-02 AC 7: each pending suggestion opens the "Same item?" prompt. */}
         {detail.suggestions.map((s) => (
-          <SuggestionCard
-            key={s.id}
-            suggestion={s}
-            onAccepted={(mergedId) =>
-              mergedId !== id &&
-              router.replace({ pathname: '/items/[id]', params: { id: mergedId } })
-            }
-          />
+          <SuggestionCard key={s.id} suggestion={s} itemId={id} />
         ))}
 
         {compareLocked ? (
@@ -195,22 +225,6 @@ export default function ItemDetailScreen() {
         ) : comparison.data ? (
           <StoreComparison comparison={comparison.data} />
         ) : null}
-
-        <Text style={styles.sectionLabel} accessibilityRole="header">
-          {PRICES_COPY.timelineHeader}
-        </Text>
-        <View style={styles.card}>
-          {prices.has_timeline ? (
-            <PriceChart points={timelinePoints(prices)} currency={prices.currency ?? 'USD'} />
-          ) : (
-            <View style={styles.needMore}>
-              <SymbolView name="chart.xyaxis.line" size={26} tintColor={colors.iosLabel3} />
-              <Text style={styles.needMoreText}>
-                {PRICES_COPY.needMorePrices(prices.min_points)}
-              </Text>
-            </View>
-          )}
-        </View>
 
         <Text style={styles.sectionLabel} accessibilityRole="header">
           {PRICES_COPY.pricesHeader(prices.observations.length)}
@@ -228,6 +242,7 @@ export default function ItemDetailScreen() {
                   p.in_timeline ? '' : `, ${PRICES_COPY.otherUnit}`
                 }`}
               >
+                <StoreSquare storeId={p.store_id} />
                 <View style={styles.rowText} testID={`price-row-text-${i}`}>
                   <Text style={type.body}>{formatLongDate(p.date)}</Text>
                   <Text style={styles.caption} numberOfLines={stacked ? undefined : 1}>
@@ -300,49 +315,98 @@ function storesOf(points: PriceHistory['observations']): StoreRef[] {
   return [...seen].map(([storeId, name]) => ({ id: storeId, name }));
 }
 
-function LatestCard({ history }: { history: PriceHistory }) {
-  const points = history.has_timeline ? timelinePoints(history) : history.observations;
-  const latest = points[points.length - 1];
-  if (!latest) return null;
-  const change = history.has_timeline ? priceChange(points) : null;
-  const price = formatUnitPrice(latest.unit_price, latest.currency, latest.unit_of_measure);
-  const changeText = change
-    ? change.percent === 0
-      ? PRICES_COPY.noChange(formatLongDate(change.sinceDate))
-      : PRICES_COPY.since(formatPercent(change.percent), formatLongDate(change.sinceDate))
+/**
+ * PI-01 AC 7: "Avg · 30d", the mean of the like-for-like prices in the 30
+ * days up to the latest, with its unit, and the change from the 30 days
+ * before: a rise red with "+", a fall green with "−" (the sign says it too).
+ * A latest price more than 30 days old adds "as of <its date>".
+ */
+function Headline({ history }: { history: PriceHistory }) {
+  const average = thirtyDayAverage(history.observations);
+  const latest = history.observations[history.observations.length - 1];
+  if (!average || !latest) return null;
+  const currency = history.currency ?? latest.currency;
+  const money = formatMoney(average.average, currency);
+  const unit = unitSuffix(history.unit_of_measure);
+  const percent = average.percent ?? 0;
+  const change = average.percent === null ? null : formatPercent(percent);
+  const changeStyle =
+    percent > 0 ? styles.changeUp : percent < 0 ? styles.changeDown : styles.changeFlat;
+  // The latest price the average counts: like-for-like, as the 30 days are.
+  const comparable = timelinePoints(history);
+  const averaged = comparable[comparable.length - 1] ?? latest;
+  const asOf = isStale(averaged.date, today())
+    ? PRICES_COPY.asOf(formatLongDate(averaged.date))
     : null;
-  // Color backs up the words, never replaces them: up is orange, down green.
-  const direction = !change || change.percent === 0 ? 'flat' : change.percent > 0 ? 'up' : 'down';
-  const changeColor = { up: colors.orange, down: colors.green, flat: colors.iosLabel2 }[direction];
-  const changeStyle = { up: styles.changeUp, down: styles.changeDown, flat: styles.changeFlat }[
-    direction
-  ];
-  const where = `${latest.store_name ?? PRICES_COPY.unknownStore} · ${formatLongDate(latest.date)}`;
+  const latestLine = PRICES_COPY.latestLine(
+    formatUnitPrice(latest.unit_price, latest.currency, latest.unit_of_measure),
+    latest.store_name ?? PRICES_COPY.unknownStore,
+    formatLongDate(latest.date),
+  );
 
   return (
     <View
-      style={styles.card}
+      style={styles.headline}
       accessible
-      accessibilityLabel={[PRICES_COPY.latest, price, changeText, where].filter(Boolean).join(', ')}
+      accessibilityLabel={[
+        PRICES_COPY.average30Label(`${money} ${unit}`.trim(), change),
+        asOf,
+        latestLine,
+      ]
+        .filter(Boolean)
+        .join('. ')}
     >
-      <Text style={styles.caption}>{PRICES_COPY.latest}</Text>
-      {/* One line, shrunk to fit: at AX5 "$4.79" split as "$4.7" and "9" (BUG-3). */}
-      <Text style={styles.latestPrice} testID="latest-price" numberOfLines={1} adjustsFontSizeToFit>
-        {price}
-      </Text>
-      {changeText ? (
-        <View style={styles.changeRow}>
-          {change && change.percent !== 0 ? (
-            <SymbolView
-              name={change.percent > 0 ? 'arrow.up.right' : 'arrow.down.right'}
-              size={13}
-              tintColor={changeColor}
-            />
-          ) : null}
-          <Text style={[styles.change, changeStyle]}>{changeText}</Text>
-        </View>
-      ) : null}
-      <Text style={styles.caption}>{where}</Text>
+      <View style={styles.headlineTop}>
+        <Text style={[styles.caption, styles.headlineCaption]}>
+          {PRICES_COPY.average30}
+          {asOf ? <Text>{' · '}</Text> : null}
+          {asOf ? <Text>{asOf}</Text> : null}
+        </Text>
+        {change ? (
+          <Text testID="headline-change" style={[styles.change, changeStyle]}>
+            {change}
+          </Text>
+        ) : null}
+      </View>
+      <View style={styles.headlinePrice}>
+        {/* One line, shrunk to fit: at AX5 "$4.79" split as "$4.7" and "9" (BUG-3). */}
+        <Text
+          style={styles.latestPrice}
+          testID="headline-price"
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
+          {money}
+        </Text>
+        {unit ? <Text style={styles.unit}>{unit}</Text> : null}
+      </View>
+      <Text style={styles.caption}>{latestLine}</Text>
+    </View>
+  );
+}
+
+/** PI-01 AC 5, 6: the range's chart, or why there is none and a way to All. */
+function RangeChart({
+  points,
+  currency,
+  onShowAll,
+}: {
+  points: PriceHistory['observations'];
+  currency: string;
+  onShowAll: () => void;
+}) {
+  if (points.length >= 2) return <PriceChart points={points} currency={currency} />;
+  return (
+    <View style={styles.needMore}>
+      <Text style={styles.needMoreText}>{PRICES_COPY.rangeTooFew}</Text>
+      <Pressable
+        onPress={onShowAll}
+        style={styles.inlineButton}
+        accessibilityRole="button"
+        accessibilityLabel={PRICES_COPY.showAllLabel}
+      >
+        <Text style={styles.link}>{PRICES_COPY.showAll}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -358,11 +422,20 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.xs,
   },
-  latestPrice: { ...type.money, fontSize: 34 },
-  changeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  change: { ...type.subheadline, fontWeight: '600' },
-  changeUp: { color: colors.orange },
-  changeDown: { color: colors.green },
+  headline: { gap: 2, marginBottom: spacing.sm },
+  headlineTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: spacing.sm,
+  },
+  headlinePrice: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
+  latestPrice: { ...type.money, fontSize: 28, flexShrink: 1 },
+  unit: { ...type.footnote, color: colors.iosLabel2 },
+  headlineCaption: { flexShrink: 1 },
+  change: { ...type.footnote, fontWeight: '600' },
+  changeUp: { color: colors.redText },
+  changeDown: { color: colors.greenText },
   changeFlat: { color: colors.iosLabel2 },
   needMore: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl },
   needMoreText: { ...type.subheadline, color: colors.iosLabel2, textAlign: 'center' },

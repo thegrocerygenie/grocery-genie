@@ -5,7 +5,14 @@ from datetime import date, datetime, timedelta
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.models.category_looks import (
+    CUSTOM_COLORS,
+    CUSTOM_ICONS,
+    DEFAULT_COLOR,
+    DEFAULT_ICON,
+)
 
 _CURRENCY_CODE = re.compile(r"^[A-Z]{3}$")
 
@@ -175,6 +182,9 @@ class BudgetCategorySummary(BaseModel):
     remaining: float
     percent: float
     rolled_over: float = 0.0
+    # The category's look, for the dashboard's bars (BC-05 AC 7, DA-9).
+    color: str = DEFAULT_COLOR
+    icon: str = DEFAULT_ICON
 
 
 class BudgetSummaryResponse(BaseModel):
@@ -271,6 +281,9 @@ class CategoryResponse(BaseModel):
     name: str
     is_default: bool
     sort_order: int
+    # BC-05 AC 5 (DA-9): names from app.models.category_looks.
+    color: str
+    icon: str
 
 
 # Longest custom category name; it has to fit a budget row and a chart legend.
@@ -286,18 +299,55 @@ def _category_name(value: str) -> str:
     return name
 
 
+# A custom category's colour and icon (BC-05 AC 5): only names from the
+# allowed sets, so the server never stores what the app cannot draw.
+CategoryColor = Literal[*CUSTOM_COLORS]  # type: ignore[valid-type]
+CategoryIcon = Literal[*CUSTOM_ICONS]  # type: ignore[valid-type]
+
+
 class CategoryCreateRequest(BaseModel):
-    """A custom category (BC-05 AC 3, Premium). Whitespace is collapsed."""
+    """A custom category (BC-05 AC 3, Premium). Whitespace is collapsed.
+
+    ``color`` and ``icon`` default to the first of each set (BC-05 AC 5).
+    """
 
     name: str
+    color: CategoryColor = DEFAULT_COLOR
+    icon: CategoryIcon = DEFAULT_ICON
 
     _check_name = field_validator("name")(_category_name)
 
 
 class CategoryUpdateRequest(BaseModel):
-    name: str
+    """Rename and/or restyle a custom category; send at least one field.
 
-    _check_name = field_validator("name")(_category_name)
+    A field left out keeps its value; ``null`` is refused like any value
+    outside the allowed sets.
+    """
+
+    name: str | None = None
+    color: CategoryColor | None = None
+    icon: CategoryIcon | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _check_name(cls, value: str | None) -> str | None:
+        if value is None:
+            raise ValueError("name must not be null")
+        return _category_name(value)
+
+    @field_validator("color", "icon")
+    @classmethod
+    def _not_null(cls, value: str | None) -> str | None:
+        if value is None:
+            raise ValueError("must not be null")
+        return value
+
+    @model_validator(mode="after")
+    def _something_to_change(self) -> "CategoryUpdateRequest":
+        if not self.model_fields_set:
+            raise ValueError("send a name, a color or an icon")
+        return self
 
 
 # --- Common ---
@@ -679,12 +729,38 @@ class ItemListResponse(BaseModel):
     pending_suggestions: int
 
 
+class SuggestionReceiptLine(BaseModel):
+    """The receipt line that raised a suggestion, as the receipt printed it
+    (PI-02 AC 5): the "Same item?" prompt's first card."""
+
+    receipt_id: uuid.UUID
+    name: str
+    store_name: str | None
+    date: date
+
+
+class SuggestedItemStats(BaseModel):
+    """The existing item a suggestion would merge into (PI-02 AC 5): the
+    caller's own purchases of it, the stores they were at, and the mean
+    unit price in the unit and currency most of its prices are in."""
+
+    purchase_count: int
+    store_count: int
+    avg_unit_price: float | None
+    unit_of_measure: str | None
+    currency: str | None
+
+
 class ItemSuggestionResponse(BaseModel):
     id: uuid.UUID
     item: ItemRef
     suggested_item: ItemRef
     confidence: float
     method: str
+    # PI-02 AC 8 (DA-5): what the "Same item?" prompt shows. None only when
+    # the item has no line on a receipt the user can see.
+    receipt_line: SuggestionReceiptLine | None = None
+    suggested_item_stats: SuggestedItemStats | None = None
 
 
 class ItemDetailResponse(ItemSummaryResponse):

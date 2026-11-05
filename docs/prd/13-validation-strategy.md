@@ -220,20 +220,20 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-01 | 2 | Line chart, a point per purchase | Component | `mobile/src/__tests__/priceHistory.test.tsx` "plots a line chart once there are two prices (AC 2)" | Pass |
 | PI-01 | 2 | Line chart, a point per purchase | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "places one dot per purchase: x by date, y by price" | Pass |
 | PI-01 | 3 | Unit price (per item, kg, lb) | Integration | `backend/tests/api/test_items.py::test_prices_are_unit_prices` | Pass |
-| PI-01 | 3 | Unit price (per item, kg, lb) | Component | `mobile/src/__tests__/priceHistory.test.tsx` "shows unit prices and the change since the first price (AC 3)" | Pass |
+| PI-01 | 3 | Unit price (per item, kg, lb) | Component | `mobile/src/__tests__/priceHistory.test.tsx` "shows unit prices in the list and the headline (AC 3)" | Pass |
 | PI-01 | 4 | Timeline needs 2 data points | Integration | `backend/tests/api/test_items.py::test_one_price_is_not_yet_a_timeline` | Pass |
 | PI-01 | FR | Filter the history by store and date range | Integration | `backend/tests/api/test_items.py::test_store_and_date_filters` | Pass |
 | PI-01 | 4 | Timeline needs 2 data points | Component | `mobile/src/__tests__/priceHistory.test.tsx` "waits for a second price before showing a trend (AC 4)" | Pass |
 | PI-01 | 1 | Every recorded price with date and store (app, at AX5: device check BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "stacks each price under its date and store at AX5" | Pass |
 | PI-01 | 1 | Every recorded price with date and store (app, Prices list at AX5: BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "stacks the price under the name at AX5, and lets the name wrap" | Pass |
-| PI-01 | 3 | Unit price (per item, kg, lb) (app, latest price at AX5: BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "keeps the latest price on one line, shrinking it to fit" | Pass |
+| PI-01 | 3 | Unit price (per item, kg, lb) (app, headline price at AX5: BUG-3) | Component | `mobile/src/__tests__/pricesLargeText.test.tsx` "keeps the headline price on one line, shrinking it to fit" | Pass |
 | PI-02 | 1 | Hybrid: embedding similarity + fuzzy strings | Integration | `backend/tests/services/test_item_matching.py::test_high_semantic_similarity_auto_links` | Pass |
 | PI-02 | 1 | Hybrid: embedding similarity + fuzzy strings | Integration | `backend/tests/services/test_item_matching.py::test_high_fuzzy_score_auto_links_and_learns_the_alias` | Pass |
 | PI-02 | FR | Matching order: an exact alias links first, at confidence 1.0 | Integration | `backend/tests/services/test_item_matching.py::test_exact_alias_links_to_the_same_item` | Pass |
 | PI-02 | 2 | Thresholds default to 0.85 fuzzy, 0.80 semantic, 0.6 ask | Unit | `backend/tests/services/test_item_matching.py::test_thresholds_default_to_the_prd_values` | Pass |
 | PI-02 | 2 | >= 0.85 auto-link | Integration | `backend/tests/services/test_item_matching.py::test_high_fuzzy_score_auto_links_and_learns_the_alias` | Pass |
 | PI-02 | 2 | 0.6-0.85 asks the user | Integration | `backend/tests/services/test_item_matching.py::test_medium_score_asks_the_user_and_keeps_the_line_separate` | Pass |
-| PI-02 | 2 | 0.6-0.85 asks the user | Component | `mobile/src/__tests__/priceHistory.test.tsx` "asks on the item and merges when the user says Same Item" | Pass |
+| PI-02 | 2 | 0.6-0.85 asks the user | Component | `mobile/src/__tests__/priceHistory.test.tsx` "asks on the item and merges when the user says Yes, merge" | Pass |
 | PI-02 | 2 | < 0.6 distinct | Integration | `backend/tests/services/test_item_matching.py::test_low_score_is_a_distinct_item_with_no_question` | Pass |
 | PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Unit | `backend/tests/services/test_item_matching.py::test_a_qualifier_difference_is_detected` | Pass |
 | PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Integration | `backend/tests/services/test_item_matching.py::test_a_qualifier_difference_asks_instead_of_auto_linking` | Pass |
@@ -323,7 +323,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | BC-05 | 3 | Delete racing a budget, correction or scan: no 500 | Integration (Postgres) | `backend/tests/api/test_custom_categories_concurrency.py::test_category_deleted_during_a_scan_moves_the_mapped_item_to_other` | Pass |
 | BC-05 | 3 | App: a free user sees the upgrade prompt, never an error | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a free user sees the upgrade prompt that opens the paywall, not an add button" | Pass |
 | BC-05 | 3 | App: a refused create shows the upgrade prompt | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a refused create (Premium lapsed) shows the upgrade prompt, not an error" | Pass |
-| BC-05 | 3 | App: add, rename, delete | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a Premium user adds a category by name" | Pass |
+| BC-05 | 3 | App: add, rename, delete | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a Premium user adds a category by name, with the first colour and icon by default" | Pass |
 | BC-05 | 3 | App: add, rename, delete | Component | `mobile/src/__tests__/categorySettings.test.tsx` "renames a custom category" | Pass |
 | BC-05 | 3 | App: add, rename, delete | Component | `mobile/src/__tests__/categorySettings.test.tsx` "deletes a custom category after confirming" | Pass |
 | BC-05 | 3 | App: at 10 the add button is disabled | Component | `mobile/src/__tests__/categorySettings.test.tsx` "at 10 the add button is disabled and says why" | Pass |
@@ -678,22 +678,81 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PREM-03 | 4 | Premium model failure falls back to the default model, then the usual failed-scan path (503, the app's offline retry, manual entry); the scan never fails because of it | Integration | `backend/tests/api/test_priority_ocr.py::test_when_both_models_fail_the_scan_fails_as_any_scan_does` | Pass |
 | PREM-03 | 5 | receipt_extraction_completed carries extraction_tier | Integration | `backend/tests/api/test_priority_ocr.py::test_extraction_completed_carries_the_tier` | Pass |
 | PREM-03 | 6 | validate-extraction on the Premium model: accuracy not below default, cost recorded, user approval | Manual | `docs/device-checklist.md` §8: Priority OCR (`run extract --premium`; harness tested by `backend/tests/llm_validation/test_harness.py::test_premium_runs_score_the_premium_model`) | Manual |
-| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Component | Not yet implemented (DA-3) | Pending |
-| PI-01 | 6 | Fewer than 2 plotted prices in a range: "Not enough prices in this range", no chart | Component | Not yet implemented (DA-3) | Pending |
-| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Unit | Not yet implemented (DA-3) | Pending |
-| PI-01 | 8 | Chart: shaded area, month labels, a dot per purchase | Component | Not yet implemented (DA-3) | Pending |
-| PI-01 | 9 | Store rows lead with a coloured square, stable per store | Unit | Not yet implemented (DA-3) | Pending |
-| PI-01 | 10 | Back label names the opener; largest text size holds | Component | Not yet implemented (DA-3) | Pending |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "offers 1M to All under the chart with 3M selected, and plots only that range" | Pass |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "follows the chosen range, and All plots every price" | Pass |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "counts calendar months back from today, and All has no start" | Pass |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "clamps to the end of a shorter month" | Pass |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "asks for the history once per open, and a range tap asks for nothing" | Pass |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "never opens on too few prices: 1 price in 3M opens 1Y with both" | Pass |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "opens on the smallest range with prices when 3M has none" | Pass |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "opens on All when even 1Y has no prices" | Pass |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "keeps the prices dated from the range start on, and All keeps every one" | Pass |
+| PI-01 | 5 | Range control 1M/3M/6M/1Y/All, 3M first; chart follows the range, list shows every price | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "opens on 3M with 2 prices, else the smallest of 6M, 1Y, All that has 2" | Pass |
+| PI-01 | 6 | Fewer than 2 plotted prices in a range: "Not enough prices in this range", no chart | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "says so instead of drawing a chart, with All one tap away" | Pass |
+| PI-01 | 6 | Fewer than 2 plotted prices in a range: "Not enough prices in this range", no chart | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "shows no range control for an item with fewer than 2 prices" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "averages the 30 days up to the latest price and compares the 30 days before" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "uses like-for-like prices only" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "gives no percent with no price in the earlier window, and a fall as negative" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "reads / ea for a count and / lb for a measure" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "shows the 30-day mean with its unit and a rise in red with a plus" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "shows a fall in green with a minus sign" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "shows no percent with no price in the 30 days before" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "adds as of the latest price date when it is more than 30 days old" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "dates as of from the latest like-for-like price, as the average does" | Pass |
+| PI-01 | 7 | Headline "Avg · 30d" with unit and change from the 30 days before; rise red, fall green | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "is true once the latest price is more than 30 days old" | Pass |
+| PI-01 | 8 | Chart: shaded area, month labels, a dot per purchase | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "draws a shaded area under the line, month labels, and a dot per purchase" | Pass |
+| PI-01 | 8 | Chart: shaded area, month labels, a dot per purchase | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "labels each month the chart spans, placed by date" | Pass |
+| PI-01 | 8 | Chart: shaded area, month labels, a dot per purchase | Unit | `mobile/src/features/price-intelligence/utils/priceTrend.test.ts` "thins the labels out over a long span" | Pass |
+| PI-01 | 9 | Store rows lead with a coloured square, stable per store | Unit | `mobile/src/features/price-intelligence/utils/storeColor.test.ts` "gives a store the same colour every time, from its id alone" | Pass |
+| PI-01 | 9 | Store rows lead with a coloured square, stable per store | Unit | `mobile/src/features/price-intelligence/utils/storeColor.test.ts` "spreads stores over the whole palette" | Pass |
+| PI-01 | 9 | Store rows lead with a coloured square, stable per store | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "leads each price row and comparison row with the store’s own colour" | Pass |
+| PI-01 | 10 | Back label names the opener; largest text size holds | Unit | `mobile/src/features/price-intelligence/__tests__/itemBackTitle.test.ts` "names the screen that opened the item: Items, Receipt, Price alerts (PI-01 AC 10)" | Pass |
+| PI-01 | 10 | Back label names the opener; largest text size holds | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "lets the range control wrap and keeps the headline price whole" | Pass |
 | PI-03 | 5 | Price alerts list: newest first, This week / Earlier, arrow, signed percent, was/now (drops add "stock-up worth it"), sparkline, tap opens item; opens from Settings → Alerts and the Budget dashboard bell (label "Price alerts") | Component | Not yet implemented (DA-4) | Pending |
 | PI-03 | 6 | Empty Price alerts list says "No price alerts yet" | Component | Not yet implemented (DA-4) | Pending |
 | PI-03 | 7 | Settings group: Threshold and Cooldown rows, footer from the user's settings | Component | Not yet implemented (DA-4) | Pending |
 | PI-03 | 8 | Cooldown user setting 1–30 days (null default, 422 otherwise), used by the alert check | Integration | Not yet implemented (DA-4) | Pending |
 | PI-03 | 9 | Alert title and body per design (a drop adds "stock-up worth it", push and in-app alike), still naming item, store, old average, new price, percent | Integration | Not yet implemented (DA-4) | Pending |
-| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | Not yet implemented (DA-5) | Pending |
-| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Component | Not yet implemented (DA-5) | Pending |
-| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | Not yet implemented (DA-5) | Pending |
-| PI-02 | 8 | GET /api/items/suggestions?receipt_id= filters and carries the prompt's fields; another user's receipt 404 | Integration | Not yet implemented (DA-5) | Pending |
-| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Component | Not yet implemented (DA-5) | Pending |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "shows the receipt line, store, date, match percent and the existing item" | Pass |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "heads a line from a receipt dated today as from today’s receipt" | Pass |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "reads each card to VoiceOver as one element" | Pass |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Integration | `backend/tests/api/test_match_prompt.py::test_a_suggestion_carries_what_the_prompt_shows` | Pass |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "dates a line from another year with its year" | Pass |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Integration | `backend/tests/api/test_match_prompt.py::test_the_average_is_like_for_like` | Pass |
+| PI-02 | 5 | "Same item?" prompt: receipt line, store, date, match %, existing item counts and avg unit price | Integration | `backend/tests/api/test_match_prompt.py::test_the_line_shown_is_the_one_that_raised_it` | Pass |
+| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Yes, merge accepts and shows the next suggestion" | Pass |
+| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Keep as separate item rejects, and the prompt closes after the last" | Pass |
+| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Skip leaves the suggestion pending and shows the next, then closes" | Pass |
+| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Cancel closes the prompt and leaves the rest pending" | Pass |
+| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "saves a double-tapped Yes, merge once and still moves on" | Pass |
+| PI-02 | 6 | Yes, merge / Keep as separate item / Skip / Cancel; item_match_resolved only for merge and keep | Integration | `backend/tests/api/test_items.py::test_accepting_a_suggestion_merges_the_history` | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "opens from Review Matches on the suggestion tapped" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "opens from item detail with only that item’s suggestions" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/priceHistory.test.tsx` "asks on the item and merges when the user says Yes, merge" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "opens after a confirm succeeds, with only that receipt’s suggestions" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "never opens when the confirm fails" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "never holds up the confirm: the app leaves the review before the fetch answers" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "does not open for a receipt that raised no suggestion" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "shows each suggestion after a confirm only once" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "gives up quietly when the fetch fails" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "opens after a manual entry is saved, for that receipt" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "does not open again when a confirmed receipt is edited" | Pass |
+| PI-02 | 7 | After a confirm: at most 3, best match first; the rest stay on Review Matches | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "asks about at most the 3 best matches, best first" | Pass |
+| PI-02 | 7 | After a confirm: at most 3, best match first; the rest stay on Review Matches | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "shows the capped suggestions in that order, counting up to 3" | Pass |
+| PI-02 | 7 | After a confirm: only while still on the screen the confirm left the user on | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "does not open once the user has moved on before the suggestions load" | Pass |
+| PI-02 | 7 | Prompt from Review Matches, item detail, and after a confirm succeeds (that receipt only) | Integration | `backend/tests/api/test_match_prompt.py::test_a_repeat_of_the_name_does_not_raise_the_suggestion_again` | Pass |
+| PI-02 | 8 | GET /api/items/suggestions?receipt_id= filters and carries the prompt's fields; another user's receipt 404 | Integration | `backend/tests/api/test_match_prompt.py::test_receipt_id_returns_only_that_receipts_suggestions` | Pass |
+| PI-02 | 8 | GET /api/items/suggestions?receipt_id= filters and carries the prompt's fields; another user's receipt 404 | Integration | `backend/tests/api/test_match_prompt.py::test_a_suggestion_carries_what_the_prompt_shows` | Pass |
+| PI-02 | 8 | GET /api/items/suggestions?receipt_id= filters and carries the prompt's fields; another user's receipt 404 | Integration | `backend/tests/api/test_match_prompt.py::test_unknown_receipt_is_404` | Pass |
+| PI-02 | 8 | GET /api/items/suggestions?receipt_id= filters and carries the prompt's fields; another user's receipt 404 | Integration | `backend/tests/api/test_match_prompt.py::test_another_users_receipt_is_404_and_their_suggestions_stay_theirs` | Pass |
+| PI-02 | 8 | GET /api/items/suggestions?receipt_id= filters and carries the prompt's fields; another user's receipt 404 | Integration | `backend/tests/api/test_match_prompt.py::test_counts_and_average_are_the_callers_own` | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "passes over a suggestion already resolved (409) without an error" | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "keeps the prompt open and says so inline when a save fails" | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "passes over a suggestion merged away elsewhere (404) without an error" | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/services/test_match_concurrency.py::test_two_answers_at_once_resolve_once` | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/services/test_match_concurrency.py::test_an_answer_and_a_merge_of_its_item_at_once_never_deadlock` | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/services/test_match_concurrency.py::test_accept_takes_its_item_locks_first_in_id_order` | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/api/test_items.py::test_rejecting_a_suggestion_keeps_the_items_apart` | Pass |
 | PI-02 | 10 | Split by line, including one of several lines sharing a receipt name | Component | Not yet implemented (DA-6) | Pending |
 | PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Component | Not yet implemented (DA-6) | Pending |
 | PI-02 | 12 | Unit-price-varies warning at highest ≥ 1.5 × lowest | Unit | Not yet implemented (DA-6) | Pending |
@@ -759,10 +818,36 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PREM-04 | 6 | Export limits: GG_MAX_EXPORTS_PER_HOUR, one export at a time per user (advisory lock), 429 with code and Retry-After | Integration | `backend/tests/api/test_data_export_limits.py::test_postgres_slot_is_released_on_error` | Pass |
 | PREM-04 | 6 | Export limits: GG_MAX_EXPORTS_PER_HOUR, one export at a time per user (advisory lock), 429 with code and Retry-After | Unit | `mobile/src/features/settings/__tests__/exportApi.test.ts` "a 429 from the download is export_busy (rate limited, or one already running)" | Pass |
 | PREM-04 | 6 | Export limits: GG_MAX_EXPORTS_PER_HOUR, one export at a time per user (advisory lock), 429 with code and Retry-After | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "a 429 (too many exports, or one already running) says to try again later" | Pass |
-| BC-05 | 5 | Colour and icon per category; API returns and validates them; migration | Integration | Not yet implemented (DA-9) | Pending |
-| BC-05 | 6 | Categories screen: Built-in first, Custom, New category row, footer, Edit button | Component | Not yet implemented (DA-9) | Pending |
-| BC-05 | 7 | Colour and icon in Categories, the picker and dashboard bars | Component | Not yet implemented (DA-9) | Pending |
-| BC-05 | 8 | After a lapse colours stay; changing them is 403 premium_required / upgrade prompt | Integration | Not yet implemented (DA-9) | Pending |
+| BC-05 | 5 | Built-ins have their fixed colour and icon | Integration | `backend/tests/api/test_category_looks.py::test_built_in_categories_have_their_fixed_colour_and_icon` | Pass |
+| BC-05 | 5 | No choice: the first colour and icon | Integration | `backend/tests/api/test_category_looks.py::test_a_new_category_without_a_choice_gets_the_first_colour_and_icon` | Pass |
+| BC-05 | 5 | Create keeps the colour and icon chosen | Integration | `backend/tests/api/test_category_looks.py::test_a_new_category_keeps_the_colour_and_icon_chosen` | Pass |
+| BC-05 | 5 | Values outside the allowed sets: 422 on POST and PATCH | Integration | `backend/tests/api/test_category_looks.py::test_colour_and_icon_outside_the_allowed_sets_are_refused` | Pass |
+| BC-05 | 5 | PATCH changes colour and icon, keeps the name | Integration | `backend/tests/api/test_category_looks.py::test_patch_changes_colour_and_icon_and_keeps_the_name` | Pass |
+| BC-05 | 5 | PATCH with nothing to change: 422 | Integration | `backend/tests/api/test_category_looks.py::test_patch_with_nothing_to_change_is_refused` | Pass |
+| BC-05 | 5 | Built-in looks cannot be changed | Integration | `backend/tests/api/test_category_looks.py::test_built_in_colours_cannot_be_changed` | Pass |
+| BC-05 | 5 | Two users: another user's look is neither changed nor seen | Integration | `backend/tests/api/test_category_looks.py::test_another_users_category_colour_cannot_be_changed_or_seen` | Pass |
+| BC-05 | 5 | A look-only change sends no `renamed` event | Integration | `backend/tests/api/test_category_looks.py::test_a_look_only_change_is_not_counted_as_a_rename` | Pass |
+| BC-05 | 5 | Migration `20261104_0021`: rows before it read the defaults | Integration | `backend/tests/api/test_category_looks.py::test_a_category_made_before_colours_reads_the_defaults` | Pass |
+| BC-05 | 5 | Migration `20261104_0021`: seeded at 0020, upgrade, downgrade, re-upgrade | Integration (Postgres) | `backend/tests/migrations/test_0021_category_color_icon.py::test_upgrade_backfills_looks_then_downgrades_and_upgrades_again` | Pass |
+| BC-05 | 5 | Migration `20261104_0021`: frozen built-in looks match the app's | Unit | `backend/tests/migrations/test_0021_category_color_icon.py::test_the_migration_gives_built_ins_the_looks_the_app_has` | Pass |
+| BC-05 | 5 | App palette and icons match the server's, defaults first | Unit | `mobile/src/constants/__tests__/categories.test.ts` "offers the same palette and icons as the server, defaults first" | Pass |
+| BC-05 | 5 | App: new category starts on the first colour and icon | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a Premium user adds a category by name, with the first colour and icon by default" | Pass |
+| BC-05 | 5 | App: new category takes the colour and icon picked | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a new category takes the colour and icon picked" | Pass |
+| BC-05 | 5 | App: edit sends only what changed | Component | `mobile/src/__tests__/categorySettings.test.tsx` "tapping a custom category edits its colour and icon, sending only what changed" | Pass |
+| BC-05 | 6 | Built-in first, Custom, New category row, footer | Component | `mobile/src/__tests__/categorySettings.test.tsx` "lists Built-in first, then Custom with a New category row and the Premium footer" | Pass |
+| BC-05 | 6 | Built-ins in icon squares, read-only | Component | `mobile/src/__tests__/categorySettings.test.tsx` "lists the built-in categories as read-only, each with its own icon square" | Pass |
+| BC-05 | 6 | Edit button: delete per row; Done | Component | `mobile/src/__tests__/categorySettings.test.tsx` "the Edit button shows a delete button per custom category, and Done hides them" | Pass |
+| BC-05 | 6 | Edit: rename | Component | `mobile/src/__tests__/categorySettings.test.tsx` "renames a custom category" | Pass |
+| BC-05 | 6 | Edit: delete after confirming | Component | `mobile/src/__tests__/categorySettings.test.tsx` "deletes a custom category after confirming" | Pass |
+| BC-05 | 7 | Categories: custom in a round icon with its colour and icon | Component | `mobile/src/__tests__/categorySettings.test.tsx` "shows each custom category in a round icon with its colour and icon (AC 7)" | Pass |
+| BC-05 | 7 | Picker shows the category's colour and icon | Component | `mobile/src/__tests__/categoryLooks.test.tsx` "shows a custom category in its own colour and icon" | Pass |
+| BC-05 | 7 | Dashboard bars in the category's colour and icon | Component | `mobile/src/__tests__/categoryLooks.test.tsx` "draw a custom category in its own colour and icon" | Pass |
+| BC-05 | 7 | Dashboard and summary API carry colour and icon | Integration | `backend/tests/api/test_category_looks.py::test_dashboard_category_bars_carry_colour_and_icon` | Pass |
+| BC-05 | 7 | Spend with no budget: the bar still carries its colour and icon | Integration | `backend/tests/api/test_category_looks.py::test_a_category_with_spend_but_no_budget_carries_its_look` | Pass |
+| BC-05 | 7 | Unknown or missing look falls back by name | Unit | `mobile/src/constants/__tests__/categories.test.ts` "falls back to the built-in look by name for an unknown or missing value" | Pass |
+| BC-05 | 8 | After a lapse the look stays; changing it is 403 premium_required | Integration | `backend/tests/api/test_category_looks.py::test_after_a_lapse_the_look_stays_and_changing_it_needs_premium` | Pass |
+| BC-05 | 8 | App: lapsed editor shows the upgrade prompt, look kept | Component | `mobile/src/__tests__/categorySettings.test.tsx` "after Premium lapses a category keeps its colour and icon, and changing them shows the upgrade prompt" | Pass |
+| BC-05 | 8 | App: a 403 on save turns the editor into the upgrade prompt | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a change refused with 403 premium_required turns the editor into the upgrade prompt" | Pass |
 | PI-04 | 5 | "Save by switching $X / unit" card, 2+ stores and a gap above zero | Component | Not yet implemented (DA-10) | Pending |
 | PI-04 | 6 | Rows lead with latest price, ordered by it; CHEAPEST badge; N purchases · avg | Component | Not yet implemented (DA-10) | Pending |
 | PI-04 | 7 | Price bar per row, latest over highest latest | Component | Not yet implemented (DA-10) | Pending |
@@ -775,8 +860,12 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | EC-PI | 4 | Timed mute expiry | Integration | Not yet implemented (DA-7) | Pending |
 | EC-PI | 5 | Lapsed Premium with existing mutes | Integration | Not yet implemented (DA-1, DA-7) | Pending |
 | EC-PI | 6 | Split with one line, or of every line | Integration | Not yet implemented (DA-6) | Pending |
-| EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | Not yet implemented (DA-5) | Pending |
-| EC-PI | 8 | A range with too few prices | Component | Not yet implemented (DA-3) | Pending |
+| EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "passes over a suggestion already resolved (409) without an error" | Pass |
+| EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/hooks/__tests__/useSyncQueue.test.tsx` "shows no match prompt when a queued receipt syncs (EC-PI 7)" | Pass |
+| EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Yes, merge accepts and shows the next suggestion" | Pass |
+| EC-PI | 7 | Match prompt after a confirm: resolved meanwhile, offline queue, several | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "Cancel closes the prompt and leaves the rest pending" | Pass |
+| EC-PI | 8 | A range with too few prices | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "says so instead of drawing a chart, with All one tap away" | Pass |
+| EC-PI | 8 | A range with too few prices | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "counts only like-for-like prices as plotted" | Pass |
 | EC-PI | 9 | Cooldown setting changes | Integration | Not yet implemented (DA-4) | Pending |
 | EC-PI | 10 | Store comparison ties | Component | Not yet implemented (DA-10) | Pending |
 | EC-PI | 11 | Price alerts list after a merge or split | Component | Not yet implemented (DA-4) | Pending |
@@ -795,7 +884,8 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | EC-PREM | 4 | Export: empty range, From after To, images left out | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "picking a month makes the period Custom; From after To is refused inline (EC-PREM 4)" | Pass |
 | EC-PREM | 4 | Export: empty range, From after To, images left out | Component | `mobile/src/__tests__/exportDataScreen.test.tsx` "with no receipts in the range the button is off (AC 4, EC-PREM 4)" | Pass |
 | EC-PREM | 4 | Export: empty range, From after To, images left out | Unit | `mobile/src/features/settings/__tests__/exportRange.test.ts` "From after To is invalid (EC-PREM 4)" | Pass |
-| EC-PREM | 5 | Category colour and icon after a lapse | Integration | Not yet implemented (DA-9) | Pending |
+| EC-PREM | 5 | Category colour and icon after a lapse | Integration | `backend/tests/api/test_category_looks.py::test_after_a_lapse_the_look_stays_and_changing_it_needs_premium` | Pass |
+| EC-PREM | 5 | Category made before DA-9: first colour, default icon | Integration | `backend/tests/api/test_category_looks.py::test_a_category_made_before_colours_reads_the_defaults` | Pass |
 
 This matrix is the source of truth for completeness. A phase is not done until every row has a passing test.
 

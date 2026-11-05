@@ -11,6 +11,7 @@ import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testi
 
 import ItemDetailScreen from '../../app/items/[id]';
 import PricesScreen from '../../app/items/index';
+import MatchPromptScreen from '../../app/items/match';
 import MatchesScreen from '../../app/items/matches';
 import MergeScreen from '../../app/items/merge';
 import ReceiptDetailScreen from '../../app/receipt/[id]';
@@ -131,6 +132,7 @@ function open(path: string) {
       'items/index': PricesScreen,
       'items/[id]': ItemDetailScreen,
       'items/matches': MatchesScreen,
+      'items/match': MatchPromptScreen,
       'items/merge': MergeScreen,
       'receipt/[id]': ReceiptDetailScreen,
     },
@@ -176,7 +178,7 @@ describe('Item price history (PI-01)', () => {
   it('shows every price with its date and store, newest first (AC 1)', async () => {
     open('/items/i-1');
 
-    expect(await screen.findByText('Prices · 2')).toBeTruthy();
+    expect(await screen.findByText('Purchases · 2')).toBeTruthy();
     expect(mockApi.getPriceHistory).toHaveBeenCalledWith('i-1');
     expect(screen.getByText('Mar 20, 2026')).toBeTruthy();
     expect(screen.getByText('Mar 1, 2026')).toBeTruthy();
@@ -199,13 +201,14 @@ describe('Item price history (PI-01)', () => {
     expect(screen.queryByText(/Buy it again/)).toBeNull();
   });
 
-  it('shows unit prices and the change since the first price (AC 3)', async () => {
+  it('shows unit prices in the list and the headline (AC 3)', async () => {
     open('/items/i-1');
 
-    expect(await screen.findByText('+10% since Mar 1, 2026')).toBeTruthy();
-    // The latest-price card, and the newest row of the price list.
-    expect(screen.getAllByText('$0.77/lb')).toHaveLength(2);
+    expect(await screen.findByText('$0.77/lb')).toBeTruthy();
     expect(screen.getByText('$0.70/lb')).toBeTruthy();
+    // The headline's 30-day average is per lb too, and names the latest price.
+    expect(screen.getByText('/ lb')).toBeTruthy();
+    expect(screen.getByText('Latest $0.77/lb · Loblaws · Mar 20, 2026')).toBeTruthy();
   });
 
   it('waits for a second price before showing a trend (AC 4)', async () => {
@@ -216,7 +219,7 @@ describe('Item price history (PI-01)', () => {
       await screen.findByText('Buy it again to see its price trend. A trend needs 2 prices.'),
     ).toBeTruthy();
     expect(screen.queryByTestId('price-chart')).toBeNull();
-    expect(screen.queryByText(/since/)).toBeNull();
+    expect(screen.queryByTestId('headline-change')).toBeNull();
   });
 
   it('lists a price in another unit but leaves it out of the chart', async () => {
@@ -242,7 +245,7 @@ describe('Item price history (PI-01)', () => {
     expect(await screen.findByText('Couldn’t load this item')).toBeTruthy();
     mockApi.getItem.mockResolvedValue(detail());
     fireEvent.press(screen.getByLabelText('Try again'));
-    expect(await screen.findByText('Prices · 2')).toBeTruthy();
+    expect(await screen.findByText('Purchases · 2')).toBeTruthy();
   });
 });
 
@@ -273,7 +276,7 @@ describe('Item names and combining (PI-02 AC 3)', () => {
     mockApi.renameItem.mockResolvedValue(detail({ canonical_name: 'Bananas' }));
     const prompt = jest.spyOn(Alert, 'prompt').mockImplementation(() => {});
     open('/items/i-1');
-    await screen.findByText('Prices · 2');
+    await screen.findByText('Purchases · 2');
 
     fireEvent.press(screen.getByLabelText('Rename item'));
     const buttons = prompt.mock.calls[0][2] as AlertButton[];
@@ -318,27 +321,35 @@ describe('Item names and combining (PI-02 AC 3)', () => {
 });
 
 describe('Possible matches (PI-02 AC 2)', () => {
-  it('asks on the item and merges when the user says Same Item', async () => {
+  it('asks on the item and merges when the user says Yes, merge', async () => {
     mockApi.getItem.mockResolvedValue(
       detail({ id: 'i-2', canonical_name: 'ORG BANANAS', suggestions: [suggestion] }),
     );
+    mockApi.listSuggestions.mockResolvedValue([suggestion]);
     mockApi.acceptSuggestion.mockResolvedValue(detail());
     const routerScreen = open('/items/i-2');
 
     expect(await screen.findByText('Is “ORG BANANAS” the same as “Organic Bananas”?')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('ORG BANANAS is the same as Organic Bananas'));
+    // PI-02 AC 7: the card opens the "Same item?" prompt, where Yes merges.
+    fireEvent.press(
+      screen.getByLabelText('Review whether ORG BANANAS is the same as Organic Bananas'),
+    );
+    fireEvent.press(await screen.findByLabelText('Yes, merge ORG BANANAS into Organic Bananas'));
 
     await waitFor(() => expect(mockApi.acceptSuggestion).toHaveBeenCalledWith('sg-1'));
     // The asked-about item is gone; the screen shows the combined one.
     await waitFor(() => expect(routerScreen.getPathname()).toBe('/items/i-1'));
   });
 
-  it('keeps them apart when the user says Different', async () => {
+  it('keeps them apart when the user says Keep as separate item', async () => {
     mockApi.listSuggestions.mockResolvedValue([suggestion]);
     mockApi.rejectSuggestion.mockResolvedValue(undefined);
     open('/items/matches');
 
-    fireEvent.press(await screen.findByLabelText('ORG BANANAS is different from Organic Bananas'));
+    fireEvent.press(
+      await screen.findByLabelText('Review whether ORG BANANAS is the same as Organic Bananas'),
+    );
+    fireEvent.press(await screen.findByLabelText('Keep ORG BANANAS as a separate item'));
 
     await waitFor(() => expect(mockApi.rejectSuggestion).toHaveBeenCalledWith('sg-1'));
     expect(mockApi.acceptSuggestion).not.toHaveBeenCalled();
