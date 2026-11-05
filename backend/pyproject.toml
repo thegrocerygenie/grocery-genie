@@ -18,6 +18,8 @@ dependencies = [
     # RC-03: decode HEIC uploads and render single-page PDFs to an image.
     "pillow-heif>=0.18.0",
     "pypdfium2>=4.30.0",
+    # PREM-04: the export's PDF report (pure Python; pypdfium2 only renders).
+    "fpdf2>=2.8.0",
     "sqlalchemy[asyncio]>=2.0.35",
     "asyncpg>=0.30.0",
     # Sync driver for Celery tasks (get_sync_session_factory).

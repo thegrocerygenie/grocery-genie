@@ -190,7 +190,7 @@ describe('Paywall', () => {
     for (const title of [
       'Cross-store comparison',
       'Custom categories',
-      'Data export · CSV/JSON',
+      'Data export · CSV/JSON/PDF',
       '12-month trends',
       'Per-item & per-store mute',
       'Unlimited receipts',
