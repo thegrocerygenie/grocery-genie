@@ -15,6 +15,10 @@ from tests.api.test_items import _item_id, _scan_and_confirm, analytics_spy  # n
 from tests.conftest import USER_B_ID
 from tests.services.test_item_matching import _receipt
 
+# Comparison and mutes are Premium (D8, PREM-02); these tests are about how
+# they work, so every user is Premium. The gates: test_premium_gating.py.
+pytestmark = pytest.mark.usefixtures("everyone_premium")
+
 
 async def _manual(
     client: AsyncClient,

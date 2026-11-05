@@ -14,8 +14,9 @@ const TAB_TITLES: Record<string, string> = {
 
 /**
  * The Back label for item detail: the name of the screen under it. An item
- * opens from the Prices list, from a receipt line, and from a price alert or
- * link straight over the tabs (then the tab that was showing). Undefined
+ * opens from the Items list, from a receipt line, from the Price alerts list,
+ * and from a price alert or link straight over the tabs (then the tab that
+ * was showing). Undefined
  * leaves iOS's default, the previous screen's title.
  */
 export function itemBackTitle(previous: RouteLike | undefined): string | undefined {
@@ -24,6 +25,9 @@ export function itemBackTitle(previous: RouteLike | undefined): string | undefin
       return PRICES_COPY.detailBack;
     case 'receipt/[id]':
       return PRICES_COPY.backReceipt;
+    // PI-01 AC 10: the Price alerts list (PI-03 AC 5, DA-4) at `app/price-alerts.tsx`.
+    case 'price-alerts':
+      return PRICES_COPY.backPriceAlerts;
     case '(tabs)': {
       const tabs = previous.state;
       // Before the tabs first render their state is unset; they open on Budget.

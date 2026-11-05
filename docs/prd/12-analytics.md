@@ -17,7 +17,7 @@ MVP notes on the table below:
 | Event | Properties | Purpose |
 |-------|-----------|---------|
 | `receipt_scan_started` | source (camera/library/pdf) | Scan initiation rate and source mix |
-| `receipt_extraction_completed` | duration_ms, item_count, confidence_avg, language_detected | Extraction performance and accuracy |
+| `receipt_extraction_completed` | duration_ms, item_count, confidence_avg, language_detected, extraction_tier (priority/standard) | Extraction performance and accuracy. `extraction_tier` (V1.1, PREM-03 Priority OCR) is `priority` when the Premium extraction model read the scan, `standard` when the default model did: a free user, no Premium model configured, or a Premium model that failed and handed the scan to the default. `duration_ms` then covers both attempts |
 | `receipt_correction_made` | field (name/qty/price/category) | Identify systematic failures for prompt improvement. The original and corrected values are in `receipt_corrections`, not in the event. |
 | `receipt_confirmed` | item_count, correction_count | Scan-to-confirmed conversion rate |
 | `receipt_abandoned` | stage (capture/review/confirmation), reason (optional) | Drop-off point identification |
@@ -26,8 +26,8 @@ MVP notes on the table below:
 | `budget_alert_opened` | threshold_percent, notification_source (push/in_app) | Alert engagement rate |
 | `price_history_viewed` | canonical_item_id, store_count | Price intelligence engagement |
 | `price_alert_triggered` | direction (up/down), percent_change | Price alert frequency (PI-03) |
-| `price_alert_muted` | scope (item/store) | Price alert fatigue: how often users mute |
-| `price_comparison_viewed` | canonical_item_id, store_count (stores compared) | Cross-store comparison engagement (PI-04) |
+| `price_alert_muted` | scope (item/store) | Price alert fatigue: how often users mute. Muting is Premium (D8): sent by the server only for a mute saved, not for a refused free user (PREM-02 AC 7) |
+| `price_comparison_viewed` | canonical_item_id, store_count (stores compared) | Cross-store comparison engagement (PI-04). Premium (D8): sent by the server only for a comparison served, not for a refused free user (PREM-02 AC 7) |
 | `store_merged` | none | Store normalization misses (EC Price Intelligence 1): how often users merge two stores themselves. Sent by the server on each successful `POST /api/stores/{id}/merge` |
 | `store_unmerged` | none | Wrong merges: sent by the server on each `DELETE /api/stores/{id}/merge` |
 | `budget_rollover_toggled` | enabled, type (overall/category) | Rollover adoption (V1.1, Premium): sent by the server on each `PUT /api/budgets/{id}/rollover` |
@@ -35,9 +35,9 @@ MVP notes on the table below:
 | `waitlist_offer_matched` | source (social_sign_in/verify_email/email_change/backfill/claim) | Waitlist free year (V11-P5): how waitlist members find their offer. Sent by the server when a waitlist email is matched to an account |
 | `waitlist_offer_granted` | source (as above), attempts (RevenueCat calls it took) | Waitlist conversion into Premium, and how often RevenueCat had to be retried. Sent by the server when RevenueCat accepts the promotional grant |
 | `waitlist_claim_requested` | none | "Claim your waitlist offer" use (Hide My Email and other emails). Sent by the server on each accepted claim request, whether or not the email is on the waitlist |
-| `custom_category_changed` | action (created/renamed/deleted), custom_count (after the change) | Custom category adoption (BC-05 AC 3, Premium): how many users make their own, and how many they keep |
-| `data_exported` | format (json/csv), receipt_count, line_item_count, budget_count, price_observation_count | Data export use (NFR Privacy 2, Premium): sent by the server when an export is built, not for a refused free user |
-| `item_match_resolved` | decision (accepted/rejected), method (fuzzy/semantic), confidence | Item matching precision against user-confirmed matches |
+| `custom_category_changed` | action (created/renamed/deleted), custom_count (after the change); a colour or icon change alone (DA-9) sends none | Custom category adoption (BC-05 AC 3, Premium): how many users make their own, and how many they keep |
+| `data_exported` | format (json/csv/pdf), from and to (the range's first and last day, `YYYY-MM-DD`, null when open), includes (list of receipts/prices/budgets/images), receipt_count, line_item_count, budget_count, category_count, price_observation_count, image_count, images_left_out (receipts with no image to include) | Data export use (NFR Privacy 2, Premium; options PREM-04): which formats, ranges and sections users pick. Sent by the server when an export is built, not for a refused free user or a rejected range |
+| `item_match_resolved` | decision (accepted/rejected), method (fuzzy/semantic), confidence | Item matching precision against user-confirmed matches. Sent by the server for "Yes, merge" and "Keep as separate item" in the "Same item?" prompt (DA-5, PI-02 AC 6); Skip and Cancel save nothing and send none |
 | `recipe_suggestion_viewed` | recipe_id, match_score, had_expiring_ingredient | Recipe relevance |
 | `recipe_suggestion_cooked` | recipe_id, ingredients_from_pantry, ingredients_purchased | End-to-end meal planner value |
 | `shopping_list_generated` | recipe_count, item_count | Shopping list adoption |

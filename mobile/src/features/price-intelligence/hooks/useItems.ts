@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
+import { isPremiumRequired } from '@/utils/premium';
+
 import {
   acceptSuggestion,
   getItem,
@@ -47,11 +49,16 @@ export function usePriceHistory(id: string | undefined) {
 }
 
 /** PI-04 AC 4: the store comparison on item detail. */
-export function usePriceComparison(id: string | undefined) {
+/**
+ * PI-04 comparison, Premium (D8, PREM-02 AC 1): asked only when `enabled`
+ * (the profile says Premium). A `403 premium_required` is final, not retried.
+ */
+export function usePriceComparison(id: string | undefined, enabled = true) {
   return useQuery({
     queryKey: [...ITEMS_KEY, 'compare', id],
     queryFn: () => getPriceComparison(id as string),
-    enabled: !!id,
+    enabled: !!id && enabled,
+    retry: (count, error) => !isPremiumRequired(error) && count < 3,
   });
 }
 

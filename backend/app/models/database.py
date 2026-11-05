@@ -20,6 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from app.models.category_looks import DEFAULT_COLOR, DEFAULT_ICON
 from app.models.types import EmbeddingVector
 
 
@@ -205,6 +206,14 @@ class Category(Base):
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    # BC-05 AC 5 (DA-9): names from app.models.category_looks. A row written
+    # without them (as every custom category before DA-9) reads the defaults.
+    color: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=DEFAULT_COLOR, server_default=DEFAULT_COLOR
+    )
+    icon: Mapped[str] = mapped_column(
+        String(30), nullable=False, default=DEFAULT_ICON, server_default=DEFAULT_ICON
+    )
 
     line_items: Mapped[list["LineItem"]] = relationship(back_populates="category")
 

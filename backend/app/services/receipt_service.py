@@ -13,11 +13,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core import clock
+from app.core.entitlements import is_premium
 from app.core.money import format_money, normalize_currency
 from app.core.retention import restore_cutoff
 from app.events.dispatcher import dispatcher
 from app.events.types import ItemCorrected, PriceChangeDetected, ReceiptConfirmed
 from app.llm.provider import (
+    EXTRACTION_TIER_PRIORITY,
+    EXTRACTION_TIER_STANDARD,
     CategoryAssigner,
     Embedder,
     ReceiptExtractor,
@@ -46,6 +49,7 @@ from app.services.price_service import PriceService
 from app.services.store_service import StoreService
 
 if TYPE_CHECKING:
+    from app.llm.schemas import ReceiptExtractionResult
     from app.services.analytics_service import AnalyticsService
 
 logger = logging.getLogger(__name__)
@@ -75,9 +79,13 @@ class ReceiptService:
         category_assigner: CategoryAssigner | None = None,
         analytics: AnalyticsService | None = None,
         embedder: Embedder | None = None,
+        premium_extractor: ReceiptExtractor | None = None,
     ) -> None:
         self.db = db
         self.extractor = extractor
+        # Priority OCR (PREM-03): reads Premium users' scans; None when no
+        # Premium model is configured.
+        self.premium_extractor = premium_extractor
         self.category_assigner = category_assigner
         self.analytics = analytics
         # PI-02 semantic matching; without it matching uses aliases and
@@ -104,6 +112,40 @@ class ReceiptService:
         )
         return int(result.scalar() or 0)
 
+    async def _extract(
+        self, user_id: uuid.UUID, image_data: bytes, content_type: str
+    ) -> tuple[ReceiptExtractionResult, ReceiptExtractor, str]:
+        """Read the receipt with the model this user's plan gets (PREM-03).
+
+        Premium is the user row's entitlement (written only from RevenueCat),
+        read now, when extraction starts: a scan retried after an upgrade or a
+        lapse gets the model the user has at that moment (EC-PREM 3). A Premium
+        model that fails in any way hands the scan to the default model, so a
+        scan never fails because of it; the default model failing is the usual
+        ExtractionUnavailableError.
+        """
+        assert self.extractor is not None
+        if self.premium_extractor is not None:
+            user = await self.db.get(User, user_id)
+            if user is not None and is_premium(user):
+                try:
+                    extraction = await self.premium_extractor.extract(
+                        image_data, content_type
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Premium extraction model failed; using the default",
+                        extra={
+                            "error_type": type(exc).__name__,
+                            "model": self.premium_extractor.model_name,
+                        },
+                        exc_info=True,
+                    )
+                else:
+                    return extraction, self.premium_extractor, EXTRACTION_TIER_PRIORITY
+        extraction = await self.extractor.extract(image_data, content_type)
+        return extraction, self.extractor, EXTRACTION_TIER_STANDARD
+
     async def process_receipt(
         self,
         user_id: uuid.UUID,
@@ -113,7 +155,9 @@ class ReceiptService:
         """Extract receipt data and persist to database."""
         assert self.extractor is not None, "Extractor required for processing"
         start_time = time.monotonic()
-        extraction = await self.extractor.extract(image_data, content_type)
+        extraction, extractor, tier = await self._extract(
+            user_id, image_data, content_type
+        )
         duration_ms = int((time.monotonic() - start_time) * 1000)
         if self.analytics:
             self.analytics.emit(
@@ -122,6 +166,7 @@ class ReceiptService:
                     "duration_ms": duration_ms,
                     "item_count": len(extraction.items),
                     "confidence_avg": round(extraction.confidence, 2),
+                    "extraction_tier": tier,
                 },
                 user_id,
             )
@@ -206,8 +251,8 @@ class ReceiptService:
             store_name_confidence=extraction.store_name_confidence,
             date_confidence=extraction.date_confidence,
             total_confidence=extraction.total_confidence,
-            extraction_model=self.extractor.model_name,
-            extraction_prompt_version=self.extractor.prompt_version,
+            extraction_model=extractor.model_name,
+            extraction_prompt_version=extractor.prompt_version,
             status="pending_review",
         )
         self.db.add(receipt)

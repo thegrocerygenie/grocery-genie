@@ -150,12 +150,13 @@ describe('Prices list at large text sizes (BUG-3)', () => {
 });
 
 describe('Item detail at large text sizes (BUG-3)', () => {
-  it('keeps the latest price on one line, shrinking it to fit', async () => {
+  it('keeps the headline price on one line, shrinking it to fit', async () => {
     mockWindow.fontScale = AX5_SCALE;
     open('/items/i-1');
 
-    const latest = await screen.findByTestId('latest-price');
-    expect(latest.props.children).toBe('$4.79');
+    // The 30-day average of $4.29 and $4.79 (PI-01 AC 7).
+    const latest = await screen.findByTestId('headline-price');
+    expect(latest.props.children).toBe('$4.54');
     expect(latest.props.numberOfLines).toBe(1);
     expect(latest.props.adjustsFontSizeToFit).toBe(true);
   });

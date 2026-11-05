@@ -1,65 +1,45 @@
 import React from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { PRICES_COPY } from '../constants';
-import { useAcceptSuggestion, useRejectSuggestion } from '../hooks/useItems';
 import type { ItemSuggestion } from '../types';
 
 interface SuggestionCardProps {
   suggestion: ItemSuggestion;
-  /** After "Same Item": the id of the item the two became. */
-  onAccepted?: (itemId: string) => void;
+  /** From item detail: the prompt asks only about this item's suggestions. */
+  itemId?: string;
 }
 
 /**
- * PI-02 AC 2: a medium-confidence match the user confirms or rejects.
- * "Same Item" joins the two price histories; "Different" keeps them apart.
+ * PI-02 AC 2, 7: a medium-confidence match waiting for the user. "Review"
+ * opens the full-screen "Same item?" prompt on it (AC 5, 6), where the user
+ * merges, keeps the two apart, or skips.
  */
-export function SuggestionCard({ suggestion, onAccepted }: SuggestionCardProps) {
-  const accept = useAcceptSuggestion();
-  const reject = useRejectSuggestion();
-  const busy = accept.isPending || reject.isPending;
+export function SuggestionCard({ suggestion, itemId }: SuggestionCardProps) {
+  const router = useRouter();
   const item = suggestion.item.canonical_name;
   const other = suggestion.suggested_item.canonical_name;
-  const failed = () => Alert.alert(PRICES_COPY.actionFailed);
 
-  const onSame = () =>
-    accept.mutate(suggestion.id, {
-      onSuccess: (merged) => {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        onAccepted?.(merged.id);
-      },
-      onError: failed,
+  const onReview = () =>
+    router.push({
+      pathname: '/items/match',
+      params: itemId ? { itemId, start: suggestion.id } : { start: suggestion.id },
     });
-  const onDifferent = () => reject.mutate(suggestion.id, { onError: failed });
 
   return (
     <View style={styles.card}>
       <Text style={styles.question}>{PRICES_COPY.sameQuestion(item, other)}</Text>
-      <View style={styles.actions}>
-        <Pressable
-          onPress={onDifferent}
-          disabled={busy}
-          style={({ pressed }) => [styles.button, styles.secondary, pressed && styles.pressed]}
-          accessibilityRole="button"
-          accessibilityLabel={PRICES_COPY.sameNoLabel(item, other)}
-          accessibilityState={{ disabled: busy }}
-        >
-          <Text style={styles.secondaryLabel}>{PRICES_COPY.sameNo}</Text>
-        </Pressable>
-        <Pressable
-          onPress={onSame}
-          disabled={busy}
-          style={({ pressed }) => [styles.button, styles.primary, pressed && styles.pressed]}
-          accessibilityRole="button"
-          accessibilityLabel={PRICES_COPY.sameYesLabel(item, other)}
-          accessibilityState={{ disabled: busy }}
-        >
-          <Text style={styles.primaryLabel}>{PRICES_COPY.sameYes}</Text>
-        </Pressable>
-      </View>
+      <Text style={styles.caption}>{PRICES_COPY.matchPercent(suggestion.confidence)}</Text>
+      <Pressable
+        onPress={onReview}
+        style={({ pressed }) => [styles.button, styles.primary, pressed && styles.pressed]}
+        accessibilityRole="button"
+        accessibilityLabel={PRICES_COPY.reviewMatchLabel(item, other)}
+      >
+        <Text style={styles.primaryLabel}>{PRICES_COPY.reviewMatch}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -69,21 +49,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.iosBg2,
     borderRadius: radii.card,
     padding: spacing.lg,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   question: { ...type.headline },
-  actions: { flexDirection: 'row', gap: spacing.md },
+  caption: { ...type.footnote, color: colors.iosLabel2 },
   button: {
-    flex: 1,
     minHeight: touchTarget.minHeight,
     borderRadius: radii.button,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
+    marginTop: spacing.xs,
   },
   primary: { backgroundColor: colors.tint },
-  secondary: { backgroundColor: colors.iosFill3 },
   primaryLabel: { ...type.headline, color: colors.onTint },
-  secondaryLabel: { ...type.headline, color: colors.tint },
   pressed: { opacity: 0.7 },
 });

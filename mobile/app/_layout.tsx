@@ -12,6 +12,7 @@ import { colors, navigationTheme } from '@/constants/theme';
 import { useMe } from '@/features/auth/hooks/useAuth';
 import { usePushNotifications } from '@/features/notifications/hooks/usePushNotifications';
 import { useSyncQueue } from '@/hooks/useSyncQueue';
+import { RouteTracker } from '@/components/RouteTracker';
 import { useAuthStore } from '@/store/authStore';
 
 // A push tap or link that launches the app opens its screen (an item, a
@@ -77,6 +78,7 @@ export default function RootLayout() {
       <ThemeProvider value={navigationTheme(scheme)}>
         <QueryClientProvider client={queryClient}>
           <SyncQueueProvider />
+          <RouteTracker />
           <OnboardingGate>
             <Stack>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -107,10 +109,14 @@ export default function RootLayout() {
               />
               <Stack.Screen name="top-items" options={{ title: 'Top Items' }} />
               <Stack.Screen name="trend" options={{ title: 'Trend' }} />
-              <Stack.Screen name="items/index" options={{ title: 'Prices' }} />
+              <Stack.Screen name="items/index" options={{ title: 'Items' }} />
               <Stack.Screen name="items/[id]" options={{ title: 'Item' }} />
               <Stack.Screen name="items/matches" options={{ title: 'Review Matches' }} />
               <Stack.Screen name="items/merge" options={{ title: 'Combine' }} />
+              <Stack.Screen
+                name="items/match"
+                options={{ title: 'Same item?', presentation: 'fullScreenModal' }}
+              />
               <Stack.Screen
                 name="email-change"
                 options={{ title: 'Change Email', presentation: 'modal' }}

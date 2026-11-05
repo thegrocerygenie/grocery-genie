@@ -1,7 +1,8 @@
 /**
  * V1.1 PI-03 price change alerts and PI-04 cross-store comparison in the app:
  * muting an item or a store from item detail, the store comparison on item
- * detail, and the price alert threshold in Settings → Alerts.
+ * detail, and the price alert threshold in Settings → Alerts. Comparison and
+ * muting are Premium (D8, PREM-02): a free user gets the upgrade prompt.
  */
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -10,6 +11,7 @@ import { Stack, router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 
 import ItemDetailScreen from '../../app/items/[id]';
+import { ApiError } from '@/services/api';
 import NotificationSettingsScreen from '../../app/settings/notification-settings';
 import type {
   ItemDetail,
@@ -24,8 +26,13 @@ jest.mock('expo-haptics', () => ({
   notificationAsync: jest.fn(),
   NotificationFeedbackType: { Success: 'success' },
 }));
+// The signed-in user: Premium unless a test says otherwise (comparison and
+// mutes are Premium, D8).
+const mockMe: { current: { is_premium: boolean } | undefined } = {
+  current: { is_premium: true },
+};
 jest.mock('@/features/auth/hooks/useAuth', () => ({
-  useMe: () => ({ data: undefined }),
+  useMe: () => ({ data: mockMe.current }),
   useUpdatePreferences: () => ({ mutate: jest.fn() }),
 }));
 jest.mock('@/features/budget/hooks/useBudget', () => ({
@@ -154,6 +161,7 @@ function open(path: string) {
         </QueryClientProvider>
       ),
       index: () => null,
+      paywall: () => null,
       'items/[id]': ItemDetailScreen,
       'settings/notification-settings': NotificationSettingsScreen,
     },
@@ -163,7 +171,13 @@ function open(path: string) {
   return routerScreen;
 }
 
+const premiumRequired = (feature: string) =>
+  new ApiError(403, {
+    detail: { code: 'premium_required', feature, message: 'Premium' },
+  });
+
 beforeEach(() => {
+  mockMe.current = { is_premium: true };
   Object.values(mockApi).forEach((fn) => fn.mockReset());
   mockApi.getItem.mockResolvedValue(detail());
   mockApi.getPriceHistory.mockResolvedValue(prices);
@@ -275,6 +289,97 @@ describe('Store comparison on item detail (PI-04 AC 4)', () => {
       await screen.findByText('Buy it 2 times at a store to compare that store’s price.'),
     ).toBeTruthy();
     expect(screen.getByText('2 more stores need 2 prices of this item to compare.')).toBeTruthy();
+  });
+});
+
+describe('Premium comparison and mutes for a free user (PREM-02 AC 5, 6)', () => {
+  const free = () => {
+    mockMe.current = { is_premium: false };
+  };
+
+  it('AC 5: item detail shows the upgrade prompt where the comparison was, and it opens the paywall', async () => {
+    free();
+    const view = open('/items/i-1');
+    expect(await screen.findByText('Compare stores with Premium')).toBeTruthy();
+    expect(screen.queryByLabelText(/, average /)).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(mockApi.getPriceComparison).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByLabelText('See Premium'));
+    await waitFor(() => expect(view.getPathname()).toBe('/paywall'));
+  });
+
+  it('AC 6: a 403 premium_required from compare (Premium lapsed) shows the same prompt', async () => {
+    mockApi.getPriceComparison.mockRejectedValue(premiumRequired('price_comparison'));
+    open('/items/i-1');
+    expect(await screen.findByText('Compare stores with Premium')).toBeTruthy();
+    expect(mockApi.getPriceComparison).toHaveBeenCalledTimes(1);
+  });
+
+  it('AC 5: a free user turning a switch off gets the upgrade prompt and the switch stays on', async () => {
+    free();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const view = open('/items/i-1');
+    const item = await screen.findByLabelText('Price alerts for Organic Bananas');
+    fireEvent(item, 'valueChange', false);
+    expect(alert).toHaveBeenCalledWith(
+      'Muting alerts is Premium',
+      expect.any(String),
+      expect.arrayContaining([expect.objectContaining({ text: 'See Premium' })]),
+    );
+    expect(screen.getByLabelText('Price alerts for Organic Bananas').props.value).toBe(true);
+
+    fireEvent(await screen.findByLabelText('Price alerts at FreshCo'), 'valueChange', false);
+    expect(alert).toHaveBeenCalledTimes(2);
+    expect(screen.getByLabelText('Price alerts at FreshCo').props.value).toBe(true);
+    expect(mockApi.muteItem).not.toHaveBeenCalled();
+    expect(mockApi.muteStore).not.toHaveBeenCalled();
+
+    // "See Premium" opens the paywall.
+    const buttons = alert.mock.calls[0]![2] as { text: string; onPress?: () => void }[];
+    act(() => buttons.find((b) => b.text === 'See Premium')!.onPress!());
+    await waitFor(() => expect(view.getPathname()).toBe('/paywall'));
+    alert.mockRestore();
+  });
+
+  it('AC 5, EC-PI 5: a lapsed user can still turn a muted switch back on', async () => {
+    free();
+    mockApi.getItem.mockResolvedValue(detail({ alerts_muted: true }));
+    mockApi.getPriceAlertSettings.mockResolvedValue(
+      settings({ muted_stores: [{ id: 's-Loblaws', name: 'Loblaws' }] }),
+    );
+    open('/items/i-1');
+    const item = await screen.findByLabelText('Price alerts for Organic Bananas');
+    expect(item.props.value).toBe(false);
+    fireEvent(item, 'valueChange', true);
+    await waitFor(() => expect(mockApi.unmuteItem).toHaveBeenCalledWith('i-1'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Price alerts at Loblaws').props.value).toBe(false),
+    );
+    fireEvent(screen.getByLabelText('Price alerts at Loblaws'), 'valueChange', true);
+    await waitFor(() => expect(mockApi.unmuteStore).toHaveBeenCalledWith('s-Loblaws'));
+  });
+
+  it('AC 6: a 403 premium_required from a mute shows the upgrade prompt and puts the switch back', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    mockApi.muteItem.mockRejectedValue(premiumRequired('price_alert_mute'));
+    open('/items/i-1');
+    fireEvent(
+      await screen.findByLabelText('Price alerts for Organic Bananas'),
+      'valueChange',
+      false,
+    );
+    await waitFor(() =>
+      expect(alert).toHaveBeenCalledWith(
+        'Muting alerts is Premium',
+        expect.any(String),
+        expect.any(Array),
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('Price alerts for Organic Bananas').props.value).toBe(true),
+    );
+    alert.mockRestore();
   });
 });
 

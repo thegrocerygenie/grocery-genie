@@ -132,16 +132,18 @@ Setup for this section:
 
 **Premium (V11-P0, D1, D2):**
 - [ ] **Sandbox purchase.** As a free user, open the paywall, tap Subscribe and buy with the Sandbox account. Settings → Premium then reads Premium, and the server's profile says `is_premium: true`. (PHASE_SCOPE D1; DEVICE-CHECK D6)
-- [ ] **Restore.** Delete and reinstall the app, sign in, open the paywall and tap Restore Purchases: Premium comes back. (DEVICE-CHECK D5)
+- [ ] **Restore.** Delete and reinstall the app, sign in, open the paywall and tap Restore purchase: Premium comes back. (DEVICE-CHECK D5)
 - [ ] **Webhook test event.** In RevenueCat, Project settings → Integrations → Webhooks, tap "Send test event". The backend answers 200. (V11-P0)
 - [ ] **Paywall.** Free user: the title, what Premium unlocks, the App Store price, Subscribe, Restore, and the Terms of Use and Privacy Policy links, each 44 pt. Premium user: "You're on Premium" with the renewal date and Manage Subscription. (DEVICE-CHECK D2, D4)
 - [ ] **Settings → Premium.** Free: "Free plan · Upgrade" opens the paywall. Premium: the row reads Premium. (DEVICE-CHECK D1)
+- [ ] **Free trial (after DA-1).** With a Sandbox account that has never subscribed, the paywall reads "Start 7-day free trial" for Yearly and for Monthly, with the price billed after it. Start the trial on one: Premium turns on, and the server's profile says `is_premium: true`. Cancel it in the Sandbox settings: Premium stays until the trial ends. A Sandbox account that has used its trial sees "Subscribe". (PREM-01 AC 2, 5; 11-edge-cases Premium 1)
+- [ ] **Plan switch (after DA-1).** As a monthly subscriber, switch to Yearly in iOS Settings → Subscriptions (or back). Premium never drops, and `premium_product_id` on the server becomes the new product once it starts. (PREM-01 AC 5; 11-edge-cases Premium 2)
 
 **Price alerts and comparison (PI-03, PI-04):**
 - [ ] **Push tap, foreground.** With the app open, confirm the receipt that moves the price. The banner arrives; tapping it opens the item. (PI-03 AC 2; DEVICE-CHECK C4)
 - [ ] **Push tap, background.** Same, with the app in the background. (PI-03 AC 2)
 - [ ] **Push tap, cold start.** Force-quit the app, then tap the banner. The item opens, and Back returns to Budget. (PI-03 AC 2; BUG-6)
-- [ ] **Item and store mute switches.** On item detail, turn off alerts for the item and for one store. Relaunch: both switches stay off. A new price change at that store sends no push. (PI-03 AC 4; DEVICE-CHECK C2)
+- [ ] **Item and store mute switches.** On the Alerts screen (pushed from item detail's Alerts row; after DA-7, before it the switches are on item detail), turn off alerts for the item and for one store. Relaunch: both switches stay off. A new price change at that store sends no push. (PI-03 AC 4; DEVICE-CHECK C2)
 - [ ] **Compare stores.** Item detail lists each store cheapest first, with latest and average, and says how many stores need more prices. (PI-04 AC 4; DEVICE-CHECK C1)
 - [ ] **Threshold picker.** Settings → Alerts: pick 25%, then "10% (default)". Each choice saves, and the line under it says what size of change sends an alert. (PI-03 AC 1; DEVICE-CHECK C3)
 - [ ] **Unmute rows.** The muted item and store are listed in Settings → Alerts. Unmute each: it leaves the list, and the switch on item detail is on again. (PI-03 AC 4; DEVICE-CHECK C3)
@@ -149,6 +151,7 @@ Setup for this section:
 **Trend, categories, export, rollover, quota (BC-FR, BC-05 AC 3, NFR Privacy 2):**
 - [ ] **Trend 3/12 toggle.** 3 Months is selected by default. A Premium user's 12 Months shows 12 bars. A free user's 12 Months shows the upgrade prompt, and its button opens the paywall. (BC-FR Trends; DEVICE-CHECK A1–A3, D3)
 - [ ] **Settings → Categories.** Premium: add, rename and delete a category; at 10 the add button is disabled and says why. Free: the upgrade prompt, not an add button. (BC-05 AC 3)
+- [ ] **Category editor sheet.** Match the category editor sheet (name, colour, icon) to the design once it exists; the design export has none yet, and the user will design it. (BC-05 AC 5, DA-9)
 - [ ] **Data export.** Settings → Export data, as Premium: the share sheet opens with the file, and saving it to Files works. As free: the upgrade prompt. (NFR Privacy 2)
 - [ ] **Rollover.** Budget settings: turn rollover on for a budget and Save. The dashboard ring text says how much rolled over once a period has ended with money left. A free user sees the upgrade prompt instead of the switches. (BC-FR Rollover)
 - [ ] **Receipt quota prompt.** As a free user at the monthly receipt limit, scan: the prompt offers Premium, and nothing uploads. As Premium, the scan goes through. (D2, unlimited receipts)
@@ -157,17 +160,20 @@ Setup for this section:
 - [ ] **Review Matches.** Confirm "Organic Bananas", then "Bananas". Review Matches asks whether they are the same item; neither links on its own. Different keeps two items; Same Item merges their prices. (PI-02 AC 2; BUG-4)
 - [ ] **Settings → Stores.** Branch numbers ("Loblaws" and "Loblaws #1234") show as one store. Merge one name into another (for example "REAL CANADIAN SUPERSTORE" into "Loblaws"): an item bought at both now compares as one store. Unmerge splits them again. Only this account's prices regroup. (11-edge-cases Price Intelligence 1; V11-05, decision D3)
 
+**Priority OCR (PREM-03 AC 6, decision D9):**
+- [ ] **Premium model accuracy, before it is switched on in production.** With `GG_LLM_API_KEY`, `GG_LLM_PREMIUM_EXTRACTION_MODEL` set to the chosen model, and the real receipt set's images in place, run `/validate-extraction` (from `backend/`: `.venv/bin/python -m tests.llm_validation.run extract`, then `... extract --premium`). The Premium run's field accuracy and item recall are no lower than the default run's, hallucination is 0%, and both reports' `tokens_per_scan` give the cost per scan (`docs/DEPLOYMENT.md` Part 3, Priority OCR model). Commit both reports; the product owner approves the model and cost before production sets the variable.
+
 **Device-check bug rechecks (`.planning/DEVICE-CHECK-2026-11-03.md`):**
 - [ ] **BUG-1.** At AX1 and AX5, Trend's bar amounts stay clear of the summary above the chart.
 - [ ] **BUG-2.** At AX5, the month-over-month change wraps under the total, on the SE.
-- [ ] **BUG-3.** At AX5 on the SE, the Prices list and item detail keep names and prices readable; "$4.79" stays on one line.
-- [ ] **BUG-5.** The "Prices" large title is drawn.
+- [ ] **BUG-3.** At AX5 on the SE, the Items list and item detail keep names and prices readable; "$4.79" stays on one line.
+- [ ] **BUG-5.** The "Items" large title is drawn.
 - [ ] **BUG-6.** A price alert tapped from a cold start opens the item with Back to Budget (also above).
 - [ ] **BUG-8.** With VoiceOver on the 12-month Trend, swiping reads the bars in month order.
 - [ ] **BUG-9.** At AX5 on the SE, the 12 month letters stay readable and apart.
 
 **Accessibility on each new screen:**
-- [ ] **VoiceOver** reads, in a logical order: Prices, item detail (chart summary, mute switches, Compare stores), Review Matches, Combine, Settings → Alerts (threshold, muted rows), Settings → Categories, Export data, Budget settings (rollover switches), the paywall, Settings → Premium, and Settings → Stores (merge, unmerge, the store picker). Every control reads as a button or switch with its label and state. (13 Accessibility)
+- [ ] **VoiceOver** reads, in a logical order: Items, item detail (chart summary, mute switches, Compare stores), Review Matches, Combine, Settings → Alerts (threshold, muted rows), Settings → Categories, Export data, Budget settings (rollover switches), the paywall, Settings → Premium, and Settings → Stores (merge, unmerge, the store picker). Every control reads as a button or switch with its label and state. (13 Accessibility)
 - [ ] **Dark mode** on each of those screens: text and charts keep their contrast, and nothing is drawn black on black. (13 Accessibility)
 
 ## After the session

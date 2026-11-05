@@ -35,7 +35,7 @@ it('opens Prices from the dashboard', () => {
     { initialUrl: '/' },
   );
 
-  const button = screen.getByRole('button', { name: 'Price history' });
+  const button = screen.getByRole('button', { name: 'Items' });
   expect(button.props.accessibilityHint).toBe('What you paid for each item over time');
   act(() => fireEvent.press(button));
 

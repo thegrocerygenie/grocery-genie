@@ -19,8 +19,11 @@ Standing decisions for the marketing site. The `marketing-site-brief` skill read
 | 13 | 2026-11-04 | V1.1 | **A redeemed free year outlives account deletion as a salted, one-way hash of the waitlist email,** with no link to the account, until the claim window closes (90 days after Premium launches), then it's deleted with the waitlist. This stops a second free year from a new account. `privacy.ts` says so under "Deleting your account". | Active |
 | 14 | 2026-11-04 | V1.1 | **V1.1 brief version: 1.1.0.** `mobile/app.json` still says 0.1.0; bump it when V1.1 ships. | Active |
 | 15 | 2026-11-04 | V1.1 | **Conversion goal stays two-state:** waitlist now, App Store downloads at launch (#1). Downloads stay the one call to action in State B; Premium upgrades happen in the app. | Active |
-| 16 | 2026-11-04 | V1.1 | **Pricing section: a Free vs Premium table, in State B only,** with Premium at $5.99/month. State A keeps "a free year of Premium when it launches" (#2). Show it only once the App Store product is live. | Active |
+| 16 | 2026-11-04 | V1.1 | **Pricing section: a Free vs Premium table, in State B only,** with Premium at $5.99/month. State A keeps "a free year of Premium when it launches" (#2). Show it only once the App Store product is live. | Price replaced by #18; the rest is active |
 | 17 | 2026-11-04 | V1.1 | **No item-matching figures on the site.** The 31/31 precision and 31/33 recall come from a small development test, not a user-facing accuracy claim. This extends #5. | Active |
+| 18 | 2026-11-04 | V1.1 | **Premium price: $4.99/month or $39.99/year, with a 7-day free trial** (V1.1 design-alignment decision D7, replacing D1's $5.99). The table in #16 shows both plans and the trial; take the prices from the App Store listing on launch day. Holds until the App Store products are live (#16). | Active |
+| 19 | 2026-11-04 | V1.1 | **What is free now (decision D8):** price history, item matching and price alerts are free; store comparison and muting alerts per item or per store are Premium. The site never says "price intelligence is free" or "store comparison stays free". Holds until DA-1 ships the gate; until then the app still gives comparison free, so the site names neither. | Active |
+| 20 | 2026-11-04 | V1.1 | **Priority OCR (decision D9)** may be named as a Premium feature ("Priority OCR processing") once DA-2 ships, with no accuracy or speed claim (#5) until the extraction harness measures one. | Active |
 
 ## Open
 

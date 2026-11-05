@@ -1,4 +1,11 @@
+import { categoryPalette } from '../theme';
 import {
+  CATEGORY_ICON_SYMBOLS,
+  CUSTOM_CATEGORY_COLORS,
+  CUSTOM_CATEGORY_ICONS,
+  DEFAULT_CUSTOM_COLOR,
+  DEFAULT_CUSTOM_ICON,
+  categoryMeta,
   DEFAULT_CATEGORIES,
   getCategoryMeta,
   getCategoryMetaByName,
@@ -68,5 +75,65 @@ describe('resolveCategoryMeta', () => {
   it('falls back to "Other" for null/undefined ids', () => {
     expect(resolveCategoryMeta(null, backendCategories)).toBe(OTHER);
     expect(resolveCategoryMeta(undefined, backendCategories)).toBe(OTHER);
+  });
+});
+
+describe('category colour and icon (BC-05 AC 5, 7)', () => {
+  it('uses the colour and icon the server sent for a custom category', () => {
+    const meta = categoryMeta({ name: 'Garden', color: 'mint', icon: 'leaf' });
+    expect(meta.name).toBe('Garden');
+    expect(meta.color).toBe(categoryPalette.mint);
+    expect(meta.symbol).toBe('leaf.fill');
+  });
+
+  it('resolves a custom category id to its own look and name, not Other', () => {
+    const cats: BackendCategory[] = [{ id: 'c-1', name: 'Garden', color: 'pink', icon: 'gift' }];
+    const meta = resolveCategoryMeta('c-1', cats);
+    expect(meta.name).toBe('Garden');
+    expect(meta.color).toBe(categoryPalette.pink);
+    expect(meta.symbol).toBe('gift.fill');
+  });
+
+  it('falls back to the built-in look by name for an unknown or missing value', () => {
+    expect(categoryMeta({ name: 'Groceries' })).toBe(getCategoryMetaByName('Groceries'));
+    const meta = categoryMeta({ name: 'Garden', color: 'chartreuse', icon: 'rocket' });
+    expect(meta.color).toBe(OTHER.color);
+    expect(meta.symbol).toBe(OTHER.symbol);
+  });
+
+  it('offers the same palette and icons as the server, defaults first', () => {
+    // backend/app/models/category_looks.py: CUSTOM_COLORS, CUSTOM_ICONS.
+    expect(CUSTOM_CATEGORY_COLORS).toEqual([
+      'indigo',
+      'purple',
+      'pink',
+      'red',
+      'orange',
+      'yellow',
+      'green',
+      'mint',
+      'teal',
+      'cyan',
+      'blue',
+      'brown',
+    ]);
+    expect(CUSTOM_CATEGORY_ICONS).toEqual([
+      'tag',
+      'leaf',
+      'gift',
+      'sparkles',
+      'fork-knife',
+      'wineglass',
+      'dumbbell',
+      'pills',
+      'book',
+      'gamecontroller',
+      'wrench',
+      'airplane',
+    ]);
+    expect(CUSTOM_CATEGORY_COLORS[0]).toBe(DEFAULT_CUSTOM_COLOR);
+    expect(CUSTOM_CATEGORY_ICONS[0]).toBe(DEFAULT_CUSTOM_ICON);
+    for (const c of CUSTOM_CATEGORY_COLORS) expect(categoryPalette[c]).toBeTruthy();
+    for (const i of CUSTOM_CATEGORY_ICONS) expect(CATEGORY_ICON_SYMBOLS[i]).toBeTruthy();
   });
 });

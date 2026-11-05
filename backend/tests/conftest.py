@@ -155,6 +155,29 @@ def mock_embedder(monkeypatch) -> Iterator[MockEmbedder]:
 
 
 @pytest.fixture
+def everyone_premium(monkeypatch) -> None:
+    """Every signed-in user counts as Premium, for tests of a Premium feature's
+    behavior rather than its gate (PREM-02 made comparison and mutes Premium).
+    The gates themselves are tested against the stored entitlement, in
+    ``tests/api/test_premium_gating.py``."""
+    from app.core import entitlements
+
+    monkeypatch.setattr(entitlements, "is_premium", lambda user: True)
+
+
+async def set_premium(db_session, user_id: uuid.UUID, active: bool) -> None:
+    """Set the stored entitlement of ``user_id``, as RevenueCat would: Premium
+    with no expiry, or none."""
+    from app.models.database import User
+
+    user = await db_session.get(User, user_id)
+    assert user is not None
+    user.premium_active = active
+    user.premium_expires_at = None
+    await db_session.flush()
+
+
+@pytest.fixture
 def mock_extractor() -> MockReceiptExtractor:
     return MockReceiptExtractor()
 

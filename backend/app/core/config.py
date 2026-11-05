@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     # Claude Sonnet 5.5 has no dated snapshot ID: "claude-sonnet-5-5" is its
     # full ID. Each receipt records the model that read it (extraction_model).
     llm_model: str = "claude-sonnet-5-5"
+    # Priority OCR (PREM-03): the extraction model for Premium users' scans, as
+    # a LiteLLM model name. "provider/model" is sent as is; a bare name gets
+    # llm_provider, like llm_model. It shares the key, base URL, timeout and
+    # max_tokens above, and is sent no temperature. Empty: Premium scans use
+    # llm_model. The proposed value and its cost are in docs/DEPLOYMENT.md.
+    llm_premium_extraction_model: str = ""
     # Sent only when set. Claude Sonnet 5.5 rejects any non-default value, so
     # leave it unset for that model; set it for a model that accepts it.
     llm_temperature: float | None = None
@@ -70,6 +76,10 @@ class Settings(BaseSettings):
     # email a day (past it the same 202, and nothing sent).
     max_waitlist_claims_per_hour: int = 5
     max_waitlist_claims_per_email_per_day: int = 3
+    # Data export (PREM-04): each export is built whole in the request, receipt
+    # images included, so a user gets this many an hour (429 past it), and
+    # one at a time (export_service.export_slot).
+    max_exports_per_hour: int = 10
 
     # Per-IP cap on unauthenticated /api/auth/* POSTs (sign-up, sign-in, social,
     # forgot/reset password, verify, refresh). 30/min/IP is generous enough for

@@ -43,9 +43,10 @@ See `docs/prd/PHASE_SCOPE.md` for what's in and out of scope.
 - Fallback to rule-based processing if LLM unavailable or returns invalid output
 
 ### Monetization
-- MVP shipped fully free; V1.1 introduces the Premium tier ($5.99/month) through RevenueCat
+- MVP shipped fully free; V1.1 introduces the Premium tier ($4.99/month or $39.99/year, 7-day free trial) through RevenueCat
 - The backend trusts only RevenueCat's webhook and REST API for entitlements, never the client
-- Premium gates only the new extras (custom categories, data export, rollover, 12-month trend, unlimited receipts); price intelligence stays free
+- Premium gates the extras (custom categories, data export, rollover, 12-month trend, unlimited receipts), cross-store comparison, price-alert mutes and Priority OCR (a stronger extraction model, set in config); price history, item matching and price alerts stay free
+- A mute made while Premium keeps working after Premium lapses, and every user can remove one
 
 ## Project Structure
 

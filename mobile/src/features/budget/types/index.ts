@@ -21,6 +21,9 @@ export interface BudgetCategorySummary {
   percent: number;
   /** What rolled over into this category's limit (Premium rollover). */
   rolled_over?: number;
+  /** The category's colour and icon names (BC-05 AC 7); absent from servers before DA-9. */
+  color?: string;
+  icon?: string;
 }
 
 export interface DashboardTopItem {
@@ -113,4 +116,15 @@ export interface CategoryResponse {
   name: string;
   is_default: boolean;
   sort_order: number;
+  /** A colour name from `categoryPalette` (BC-05 AC 5); absent from servers before DA-9. */
+  color?: string;
+  /** An icon name from `CATEGORY_ICON_SYMBOLS`; absent from servers before DA-9. */
+  icon?: string;
+}
+
+/** What a create or edit sends: a custom category's name, colour and icon. */
+export interface CategoryInput {
+  name?: string;
+  color?: string;
+  icon?: string;
 }

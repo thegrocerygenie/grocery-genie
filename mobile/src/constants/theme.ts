@@ -33,6 +33,7 @@ export const colors = {
   iosBg2: system('secondarySystemGroupedBackground'),
   iosBg3: system('tertiarySystemGroupedBackground'),
   iosFill1: system('systemFill'),
+  iosFill2: system('secondarySystemFill'),
   iosFill3: system('tertiarySystemFill'),
   iosSeparator: system('separator'),
   iosLabel: system('label'),
@@ -68,6 +69,13 @@ export const colors = {
   onIconSquare: pair('#FFFFFF', '#FFFFFF'),
   /** systemRed at 40% — the border of a field with an error. */
   redBorder: pair('rgba(255,59,48,0.40)', 'rgba(255,69,58,0.50)'),
+  /**
+   * Red and green for small text on a card: systemRed and systemGreen fall
+   * under 4.5:1 on white (3.6 and 2.2), these reach 5.4 (and 6.0, 9.2 on
+   * the dark card).
+   */
+  redText: pair('#D70015', '#FF6961'),
+  greenText: pair('#1E7A36', '#30DB5B'),
   /** systemBlue at 8% (16% in dark) — tip cards. */
   blueBg: pair('rgba(0,122,255,0.08)', 'rgba(10,132,255,0.16)'),
   /** Action sheet cards: near-opaque white, or the dark elevated gray. */
@@ -89,6 +97,30 @@ export const colors = {
     other: system('systemGray'),
   },
 };
+
+/**
+ * Category colours by name (BC-05 AC 5, DA-9). The server stores these names,
+ * never a colour value: `backend/app/models/category_looks.py`. The custom
+ * palette (CUSTOM_CATEGORY_COLORS in constants/categories.ts) is every key but
+ * `gray`, which only the built-in "Other" uses.
+ */
+export const categoryPalette = {
+  indigo: system('systemIndigo'),
+  purple: system('systemPurple'),
+  pink: system('systemPink'),
+  red: system('systemRed'),
+  orange: system('systemOrange'),
+  yellow: system('systemYellow'),
+  green: system('systemGreen'),
+  mint: system('systemMint'),
+  teal: system('systemTeal'),
+  cyan: system('systemCyan'),
+  blue: system('systemBlue'),
+  brown: system('systemBrown'),
+  gray: system('systemGray'),
+} as const satisfies Record<string, ColorValue>;
+
+export type CategoryColorName = keyof typeof categoryPalette;
 
 /**
  * The React Navigation theme for an appearance. Native stack headers take

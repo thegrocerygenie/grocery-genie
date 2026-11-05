@@ -39,7 +39,7 @@ from datetime import UTC, datetime
 
 from pgvector.sqlalchemy import Vector
 from rapidfuzz.distance import JaroWinkler, Levenshtein
-from sqlalchemy import Float, cast, delete, select, update
+from sqlalchemy import Float, case, cast, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -470,6 +470,8 @@ class ItemMatchingService:
         """
         if source_id == target_id:
             raise ItemMatchConflictError("An item cannot be merged into itself")
+        # Items before suggestion rows, in id order (_lock_items).
+        await self._lock_items(source_id, target_id)
         source = await self.get_item(user_id, source_id)
         target = await self.get_item(user_id, target_id)
 
@@ -623,8 +625,19 @@ class ItemMatchingService:
     # --- Suggestions (PI-02 AC 2) -----------------------------------------
 
     async def list_suggestions(
-        self, user_id: uuid.UUID, item_id: uuid.UUID | None = None
+        self,
+        user_id: uuid.UUID,
+        item_id: uuid.UUID | None = None,
+        receipt_id: uuid.UUID | None = None,
     ) -> list[ItemMatchSuggestion]:
+        """The user's pending suggestions, newest first.
+
+        ``receipt_id`` keeps those raised by that receipt's lines (PI-02 AC 7,
+        8): a line there that matching made a new item of (``MATCH_NEW``), the
+        item the suggestion asks about. A later receipt with the same name
+        links to that item by its alias and raises nothing, so it is not
+        asked again. The caller checks the receipt is the user's.
+        """
         query = (
             select(ItemMatchSuggestion)
             .where(
@@ -635,21 +648,100 @@ class ItemMatchingService:
         )
         if item_id is not None:
             query = query.where(ItemMatchSuggestion.item_id == item_id)
+        if receipt_id is not None:
+            raised = select(LineItem.canonical_item_id).where(
+                LineItem.receipt_id == receipt_id,
+                LineItem.match_method == MATCH_NEW,
+            )
+            query = query.where(ItemMatchSuggestion.item_id.in_(raised))
         rows = await self.db.execute(query)
         suggestions = list(rows.scalars().all())
         for suggestion in suggestions:
             await self.db.refresh(suggestion, ["item", "suggested_item"])
         return suggestions
 
+    async def suggestion_line(
+        self, user_id: uuid.UUID, item_id: uuid.UUID
+    ) -> tuple[LineItem, Receipt] | None:
+        """The receipt line a suggestion about ``item_id`` shows (PI-02 AC 5):
+        the line matching made the item from, else its latest line; only on
+        the user's confirmed receipts that are not deleted."""
+        row = (
+            await self.db.execute(
+                select(LineItem, Receipt)
+                .join(Receipt, LineItem.receipt_id == Receipt.id)
+                .where(
+                    LineItem.canonical_item_id == item_id,
+                    Receipt.user_id == user_id,
+                    Receipt.status == "confirmed",
+                    Receipt.deleted_at.is_(None),
+                )
+                .order_by(
+                    case((LineItem.match_method == MATCH_NEW, 0), else_=1),
+                    Receipt.date.desc(),
+                    Receipt.created_at.desc(),
+                    LineItem.position,
+                )
+                .limit(1)
+            )
+        ).first()
+        return (row[0], row[1]) if row else None
+
+    async def _lock_items(self, *item_ids: uuid.UUID) -> None:
+        """Lock canonical item rows, in id order, for a merge.
+
+        Lock order (DA-5): items first, in id order, then suggestion rows.
+        merge() and accept_suggestion() both follow it, and reject_suggestion
+        locks only its one suggestion, so no two answers or merges can wait
+        on each other in a cycle. FOR NO KEY UPDATE: it does not block a
+        confirm linking new lines to the item (their foreign keys take KEY
+        SHARE).
+        """
+        await self.db.execute(
+            select(CanonicalItem.id)
+            .where(CanonicalItem.id.in_(sorted(set(item_ids))))
+            .order_by(CanonicalItem.id)
+            .with_for_update(key_share=True)
+        )
+
     async def _get_pending(
-        self, user_id: uuid.UUID, suggestion_id: uuid.UUID
+        self,
+        user_id: uuid.UUID,
+        suggestion_id: uuid.UUID,
+        *,
+        lock_items: bool = False,
     ) -> ItemMatchSuggestion:
+        """The pending suggestion, locked for this transaction (PI-02 AC 9).
+
+        A second answer to it waits on the lock, then finds it resolved (or
+        merged away) and gets ItemMatchConflictError: 409. ``lock_items``
+        (accept) locks its two items first, per the lock order above.
+        """
         suggestion = await self.db.get(ItemMatchSuggestion, suggestion_id)
         if suggestion is None or suggestion.user_id != user_id:
             raise ItemNotFoundError(suggestion_id)
         if suggestion.status != "pending":
             raise ItemMatchConflictError(f"Suggestion is already {suggestion.status}")
-        return suggestion
+        pair = (suggestion.item_id, suggestion.suggested_item_id)
+        if lock_items:
+            await self._lock_items(*pair)
+        locked = (
+            await self.db.execute(
+                select(ItemMatchSuggestion)
+                .where(ItemMatchSuggestion.id == suggestion_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one_or_none()
+        if locked is None:
+            # Accepted meanwhile: the merge dropped it.
+            raise ItemMatchConflictError("Suggestion is already resolved")
+        if locked.status != "pending":
+            raise ItemMatchConflictError(f"Suggestion is already {locked.status}")
+        if lock_items and (locked.item_id, locked.suggested_item_id) != pair:
+            # A merge moved it to other items while this waited.
+            raise ItemMatchConflictError("Suggestion changed; ask again")
+        return locked
 
     async def accept_suggestion(
         self, user_id: uuid.UUID, suggestion_id: uuid.UUID
@@ -660,7 +752,7 @@ class ItemMatchingService:
         precision metric). merge() drops the suggestion itself: it would pair
         the item with itself.
         """
-        suggestion = await self._get_pending(user_id, suggestion_id)
+        suggestion = await self._get_pending(user_id, suggestion_id, lock_items=True)
         confirmed = MatchResult(
             suggestion.suggested_item_id, suggestion.confidence, suggestion.method
         )

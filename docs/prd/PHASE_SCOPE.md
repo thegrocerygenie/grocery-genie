@@ -2,7 +2,9 @@
 
 ## Active Phase: V1.1 (Price Intelligence + Premium)
 
-The MVP (Budget Copilot) has shipped. V1.1 turns the line items users already scan into price intelligence and launches the Premium tier. Price intelligence stays free; Premium adds extras on top of the free app.
+The MVP (Budget Copilot) has shipped. V1.1 turns the line items users already scan into price intelligence and launches the Premium tier. Price history, item matching and price alerts are free; Premium adds cross-store comparison, alert mutes (decision D8), Priority OCR (D9) and the extras on top of the free app.
+
+The V1.1 design alignment (plan `.planning/PLAN-2026-11-04-v1.1-design-alignment.md`, decisions D6–D10, 2026-11-04) brings the V1.1 screens in line with `design/claude-design/` (D6: the design wins where the PRD allows) and accepts the new scope listed below (D10). Its ACs are tagged "(DA-n)" in `03-price-intelligence.md` and `02-budget-copilot.md`.
 
 ## Explicitly IN V1.1 Scope
 
@@ -10,14 +12,17 @@ The MVP (Budget Copilot) has shipped. V1.1 turns the line items users already sc
 - Price change alerts with rolling 7- and 30-day averages, per-item and per-store mutes, user threshold (PI-03)
 - Cross-store price comparison on item detail (PI-04)
 - Store name normalization (branch numbers, punctuation) and per-user store merge; a user's merge never renames a shared store
-- Premium tier via RevenueCat ($5.99/month): webhook-backed entitlements, paywall, restore purchases
-- Premium-only extras: custom categories (up to 10, BC-05 AC 3), data export (JSON/CSV), budget rollover, 12-month spending trend, unlimited receipts
-- Free users who reach a Premium extra see an upgrade prompt, never an error screen
+- Premium tier via RevenueCat at $4.99/month or $39.99/year with a 7-day free trial (D7, replacing D1's $5.99): webhook-backed entitlements, paywall, restore purchases (PREM-01)
+- Premium-only extras: custom categories (up to 10, BC-05 AC 3), data export, budget rollover, 12-month spending trend, unlimited receipts
+- Premium price intelligence (D8, PREM-02): cross-store comparison and price-alert mutes. Price history, matching and alerts stay free; a mute made while Premium keeps working after a lapse and can still be removed
+- Priority OCR (D9, PREM-03): Premium scans use a stronger extraction model, set in provider-agnostic config
+- Design-alignment scope (D10): item detail range control (PI-01 AC 5–10) and an in-app Price alerts list with a cooldown setting (PI-03 AC 5–9); the "Same item?" match prompt, also right after a receipt is confirmed (PI-02 AC 5–9); split by line and the Link items sheet (PI-02 AC 10–15); timed mutes (PI-03 AC 10–14); export options: date range, PDF report, receipt images (PREM-04); category colour and icon (BC-05 AC 5–8); the Compare stores and Trend layouts (PI-04 AC 5–8, BC-04 AC 6–10)
+- Free users who reach a Premium feature see an upgrade prompt, never an error screen
 
 ## Explicitly OUT of V1.1 Scope
 
 - Multi-image receipt linking (the "V1.1 stretch" in the edge cases) → dropped from V1.1
-- Household sharing, multi-member anything → **V1.5**
+- Household sharing, multi-member anything → **V1.5**. Decided 2026-11-05 (user, DA-9 review): custom categories stay per user in V1.1; when households ship in V1.5 they become shared per household, colour and icon included.
 - Ingredient classification, pantry, recipes, shopping lists → **V2.0**
 - Community features, basket comparison, personal inflation → **V2.5**
 - Semantic search, LLM recipe variations, taste profiles → **V3.0**
@@ -80,7 +85,7 @@ Every user story, requirement, and data entity in the PRD docs is tagged with it
 - **Database:** PostgreSQL with pgvector extension, SQLAlchemy 2.0+ (async), Alembic for migrations
 - **LLM provider:** Anthropic Claude Sonnet via LiteLLM (provider-agnostic, swappable via config)
 - **Image processing:** Pillow + OpenCV for receipt quality assessment
-- **Monetization:** MVP was fully free. V1.1 adds Premium through RevenueCat (`react-native-purchases` in the app; the backend trusts only RevenueCat's webhook and REST API for entitlements, never the client).
+- **Monetization:** MVP was fully free. V1.1 adds Premium through RevenueCat (`react-native-purchases` in the app; the backend trusts only RevenueCat's webhook and REST API for entitlements, never the client). The user creates the App Store products, the trial offer and the RevenueCat offering (D7); the app builds against the offering, with mocks in tests, and `docs/DEPLOYMENT.md` lists the product ids and steps.
 
 All open questions have been resolved. See `OPEN_QUESTIONS.md` for the full decision log.
 

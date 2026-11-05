@@ -4,11 +4,13 @@ Intelligence 1, decision D3).
 Branch numbers and punctuation normalize away for everyone; a user merges two
 of their own stores to group them, which changes only how that user's prices
 group: price history, item stats, cross-store comparison, price alerts and
-store mutes. Price intelligence is free, so every test runs as a free user.
+store mutes. Comparison and mutes are Premium (D8), so every test runs as a
+Premium user; the gates are in test_premium_gating.py.
 """
 
 import uuid
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
@@ -16,6 +18,10 @@ from app.models.database import Notification, Store, UserStoreAlias
 from tests.api.test_items import _item_id, analytics_spy  # noqa: F401
 from tests.api.test_price_comparison import _compare, _manual
 from tests.conftest import USER_B_ID, ensure_user
+
+# Comparison and mutes are Premium (D8, PREM-02); these tests are about how
+# they work, so every user is Premium. The gates: test_premium_gating.py.
+pytestmark = pytest.mark.usefixtures("everyone_premium")
 
 
 async def _stores(client: AsyncClient) -> list[dict]:

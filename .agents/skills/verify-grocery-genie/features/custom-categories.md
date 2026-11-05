@@ -16,10 +16,13 @@ A Premium user adds up to 10 categories of their own on top of the eight default
 - `cat-delete` a lapsed user's delete is `204`: the item moves to "Other", no `line_items` or `budgets` row points at the category, the mapping loses its category, and the budget is gone from `/api/budgets`.
 - `cat-isolation` another user never lists the category, and using its id in a budget or a correction is `400`.
 - `cat-account-delete` deleting the account deletes the user's categories.
+- `cat-look` (DA-9, BC-05 AC 5, 7) every category lists a `color` and `icon`: the eight defaults their fixed ones (Groceries `green`/`cart` ... Other `gray`/`tag`); a create with none gets `indigo`/`tag`, one with `mint`/`leaf` keeps them; a value outside the allowed sets (`#ff0000`, `trash.fill`, the built-in-only `gray`) is `422` on POST and PATCH, and so is an empty PATCH; a PATCH of `color`/`icon` alone is `200` and keeps the name; the dashboard's `categories[]` carries the look.
+- `cat-look-lapse` (AC 8) after an `EXPIRATION` the looks still list unchanged, and a PATCH of `color` is `403 premium_required`.
+- `cat-look-isolation` a second Premium user's PATCH of the first user's category colour is `404`, the row keeps its look, and they can make their own with the same name and look.
 
 ## How to get to it (user POV)
 
-- Settings, Spending, Categories: the user's own categories with "n of 10" and Add Category, then the built-in ones. A free user sees the upgrade prompt ("See Premium" opens the paywall) instead of Add Category; a lapsed user sees their categories with a delete action and a note to renew. Tapping a category offers Rename and Delete; Delete asks first. The category picker on Review and on a receipt lists custom categories after the defaults, and so does Budgets. The paywall lists "Your own categories". These screens are UI and need a Simulator check; this journey proves the API they call.
+- Settings, Spending, Categories (DA-9 layout): "Built-in" first, each in its icon square; then "Custom" with "n of 10", the user's categories in round icons, a "New category" row and the footer "Custom categories require Premium.". A free user sees the upgrade prompt ("See Premium" opens the paywall) instead of New category; a lapsed user sees their categories in their colours with a note to renew. Tapping a custom category opens the editor (name, colour, icon); for a lapsed user it shows the upgrade prompt instead of Save. Edit in the navigation bar shows a delete button per custom category (Delete asks first) and makes a tap rename. The category picker on Review and on a receipt lists custom categories after the defaults, and so does Budgets. The paywall lists "Your own categories". These screens are UI and need a Simulator check; this journey proves the API they call.
 
 ## Driving it with gg-verify
 
@@ -50,6 +53,17 @@ ev() {  # ev ID TYPE EVENT_AT EXPIRES_AT [APP_USER_ID]
 - **Delete (`cat-delete`).** `other=$($G api GET /api/categories | jq -r '.[] | select(.name=="Other") | .id')`. `$G api DELETE /api/categories/$c0` is `204`. The item on `$rid` now has `category_id` `$other`. `$G sql "SELECT count(*) FROM line_items WHERE category_id = '$c0'"` and the same on `budgets` are `0`; the mapping row reads `paper towels 6pk|` (no category). `$G api GET /api/budgets` is `[]`.
 - **Isolation (`cat-isolation`).** `$G signup categories-b`. `$G api GET /api/categories | jq --arg c "$c1" '[.[] | select(.id==$c)] | length'` is `0`. A budget with `category_id` `$c1` prints `-> 400`. Scan, then a PATCH correcting an item to `$c1` prints `-> 400` (`Unknown category ...`).
 - **Account delete (`cat-account-delete`).** As user B: `uidb=$($G api GET /api/users/me | jq -r .id)`, grant with `$G revenuecat "$(ev "gb-$uidb" INITIAL_PURCHASE $now $((now+30*day)) $uidb)"`, `$G api POST /api/categories '{"name":"Garden"}'` (`201`), `$G api DELETE /api/users/me` (`204`). `$G sql "SELECT count(*) FROM categories WHERE user_id = '$uidb'"` is `0`.
+
+### Colour and icon (DA-9)
+
+A fresh user, so the cap and lapse steps above don't interfere: `$G signup looks`, `uid` and `ev` as above.
+
+- **Free.** `$G api POST /api/categories '{"name":"Garden","color":"mint","icon":"leaf"}' || true` is `-> 403 premium_required`. Grant as above.
+- **Looks (`cat-look`).** `$G api POST /api/categories '{"name":"Garden"}'` is `201` with `"color":"indigo","icon":"tag"`; `'{"name":"Yard","color":"mint","icon":"leaf"}'` is `201` with those. `'{"name":"Bad","color":"#ff0000"}'` and `'{"name":"Bad","icon":"trash.fill"}'` print `-> 422` (`literal_error` listing the allowed set). With `g` Garden's id: `$G api PATCH /api/categories/$g '{"color":"green","icon":"gift"}'` is `200`, name still `Garden`; `'{}'` and `'{"color":"gray"}'` are `-> 422`. `$G api GET /api/categories | jq -c '[.[] | [.name,.color,.icon]]'` lists the eight defaults with their fixed looks, then `Garden green gift`, `Yard mint leaf`. A budget on Yard (`201`), then `$G api GET '/api/dashboard/spending?period=2026-03' | jq -c '[.categories[] | {name,color,icon}]'` is `[{"name":"Yard","color":"mint","icon":"leaf"}]`. `$G sql "SELECT name, color, icon FROM categories WHERE user_id = '$uid' ORDER BY sort_order"` agrees.
+- **Lapse (`cat-look-lapse`).** `EXPIRATION` as above; `$G api PATCH /api/categories/$y '{"color":"red"}' || true` is `-> 403 premium_required`; the list still shows `Garden green gift`, `Yard mint leaf`.
+- **Isolation (`cat-look-isolation`).** `$G signup looks-b`, grant B Premium. `$G api PATCH /api/categories/$y '{"color":"red"}' || true` is `-> 404`; B lists no custom categories; B's `POST '{"name":"Yard","color":"mint","icon":"leaf"}'` is `201`. `$G sql "SELECT color, icon FROM categories WHERE id = '$y'"` is still `mint|leaf`.
+
+Proven 2026-11-04, run `20261104-231913` (debug mode).
 
 ## Gotchas
 

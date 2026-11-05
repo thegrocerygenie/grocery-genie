@@ -30,6 +30,7 @@ The "Since" column says which stage introduced the feature.
   - **Free:** scanning, budgets, alerts, and all price intelligence (price history, price alerts, store comparison). Up to 20 receipts a month.
   - **Premium, $5.99/month** (RevenueCat; the price shown comes from the App Store): unlimited receipts, custom categories, a 12-month trend, budget rollover and data export.
   - The App Store product and RevenueCat production keys aren't set up yet (see section 4).
+  - **Changing (decided 2026-11-04, not built yet):** Premium becomes $4.99/month or $39.99/year with a 7-day free trial (decision D7, [#18](../decisions.md)), and store comparison and alert mutes move to Premium (D8, #19); price history, matching and price alerts stay free. Priority OCR joins Premium (D9, #20). The lines above describe the code as it is; the site follows #18–#20 (section 3).
 
 ## 2. Feature list
 
@@ -93,6 +94,10 @@ Every MVP feature in [../mvp/feature-scope.md](../mvp/feature-scope.md) §2 is s
   - a free user hitting the 20-receipt cap now gets an upgrade prompt;
   - AX5 layout fixes.
 - **Removed:** nothing.
+- **Decided for the V1.1 design alignment, not built yet (DA-1 to DA-10, decisions D6–D10, `docs/prd/PHASE_SCOPE.md`):**
+  - the new price and plans, and Premium store comparison and mutes (#18, #19): until DA-1 ships, the site shows no price and doesn't say which of the two is free;
+  - Priority OCR (#20);
+  - item detail range control, the in-app Price alerts list and cooldown setting, the "Same item?" prompt after scanning, split by line and the Link items sheet, timed mutes, export by date range with a PDF report and receipt images, category colours and icons, and the new Compare stores and Trend layouts. Keep them off the site until each is built; rerun this scope then.
 - **Planned for V1.1 but not built (keep off the site):**
   - **V11-05:** store name clean-up and store merge. "Loblaws" and "Loblaws #1234" are still separate stores in comparison.
   - **V11-P5:** the waitlist free-year matching and the Settings claim step.
@@ -102,8 +107,9 @@ Every MVP feature in [../mvp/feature-scope.md](../mvp/feature-scope.md) §2 is s
 Settled (see [decisions](../decisions.md)):
 1. **#14:** version 1.1.0.
 2. **#15:** two states: waitlist now, App Store downloads at launch.
-3. **#16:** a Free vs Premium table in State B only, at $5.99/month, once the App Store product is live.
+3. **#16:** a Free vs Premium table in State B only, once the App Store product is live (its $5.99/month is replaced by #18).
 4. **#17:** no item-matching figures.
+   - **#18–#20:** Premium at $4.99/month or $39.99/year with a 7-day trial; store comparison and mutes are Premium, never "price intelligence is free"; Priority OCR named only once built, with no accuracy claim.
 5. **Still in force from the MVP:** #2–#13, including the free Premium year, "Free" in the hero, no on-device claims, no speed or accuracy figures, and Q4 2026.
 
 Still open:
@@ -130,6 +136,9 @@ Still open:
 | Pantry, recipes, shopping lists, meal plans | Not built | V2.0 |
 | Family plan, $8.99/month | Not built | Later |
 | Premium price before the App Store product is live | Hold | Decision #16 |
+| Premium at $5.99/month | Now $4.99/month or $39.99/year, 7-day trial | Decision #18 |
+| "All price intelligence is free", "store comparison stays free" | Comparison and mutes become Premium | Decision #19 |
+| "Priority OCR", "more accurate scans" for Premium | Not built; no accuracy figures | Decision #20, #5 |
 | "Unlimited" for the free plan | 20 a month | Decision #3 |
 | "Early sign-ups get TestFlight access first" (current FAQ) | No TestFlight build or invite process exists in the repo | Unconfirmed: confirm or remove |
 | "Continue with Google" | Hold until configured | — |

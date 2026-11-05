@@ -1,13 +1,21 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, Switch, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
+import { isPremiumRequired } from '@/utils/premium';
 
 import { PRICES_COPY } from '../constants';
 import { useMuteItem, useMuteStore, usePriceAlertSettings } from '../hooks/useItems';
 import type { StoreRef } from '../types';
 
 interface Props {
+  /**
+   * Whether the user may mute (Premium, D8, PREM-02 AC 2). False: turning a
+   * switch off shows the upgrade prompt instead and the switch stays on;
+   * turning a muted switch back on (unmuting) always works.
+   */
+  canMute: boolean;
   itemId: string;
   itemName: string;
   alertsMuted: boolean;
@@ -20,9 +28,11 @@ const ITEM_KEY = 'item';
 /**
  * PI-03 AC 4: turn price change alerts off for this item, or for prices paid
  * at one of its stores. A switch shows the new state while it saves and goes
- * back if the save fails.
+ * back if the save fails. Muting is Premium (PREM-02 AC 5, 6): a free user,
+ * or a `403 premium_required`, gets the upgrade prompt.
  */
-export function PriceAlertControls({ itemId, itemName, alertsMuted, stores }: Props) {
+export function PriceAlertControls({ canMute, itemId, itemName, alertsMuted, stores }: Props) {
+  const router = useRouter();
   const settings = usePriceAlertSettings();
   const muteItem = useMuteItem();
   const muteStore = useMuteStore();
@@ -35,9 +45,16 @@ export function PriceAlertControls({ itemId, itemName, alertsMuted, stores }: Pr
       delete next[key];
       return next;
     });
-  const failed = () => Alert.alert(PRICES_COPY.actionFailed);
+  const upgrade = () =>
+    Alert.alert(PRICES_COPY.muteUpgradeTitle, PRICES_COPY.muteUpgradeMessage, [
+      { text: PRICES_COPY.notNow, style: 'cancel' },
+      { text: PRICES_COPY.upgradeAction, onPress: () => router.push('/paywall') },
+    ]);
+  const failed = (error: unknown) =>
+    isPremiumRequired(error) ? upgrade() : Alert.alert(PRICES_COPY.actionFailed);
 
   const setItemAlerts = (on: boolean) => {
+    if (!on && !canMute) return upgrade();
     setSaving((s) => ({ ...s, [ITEM_KEY]: on }));
     muteItem.mutate(
       { id: itemId, muted: !on },
@@ -45,6 +62,7 @@ export function PriceAlertControls({ itemId, itemName, alertsMuted, stores }: Pr
     );
   };
   const setStoreAlerts = (storeId: string, on: boolean) => {
+    if (!on && !canMute) return upgrade();
     setSaving((s) => ({ ...s, [storeId]: on }));
     muteStore.mutate(
       { storeId, muted: !on },

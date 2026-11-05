@@ -135,6 +135,12 @@ GG_LLM_API_KEY=sk-ant-...
 # A starting value until extraction latency is measured on the receipt test set.
 GG_LLM_TIMEOUT_SECONDS=60
 GG_LLM_NUM_RETRIES=1
+# Priority OCR (V1.1, PREM-03): the extraction model for Premium users' scans,
+# as a LiteLLM model name ("provider/model" as is; a bare name gets
+# GG_LLM_PROVIDER). Same key, base URL, timeout and max_tokens; no temperature.
+# Unset: Premium scans use GG_LLM_MODEL. Set GG_LLM_PREMIUM_EXTRACTION_MODEL
+# to the stronger extraction model the product owner chose (decision D9),
+# after the check in "Priority OCR model" (Part 3).
 
 # Item matching (V1.1, PI-02). Defaults shown; the image bakes in the default
 # model, so another one is downloaded on first use (and needs a migration of
@@ -519,37 +525,65 @@ Set `EXPO_TOKEN` in GitHub repository secrets (generate at expo.dev → Account 
 
 ### 2.9 Premium through RevenueCat (V1.1)
 
-Premium is $5.99/month (`docs/prd/00-overview.md`), sold as an App Store
-auto-renewing subscription through RevenueCat. The app buys and restores with
-`react-native-purchases`; the backend never believes the app about Premium.
-It stores the entitlement from RevenueCat's webhook, and reads RevenueCat's
-REST API after a purchase or restore (`POST /api/users/me/premium/refresh`).
+Premium is $4.99/month or $39.99/year, each with a 7-day free trial
+(`docs/prd/00-overview.md`, decision D7, replacing $5.99), sold as App Store
+auto-renewing subscriptions through RevenueCat. The paywall reads both plans
+and their prices from the RevenueCat offering, never from the code, and shows
+the trial only when RevenueCat says the Apple ID may take it (PRD PREM-01). The
+app buys and restores with `react-native-purchases`; the backend never believes
+the app about Premium. It stores the entitlement from RevenueCat's webhook, and
+reads RevenueCat's REST API after a purchase or restore
+(`POST /api/users/me/premium/refresh`).
 
-1. **App Store Connect:** create an auto-renewable subscription (for example
-   `gg_premium_monthly`, $5.99/month) in a subscription group, and an
-   In-App Purchase key (Users and Access → Integrations → In-App Purchase).
+What to create (the tests mock all of it):
+
+| What | Identifier | Setting |
+|---|---|---|
+| Subscription group | `Grocery Genie Premium` | Both products in it, Yearly ranked above Monthly (an upgrade takes effect at once, a downgrade at the next renewal) |
+| Product | `gg_premium_monthly` | Auto-renewable, 1 month, $4.99 (US price tier; App Store Connect sets the rest) |
+| Product | `gg_premium_yearly` | Auto-renewable, 1 year, $39.99 |
+| Introductory offer | on each product | Free trial, 1 week (7 days), new subscribers, all territories |
+| RevenueCat entitlement | `premium` | Both products attached |
+| RevenueCat offering | `default`, marked current | Packages `$rc_annual` → `gg_premium_yearly` and `$rc_monthly` → `gg_premium_monthly` |
+
+1. **App Store Connect:** My Apps → Grocery Genie → Subscriptions: create the
+   subscription group, then the two auto-renewable subscriptions above with
+   their prices, display names and review screenshots. On each, Subscription
+   Prices → Introductory Offers → add a Free trial of 1 week, starting now with
+   no end date. Then Users and Access → Integrations → In-App Purchase: create
+   an In-App Purchase key. Apple allows one trial per Apple ID per group, so a
+   user who had the trial on one plan sees "Subscribe" on both.
 2. **RevenueCat:** create a project with an Apple App Store app for the bundle
-   ID `com.grocerygenie.app`, upload the In-App Purchase key, import the
-   product, and attach it to an entitlement with the identifier `premium`
-   (`GG_REVENUECAT_ENTITLEMENT_ID` if you pick another). Put the product in the
-   current offering as its monthly package: the paywall shows that package
-   and its App Store price.
+   ID `com.grocerygenie.app`, upload the In-App Purchase key, and import both
+   products. Create the entitlement `premium` (`GG_REVENUECAT_ENTITLEMENT_ID` if
+   you pick another) and attach both products. Create the offering `default`,
+   make it current, and add the Annual package (`$rc_annual`) with
+   `gg_premium_yearly` and the Monthly package (`$rc_monthly`) with
+   `gg_premium_monthly`. The paywall shows the Annual package first (selected)
+   and the Monthly one under it, with their App Store prices; an offering with
+   neither shows "Premium can't be loaded right now" and Try Again.
 3. **Webhook:** Project settings → Integrations → Webhooks → add
    `https://api.grocerygenie.app/api/webhooks/revenuecat`. Set the
    Authorization header value to the secret generated for
    `GG_REVENUECAT_WEBHOOK_SECRET` (with or without `Bearer `), and send events
    for both production and sandbox: App Review and TestFlight buy in the
-   sandbox. "Send test event" should answer 200 `{"status": "ignored"}`.
+   sandbox. "Send test event" should answer 200 `{"status": "ignored"}`. A
+   trial arrives as an `INITIAL_PURCHASE` with `period_type` `TRIAL` and the
+   trial's end as its expiry; either product grants Premium.
 4. **API keys:** the secret API key (v1, `sk_...`) goes in
    `GG_REVENUECAT_API_KEY` (1.5). The public Apple SDK key (`appl_...`) goes in
    the build's `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` (2.3).
 5. **Build:** `react-native-purchases` is a native module, so Premium works
    only in a development or EAS build, never in Expo Go (there the paywall
    says purchases need the App Store build).
-6. **Check on a device** with a sandbox Apple ID: buy Premium, see Settings say
-   Premium, open the 12-month trend; delete and reinstall the app, then
-   "Restore purchases". Cancel in the sandbox and wait for the expiry
-   (sandbox months last minutes): the app goes back to the free plan.
+6. **Check on a device** with a new sandbox Apple ID: the paywall shows
+   Yearly $39.99 "/yr · $3.33/mo" with "SAVE 33%", and Monthly $4.99, and
+   reads "Start 7-day free trial". Start the trial on Yearly, see Settings say
+   Premium, open the 12-month trend and a store comparison; delete and
+   reinstall the app, then "Restore purchase". Switch to Monthly in iOS
+   Settings → Subscriptions and check Premium stays on. Cancel in the sandbox
+   and wait for the expiry (sandbox trials and months last minutes): the app
+   goes back to the free plan, and the paywall now reads "Subscribe".
 
 The app logs in to RevenueCat with the user's Grocery Genie id, so webhook
 events name that id. A purchase made before sign-in arrives with the id among
@@ -636,11 +670,30 @@ email. Accounts whose email differs (Apple's Hide My Email) use Settings →
 |---------|------|-------|
 | Hetzner VPS (CX22 or CX32) | €4-8/month | 2-4 vCPU, 4-8GB RAM. Already paying for this. |
 | Supabase PostgreSQL (Free/Pro) | $0-25/month | Free tier: 500MB. Pro: 8GB, $25/month. |
-| Anthropic API | ~$50-200/month | Depends on receipt volume. ~$0.003-0.01 per receipt with Sonnet. |
+| Anthropic API | ~$50-200/month | Depends on receipt volume. ~$0.03-0.06 per receipt on the default model (the earlier ~$0.003-0.01 was stale: it predates adaptive thinking); Premium scans ~2x, see Priority OCR model below. |
 | Apple Developer Program | $99/year (~$8/month) | Required for App Store. |
 | Expo EAS (Free tier) | $0 | 15 iOS builds/month. Sufficient for MVP. |
 | Domain name | ~$12/year | For api.grocerygenie.app |
 | **Total** | **~$65-250/month** | Before revenue. Lower end if using Supabase free tier. |
+
+### Priority OCR model (V1.1, PREM-03)
+
+Premium users' scans are read by `GG_LLM_PREMIUM_EXTRACTION_MODEL`; free users' by `GG_LLM_MODEL`. The backend decides from the user's Premium entitlement (written only from RevenueCat) when extraction starts. If the Premium model fails or returns output the schema rejects, the scan goes to the default model; if that fails too, the scan fails the usual way (503; the app keeps the photo and retries it, and manual entry stays open). `receipt_extraction_completed` records `extraction_tier` (`priority` or `standard`) and each receipt records the model that read it (`receipts.extraction_model`).
+
+**Which model:** the operator sets `GG_LLM_PREMIUM_EXTRACTION_MODEL` to the stronger extraction model the product owner chose (decision D9), as a LiteLLM model name. A model from the default's provider uses the same key and gateway. The backend sends it no sampling settings.
+
+Estimated cost per scan, from the provider's published per-token prices, for one call of about 3,000-6,000 input tokens (the system prompt plus the receipt photo) and 2,500-4,500 output tokens (adaptive thinking plus the JSON for a typical receipt). The stronger tier costs about 2x the default's per token, so about 2x per scan:
+
+| Tier | Used for | Estimated cost per scan |
+|------|----------|-------------------------|
+| Default (`GG_LLM_MODEL`) | Free scans, and the fallback | ~$0.03-0.06 |
+| Stronger tier (`GG_LLM_PREMIUM_EXTRACTION_MODEL`) | Premium scans | ~$0.06-0.11 (about 2x) |
+
+At 30 scans a month a Premium user costs about $1-2 more than on the default, against $4.99/month or $39.99/year. These are estimates: the token counts are not measured yet, because the receipt test set has no images. Before turning it on (PREM-03 AC 6):
+
+1. Run `cd backend && .venv/bin/python -m tests.llm_validation.run extract` and then `... extract --premium` with `GG_LLM_API_KEY` and `GG_LLM_PREMIUM_EXTRACTION_MODEL` set. Each report in `tests/llm_validation/reports/` records the model, the accuracy metrics and `tokens_per_scan` (mean input and output tokens).
+2. The Premium model's field accuracy and item recall must be no lower than the default's, with 0% hallucination. Multiply `tokens_per_scan` by the provider's prices for the cost per scan, and record both in the release notes.
+3. The owner approves the model and its cost; then set `GG_LLM_PREMIUM_EXTRACTION_MODEL` in production. This run is the manual check in `docs/device-checklist.md` §8 (Priority OCR).
 
 ---
 
