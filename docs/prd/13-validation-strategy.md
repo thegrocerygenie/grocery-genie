@@ -752,6 +752,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Component | `mobile/src/__tests__/matchPrompt.test.tsx` "passes over a suggestion merged away elsewhere (404) without an error" | Pass |
 | PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/services/test_match_concurrency.py::test_two_answers_at_once_resolve_once` | Pass |
 | PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/services/test_match_concurrency.py::test_an_answer_and_a_merge_of_its_item_at_once_never_deadlock` | Pass |
+| PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/services/test_match_concurrency.py::test_accept_takes_its_item_locks_first_in_id_order` | Pass |
 | PI-02 | 9 | Already-resolved suggestion (409) skipped quietly; failed save says so inline | Integration | `backend/tests/api/test_items.py::test_rejecting_a_suggestion_keeps_the_items_apart` | Pass |
 | PI-02 | 10 | Split by line, including one of several lines sharing a receipt name | Component | Not yet implemented (DA-6) | Pending |
 | PI-02 | 11 | Named new items, counts and averages, "+ Add another split", Save rules | Component | Not yet implemented (DA-6) | Pending |

@@ -144,3 +144,67 @@ async def test_an_answer_and_a_merge_of_its_item_at_once_never_deadlock(
         ids = {i.id for i in (await db.execute(select(CanonicalItem))).scalars()}
     assert third in ids
     assert suggestion.suggested_item_id not in ids
+
+
+async def test_accept_takes_its_item_locks_first_in_id_order(db_engine):
+    """Pins the lock order. A manual merge the other way round (the suggested
+    item into the asked one) races an accept of the suggestion. Two holders of
+    shared locks on the items, released highest id first, line the waits up:
+
+    - accept locking its items in id order waits behind the merge and then
+      finds the suggestion merged away (409);
+    - accept skipping its item locks would hold the suggestion row while the
+      merge, holding the items, needs it: a deadlock;
+    - accept locking them highest id first would hold the highest while the
+      merge, holding the lowest, needs it: a deadlock.
+    """
+    factory = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+    suggestion = await _pending(factory)
+    low, high = sorted([suggestion.item_id, suggestion.suggested_item_id])
+
+    async def share(item_id) -> AsyncSession:
+        db = factory()
+        await db.begin()
+        await db.execute(
+            select(CanonicalItem.id)
+            .where(CanonicalItem.id == item_id)
+            .with_for_update(read=True)
+        )
+        return db
+
+    hold_high = await share(high)
+    hold_low = await share(low)
+
+    async def merge() -> str:
+        async with factory() as db, db.begin():
+            await ItemMatchingService(db).merge(
+                USER, suggestion.suggested_item_id, suggestion.item_id
+            )
+            return "ok"
+
+    async def accept() -> str:
+        async with factory() as db, db.begin():
+            try:
+                await ItemMatchingService(db).accept_suggestion(USER, suggestion.id)
+                return "ok"
+            except ItemMatchConflictError:
+                return "conflict"
+
+    merging = asyncio.create_task(merge())
+    await asyncio.sleep(0.3)  # the merge waits on the lowest id
+    accepting = asyncio.create_task(accept())
+    await asyncio.sleep(0.3)  # the accept waits too, on whichever it locks
+    await hold_high.commit()
+    await hold_high.close()
+    await asyncio.sleep(0.3)
+    await hold_low.commit()
+    await hold_low.close()
+
+    results = await asyncio.wait_for(
+        asyncio.gather(merging, accepting, return_exceptions=True), timeout=15
+    )
+
+    assert results == ["ok", "conflict"]
+    async with factory() as db:
+        ids = {i.id for i in (await db.execute(select(CanonicalItem))).scalars()}
+    assert ids == {suggestion.item_id}
