@@ -26,9 +26,12 @@ from app.models.schemas import (
     ItemMergeRequest,
     ItemRef,
     ItemRenameRequest,
+    ItemSplitRequest,
+    ItemSplitResponse,
     ItemSuggestionResponse,
     ItemSummaryResponse,
     LatestPrice,
+    LinkCandidatesResponse,
     PriceAlertSettingsResponse,
     PriceAlertSettingsUpdate,
     PriceComparisonResponse,
@@ -44,11 +47,14 @@ from app.services.item_matching_service import (
     ItemMatchConflictError,
     ItemMatchingService,
     ItemNotFoundError,
+    SplitLineError,
+    SplitPart,
 )
 from app.services.price_alert_service import PriceAlertService, PriceAlertSettings
 from app.services.price_service import (
     MIN_COMPARISON_OBSERVATIONS,
     MIN_TIMELINE_POINTS,
+    ItemSummary,
     PriceService,
 )
 from app.services.receipt_service import ReceiptService
@@ -57,6 +63,8 @@ from app.services.store_service import StoreGroup, StoreService
 router = APIRouter(prefix="/api/items", tags=["items"])
 
 ITEM_NOT_FOUND = "Item not found"
+# PI-02 AC 15: items listed on the Link items sheet, at most.
+LINK_CANDIDATES_MAX = 500
 
 
 def _latest(
@@ -71,6 +79,24 @@ def _latest(
         currency=observation.currency,
         date=observation.date,
         store_name=store.name if store else None,
+    )
+
+
+def _money(value) -> float | None:
+    return float(value) if value is not None else None
+
+
+def _summary(
+    s: ItemSummary, stores: dict[uuid.UUID, StoreGroup]
+) -> ItemSummaryResponse:
+    return ItemSummaryResponse(
+        id=s.item.id,
+        canonical_name=s.item.canonical_name,
+        unit_of_measure=s.item.unit_of_measure,
+        observation_count=s.observation_count,
+        store_count=s.store_count,
+        latest_price=_latest(s.latest, stores),
+        avg_unit_price=_money(s.average),
     )
 
 
@@ -127,7 +153,9 @@ async def _detail(
     db: AsyncSession, user_id: uuid.UUID, item: CanonicalItem
 ) -> ItemDetailResponse:
     await db.refresh(item, ["aliases"])
-    count, stores, latest = await PriceService(db).item_stats(user_id, item.id)
+    prices = PriceService(db)
+    count, stores, latest = await prices.item_stats(user_id, item.id)
+    average = (await prices.averages(user_id, [item.id])).get(item.id)
     groups = await _store_groups(db, user_id, [latest])
     suggestions = await ItemMatchingService(db).list_suggestions(user_id, item.id)
     return ItemDetailResponse(
@@ -137,6 +165,7 @@ async def _detail(
         observation_count=count,
         store_count=stores,
         latest_price=_latest(latest, groups),
+        avg_unit_price=_money(average),
         aliases=[ItemAliasResponse.model_validate(a) for a in item.aliases],
         suggestions=[await _suggestion(db, user_id, s) for s in suggestions],
         alerts_muted=await PriceAlertService(db).is_item_muted(user_id, item.id),
@@ -178,17 +207,7 @@ async def list_items(
     groups = await _store_groups(db, user.id, [s.latest for s in summaries])
     pending = await ItemMatchingService(db).list_suggestions(user.id)
     return ItemListResponse(
-        items=[
-            ItemSummaryResponse(
-                id=s.item.id,
-                canonical_name=s.item.canonical_name,
-                unit_of_measure=s.item.unit_of_measure,
-                observation_count=s.observation_count,
-                store_count=s.store_count,
-                latest_price=_latest(s.latest, groups),
-            )
-            for s in summaries
-        ],
+        items=[_summary(s, groups) for s in summaries],
         total=total,
         page=page,
         per_page=per_page,
@@ -314,8 +333,12 @@ async def get_price_history(
 ) -> PriceHistoryResponse:
     """Every price paid for the item, oldest first (PI-01)."""
     item = await _get_item(ItemMatchingService(db), user.id, item_id)
-    history = await PriceService(db).history(
+    prices = PriceService(db)
+    history = await prices.history(
         user.id, item, store_id=store, from_date=from_date, to_date=to_date
+    )
+    names = await prices.line_names(
+        [p.observation.line_item_id for p in history.points]
     )
     analytics.emit(
         "price_history_viewed",
@@ -332,6 +355,8 @@ async def get_price_history(
         observations=[
             PricePointResponse(
                 receipt_id=p.observation.receipt_id,
+                line_item_id=p.observation.line_item_id,
+                line_name=names.get(p.observation.line_item_id, ""),
                 date=p.observation.date,
                 store_id=p.store_id,
                 store_name=p.store_name,
@@ -438,6 +463,62 @@ async def split_alias(
     except ItemMatchConflictError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return await _detail(db, user.id, item)
+
+
+@router.post("/{item_id}/split", response_model=ItemSplitResponse, status_code=201)
+async def split_item(
+    item_id: uuid.UUID,
+    body: ItemSplitRequest,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User = Depends(get_current_user),
+) -> ItemSplitResponse:
+    """Split by line (PI-02 AC 10-14): each split's lines, with their prices,
+    become a new item of that name. Returns the new items, in order."""
+    service = ItemMatchingService(db)
+    try:
+        new_items = await service.split_lines(
+            user.id,
+            item_id,
+            [SplitPart(p.name, p.line_item_ids) for p in body.splits],
+        )
+    except ItemNotFoundError:
+        raise HTTPException(status_code=404, detail=ITEM_NOT_FOUND) from None
+    except SplitLineError:
+        raise HTTPException(
+            status_code=422,
+            detail="Each line must be one of the item's, in one split only",
+        ) from None
+    except ItemMatchConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    return ItemSplitResponse(
+        items=[await _detail(db, user.id, new_item) for new_item in new_items]
+    )
+
+
+@router.get("/{item_id}/link-candidates", response_model=LinkCandidatesResponse)
+async def link_candidates(
+    item_id: uuid.UUID,
+    q: str | None = Query(default=None, max_length=100),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User = Depends(get_current_user),
+) -> LinkCandidatesResponse:
+    """The Link items sheet (PI-02 AC 15): "Suggested" (the item's pending
+    suggestions, then the most similar names) and "All items" (the rest, most
+    recently bought first). ``q`` narrows both; the item is never listed."""
+    service = ItemMatchingService(db)
+    item = await _get_item(service, user.id, item_id)
+    summaries, _ = await PriceService(db).list_items(
+        user.id, query=q, page=1, per_page=LINK_CANDIDATES_MAX
+    )
+    others = {s.item.id: s for s in summaries if s.item.id != item.id}
+    suggested = await service.link_candidates(user.id, item, list(others))
+    groups = await _store_groups(db, user.id, [s.latest for s in others.values()])
+    return LinkCandidatesResponse(
+        suggested=[_summary(others[i], groups) for i in suggested],
+        items=[
+            _summary(s, groups) for i, s in others.items() if i not in set(suggested)
+        ],
+    )
 
 
 @router.post("/{item_id}/mute", status_code=204)

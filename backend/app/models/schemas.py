@@ -718,6 +718,9 @@ class ItemSummaryResponse(BaseModel):
     observation_count: int
     store_count: int
     latest_price: LatestPrice | None = None
+    # PI-02 AC 11, 15 (DA-6): "N purchases · $X avg": the mean unit price of
+    # the prices in the unit and currency most of them are in, to the cent.
+    avg_unit_price: float | None = None
 
 
 class ItemListResponse(BaseModel):
@@ -773,6 +776,10 @@ class ItemDetailResponse(ItemSummaryResponse):
 
 class PricePointResponse(BaseModel):
     receipt_id: uuid.UUID
+    # PI-02 AC 10 (DA-6): the receipt line, which a split by line moves, and
+    # its name as the receipt printed it.
+    line_item_id: uuid.UUID
+    line_name: str
     date: date
     store_id: uuid.UUID | None = None
     store_name: str | None = None
@@ -828,6 +835,39 @@ class ItemRenameRequest(BaseModel):
         if not value:
             raise ValueError("Name cannot be blank")
         return value
+
+
+class ItemSplitPart(BaseModel):
+    """One new item of a split by line (PI-02 AC 11, 14)."""
+
+    name: str = Field(min_length=1, max_length=255)
+    line_item_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+
+    @field_validator("name")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Name cannot be blank")
+        return value
+
+
+class ItemSplitRequest(BaseModel):
+    splits: list[ItemSplitPart] = Field(min_length=1, max_length=10)
+
+
+class ItemSplitResponse(BaseModel):
+    # The new items, in the order of the request's splits.
+    items: list[ItemDetailResponse]
+
+
+class LinkCandidatesResponse(BaseModel):
+    """The Link items sheet (PI-02 AC 15)."""
+
+    # The item's pending suggestions, then the most similar names.
+    suggested: list[ItemSummaryResponse]
+    # Every other item, most recently bought first.
+    items: list[ItemSummaryResponse]
 
 
 class ItemMergeRequest(BaseModel):
