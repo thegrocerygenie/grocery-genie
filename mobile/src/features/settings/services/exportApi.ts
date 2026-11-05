@@ -31,6 +31,17 @@ function premiumRequired(): ApiError {
   return new ApiError(403, { detail: { code: 'premium_required', feature: FEATURE } });
 }
 
+const EXPORT_BUSY = 'export_busy';
+
+/** A 429 from the export: too many this hour, or one already being built. */
+function exportBusy(): ApiError {
+  return new ApiError(429, { detail: { code: EXPORT_BUSY } });
+}
+
+export function isExportBusy(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 429;
+}
+
 function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
@@ -95,8 +106,10 @@ export async function downloadExport(
     );
     return file.uri;
   } catch (error) {
-    // The native download reports only "response has status 403".
+    // The native download reports only "response has status 403" (or 429),
+    // never the body, so a 429 cannot tell the hourly limit from a running export.
     if (error instanceof Error && /status 403\b/.test(error.message)) throw premiumRequired();
+    if (error instanceof Error && /status 429\b/.test(error.message)) throw exportBusy();
     throw error;
   }
 }

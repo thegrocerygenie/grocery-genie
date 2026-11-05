@@ -26,6 +26,7 @@ const mockDownload = jest.fn();
 const mockShare = jest.fn();
 const mockSummary = jest.fn();
 jest.mock('@/features/settings/services/exportApi', () => ({
+  isExportBusy: jest.requireActual('@/features/settings/services/exportApi').isExportBusy,
   downloadExport: (...a: unknown[]) => mockDownload(...a),
   shareExport: (...a: unknown[]) => mockShare(...a),
   fetchExportSummary: (...a: unknown[]) => mockSummary(...a),
@@ -202,7 +203,7 @@ describe('Export data', () => {
     // Receipt images is the only one on: it cannot be turned off.
     expect(screen.getByLabelText('Receipt images').props.disabled).toBe(true);
 
-    fireEvent.press(await exportButton());
+    fireEvent.press(await exportButton('Export data'));
     await waitFor(() => expect(mockDownload).toHaveBeenCalled());
     expect(lastRequest().includes).toEqual(['images']);
   });
@@ -222,6 +223,32 @@ describe('Export data', () => {
     expect(button.props.accessibilityState).toMatchObject({ disabled: true });
     fireEvent.press(button);
     expect(mockDownload).not.toHaveBeenCalled();
+  });
+
+  it('with Receipts & line items off the button names no receipt count', async () => {
+    mockSummary.mockResolvedValue({ receipt_count: 0 });
+    renderScreen();
+    await exportButton('No receipts in this range');
+    fireEvent(screen.getByLabelText('Receipts & line items'), 'valueChange', false);
+
+    // Categories & budgets are not cut by the range: still something to export.
+    const button = await exportButton('Export data');
+    expect(button.props.accessibilityState).toMatchObject({ disabled: false });
+    fireEvent(screen.getByLabelText('Categories & budgets'), 'valueChange', false);
+    // Only Price history is left and the range has no receipts: nothing to export.
+    expect((await exportButton('Export data')).props.accessibilityState).toMatchObject({
+      disabled: true,
+    });
+  });
+
+  it('a 429 (too many exports, or one already running) says to try again later', async () => {
+    mockDownload.mockRejectedValueOnce(new ApiError(429, { detail: { code: 'export_busy' } }));
+    renderScreen();
+    fireEvent.press(await exportButton());
+
+    expect(await screen.findByText(S.busy)).toBeTruthy();
+    expect(screen.queryByText(S.failed)).toBeNull();
+    expect(screen.queryByTestId('premium-upgrade-prompt')).toBeNull();
   });
 
   it('a free user sees the upgrade prompt, which opens the paywall', async () => {

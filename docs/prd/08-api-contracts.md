@@ -400,7 +400,13 @@ Data export (NFR Privacy 2), Premium (D2), with the options of PREM-04 (DA-8). A
 
 **Large accounts:** rows are read 500 at a time (keyset pages) into a spooled temporary file, in memory up to 8 MB and on disk past that, which is then streamed with its `Content-Length`. Receipt images are read one at a time and stored in the zip uncompressed (they are compressed already). The PDF report is built in memory (about a kilobyte a page, one line per receipt) before it is written. Memory stays bounded however many receipts there are, and the database work is done before the first byte is sent. The export is built in the request, as before PREM-04: no background job.
 
-Records `data_exported` with the format, the range and the includes (12-analytics.md). The 300 reads/minute limit applies.
+**Limits:** the export is built whole in the request, receipt images included, so each user gets `GG_MAX_EXPORTS_PER_HOUR` (10) exports an hour and one at a time. Past either, `429` with `Retry-After`:
+```json
+{ "detail": { "code": "export_rate_limited", "message": "Too many exports this hour. Try again later." } }
+```
+(`Retry-After: 600`), or `export_in_progress` while another export of the user's is being built (`Retry-After: 30`). The one-at-a-time slot is a Postgres advisory lock on the request's transaction (`pg_try_advisory_xact_lock`), so every API worker sees it and the database releases it when the transaction ends, committed, rolled back on an error, or with a dropped connection. A refused request (422, 403 or `export_in_progress`) does not use up the hourly count, and the summary below is not counted. A build whose client has gone stops before its next page and its spooled file is closed. The app shows one message for either 429: the native download gives only the status, not the body.
+
+Records `data_exported` with the format, the range and the includes (12-analytics.md). The 300 reads/minute limit applies too.
 
 ### GET /api/users/me/export/summary?from=&to=
 

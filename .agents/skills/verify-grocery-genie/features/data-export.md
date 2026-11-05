@@ -12,6 +12,7 @@ A Premium user downloads their receipts, line items, categories, budgets and pri
 - `export-pdf` the PDF report (`%PDF-`) of the range has the range label, the receipt count, "Monthly spend by category" with the month and its categories, "Top items" and "Receipts" (date, store, total).
 - `export-all` all time with every switch is all three receipts, all seven prices, the budget and both scanned images.
 - `export-scope` the other user's id, receipt and budget, and the user's own deleted receipt, are in none of the files.
+- `export-limits` exports past `GG_MAX_EXPORTS_PER_HOUR` (10) an hour get `429` with `{"code":"export_rate_limited",...}`; a refused request (the 422 above) is not counted, and the summary still answers.
 - `export-event` each export records `data_exported` with its format, `from`, `to`, `includes`, `receipt_count`, `image_count` and `images_left_out`.
 
 ## How to get to it (user POV)
@@ -34,10 +35,13 @@ Preconditions: a debug-mode instance; `$G doctor` shows no `FAIL`. `$G download 
 - **Scope (`export-scope`).** `grep -c` for `$other`, `$orid`, `$gone` and `987.65` in `$j`, in `$d`, in `unzip -p "$z"` and in `unzip -p "$a"`: 0 each.
 - **Event (`export-event`).** `$G sql "SELECT properties->>'format', properties->>'from', properties->>'to', properties->'includes', properties->>'receipt_count', properties->>'image_count', properties->>'images_left_out' FROM analytics_events WHERE user_id = '$uid' AND event_name = 'data_exported' ORDER BY created_at"` is five rows: `json|2025-12-01|2026-11-30|["receipts", "prices", "budgets"]|2|0|0`, `json|…|["prices"]|2|0|0`, `csv|…|["receipts", "prices", "budgets", "images"]|2|1|1`, `pdf|…|["receipts", "prices", "budgets"]|2|0|0`, and `json|||[… "images"]|3|2|1`. The free user has none.
 
+- **Limits (`export-limits`).** The journey has built 5 exports by now (the `invalid_include` 422 is not counted). Download `/api/users/me/export?format=json&include=prices&$R` until one fails: 5 more succeed, then `$G download` exits non-zero with status `429`, and the `.body` file is `{"detail":{"code":"export_rate_limited","message":"Too many exports this hour. Try again later."}}`. `GET /api/users/me/export/summary?$R` is still `{"receipt_count":2}`. The one-at-a-time `429 export_in_progress` needs two overlapping builds, which the API cannot be made to hold open; pytest covers it on Postgres (`backend/tests/api/test_data_export_limits.py`).
+
 ## Gotchas
 
 - Grep for ids, not amounts: a random UUID or timestamp can hold `999` by chance, which is why the other user's budget is `987.65`.
 - `$G download` exits non-zero on a status of 400 or more, like `$G api`; add `|| true` when the refusal is the expected result.
 - The journey sets `old`'s date with one `PATCH` and confirms it with another, as the review screen saves a corrected date before Confirm.
 - The PDF's top items group by the name printed on the receipt, as the dashboard's top items do; CSV formula escaping does not apply to it (a PDF runs nothing).
-- Batched reads for large accounts and ranges (more receipts and price observations than one 500-row page, a PDF past one page), the spooled file closed however the response ends, the `'` prefix for `+`, `-`, `@`, tab and carriage return, a purged image left out, names outside Windows-1252 in the PDF, and the other 422s (bad date, unknown format, empty include) are covered by pytest (`backend/tests/api/test_data_export.py`, `backend/tests/api/test_data_export_options.py`).
+- Batched reads for large accounts and ranges (more receipts and price observations than one 500-row page, a PDF past one page), the spooled file closed however the response ends, the `'` prefix for `+`, `-`, `@`, tab and carriage return, a purged image left out, names outside Windows-1252 in the PDF, the other 422s (bad date, unknown format, empty include), one export at a time per user (parallel requests on Postgres, released on error) and a build stopped when its client has gone are covered by pytest (`backend/tests/api/test_data_export.py`, `backend/tests/api/test_data_export_options.py`, `backend/tests/api/test_data_export_limits.py`).
+- Rate limit counts live in Redis (`VERIFY_REDIS_URL`), keyed by user id: a fresh `signup` starts at zero.

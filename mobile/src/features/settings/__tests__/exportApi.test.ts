@@ -14,6 +14,7 @@ import {
   exportFileName,
   exportQuery,
   fetchExportSummary,
+  isExportBusy,
   shareExport,
   type ExportRequest,
 } from '../services/exportApi';
@@ -140,6 +141,17 @@ describe('downloadExport', () => {
     const error = await downloadExport(request()).catch((e: unknown) => e);
 
     expect(isPremiumRequired(error)).toBe(true);
+  });
+
+  it('a 429 from the download is export_busy (rate limited, or one already running)', async () => {
+    mockDownload.mockRejectedValue(new Error('Unable to download: response has status 429'));
+
+    const error = await downloadExport(request()).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(429);
+    expect(isExportBusy(error)).toBe(true);
+    expect(isPremiumRequired(error)).toBe(false);
   });
 
   it('any other failure is passed on as is', async () => {

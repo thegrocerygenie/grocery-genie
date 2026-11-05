@@ -18,7 +18,11 @@ import { colors, fontScale, radii, spacing, touchTarget, type } from '@/constant
 import { useMe } from '@/features/auth/hooks/useAuth';
 import { EXPORT_STRINGS as S } from '@/features/settings/content/export';
 import { useExportData, useExportSummary } from '@/features/settings/hooks/useExportData';
-import type { ExportFormat, ExportInclude } from '@/features/settings/services/exportApi';
+import {
+  isExportBusy,
+  type ExportFormat,
+  type ExportInclude,
+} from '@/features/settings/services/exportApi';
 import {
   compareMonths,
   monthOf,
@@ -71,20 +75,27 @@ export default function ExportDataScreen() {
 
   const refused = isPremiumRequired(exportData.error) || isPremiumRequired(summary.error);
   const free = profile?.is_premium === false || refused;
-  const failed = exportData.isError && !refused;
+  const busy = isExportBusy(exportData.error);
+  const failed = exportData.isError && !refused && !busy;
   const pending = exportData.isPending;
 
   const count = summary.data?.receipt_count;
   const onlyOneOn = Object.values(includes).filter(Boolean).length === 1;
 
+  // "Export N receipts" only while receipts are in the export (AC 4). Without
+  // them the label names no count; categories and budgets are never cut by
+  // the range, so only an empty range with them off has nothing to export.
+  const countsReceipts = includes.receipts;
+  const nothing = count === 0 && (countsReceipts || !includes.budgets);
   let label: string;
   if (pending) label = S.preparing;
+  else if (!countsReceipts) label = S.actionData;
   else if (!valid) label = S.actionNoCount;
   else if (count === 0) label = S.noReceipts;
   else if (count !== undefined) label = S.action(count);
   else if (summary.isError) label = S.actionNoCount;
   else label = S.counting;
-  const disabled = pending || !valid || count === 0 || (count === undefined && !summary.isError);
+  const disabled = pending || !valid || nothing || (count === undefined && !summary.isError);
 
   const pickPeriod = (next: ExportPeriod) => {
     if (next === 'custom' && period !== 'custom' && months.from && months.to) {
@@ -192,6 +203,11 @@ export default function ExportDataScreen() {
               ))}
             </Section>
 
+            {busy ? (
+              <Text style={styles.error} accessibilityRole="alert">
+                {S.busy}
+              </Text>
+            ) : null}
             {failed ? (
               <Text style={styles.error} accessibilityRole="alert">
                 {S.failed}

@@ -71,11 +71,14 @@ export const EXPORT_STRINGS = {
   action: (count: number) =>
     count === 1 ? 'Export 1 receipt' : `Export ${count.toLocaleString()} receipts`,
   actionNoCount: 'Export',
+  // With Receipts & line items off the export holds no receipts, so no count.
+  actionData: 'Export data',
   counting: 'Counting receipts…',
   noReceipts: 'No receipts in this range',
   preparing: 'Preparing your export…',
   deletedNote: 'Receipts and budgets you deleted aren’t included.',
   failed: 'Couldn’t export your data. Check your connection and try again.',
+  busy: 'You’ve exported several times this hour, or an export is still being prepared. Try again in a few minutes.',
 
   upgradeTitle: 'Export your data with Premium',
   upgradeMessage:
