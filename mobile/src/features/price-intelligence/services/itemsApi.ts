@@ -19,13 +19,9 @@ export async function getItem(id: string): Promise<ItemDetail> {
   return apiClient<ItemDetail>(`/api/items/${id}`);
 }
 
-/** PI-01: every price, or (AC 5) only those dated from `range.from` on. */
-export async function getPriceHistory(
-  id: string,
-  range?: { from?: string },
-): Promise<PriceHistory> {
-  const query = range?.from ? `?${new URLSearchParams({ from: range.from }).toString()}` : '';
-  return apiClient<PriceHistory>(`/api/items/${id}/prices${query}`);
+/** PI-01: every price; item detail's range control filters it (AC 5). */
+export async function getPriceHistory(id: string): Promise<PriceHistory> {
+  return apiClient<PriceHistory>(`/api/items/${id}/prices`);
 }
 
 export async function renameItem(id: string, canonicalName: string): Promise<ItemDetail> {

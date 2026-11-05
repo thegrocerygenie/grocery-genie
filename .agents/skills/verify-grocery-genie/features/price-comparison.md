@@ -12,7 +12,7 @@ An item's price at each store the user has bought it from, side by side (PI-04):
 
 ## How to get to it (user POV)
 
-Budget tab → Price history (Prices list) → an item → Compare stores (PI-04 AC 4, `mobile/src/features/price-intelligence/components/StoreComparison.tsx`): each store's average and latest price, the cheapest named, and a line counting `stores_below_minimum`. The section is UI-only: check it on a simulator.
+Budget tab → Price history (the Items list) → an item → Compare stores (PI-04 AC 4, `mobile/src/features/price-intelligence/components/StoreComparison.tsx`): each store's average and latest price, the cheapest named, and a line counting `stores_below_minimum`. The section is UI-only: check it on a simulator.
 
 ## Driving it with gg-verify
 

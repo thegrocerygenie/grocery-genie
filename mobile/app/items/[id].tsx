@@ -29,16 +29,16 @@ import {
   useItem,
   usePriceComparison,
   usePriceHistory,
-  usePriceRange,
   useRenameItem,
   useSplitAlias,
 } from '@/features/price-intelligence/hooks/useItems';
 import type { ItemAlias, PriceHistory, StoreRef } from '@/features/price-intelligence/types';
 import {
-  DEFAULT_PRICE_RANGE,
   formatPercent,
   formatUnitPrice,
-  rangeFrom,
+  isStale,
+  openingRange,
+  pointsInRange,
   thirtyDayAverage,
   timelinePoints,
   unitSuffix,
@@ -74,10 +74,8 @@ export default function ItemDetailScreen() {
   const backTitle = useBackTitle();
   const item = useItem(id);
   const history = usePriceHistory(id);
-  // PI-01 AC 5: the chart's range; All plots the full history above.
-  const [range, setRange] = useState<PriceRange>(DEFAULT_PRICE_RANGE);
-  const from = rangeFrom(range, today());
-  const ranged = usePriceRange(id, from, history.data?.has_timeline === true);
+  // PI-01 AC 5: the range the user picked; until then the opening range.
+  const [picked, setPicked] = useState<PriceRange | null>(null);
   // Premium (PREM-02 AC 1) as the server last said; undefined while loading.
   const me = useMe().data;
   const premium = me?.is_premium === true;
@@ -175,8 +173,13 @@ export default function ItemDetailScreen() {
   const prices = history.data;
   const newestFirst = [...prices.observations].reverse();
   const stores = storesOf(newestFirst);
-  // The range's like-for-like prices (AC 5); All plots the whole history's.
-  const chartPoints = timelinePoints(from !== undefined && ranged.data ? ranged.data : prices);
+  // PI-01 AC 5: the chart filters the one full history by date, so a range
+  // costs no request (and no price_history_viewed). 3M first, or the
+  // smallest range with prices when 3M has none.
+  const now = today();
+  const plottable = timelinePoints(prices);
+  const range = picked ?? openingRange(plottable, now);
+  const chartPoints = pointsInRange(plottable, range, now);
 
   return (
     <>
@@ -191,11 +194,8 @@ export default function ItemDetailScreen() {
           {prices.has_timeline ? (
             <RangeChart
               points={chartPoints}
-              loading={from !== undefined && !ranged.data && !ranged.isError}
-              failed={from !== undefined && !ranged.data && ranged.isError}
-              onRetry={() => void ranged.refetch()}
               currency={prices.currency ?? 'USD'}
-              onShowAll={() => setRange('All')}
+              onShowAll={() => setPicked('All')}
             />
           ) : (
             <View style={styles.needMore}>
@@ -206,7 +206,7 @@ export default function ItemDetailScreen() {
             </View>
           )}
         </View>
-        {prices.has_timeline ? <RangeControl value={range} onChange={setRange} /> : null}
+        {prices.has_timeline ? <RangeControl value={range} onChange={setPicked} /> : null}
 
         {detail.suggestions.map((s) => (
           <SuggestionCard
@@ -325,6 +325,7 @@ function storesOf(points: PriceHistory['observations']): StoreRef[] {
  * PI-01 AC 7: "Avg · 30d", the mean of the like-for-like prices in the 30
  * days up to the latest, with its unit, and the change from the 30 days
  * before: a rise red with "+", a fall green with "−" (the sign says it too).
+ * A latest price more than 30 days old adds "as of <its date>".
  */
 function Headline({ history }: { history: PriceHistory }) {
   const average = thirtyDayAverage(history.observations);
@@ -337,6 +338,7 @@ function Headline({ history }: { history: PriceHistory }) {
   const change = average.percent === null ? null : formatPercent(percent);
   const changeStyle =
     percent > 0 ? styles.changeUp : percent < 0 ? styles.changeDown : styles.changeFlat;
+  const asOf = isStale(latest.date, today()) ? PRICES_COPY.asOf(formatLongDate(latest.date)) : null;
   const latestLine = PRICES_COPY.latestLine(
     formatUnitPrice(latest.unit_price, latest.currency, latest.unit_of_measure),
     latest.store_name ?? PRICES_COPY.unknownStore,
@@ -347,10 +349,20 @@ function Headline({ history }: { history: PriceHistory }) {
     <View
       style={styles.headline}
       accessible
-      accessibilityLabel={`${PRICES_COPY.average30Label(`${money} ${unit}`.trim(), change)}. ${latestLine}`}
+      accessibilityLabel={[
+        PRICES_COPY.average30Label(`${money} ${unit}`.trim(), change),
+        asOf,
+        latestLine,
+      ]
+        .filter(Boolean)
+        .join('. ')}
     >
       <View style={styles.headlineTop}>
-        <Text style={styles.caption}>{PRICES_COPY.average30}</Text>
+        <Text style={[styles.caption, styles.headlineCaption]}>
+          {PRICES_COPY.average30}
+          {asOf ? <Text>{' · '}</Text> : null}
+          {asOf ? <Text>{asOf}</Text> : null}
+        </Text>
         {change ? (
           <Text testID="headline-change" style={[styles.change, changeStyle]}>
             {change}
@@ -377,27 +389,13 @@ function Headline({ history }: { history: PriceHistory }) {
 /** PI-01 AC 5, 6: the range's chart, or why there is none and a way to All. */
 function RangeChart({
   points,
-  loading,
-  failed,
-  onRetry,
   currency,
   onShowAll,
 }: {
   points: PriceHistory['observations'];
-  loading: boolean;
-  failed: boolean;
-  onRetry: () => void;
   currency: string;
   onShowAll: () => void;
 }) {
-  if (failed) return <LoadErrorState title={PRICES_COPY.rangeLoadFailed} onRetry={onRetry} />;
-  if (loading) {
-    return (
-      <View style={styles.chartPlaceholder}>
-        <ActivityIndicator color={colors.tint} />
-      </View>
-    );
-  }
   if (points.length >= 2) return <PriceChart points={points} currency={currency} />;
   return (
     <View style={styles.needMore}>
@@ -435,10 +433,10 @@ const styles = StyleSheet.create({
   headlinePrice: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
   latestPrice: { ...type.money, fontSize: 28, flexShrink: 1 },
   unit: { ...type.footnote, color: colors.iosLabel2 },
-  chartPlaceholder: { height: 164, alignItems: 'center', justifyContent: 'center' },
+  headlineCaption: { flexShrink: 1 },
   change: { ...type.footnote, fontWeight: '600' },
-  changeUp: { color: colors.red },
-  changeDown: { color: colors.green },
+  changeUp: { color: colors.redText },
+  changeDown: { color: colors.greenText },
   changeFlat: { color: colors.iosLabel2 },
   needMore: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl },
   needMoreText: { ...type.subheadline, color: colors.iosLabel2, textAlign: 'center' },

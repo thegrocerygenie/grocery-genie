@@ -7,7 +7,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack, router } from 'expo-router';
-import { act, fireEvent, renderRouter, screen, waitFor, within } from 'expo-router/testing-library';
+import { act, fireEvent, renderRouter, screen, within } from 'expo-router/testing-library';
 
 import ItemDetailScreen from '../../app/items/[id]';
 import { colors } from '@/constants/theme';
@@ -100,11 +100,9 @@ jest.mock('@/features/price-intelligence/services/itemsApi', () => ({
   }),
 }));
 
-/** The server's range filter, as `GET /prices?from=` applies it. */
+/** The item's full history, the one request item detail makes. */
 function serve(observations: PricePoint[]) {
-  mockApi.getPriceHistory.mockImplementation(async (_id: string, range?: { from?: string }) =>
-    history(observations.filter((p) => !range?.from || p.date >= range.from)),
-  );
+  mockApi.getPriceHistory.mockResolvedValue(history(observations));
 }
 
 const comparison: PriceComparison = {
@@ -175,7 +173,6 @@ describe('Range control (PI-01 AC 5)', () => {
       expect(button.props.accessibilityRole).toBe('button');
       expect(button.props.accessibilityState).toEqual({ selected: label === '3 months' });
     }
-    expect(mockApi.getPriceHistory).toHaveBeenCalledWith('i-1', { from: '2026-01-20' });
     expect((await screen.findByTestId('price-chart')).props.accessibilityLabel).toBe(
       'Price chart, 3 prices from $2.00 to $2.60, latest $2.60',
     );
@@ -187,26 +184,51 @@ describe('Range control (PI-01 AC 5)', () => {
     open();
 
     fireEvent.press(await screen.findByLabelText('1 year'));
-    expect(mockApi.getPriceHistory).toHaveBeenCalledWith('i-1', { from: '2025-04-20' });
     expect(screen.getByLabelText('1 year').props.accessibilityState).toEqual({ selected: true });
     expect(screen.getByLabelText('3 months').props.accessibilityState).toEqual({
       selected: false,
     });
-    // The last range stays drawn until the new one arrives.
-    await waitFor(() =>
-      expect(screen.getByTestId('price-chart').props.accessibilityLabel).toMatch(
-        /^Price chart, 5 prices/,
-      ),
+    expect(screen.getByTestId('price-chart').props.accessibilityLabel).toMatch(
+      /^Price chart, 5 prices/,
     );
 
     fireEvent.press(screen.getByLabelText('1 month'));
-    expect(mockApi.getPriceHistory).toHaveBeenCalledWith('i-1', { from: '2026-03-20' });
     expect(await screen.findByText('Not enough prices in this range')).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('All prices'));
     expect((await screen.findByTestId('price-chart')).props.accessibilityLabel).toMatch(
       /^Price chart, 5 prices/,
     );
+  });
+
+  it('asks for the history once per open, and a range tap asks for nothing', async () => {
+    open();
+
+    fireEvent.press(await screen.findByLabelText('1 year'));
+    fireEvent.press(screen.getByLabelText('1 month'));
+    fireEvent.press(screen.getByLabelText('All prices'));
+    await screen.findByTestId('price-chart');
+    // One GET /prices, so one price_history_viewed, with no date filter.
+    expect(mockApi.getPriceHistory).toHaveBeenCalledTimes(1);
+    expect(mockApi.getPriceHistory).toHaveBeenCalledWith('i-1');
+  });
+
+  it('opens on the smallest range with prices when 3M has none', async () => {
+    serve([point('2025-06-01', 1.5, 'FreshCo'), point('2025-09-01', 1.8, 'Loblaws')]);
+    open();
+
+    expect(await screen.findByTestId('price-chart')).toBeTruthy();
+    expect(screen.getByLabelText('1 year').props.accessibilityState).toEqual({ selected: true });
+  });
+
+  it('opens on All when even 1Y has no prices', async () => {
+    serve([point('2024-01-01', 1.5, 'FreshCo'), point('2024-06-01', 1.8, 'Loblaws')]);
+    open();
+
+    expect(await screen.findByTestId('price-chart')).toBeTruthy();
+    expect(screen.getByLabelText('All prices').props.accessibilityState).toEqual({
+      selected: true,
+    });
   });
 });
 
@@ -235,28 +257,12 @@ describe('A range with too few prices (PI-01 AC 6, edge case 8)', () => {
     expect(await screen.findByText('Not enough prices in this range')).toBeTruthy();
   });
 
-  it('offers a retry when a range cannot load, keeping the list', async () => {
-    const full = history(ALL);
-    mockApi.getPriceHistory.mockImplementation(async (_id: string, range?: { from?: string }) => {
-      if (range) throw new Error('offline');
-      return full;
-    });
-    open();
-
-    expect(await screen.findByText('Couldn’t load this range')).toBeTruthy();
-    expect(screen.getByText('Prices · 5')).toBeTruthy();
-    serve(ALL);
-    fireEvent.press(screen.getByLabelText('Try again'));
-    expect(await screen.findByTestId('price-chart')).toBeTruthy();
-  });
-
   it('shows no range control for an item with fewer than 2 prices', async () => {
     serve([point('2026-04-15', 2.6, 'FreshCo')]);
     open();
 
     expect(await screen.findByText(/Buy it again/)).toBeTruthy();
     expect(screen.queryByLabelText('3 months')).toBeNull();
-    expect(mockApi.getPriceHistory).not.toHaveBeenCalledWith('i-1', expect.anything());
   });
 });
 
@@ -270,7 +276,17 @@ describe('Headline "Avg · 30d" (PI-01 AC 7)', () => {
     expect(screen.getByText('/ lb')).toBeTruthy();
     const change = screen.getByTestId('headline-change');
     expect(change.props.children).toBe('+18%');
-    expect(StyleSheet.flatten(change.props.style).color).toBe(colors.red);
+    expect(StyleSheet.flatten(change.props.style).color).toBe(colors.redText);
+    // The latest price is 5 days old: no "as of".
+    expect(screen.queryByText(/^as of /)).toBeNull();
+  });
+
+  it('adds as of the latest price date when it is more than 30 days old', async () => {
+    serve([point('2026-01-05', 1.8, 'FreshCo'), point('2026-02-10', 2, 'FreshCo')]);
+    open();
+
+    expect((await screen.findByTestId('headline-price')).props.children).toBe('$2.00');
+    expect(screen.getByText('as of Feb 10, 2026')).toBeTruthy();
   });
 
   it('shows a fall in green with a minus sign', async () => {
@@ -279,7 +295,7 @@ describe('Headline "Avg · 30d" (PI-01 AC 7)', () => {
 
     const change = await screen.findByTestId('headline-change');
     expect(change.props.children).toBe('−20%');
-    expect(StyleSheet.flatten(change.props.style).color).toBe(colors.green);
+    expect(StyleSheet.flatten(change.props.style).color).toBe(colors.greenText);
   });
 
   it('shows no percent with no price in the 30 days before', async () => {

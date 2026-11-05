@@ -1,10 +1,4 @@
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type QueryClient,
-} from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { isPremiumRequired } from '@/utils/premium';
 
@@ -51,20 +45,6 @@ export function usePriceHistory(id: string | undefined) {
     queryKey: [...ITEMS_KEY, 'prices', id],
     queryFn: () => getPriceHistory(id as string),
     enabled: !!id,
-  });
-}
-
-/**
- * PI-01 AC 5: the prices the chart plots for a range starting `from` (All:
- * undefined, the full history above). Asked only when `enabled`; the last
- * range stays on screen while the next loads.
- */
-export function usePriceRange(id: string | undefined, from: string | undefined, enabled: boolean) {
-  return useQuery({
-    queryKey: [...ITEMS_KEY, 'prices', id, 'from', from],
-    queryFn: () => getPriceHistory(id as string, { from }),
-    enabled: !!id && !!from && enabled,
-    placeholderData: keepPreviousData,
   });
 }
 

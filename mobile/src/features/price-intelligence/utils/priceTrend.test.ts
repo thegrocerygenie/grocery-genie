@@ -3,6 +3,9 @@ import {
   chartGeometry,
   formatPercent,
   monthTicks,
+  isStale,
+  openingRange,
+  pointsInRange,
   rangeFrom,
   thirtyDayAverage,
   unitSuffix,
@@ -161,6 +164,32 @@ describe('rangeFrom (PI-01 AC 5)', () => {
 
   it('clamps to the end of a shorter month', () => {
     expect(rangeFrom('1M', new Date(2026, 2, 31))).toBe('2026-02-28');
+  });
+});
+
+describe('pointsInRange and openingRange (PI-01 AC 5)', () => {
+  const now = new Date(2026, 3, 20);
+  const pts = [point('2025-06-01', 1), point('2026-01-20', 2), point('2026-04-15', 3)];
+
+  it('keeps the prices dated from the range start on, and All keeps every one', () => {
+    expect(pointsInRange(pts, '3M', now).map((p) => p.date)).toEqual(['2026-01-20', '2026-04-15']);
+    expect(pointsInRange(pts, '1M', now).map((p) => p.date)).toEqual(['2026-04-15']);
+    expect(pointsInRange(pts, 'All', now)).toHaveLength(3);
+  });
+
+  it('opens on 3M, or the smallest range with prices when 3M has none', () => {
+    expect(openingRange(pts, now)).toBe('3M');
+    expect(openingRange([point('2025-12-01', 1)], now)).toBe('6M');
+    expect(openingRange([point('2025-06-01', 1)], now)).toBe('1Y');
+    expect(openingRange([point('2024-06-01', 1)], now)).toBe('All');
+  });
+});
+
+describe('isStale (PI-01 AC 7)', () => {
+  it('is true once the latest price is more than 30 days old', () => {
+    const now = new Date(2026, 3, 20);
+    expect(isStale('2026-03-21', now)).toBe(false); // 30 days
+    expect(isStale('2026-03-20', now)).toBe(true);
   });
 });
 

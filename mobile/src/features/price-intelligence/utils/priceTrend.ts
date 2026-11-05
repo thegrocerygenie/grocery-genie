@@ -100,6 +100,29 @@ export function rangeFrom(range: PriceRange, now: Date): string | undefined {
   return toIsoDate(new Date(year, month, Math.min(now.getDate(), lastDay)));
 }
 
+/** PI-01 AC 5: the prices dated from the range's first day on (All: every one). */
+export function pointsInRange(points: PricePoint[], range: PriceRange, now: Date): PricePoint[] {
+  const from = rangeFrom(range, now);
+  return from === undefined ? points : points.filter((p) => p.date >= from);
+}
+
+/**
+ * The range item detail opens on: 3M, or when 3M holds no price the smallest
+ * range that does (6M, 1Y, then All). `points` are the plotted prices.
+ */
+export function openingRange(points: PricePoint[], now: Date): PriceRange {
+  const start = PRICE_RANGES.indexOf(DEFAULT_PRICE_RANGE);
+  for (const range of PRICE_RANGES.slice(start)) {
+    if (pointsInRange(points, range, now).length > 0) return range;
+  }
+  return 'All';
+}
+
+/** PI-01 AC 7: the latest price is more than 30 days before today. */
+export function isStale(latestDate: string, now: Date): boolean {
+  return dayNumber(toIsoDate(now)) - dayNumber(latestDate) > WINDOW_DAYS;
+}
+
 export interface MonthTick {
   x: number;
   label: string;
