@@ -65,7 +65,7 @@ Every MVP feature in [../mvp/feature-scope.md](../mvp/feature-scope.md) §2 is s
 | Feature | Benefit line | What it actually does | Story | Since | Status |
 |---|---|---|---|---|---|
 | Unlimited receipts | Scan every trip. | The free plan allows 20 receipts a month; Premium has no cap. At the cap, a free user sees "You've used this month's free scans", with See Premium or Enter manually. | V11-P4 | V1.1 | Built (Simulator check of the prompt pending) |
-| 12-month trend | See your whole grocery year. | Trend toggles between 3 Months (free) and 12 Months (Premium): "12-month average", "vs prior 12 months". | BC-04 | V1.1 | Built |
+| 12-month trend | See your whole grocery year. | Trend range chips 1M and 3M (free), 6M, 1Y and All (Premium, DA-10): "12-month average", "−5% YoY", and Highlights (highest, lowest month, trend). | BC-04 | V1.1 | Built (Simulator check pending) |
 | Custom categories | Categories named your way. | Up to 10 of your own (names up to 40 characters), for budgets and corrections. If Premium lapses, they stay and keep their spending. | BC-05 AC 3 | V1.1 | Built |
 | Budget rollover | Unspent budget carries over. | Per-budget switch. What you don't spend carries into next month; overspending doesn't. The dashboard shows "Includes $40 rolled over". | BC-FR | V1.1 | Built |
 | Data export | Take your data with you. | Receipts, line items, budgets and price history as JSON, or CSV in a zip. Deleted items are left out. | NFR | V1.1 | Built (share sheet on a device pending) |

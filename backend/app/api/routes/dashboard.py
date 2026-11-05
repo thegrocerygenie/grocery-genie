@@ -1,4 +1,4 @@
-from enum import IntEnum
+from enum import StrEnum
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,11 +18,19 @@ from app.services.budget_service import BudgetService
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 
-class TrendMonths(IntEnum):
-    """Allowed trend lengths; any other ``months`` is a 422."""
+class TrendMonths(StrEnum):
+    """The Trend screen's range chips (BC-04 AC 6); any other ``months`` is a
+    422. Over 3 months is Premium (D2, D11); ``all`` starts at the user's
+    first receipt."""
 
-    THREE = 3
-    TWELVE = 12  # Premium (D2)
+    ONE = "1"
+    THREE = "3"
+    SIX = "6"  # Premium
+    TWELVE = "12"  # Premium
+    ALL = "all"  # Premium
+
+
+FREE_TREND_MONTHS = {TrendMonths.ONE, TrendMonths.THREE}
 
 
 @router.get("/spending", response_model=DashboardSpendingResponse)
@@ -36,15 +44,23 @@ async def dashboard_spending(
     ),
     months: TrendMonths = Query(
         default=TrendMonths.THREE,
-        description="Trend length in months: 3, or 12 for Premium users.",
+        description=(
+            "Trend length in months: 1 or 3, or for Premium users 6, 12, or "
+            "all (every month since the first receipt)."
+        ),
     ),
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
     premium: bool = Depends(user_is_premium),
 ) -> DashboardSpendingResponse:
-    if months is TrendMonths.TWELVE and not premium:
+    # The server decides, never the app (D11): every range over 3 months is
+    # Premium, under the 12-month trend's feature id the app already knows.
+    if months not in FREE_TREND_MONTHS and not premium:
         raise premium_required(FEATURE_TREND_12_MONTHS)
     service = BudgetService(db)
     return await service.get_dashboard_data(
-        user.id, period, months=int(months), today=clock.today_in(user.timezone)
+        user.id,
+        period,
+        months=None if months is TrendMonths.ALL else int(months),
+        today=clock.today_in(user.timezone),
     )

@@ -331,7 +331,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | BC-FR | Trends | 12-month trend (V1.1), Premium per D2 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_for_premium` | Pass |
 | BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_premium_user_still_gets_3_months_by_default` | Pass |
 | BC-FR | Trends | 3 months stays the default; `months=3` works | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_trend_is_3_months_with_months_3` | Pass |
-| BC-FR | Trends | `months` other than 3 or 12 is a 422 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_rejects_months_other_than_3_or_12` | Pass |
+| BC-FR | Trends | `months` other than 1, 3, 6, 12 or `all` is a 422 | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_rejects_months_outside_the_ranges` | Pass |
 | BC-FR | Trends | Free user asking for 12 months gets `403 premium_required` | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_12_month_trend_needs_premium` | Pass |
 | BC-FR | Trends | Trend bar amounts in the budget currency (BUG-7) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "labels each bar in euros when the budget is in euros" | Pass |
 | BC-FR | Trends | Trend readable at accessibility text sizes (BUG-1) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "lets the chart grow down with the text, not up over the summary (BUG-1)" | Pass |
@@ -449,7 +449,7 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PREM | D1 | RevenueCat SDK guarded outside the dev build; logs in as the user | Component | `mobile/src/features/premium/__tests__/purchases.test.ts` "restores purchases for the signed-in user" | Pass |
 | PREM | D1 | Settings → Premium row, from the backend `is_premium` | Component | `mobile/src/__tests__/settingsHub.test.tsx` "a free user sees the free plan and a Premium row that opens the paywall (V11-P0)" | Pass |
 | PREM | D1 | Settings → Premium row, from the backend `is_premium` | Component | `mobile/src/__tests__/settingsHub.test.tsx` "a Premium user sees Premium, from the backend profile" | Pass |
-| PREM | D1 | Upgrade prompt opens the paywall (D2) | Component | `mobile/src/__tests__/trendMonths.test.tsx` "the upgrade prompt opens the Premium paywall (V11-P0)" | Pass |
+| PREM | D1 | Upgrade prompt opens the paywall (D2) | Component | `mobile/src/__tests__/trendRanges.test.tsx` "the upgrade prompt opens the Premium paywall (V11-P0)" | Pass |
 | PREM | D1 | Deleting the account says the subscription is not cancelled | Component | `mobile/src/__tests__/deleteAccountScreen.test.tsx` "says a Premium subscription is not cancelled by deleting (V11-P0)" | Pass |
 | PREM | D1 | Premium is never active with no expiry from a late grant or a refund | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_cancellation_without_expiry_before_its_purchase_grants_no_open_premium` | Pass |
 | PREM | D1 | Premium is never active with no expiry from a late grant or a refund | Integration | `backend/tests/api/test_revenuecat_webhook.py::test_refunded_non_renewing_purchase_arriving_late_grants_nothing` | Pass |
@@ -508,13 +508,13 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PREM | NFR-P2 | Export (app): paywall lists data export | Component | `mobile/src/__tests__/paywallScreen.test.tsx` "PREM-01 AC 4: the feature list names what is built, with unlimited receipts and rollover" | Pass |
 | PREM | NFR-P2 | Export (app): share sheet on a device (Save to Files, AirDrop) | Manual | Simulator / device check; API-only verify cannot drive the share sheet | Pending |
 | BC-04 | 5 | 12-month dashboard loads within 2 seconds | Integration | `backend/tests/api/test_p95_postgres.py::test_dashboard_12_month_trend_p95_under_2s` (Postgres) | Pass |
-| BC-FR | Trends | 3/12-month toggle on Trend; 3 stays the default | Component | `mobile/src/__tests__/trendMonths.test.tsx` "shows 3 months by default and asks the server for 3" | Pass |
-| BC-FR | Trends | 3/12-month toggle on Trend; 12 months charts every month | Component | `mobile/src/__tests__/trendMonths.test.tsx` "switching to 12 months asks the server for 12 and charts every month" | Pass |
-| BC-FR | Trends | 3/12-month toggle on Trend; 12 months charts every month | Component | `mobile/src/__tests__/trendMonths.test.tsx` "compares the 12-month average with the 12 months before" | Pass |
-| BC-FR | Trends | Free user sees an upgrade prompt, not an error (D2) | Component | `mobile/src/__tests__/trendMonths.test.tsx` "a free user asking for 12 months sees an upgrade prompt, not an error" | Pass |
-| BC-FR | Trends | Free user sees an upgrade prompt, not an error (D2) | Component | `mobile/src/__tests__/trendMonths.test.tsx` "switching back to 3 months after the upgrade prompt shows the 3-month chart" | Pass |
+| BC-FR | Trends | Range chips on Trend (DA-10); 3 stays the default | Component | `mobile/src/__tests__/trendRanges.test.tsx` "shows 3 months by default and asks the server for 3" | Pass |
+| BC-FR | Trends | Range chips on Trend (DA-10); 1Y charts every month | Component | `mobile/src/__tests__/trendRanges.test.tsx` "1Y charts every month and compares the year with the year before as YoY (AC 7)" | Pass |
+| BC-FR | Trends | Range chips on Trend (DA-10); each chip asks the server for its range | Component | `mobile/src/__tests__/trendRanges.test.tsx` "%s asks the server for months=%s" | Pass |
+| BC-FR | Trends | Free user sees an upgrade prompt, not an error (D2) | Component | `mobile/src/__tests__/trendRanges.test.tsx` "a free user picking %s sees the upgrade prompt, not an error (D2, D11)" | Pass |
+| BC-FR | Trends | Free user sees an upgrade prompt, not an error (D2) | Component | `mobile/src/__tests__/trendRanges.test.tsx` "a free user picking 1M or back to 3M after the prompt sees the chart" | Pass |
 | BC-FR | Trends | Free user sees an upgrade prompt, not an error (D2) | Component | `mobile/src/components/__tests__/PremiumUpgradePrompt.test.tsx` "calls onUpgrade when the upgrade button is tapped (the V11-P0 paywall seam)" | Pass |
-| BC-FR | Trends | Another 12-month load failure offers a retry | Component | `mobile/src/__tests__/trendMonths.test.tsx` "another failure loading 12 months offers a retry" | Pass |
+| BC-FR | Trends | Another failure loading a range offers a retry | Component | `mobile/src/__tests__/trendRanges.test.tsx` "another failure loading a range offers a retry" | Pass |
 | EC-PI | 1 | Store normalization: branch numbers and punctuation drop out | Unit | `backend/tests/services/test_store_service.py::test_normalize_store_name` | Pass |
 | EC-PI | 1 | Store normalization: branch numbers and punctuation drop out | Integration | `backend/tests/services/test_store_service.py::test_branch_numbers_and_punctuation_find_one_store` | Pass |
 | EC-PI | 1 | Store normalization: branch numbers and punctuation drop out | Integration | `backend/tests/api/test_store_merge.py::test_branch_numbers_normalize_into_one_store` | Pass |
@@ -946,15 +946,49 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | BC-05 | 8 | After a lapse the look stays; changing it is 403 premium_required | Integration | `backend/tests/api/test_category_looks.py::test_after_a_lapse_the_look_stays_and_changing_it_needs_premium` | Pass |
 | BC-05 | 8 | App: lapsed editor shows the upgrade prompt, look kept | Component | `mobile/src/__tests__/categorySettings.test.tsx` "after Premium lapses a category keeps its colour and icon, and changing them shows the upgrade prompt" | Pass |
 | BC-05 | 8 | App: a 403 on save turns the editor into the upgrade prompt | Component | `mobile/src/__tests__/categorySettings.test.tsx` "a change refused with 403 premium_required turns the editor into the upgrade prompt" | Pass |
-| PI-04 | 5 | "Save by switching $X / unit" card, 2+ stores and a gap above zero | Component | Not yet implemented (DA-10) | Pending |
-| PI-04 | 6 | Rows lead with latest price, ordered by it; CHEAPEST badge; N purchases · avg | Component | Not yet implemented (DA-10) | Pending |
-| PI-04 | 7 | Price bar per row, latest over highest latest | Component | Not yet implemented (DA-10) | Pending |
-| PI-04 | 8 | VoiceOver reads a row as one element; largest text size holds | Component | Not yet implemented (DA-10) | Pending |
-| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Integration | Not yet implemented (DA-10) | Pending |
-| BC-04 | 7 | Headline N-month average with change (YoY for 1Y) | Component | Not yet implemented (DA-10) | Pending |
-| BC-04 | 8 | Highlights: Highest, Lowest (in progress), Trend | Component | Not yet implemented (DA-10) | Pending |
-| BC-04 | 9 | Grey bars, current month tinted, VoiceOver per bar | Component | Not yet implemented (DA-10) | Pending |
-| BC-04 | 10 | Trend strings externalized | Component | Not yet implemented (DA-10) | Pending |
+| PI-04 | 5 | "Save by switching $X / unit" card, 2+ stores and a gap above zero | Component | `mobile/src/__tests__/storeComparison.test.tsx` "shows the gap between the highest and lowest latest price, cheapest vs priciest" | Pass |
+| PI-04 | 5 | "Save by switching $X / unit" card, 2+ stores and a gap above zero | Component | `mobile/src/__tests__/storeComparison.test.tsx` "names a measured unit" | Pass |
+| PI-04 | 5 | "Save by switching $X / unit" card, 2+ stores and a gap above zero | Component | `mobile/src/__tests__/storeComparison.test.tsx` "is not shown with one store" | Pass |
+| PI-04 | 5 | "Save by switching $X / unit" card, 2+ stores and a gap above zero | Unit | `mobile/src/features/price-intelligence/utils/storeComparison.test.ts` "is the gap between the highest and lowest latest price, cheapest vs priciest" | Pass |
+| PI-04 | 6 | Rows lead with latest price, ordered by it; CHEAPEST badge; N purchases · avg | Component | `mobile/src/__tests__/storeComparison.test.tsx` "orders rows by latest price, leads with it, and badges the cheapest" | Pass |
+| PI-04 | 6 | Rows lead with latest price, ordered by it; CHEAPEST badge; N purchases · avg | Component | `mobile/src/__tests__/storeComparison.test.tsx` "says 1 purchase for one" | Pass |
+| PI-04 | 6 | Rows lead with latest price, ordered by it; CHEAPEST badge; N purchases · avg | Unit | `mobile/src/features/price-intelligence/utils/storeComparison.test.ts` "orders by latest price, cheapest first" | Pass |
+| PI-04 | 7 | Price bar per row, latest over highest latest | Component | `mobile/src/__tests__/storeComparison.test.tsx` "draws each row's bar in the store's colour, its latest price over the highest" | Pass |
+| PI-04 | 7 | Price bar per row, latest over highest latest | Unit | `mobile/src/features/price-intelligence/utils/storeComparison.test.ts` "is the store's latest price over the highest latest price" | Pass |
+| PI-04 | 8 | VoiceOver reads a row as one element; largest text size holds | Component | `mobile/src/__tests__/storeComparison.test.tsx` "reads each row as one element: store, cheapest, latest, average, purchases" | Pass |
+| PI-04 | 8 | VoiceOver reads a row as one element; largest text size holds | Component | `mobile/src/__tests__/storeComparison.test.tsx` "truncates nothing at AX5: names wrap and the latest price stacks under them" | Pass |
+| PI-04 | 8 | VoiceOver reads a row as one element; largest text size holds | Manual | `docs/device-checklist.md` "Compare stores" (VoiceOver and AX5 on a device) | Pending |
+| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Integration | `backend/tests/api/test_premium_gating.py::test_trend_over_3_months_is_premium` | Pass |
+| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Integration | `backend/tests/api/test_premium_gating.py::test_trend_of_1_or_3_months_is_free` | Pass |
+| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Integration | `backend/tests/api/test_premium_gating.py::test_trend_entitlement_is_each_users_own` | Pass |
+| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_1_month_trend_compares_with_the_month_before` | Pass |
+| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_6_month_trend_for_premium` | Pass |
+| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_all_trend_starts_at_the_first_receipt` | Pass |
+| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_all_trend_without_earlier_receipts_is_the_period` | Pass |
+| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_all_trend_follows_the_reset_day` | Pass |
+| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_rejects_months_outside_the_ranges` | Pass |
+| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Component | `mobile/src/__tests__/trendRanges.test.tsx` "shows the five chips in order, under the chart" | Pass |
+| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Component | `mobile/src/__tests__/trendRanges.test.tsx` "a free user picking %s sees the upgrade prompt, not an error (D2, D11)" | Pass |
+| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Component | `mobile/src/__tests__/trendRanges.test.tsx` "All shows every month since the first receipt and no change (AC 6, 7)" | Pass |
+| BC-04 | 6 | Trend range chips 1M–All; over 3 months Premium (403, upgrade prompt); months param | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "keeps each chip a full touch target that wraps to a new row rather than clipping" | Pass |
+| BC-04 | 7 | Headline N-month average with change (YoY for 1Y) | Component | `mobile/src/__tests__/trendScreen.test.tsx` "leads with the 3-month average and its change from the 3 months before (AC 7)" | Pass |
+| BC-04 | 7 | Headline N-month average with change (YoY for 1Y) | Component | `mobile/src/__tests__/trendRanges.test.tsx` "1Y charts every month and compares the year with the year before as YoY (AC 7)" | Pass |
+| BC-04 | 7 | Headline N-month average with change (YoY for 1Y) | Component | `mobile/src/__tests__/trendRanges.test.tsx` "1M compares the month with the month before (AC 7)" | Pass |
+| BC-04 | 7 | Headline N-month average with change (YoY for 1Y) | Component | `mobile/src/__tests__/trendRanges.test.tsx` "All shows every month since the first receipt and no change (AC 6, 7)" | Pass |
+| BC-04 | 8 | Highlights: Highest, Lowest (no empty or current month), Trend (headline's change; halves for All) | Component | `mobile/src/__tests__/trendScreen.test.tsx` "names the highest and lowest month, and the trend with its percent" | Pass |
+| BC-04 | 8 | Highlights: Highest, Lowest (no empty or current month), Trend (headline's change; halves for All) | Component | `mobile/src/__tests__/trendScreen.test.tsx` "skips the current month, still in progress, for the lowest" | Pass |
+| BC-04 | 8 | Highlights: Highest, Lowest (no empty or current month), Trend (headline's change; halves for All) | Component | `mobile/src/__tests__/trendScreen.test.tsx` "says so when no finished month had spending to be the lowest" | Pass |
+| BC-04 | 8 | Highlights: Highest, Lowest (no empty or current month), Trend (headline's change; halves for All) | Component | `mobile/src/__tests__/trendScreen.test.tsx` "shows no trend percent when the months before had no spending, like the headline" | Pass |
+| BC-04 | 8 | Highlights: Highest, Lowest (no empty or current month), Trend (headline's change; halves for All) | Unit | `mobile/src/features/budget/__tests__/trendHighlights.test.ts` "skips months with no spending for the lowest" | Pass |
+| BC-04 | 8 | Highlights: Highest, Lowest (no empty or current month), Trend (headline's change; halves for All) | Unit | `mobile/src/features/budget/__tests__/trendHighlights.test.ts` "has no lowest when only the current month or empty months remain" | Pass |
+| BC-04 | 8 | Highlights: Highest, Lowest (no empty or current month), Trend (headline's change; halves for All) | Unit | `mobile/src/features/budget/__tests__/trendHighlights.test.ts` "has no trend for 1M-1Y without a headline change, never switching to halves" | Pass |
+| BC-04 | 8 | Highlights: Highest, Lowest (no empty or current month), Trend (headline's change; halves for All) | Unit | `mobile/src/features/budget/__tests__/trendHighlights.test.ts` "for All, compares the later half of the months with the earlier" | Pass |
+| BC-04 | 8 | Highlights: Highest, Lowest (no empty or current month), Trend (headline's change; halves for All) | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_names_the_current_period` | Pass |
+| BC-04 | 8 | Highlights: Highest, Lowest (no empty or current month), Trend (headline's change; halves for All) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "lets a Highlights row wrap its detail and value under the title at AX sizes" | Pass |
+| BC-04 | 9 | Grey bars, current month tinted, VoiceOver per bar | Component | `mobile/src/__tests__/trendScreen.test.tsx` "draws grey bars with the current month in the tint colour" | Pass |
+| BC-04 | 9 | Grey bars, current month tinted, VoiceOver per bar | Component | `mobile/src/__tests__/trendScreen.test.tsx` "tints no bar when the current month is outside the chart (a past period)" | Pass |
+| BC-04 | 9 | Grey bars, current month tinted, VoiceOver per bar | Component | `mobile/src/__tests__/trendScreen.test.tsx` "labels each bar with its month's initial and reads its month and total" | Pass |
+| BC-04 | 10 | Trend strings externalized | Component | `mobile/src/__tests__/trendScreen.test.tsx` "keeps every user-facing string in the content file, none in the screen" | Pass |
 | EC-PI | 4 | Timed mute expiry | Integration | `backend/tests/api/test_timed_mutes.py::test_a_timed_item_mute_ends_by_itself` | Pass |
 | EC-PI | 4 | Timed mute expiry | Integration | `backend/tests/api/test_timed_mutes.py::test_an_until_with_an_offset_is_kept_in_utc` | Pass |
 | EC-PI | 4 | Timed mute expiry | Integration | `backend/tests/api/test_timed_mutes.py::test_an_ended_mute_can_still_be_removed` | Pass |
@@ -977,7 +1011,9 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | EC-PI | 8 | A range with too few prices | Component | `mobile/src/__tests__/itemDetailRange.test.tsx` "counts only like-for-like prices as plotted" | Pass |
 | EC-PI | 9 | A longer cooldown counts from the item's last alert | Integration | `backend/tests/api/test_price_alert_list.py::test_a_longer_cooldown_counts_from_the_last_alert` | Pass |
 | EC-PI | 9 | Shortening the cooldown never resends a held-back alert | Integration | `backend/tests/api/test_price_alert_list.py::test_shortening_the_cooldown_never_resends_a_held_back_alert` | Pass |
-| EC-PI | 10 | Store comparison ties | Component | Not yet implemented (DA-10) | Pending |
+| EC-PI | 10 | Store comparison ties | Component | `mobile/src/__tests__/storeComparison.test.tsx` "orders a tie on latest price by average, then name, and badges the first" | Pass |
+| EC-PI | 10 | Store comparison ties | Component | `mobile/src/__tests__/storeComparison.test.tsx` "shows no Save by switching card when every store has the same latest price" | Pass |
+| EC-PI | 10 | Store comparison ties | Unit | `mobile/src/features/price-intelligence/utils/storeComparison.test.ts` "breaks a tie on latest price by average, then by name" | Pass |
 | EC-PI | 11 | An alert for a merged item opens the item it went into | Integration | `backend/tests/api/test_price_alert_list.py::test_an_alert_for_a_merged_item_opens_the_item_it_went_into` | Pass |
 | EC-PI | 11 | A merge never touches another user's alerts (two users) | Integration | `backend/tests/api/test_price_alert_list.py::test_a_merge_never_touches_another_users_alerts` | Pass |
 | EC-PI | 11 | An alert written during a merge opens the surviving item (race) | Integration | `backend/tests/services/test_merge_price_alert_race.py::test_an_alert_written_during_a_merge_opens_the_surviving_item` | Pass (Postgres only) |

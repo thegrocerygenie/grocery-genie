@@ -79,11 +79,16 @@ export interface DashboardData {
   top_items: DashboardTopItem[];
   trend: DashboardTrendMonth[];
   /**
-   * Mean monthly spend over the 3 months before the trend window; 0 when there
-   * was none. Absent from servers older than the comparison.
+   * Mean monthly spend over as many months before the trend window; 0 when
+   * there was none, and for All. Absent from servers older than the comparison.
    */
   prior_average?: number;
   previous_period: string;
+  /**
+   * The period holding today, whichever period was asked for: Trend tints its
+   * bar and leaves it out of Lowest (BC-04 AC 8, 9). Absent from older servers.
+   */
+  current_period?: string;
   category_changes: DashboardCategoryChange[];
   /** Any receipt outside Recently Deleted, in any period (L7). */
   has_receipts?: boolean;

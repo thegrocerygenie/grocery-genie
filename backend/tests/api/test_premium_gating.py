@@ -25,7 +25,7 @@ from tests.api.test_price_alerts import (
     _store_id,
 )
 from tests.api.test_price_comparison import _manual
-from tests.conftest import DEV_USER_ID, set_premium
+from tests.conftest import DEV_USER_ID, USER_B_ID, ensure_user, set_premium
 
 
 @pytest.fixture
@@ -296,3 +296,31 @@ async def test_three_month_trend_is_free_and_twelve_is_premium(client):
             "message": "This feature is part of Grocery Genie Premium.",
         }
     }
+
+
+@pytest.mark.parametrize("months", ["6", "12", "all"])
+async def test_trend_over_3_months_is_premium(client, db_session, months):
+    """BC-04 AC 6 (DA-10): 1M and 3M are free; 6M, 1Y and All answer a free
+    user 403 premium_required, and the stored entitlement opens them."""
+    url = f"/api/dashboard/spending?period=2026-03&months={months}"
+    _assert_premium_required(await client.get(url), "trend_12_months")
+
+    await set_premium(db_session, DEV_USER_ID, True)
+    resp = await client.get(url)
+    assert resp.status_code == 200, resp.text
+
+
+@pytest.mark.parametrize("months", ["1", "3"])
+async def test_trend_of_1_or_3_months_is_free(client, months):
+    resp = await client.get(f"/api/dashboard/spending?period=2026-03&months={months}")
+    _assert_free(resp)
+    assert len(resp.json()["trend"]) == int(months)
+
+
+async def test_trend_entitlement_is_each_users_own(client, db_session):
+    """Another user's Premium opens nothing for this user (two users)."""
+    await ensure_user(db_session, USER_B_ID)
+    await set_premium(db_session, USER_B_ID, True)
+
+    resp = await client.get("/api/dashboard/spending?period=2026-03&months=all")
+    _assert_premium_required(resp, "trend_12_months")

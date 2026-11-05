@@ -550,8 +550,10 @@ async def test_dashboard_trend_is_3_months_with_months_3(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("months", ["0", "1", "6", "13", "24", "abc", "-3", ""])
-async def test_dashboard_rejects_months_other_than_3_or_12(
+@pytest.mark.parametrize(
+    "months", ["0", "2", "4", "13", "24", "abc", "-3", "", "ALL", "1.0"]
+)
+async def test_dashboard_rejects_months_outside_the_ranges(
     client: AsyncClient, seeded_db, premium_user, months
 ):
     response = await client.get(
@@ -635,3 +637,145 @@ async def test_dashboard_premium_user_still_gets_3_months_by_default(
     response = await client.get("/api/dashboard/spending?period=2026-03")
 
     assert len(response.json()["trend"]) == 3
+
+
+# --- BC-04 AC 6 (DA-10): range chips 1M, 3M, 6M, 1Y, All; over 3 is Premium ---
+
+
+@pytest.mark.asyncio
+async def test_dashboard_1_month_trend_compares_with_the_month_before(
+    client: AsyncClient, seeded_db, db_session
+):
+    groceries = await _category_id(db_session, "Groceries")
+    await _add_receipt(db_session, date(2026, 2, 10), [(groceries, 80.0)])
+    await _add_receipt(db_session, date(2026, 3, 10), [(groceries, 60.0)])
+
+    response = await client.get("/api/dashboard/spending?period=2026-03&months=1")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert [(m["period"], m["spent"]) for m in data["trend"]] == [("2026-03", 60.0)]
+    # The month before the window: February.
+    assert data["prior_average"] == 80.0
+
+
+@pytest.mark.asyncio
+async def test_dashboard_6_month_trend_for_premium(
+    client: AsyncClient, seeded_db, db_session, premium_user
+):
+    groceries = await _category_id(db_session, "Groceries")
+    # Window Oct 2025 - Mar 2026; prior window Apr - Sep 2025.
+    await _add_receipt(db_session, date(2025, 10, 1), [(groceries, 12.0)])
+    await _add_receipt(db_session, date(2026, 3, 31), [(groceries, 24.0)])
+    await _add_receipt(db_session, date(2025, 9, 30), [(groceries, 60.0)])
+    await _add_receipt(db_session, date(2025, 4, 1), [(groceries, 60.0)])
+    # Outside both windows, another user's, a pending scan: none count.
+    await _add_receipt(db_session, date(2025, 3, 31), [(groceries, 999.0)])
+    await _add_receipt(
+        db_session, date(2026, 1, 5), [(groceries, 999.0)], user_id=USER_B_ID
+    )
+    await _add_receipt(
+        db_session, date(2026, 1, 6), [(groceries, 999.0)], status="pending"
+    )
+
+    response = await client.get("/api/dashboard/spending?period=2026-03&months=6")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert [(m["period"], m["spent"]) for m in data["trend"]] == [
+        ("2025-10", 12.0),
+        ("2025-11", 0.0),
+        ("2025-12", 0.0),
+        ("2026-01", 0.0),
+        ("2026-02", 0.0),
+        ("2026-03", 24.0),
+    ]
+    assert data["prior_average"] == 20.0
+
+
+@pytest.mark.asyncio
+async def test_dashboard_all_trend_starts_at_the_first_receipt(
+    client: AsyncClient, seeded_db, db_session, premium_user
+):
+    groceries = await _category_id(db_session, "Groceries")
+    await _add_receipt(db_session, date(2025, 11, 20), [(groceries, 15.0)])
+    await _add_receipt(db_session, date(2026, 3, 2), [(None, 5.0)])
+    # Earlier, but not this user's first receipt: another user's, a pending
+    # scan, one in Recently Deleted.
+    await _add_receipt(
+        db_session, date(2024, 1, 5), [(groceries, 9.0)], user_id=USER_B_ID
+    )
+    await _add_receipt(
+        db_session, date(2024, 2, 5), [(groceries, 9.0)], status="pending"
+    )
+    await _add_receipt(db_session, date(2024, 3, 5), [(groceries, 9.0)])
+    await db_session.execute(
+        Receipt.__table__.update()
+        .where(Receipt.date == date(2024, 3, 5))
+        .values(deleted_at=date(2024, 3, 6))
+    )
+    await db_session.commit()
+
+    response = await client.get("/api/dashboard/spending?period=2026-03&months=all")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert [(m["period"], m["spent"]) for m in data["trend"]] == [
+        ("2025-11", 15.0),
+        ("2025-12", 0.0),
+        ("2026-01", 0.0),
+        ("2026-02", 0.0),
+        ("2026-03", 5.0),
+    ]
+    assert data["trend"][-1]["categories"] == [
+        {"category_id": None, "name": "Uncategorized", "spent": 5.0}
+    ]
+    # Nothing comes before the first receipt (BC-04 AC 7: no change for All).
+    assert data["prior_average"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_dashboard_all_trend_without_earlier_receipts_is_the_period(
+    client: AsyncClient, seeded_db, db_session, premium_user
+):
+    # Only a receipt after the period: All is just the period itself.
+    await _add_receipt(db_session, date(2026, 5, 1), [(None, 5.0)])
+
+    response = await client.get("/api/dashboard/spending?period=2026-03&months=all")
+
+    data = response.json()
+    assert [(m["period"], m["spent"]) for m in data["trend"]] == [("2026-03", 0.0)]
+    assert data["prior_average"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_dashboard_all_trend_follows_the_reset_day(
+    client: AsyncClient, seeded_db, db_session, premium_user
+):
+    # Reset day 15: December 10 is in the period that began November 15.
+    await set_reset_day(client, "2025-01-15")
+    await _add_receipt(db_session, date(2025, 12, 10), [(None, 7.0)])
+    await _add_receipt(db_session, date(2026, 1, 14), [(None, 3.0)])
+
+    response = await client.get("/api/dashboard/spending?period=2026-01&months=all")
+
+    assert [(m["period"], m["spent"]) for m in response.json()["trend"]] == [
+        ("2025-11", 7.0),
+        ("2025-12", 3.0),
+        ("2026-01", 0.0),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_dashboard_names_the_current_period(
+    client: AsyncClient, seeded_db, monkeypatch
+):
+    # BC-04 AC 8, 9: the app tints the current month and leaves it out of Lowest.
+    await set_reset_day(client, "2026-09-15")
+    pin_now(monkeypatch, "2026-10-10T12:00:00")
+
+    past = (await client.get("/api/dashboard/spending?period=2026-03")).json()
+    now = (await client.get("/api/dashboard/spending")).json()
+
+    assert past["current_period"] == "2026-09"
+    assert now["current_period"] == now["period"] == "2026-09"

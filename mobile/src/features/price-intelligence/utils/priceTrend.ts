@@ -2,7 +2,7 @@ import { toIsoDate } from '@/features/receipt-capture/utils/receiptDate';
 import { formatMoney } from '@/utils/money';
 import type { PriceHistory, PricePoint } from '../types';
 
-const EACH_UNITS = new Set(['each', 'ea', 'unit', 'units', 'item', 'items', 'pc', 'pcs']);
+export const EACH_UNITS = new Set(['each', 'ea', 'unit', 'units', 'item', 'items', 'pc', 'pcs']);
 
 /** PI-01 AC 3: "$0.69/lb", "$1.29 each", or just "$4.99" with no unit. */
 export function formatUnitPrice(price: number, currency: string, unit: string | null): string {

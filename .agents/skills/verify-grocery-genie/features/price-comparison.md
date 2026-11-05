@@ -9,10 +9,11 @@ An item's price at each store the user has bought it from, side by side (PI-04):
 - `pi.compare-own-stores`: a store only another user bought from never shows; a deleted receipt's price leaves the comparison (its store drops below the minimum) and comes back on restore.
 - `pi.compare-like-for-like`: a price in another currency counts toward no store.
 - `pi.compare-isolation`: another user's item answers 404.
+- `pi.compare-switch-card` (DA-10): the latest prices the app's "Save by switching" card and row order read. FreshCo's latest 0.80 and Loblaws' 1.10 make the card "$0.30 / unit, FreshCo vs. Loblaws", FreshCo first with CHEAPEST. The app orders by latest price (ties: average, then name) and draws the card, bars and badge itself (PI-04 AC 5-8, EC-PI 10; `mobile/src/features/price-intelligence/utils/storeComparison.ts`), so their proof is jest and a Simulator check.
 
 ## How to get to it (user POV)
 
-Budget tab → Items → an item → Compare stores (PI-04 AC 4, `mobile/src/features/price-intelligence/components/StoreComparison.tsx`): each store's average and latest price, the cheapest named, and a line counting `stores_below_minimum`. The section is UI-only: check it on a simulator.
+Budget tab → Items → an item → Compare stores (PI-04 AC 4-8, `mobile/src/features/price-intelligence/components/StoreComparison.tsx`): the "Save by switching" card, then each store's latest price, "N purchases · avg $X" and a price bar, the cheapest badged CHEAPEST, and a line counting `stores_below_minimum`. The section is UI-only: check it on a simulator.
 
 ## Driving it with gg-verify
 
@@ -29,6 +30,7 @@ lime "Duty Free" 2026-03-06 0.30 EUR > /dev/null; lime "Duty Free" 2026-03-07 0.
 iid=$($G api GET '/api/items?q=limes' | jq -r '.items[0].id')
 $G api GET /api/items/$iid/compare | jq -c '{currency, min_observations, stores_below_minimum, stores: [.stores[] | [.store_name, .latest_price, .latest_date, .avg_price, .observation_count]]}'
 # pi.compare: FreshCo [0.8, 2026-03-15, 0.7, 2] then Loblaws [1.1, 2026-03-20, 1.0, 2]
+# pi.compare-switch-card: latest 1.10 - 0.80 = $0.30 / unit, FreshCo vs. Loblaws
 # pi.compare-minimum: Metro absent, stores_below_minimum 1
 # pi.compare-like-for-like: currency USD, Duty Free (EUR) absent
 # pi.compare-own-stores: Costco (the other user's) absent
@@ -48,3 +50,4 @@ $G signup compare-third && $G premium && $G api GET /api/items/$iid/compare     
 - The last call answers 404, so `$G api` exits non-zero there: that is the pass. The third user is Premium first: a free user gets `403 premium_required` before the item is looked up.
 - Verified 2026-11-03 against Postgres 16 in debug mode (run `20261103-151240`; again with the app's screen built, run `20261103-183706`).
 - Run in full as Premium users (`$G premium`, decision D8) on 2026-11-04: run `20261104-231532`.
+- `pi.compare-switch-card` checked 2026-11-05 for DA-10: run `20261105-201426` (FreshCo 0.8 / avg 0.7, Loblaws 1.1 / avg 1.0).

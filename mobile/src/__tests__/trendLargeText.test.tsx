@@ -4,7 +4,6 @@
  * check the layout props that keep text in its place; the Simulator recheck
  * at AX1 and AX5 confirms the drawing.
  */
-import React from 'react';
 import { StyleSheet } from 'react-native';
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 
@@ -13,12 +12,6 @@ import type { DashboardData, DashboardTrendMonth } from '@/features/budget/types
 import { useBudgetCurrency } from '@/hooks/useBudgetCurrency';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
-jest.mock('@react-native-segmented-control/segmented-control', () => {
-  const { View: MockView } = jest.requireActual('react-native');
-  return function MockSegmented(props: object) {
-    return <MockView testID="trend-months" {...props} />;
-  };
-});
 
 /** The `count` months ending at 2026-11. Heights are not in month order. */
 const MOCK_SPEND = [40, 55, 30, 70, 90, 120, 20, 25, 63, 77, 19, 50];
@@ -63,11 +56,7 @@ function flat(testID: string) {
 
 function renderTrend(months: 3 | 12 = 3) {
   renderRouter({ trend: TrendScreen }, { initialUrl: '/trend' });
-  if (months === 12) {
-    fireEvent(screen.getByTestId('trend-months'), 'change', {
-      nativeEvent: { selectedSegmentIndex: 1 },
-    });
-  }
+  if (months === 12) fireEvent.press(screen.getByLabelText('1 year'));
 }
 
 describe('Trend chart at large text sizes', () => {
@@ -103,6 +92,25 @@ describe('Trend chart at large text sizes', () => {
   });
 });
 
+describe('Trend chips and Highlights at large text sizes (DA-10)', () => {
+  it('keeps each chip a full touch target that wraps to a new row rather than clipping', () => {
+    renderTrend();
+
+    expect(flat('trend-ranges').flexWrap).toBe('wrap');
+    for (const value of ['1', '3', '6', '12', 'all']) {
+      expect(flat(`trend-range-${value}`).minHeight).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  it('lets a Highlights row wrap its detail and value under the title at AX sizes', () => {
+    renderTrend();
+
+    const row = screen.getByLabelText(/^Highest: /);
+    expect(StyleSheet.flatten(row.props.style).flexWrap).toBe('wrap');
+    expect(screen.getByText('Highest').props.numberOfLines).toBeUndefined();
+  });
+});
+
 describe('Trend chart with VoiceOver (BUG-8)', () => {
   it('gives every month column the same height, so VoiceOver reads them left to right', () => {
     renderTrend(12);
@@ -117,7 +125,6 @@ describe('Trend chart with VoiceOver (BUG-8)', () => {
       expect(StyleSheet.flatten(column.props.style).alignSelf).toBeUndefined();
     }
   });
-
 });
 
 describe('Trend bar amounts in the budget currency (BUG-7)', () => {

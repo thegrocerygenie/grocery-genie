@@ -1,7 +1,7 @@
 """Premium entitlement: the one place the backend asks "is this user Premium?".
 
-Premium (decision D2, 2026-11-03) gates the V1.1 extras: the 12-month
-spending trend, custom categories, data export, budget rollover and unlimited
+Premium (decision D2, 2026-11-03) gates the V1.1 extras: trends over 3 months
+(6M, 1Y, All; D11), custom categories, data export, budget rollover and unlimited
 receipts. Decision D8 (2026-11-04, PREM-02) adds cross-store comparison and
 muting price alerts; unmuting stays open, so a mute outlives a lapse and can
 still be removed. A free user who asks for one gets ``403`` with

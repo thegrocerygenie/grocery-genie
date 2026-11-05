@@ -1,6 +1,8 @@
 import calendar
 import uuid
+from bisect import bisect_right
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -789,11 +791,24 @@ class BudgetService:
         return {name: entry[3] for name, entry in best.items()}
 
     async def get_spending_trend(
-        self, user_id: uuid.UUID, period: str, months: int = 3
+        self, user_id: uuid.UUID, period: str, months: int | None = 3
     ) -> list[DashboardTrendMonth]:
-        """Get spending trend for the specified number of months ending at period."""
-        year, month = int(period[:4]), int(period[5:7])
-        trend: list[DashboardTrendMonth] = []
+        """Spending in each of the ``months`` periods ending at ``period``,
+        oldest first. ``months=None`` is the Trend screen's "All" (BC-04 AC
+        6): every period from the one holding the user's first counted
+        receipt, and at least ``period`` itself.
+
+        One query covers the whole window, so a long "All" costs no more round
+        trips than three months.
+        """
+        start_day = await self._start_day(user_id)
+        if months is None:
+            months = await self._months_since_first_receipt(user_id, period, start_day)
+        periods = [period]
+        for _ in range(months - 1):
+            periods.insert(0, previous_period(periods[0]))
+        bounds = [_period_bounds(int(p[:4]), int(p[5:7]), start_day) for p in periods]
+        starts = [b[0] for b in bounds]
 
         # The overall budget line, the same for every month of the trend.
         result = await self.db.execute(
@@ -807,20 +822,36 @@ class BudgetService:
         )
         budget = result.scalar_one_or_none()
 
-        for i in range(months - 1, -1, -1):
-            # Calculate the month offset
-            m = month - i
-            y = year
-            while m <= 0:
-                m += 12
-                y -= 1
-            p = f"{y:04d}-{m:02d}"
-            p_start, p_end = await self.get_period_dates(user_id, p)
-            by_category = await self.get_spending_by_category(user_id, p_start, p_end)
-            total = sum(by_category.values())
-            names = await self._get_category_names(
-                {cid for cid in by_category if cid is not None}
+        # Spend per day and category over the window, then bucketed into
+        # periods here: the same receipts get_spending_by_category counts.
+        result = await self.db.execute(
+            select(
+                Receipt.date,
+                LineItem.category_id,
+                func.sum(LineItem.total_price),
             )
+            .join(Receipt, LineItem.receipt_id == Receipt.id)
+            .where(
+                Receipt.user_id == user_id,
+                Receipt.status == "confirmed",
+                Receipt.deleted_at.is_(None),
+                in_budget_currency(user_id),
+                Receipt.date >= bounds[0][0],
+                Receipt.date <= bounds[-1][1],
+            )
+            .group_by(Receipt.date, LineItem.category_id)
+        )
+        by_period: list[dict[uuid.UUID | None, Decimal]] = [{} for _ in periods]
+        for day, category_id, spent in result.all():
+            bucket = by_period[bisect_right(starts, day) - 1]
+            amount = spent if isinstance(spent, Decimal) else Decimal(str(spent))
+            bucket[category_id] = bucket.get(category_id, Decimal(0)) + amount
+
+        names = await self._get_category_names(
+            {cid for bucket in by_period for cid in bucket if cid is not None}
+        )
+        trend: list[DashboardTrendMonth] = []
+        for p, by_category in zip(periods, by_period, strict=True):
             categories = sorted(
                 (
                     DashboardTrendCategory(
@@ -828,17 +859,16 @@ class BudgetService:
                         name=names.get(cid, "Unknown")
                         if cid is not None
                         else UNCATEGORIZED,
-                        spent=round(spent, 2),
+                        spent=round(float(spent), 2),
                     )
                     for cid, spent in by_category.items()
                 ),
                 key=lambda c: (-c.spent, c.name),
             )
-
             trend.append(
                 DashboardTrendMonth(
                     period=p,
-                    spent=round(total, 2),
+                    spent=round(float(sum(by_category.values(), Decimal(0))), 2),
                     budget=float(budget.amount) if budget else None,
                     categories=categories,
                 )
@@ -846,14 +876,40 @@ class BudgetService:
 
         return trend
 
+    async def _months_since_first_receipt(
+        self, user_id: uuid.UUID, period: str, start_day: int
+    ) -> int:
+        """How many periods run from the one holding the user's first counted
+        receipt (confirmed, not in Recently Deleted, in the budget currency)
+        through ``period``; 1 when there is none on or before ``period``."""
+        result = await self.db.execute(
+            select(func.min(Receipt.date)).where(
+                Receipt.user_id == user_id,
+                Receipt.status == "confirmed",
+                Receipt.deleted_at.is_(None),
+                in_budget_currency(user_id),
+            )
+        )
+        first_day = result.scalar_one_or_none()
+        if first_day is None:
+            return 1
+        first, _, _ = period_containing(first_day, start_day)
+        count = (int(period[:4]) - int(first[:4])) * 12 + (
+            int(period[5:7]) - int(first[5:7])
+        )
+        return max(count + 1, 1)
+
     async def get_prior_average(
-        self, user_id: uuid.UUID, period: str, months: int = 3
+        self, user_id: uuid.UUID, period: str, months: int | None = 3
     ) -> float:
         """Mean monthly spend over the ``months`` before the trend window.
 
         The trend covers ``period`` and the ``months - 1`` before it, so the
-        prior window is the ``months`` months before that.
+        prior window is the ``months`` months before that. "All"
+        (``months=None``) starts at the first receipt, so nothing is before it.
         """
+        if months is None:
+            return 0.0
         first = period
         for _ in range(months):
             first = previous_period(first)
@@ -898,7 +954,7 @@ class BudgetService:
         self,
         user_id: uuid.UUID,
         period: str | None = None,
-        months: int = 3,
+        months: int | None = 3,
         today: date | None = None,
     ) -> DashboardSpendingResponse:
         """Get complete dashboard data in a single call.
@@ -907,15 +963,17 @@ class BudgetService:
         date; the server's when not given). With a reset day of 15, October 10
         is in '2026-09', the period that began September 15.
 
-        ``months`` sets the trend length (3, or 12 for Premium) and the prior
-        window ``prior_average`` covers; the rest is about ``period`` alone.
+        ``months`` sets the trend length (1, 3, 6 or 12; None for every month
+        since the first receipt) and the prior window ``prior_average``
+        covers; the rest is about ``period`` alone. ``current_period`` is the
+        period holding ``today``, whichever ``period`` was asked for.
         """
+        current_period, _, _ = await self.get_period_containing(
+            user_id, today or clock.today()
+        )
         if period is None:
-            period, period_start, period_end = await self.get_period_containing(
-                user_id, today or clock.today()
-            )
-        else:
-            period_start, period_end = await self.get_period_dates(user_id, period)
+            period = current_period
+        period_start, period_end = await self.get_period_dates(user_id, period)
 
         summary = await self.get_budget_summary(user_id, period)
         top_items = await self.get_top_items(user_id, period_start, period_end)
@@ -936,6 +994,7 @@ class BudgetService:
             previous_period=previous_period(period),
             category_changes=category_changes,
             has_receipts=has_receipts,
+            current_period=current_period,
         )
 
     async def _has_receipts(self, user_id: uuid.UUID) -> bool:

@@ -144,12 +144,12 @@ Setup for this section:
 - [ ] **Push tap, background.** Same, with the app in the background. (PI-03 AC 2)
 - [ ] **Push tap, cold start.** Force-quit the app, then tap the banner. The item opens, and Back returns to Budget. (PI-03 AC 2; BUG-6)
 - [ ] **Item and store mute switches.** On the Alerts screen (pushed from item detail's Alerts row; after DA-7, before it the switches are on item detail), turn off alerts for the item and for one store. Relaunch: both switches stay off. A new price change at that store sends no push. (PI-03 AC 4; DEVICE-CHECK C2)
-- [ ] **Compare stores.** Item detail lists each store cheapest first, with latest and average, and says how many stores need more prices. (PI-04 AC 4; DEVICE-CHECK C1)
+- [ ] **Compare stores.** As a Premium user with an item bought at 2 or more stores at different prices, item detail's Compare stores starts with the "Save by switching" card: the gap as "$X / unit" (or "/ lb"), and "cheapest store vs. priciest store". Each row leads with its latest price on the right, "N purchases · avg $X" under the store name, the store's square, and a bar in the store's colour below; rows run from the cheapest latest price, and only the first has the CHEAPEST badge. Stores at the same latest price show no card. It still says how many stores need more prices. With VoiceOver each row reads as one element (store, cheapest, latest, average, purchases); at AX5 on the SE nothing is cut off and the price sits under the name. A free user sees the upgrade prompt instead. (PI-04 AC 4–8, EC-PI 10; DEVICE-CHECK C1)
 - [ ] **Threshold picker.** Settings → Alerts: pick 25%, then "10% (default)". Each choice saves, and the line under it says what size of change sends an alert. (PI-03 AC 1; DEVICE-CHECK C3)
 - [ ] **Unmute rows.** The muted item and store are listed in Settings → Alerts. Unmute each: it leaves the list, and the switch on item detail is on again. (PI-03 AC 4; DEVICE-CHECK C3)
 
 **Trend, categories, export, rollover, quota (BC-FR, BC-05 AC 3, NFR Privacy 2):**
-- [ ] **Trend 3/12 toggle.** 3 Months is selected by default. A Premium user's 12 Months shows 12 bars. A free user's 12 Months shows the upgrade prompt, and its button opens the paywall. (BC-FR Trends; DEVICE-CHECK A1–A3, D3)
+- [ ] **Trend range chips.** The chips 1M, 3M, 6M, 1Y and All sit under the chart, 3M selected by default. The headline reads "N-month average" with its change ("YoY" on 1Y, none on All). Bars are grey with the current month in green, each labelled with its month's letter. Highlights lists Highest, Lowest (never a month with no spending or the current month; "No finished month with spending yet" when none is left) and Trend with the headline's percent (none when the headline has none; on All, later half against earlier half). A Premium user's 6M, 1Y and All show 6, 12 and every month since the first receipt (All scrolls sideways past 12). A free user's 1M and 3M work; 6M, 1Y and All show the upgrade prompt (no error, no Highlights), and its button opens the paywall. (BC-04 AC 6–9; DEVICE-CHECK A1–A3, D3)
 - [ ] **Settings → Categories.** Premium: add, rename and delete a category; at 10 the add button is disabled and says why. Free: the upgrade prompt, not an add button. (BC-05 AC 3)
 - [ ] **Category editor sheet.** Match the category editor sheet (name, colour, icon) to the design once it exists; the design export has none yet, and the user will design it. (BC-05 AC 5, DA-9)
 - [ ] **Data export.** Settings → Export data, as Premium: the share sheet opens with the file, and saving it to Files works. As free: the upgrade prompt. (NFR Privacy 2)
@@ -164,13 +164,13 @@ Setup for this section:
 - [ ] **Premium model accuracy, before it is switched on in production.** With `GG_LLM_API_KEY`, `GG_LLM_PREMIUM_EXTRACTION_MODEL` set to the chosen model, and the real receipt set's images in place, run `/validate-extraction` (from `backend/`: `.venv/bin/python -m tests.llm_validation.run extract`, then `... extract --premium`). The Premium run's field accuracy and item recall are no lower than the default run's, hallucination is 0%, and both reports' `tokens_per_scan` give the cost per scan (`docs/DEPLOYMENT.md` Part 3, Priority OCR model). Commit both reports; the product owner approves the model and cost before production sets the variable.
 
 **Device-check bug rechecks (`.planning/DEVICE-CHECK-2026-11-03.md`):**
-- [ ] **BUG-1.** At AX1 and AX5, Trend's bar amounts stay clear of the summary above the chart.
+- [ ] **BUG-1.** At AX1 and AX5, Trend's bar amounts (1M, 3M) stay clear of the average headline above the chart, the chips wrap instead of clipping, and the Highlights rows wrap their month and amount instead of truncating.
 - [ ] **BUG-2.** At AX5, the month-over-month change wraps under the total, on the SE.
 - [ ] **BUG-3.** At AX5 on the SE, the Items list and item detail keep names and prices readable; "$4.79" stays on one line.
 - [ ] **BUG-5.** The "Items" large title is drawn.
 - [ ] **BUG-6.** A price alert tapped from a cold start opens the item with Back to Budget (also above).
-- [ ] **BUG-8.** With VoiceOver on the 12-month Trend, swiping reads the bars in month order.
-- [ ] **BUG-9.** At AX5 on the SE, the 12 month letters stay readable and apart.
+- [ ] **BUG-8.** With VoiceOver on Trend's 1Y range, swiping reads the bars in month order, each as its month and total, then the chips (the selected one says so), then Highlights row by row.
+- [ ] **BUG-9.** At AX5 on the SE, the 12 month letters on 1Y stay readable and apart; on All past 12 months the chart scrolls sideways with every letter readable.
 
 **Accessibility on each new screen:**
 - [ ] **VoiceOver** reads, in a logical order: Items, item detail (chart summary, mute switches, Compare stores), Review Matches, Combine, Settings → Alerts (threshold, muted rows), Settings → Categories, Export data, Budget settings (rollover switches), the paywall, Settings → Premium, and Settings → Stores (merge, unmerge, the store picker). Every control reads as a button or switch with its label and state. (13 Accessibility)
