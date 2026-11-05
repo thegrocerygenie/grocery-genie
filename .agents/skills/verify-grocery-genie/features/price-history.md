@@ -1,6 +1,6 @@
 # Price history and item matching (V1.1)
 
-Confirming a receipt links each line to a canonical item (PI-02) and records its unit price (PI-01). Receipt abbreviations of a product already bought link to it on their own; a close-but-unsure name, or a close name that differs in a qualifier (plain "Bananas" after "Organic Bananas"), becomes a "same item?" question the user accepts or rejects. Items (the list, titled "Prices" before DA-3) lists every item with its latest price, and an item shows its price history with date and store. The user can rename an item, combine two, and split a name off.
+Confirming a receipt links each line to a canonical item (PI-02) and records its unit price (PI-01). Receipt abbreviations of a product already bought link to it on their own; a close-but-unsure name, or a close name that differs in a qualifier (plain "Bananas" after "Organic Bananas"), becomes a "same item?" question the user accepts or rejects. Items (the list, titled "Prices" before DA-3) lists every item with its latest price, and an item shows its price history with date and store. The user can rename an item, combine two (the Link items sheet), split a name off, and split chosen lines off into new items.
 
 ## Sub-features
 
@@ -14,6 +14,7 @@ Confirming a receipt links each line to a canonical item (PI-02) and records its
 - `pi.history`: `GET /api/items/{id}/prices` lists every price oldest first with date and store; `has_timeline` is true from 2 prices.
 - `pi.range`: item detail (PI-01 AC 5, DA-3) asks `GET /api/items/{id}/prices` once, with no filter, and its range control (1M/3M/6M/1Y/All, counted back from today, opening on 3M or the smallest range with prices) filters that history in the app, so opening an item records exactly one `price_history_viewed` and a range tap records none. The API's own `from` filter still answers (has_timeline and store_count for the range alone), but the app does not use it. Each price's `store_id` is the same store id `/compare` gives, which the app colours its store squares by (PI-01 AC 9). Another user's item answers 404.
 - `pi.split` / `pi.merge` / `pi.rename`: unlink a name, link two items, rename.
+- `pi.split-lines`: split by line (PI-02 AC 10-15, DA-6). Each price carries `line_item_id` and `line_name`. `POST /api/items/{id}/split` moves one of several lines sharing a receipt name to a new, named item with its price (`avg_unit_price` its own); the name, with lines left on the original, stays there, so a later scan of it joins the original. Moving every line is 409, a blank name 422, another user's item 404. `GET /api/items/{id}/link-candidates` (the Link items sheet) lists the similar new item under `suggested`, never the item itself; another user's item 404.
 - `pi.isolation`: another user's list is empty and the item answers 404.
 - `pi.match-prompt`: the "Same item?" prompt's data (PI-02 AC 5-9, DA-5). Every suggestion carries `receipt_line` (the line as printed, its receipt's store and date) and `suggested_item_stats` (the caller's purchases, stores and average unit price of the existing item). `GET /api/items/suggestions?receipt_id=` gives only the suggestions that receipt's lines raised, which the app asks right after a confirm: `[]` for a receipt that raised none or once they are resolved, 404 for an unknown or another user's receipt. A second reject answers 409, which the prompt passes over.
 
@@ -67,6 +68,19 @@ $G sql "SELECT event_name, properties->>'decision' FROM analytics_events WHERE e
 $G signup promptother
 $G api GET "/api/items/suggestions?receipt_id=$rid" || true                  # 404
 $G api GET /api/items/suggestions                                            # []
+$G signup split                                                              # pi.split-lines
+$G api POST /api/receipts '{"store_name":"FreshCo","date":"2026-03-01","total":11.49,"items":[{"name":"OLIVE OIL","quantity":1,"unit_price":11.49,"total_price":11.49}]}'
+$G api POST /api/receipts '{"store_name":"Loblaws","date":"2026-03-08","total":11.99,"items":[{"name":"OLIVE OIL","quantity":1,"unit_price":11.99,"total_price":11.99}]}'
+oil=$($G api POST /api/receipts '{"store_name":"FreshCo","date":"2026-03-15","total":24.99,"items":[{"name":"OLIVE OIL","quantity":1,"unit_price":24.99,"total_price":24.99}]}' | jq -r '.items[0].canonical_item_id')
+$G api GET /api/items/$oil/prices | jq -c '[.observations[] | [.line_item_id, .line_name, .unit_price]]'   # three lines, one name; take the 24.99 line's id as L3, all three as L1 L2 L3
+$G api POST /api/items/$oil/split '{"splits":[{"name":"A","line_item_ids":["L1","L2","L3"]}]}' || true   # 409: the original keeps a line
+$G api POST /api/items/$oil/split '{"splits":[{"name":"  ","line_item_ids":["L3"]}]}' || true            # 422
+$G api POST /api/items/$oil/split '{"splits":[{"name":"Olive oil 3L","line_item_ids":["L3"]}]}' | jq -c '.items[] | {canonical_name, observation_count, avg_unit_price, aliases}'   # 201: 1 purchase, 24.99, no alias
+$G sql "SELECT c.canonical_name, p.unit_price, l.canonical_item_id = p.canonical_item_id FROM price_observations p JOIN line_items l ON l.id = p.line_item_id JOIN canonical_items c ON c.id = p.canonical_item_id ORDER BY p.date"   # each price on its line's item, none twice
+$G api GET /api/items/$oil/link-candidates | jq -c '{suggested: [.suggested[].canonical_name], items: [.items[].canonical_name]}'   # suggested: Olive oil 3L
+$G api POST /api/receipts '{"store_name":"FreshCo","date":"2026-03-22","total":11.79,"items":[{"name":"OLIVE OIL","quantity":1,"unit_price":11.79,"total_price":11.79}]}' | jq -r '.items[0].canonical_item_id'   # $oil: the name stayed
+$G signup splitother && $G api POST /api/items/$oil/split '{"splits":[{"name":"Mine","line_item_ids":["L1"]}]}' || true   # 404
+$G api GET /api/items/$oil/link-candidates || true                          # 404
 $G signup range                                                              # pi.range
 $G api POST /api/receipts '{"store_name":"FreshCo","date":"2026-02-10","total":2.0,"items":[{"name":"Avocado","quantity":1,"unit_price":2.0,"total_price":2.0}]}'
 $G api POST /api/receipts '{"store_name":"Loblaws","date":"2026-08-15","total":2.2,"items":[{"name":"Avocado","quantity":1,"unit_price":2.2,"total_price":2.2}]}'
@@ -83,8 +97,9 @@ $G signup rangeother && $G api GET "/api/items/$av/prices" || true          # 40
 
 - Debug mode mocks only the LLM extractor. Matching runs the real local embedding model (`GG_EMBEDDING_MODEL`), which loads on the first confirm (a few seconds, and a download on a host that has never fetched it). `GG_EMBEDDINGS_ENABLED=false` matches on aliases and fuzzy similarity only, and aliases keep a null embedding.
 - `pi.match-prompt` with the real embedding model: "CUCUMBERS ENG" after "Cucumber" links semantically (about 0.81), so it asks only in pytest, which runs without the model; "Chicken Breast" after "CHKN BRST" asks under both. Skip and Cancel are app-only (they save nothing). The full-screen prompt, its opening after a confirm, and its inline error need a Simulator check.
+- `pi.split-lines`: the split screen's line picking, "+ Add another split", the unit-price warning (highest ≥ 1.5× lowest, computed in the app) and the Link items sheet's radios are app-only; they need a Simulator check.
 - The ranges count back from today on the phone and filter in the app; the API sees only the one plain request.
 - Manual entries carry no `unit_of_measure`, so their history's `unit_of_measure` is null and prices show without a unit. A scan's extraction supplies it.
 - Exact confidences depend on the model version; the journey checks which pairs link, ask, or stay apart, not the score.
 - Qualifier words and their receipt abbreviations are listed in `backend/app/services/item_qualifiers.py`. If an abbreviation is missing there, a true match asks instead of linking. This journey found "WHL" (whole) missing at first, and the device check "WHL WHT" (whole wheat). French words match without accents ("ECREME" is écrémé).
-- Verified 2026-11-03 against Postgres 16 with pgvector 0.6 (run `20261103-053414`), and with the qualifier steps the same day (run `20261103-220037`). The WHL WHT and French steps verified 2026-11-04 (run `20261104-040224`). `pi.range` verified 2026-11-05 (run `20261105-042923`), and with the single request (run `20261105-045304`). `pi.match-prompt` verified 2026-11-05 (run `20261105-055716`), and with the suggestion row lock (run `20261105-064233`).
+- Verified 2026-11-03 against Postgres 16 with pgvector 0.6 (run `20261103-053414`), and with the qualifier steps the same day (run `20261103-220037`). The WHL WHT and French steps verified 2026-11-04 (run `20261104-040224`). `pi.range` verified 2026-11-05 (run `20261105-042923`), and with the single request (run `20261105-045304`). `pi.match-prompt` verified 2026-11-05 (run `20261105-055716`), and with the suggestion row lock (run `20261105-064233`). `pi.split-lines` verified 2026-11-05 (run `20261105-154506`).

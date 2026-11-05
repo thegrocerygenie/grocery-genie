@@ -2,6 +2,8 @@ import { apiClient } from '@/services/api';
 import type {
   ItemDetail,
   ItemList,
+  ItemSplitPart,
+  LinkCandidates,
   ItemSuggestion,
   PriceAlertSettings,
   PriceAlertSettingsUpdate,
@@ -44,6 +46,23 @@ export async function splitAlias(id: string, aliasId: string): Promise<ItemDetai
   return apiClient<ItemDetail>(`/api/items/${id}/aliases/${aliasId}/split`, {
     method: 'POST',
   });
+}
+
+/** PI-02 AC 13, 14 (DA-6): chosen lines become new items. Returns them, in order. */
+export async function splitItem(id: string, splits: ItemSplitPart[]): Promise<ItemDetail[]> {
+  const body = await apiClient<{ items: ItemDetail[] }>(`/api/items/${id}/split`, {
+    method: 'POST',
+    body: JSON.stringify({ splits }),
+  });
+  return body.items;
+}
+
+/** PI-02 AC 15: the Link items sheet's "Suggested" and "All items". */
+export async function getLinkCandidates(id: string, query?: string): Promise<LinkCandidates> {
+  const params = new URLSearchParams();
+  if (query?.trim()) params.set('q', query.trim());
+  const qs = params.toString();
+  return apiClient<LinkCandidates>(`/api/items/${id}/link-candidates${qs ? `?${qs}` : ''}`);
 }
 
 export async function listSuggestions(): Promise<ItemSuggestion[]> {

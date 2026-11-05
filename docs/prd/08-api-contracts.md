@@ -412,13 +412,15 @@ Items with at least one price, most recently bought first. `q` searches names an
       "unit_of_measure": "lb",
       "observation_count": 12,
       "store_count": 2,
-      "latest_price": { "unit_price": 0.79, "unit_of_measure": "lb", "currency": "USD", "date": "2026-03-12", "store_name": "Loblaws" }
+      "latest_price": { "unit_price": 0.79, "unit_of_measure": "lb", "currency": "USD", "date": "2026-03-12", "store_name": "Loblaws" },
+      "avg_unit_price": 0.74
     }
   ],
   "total": 1, "page": 1, "per_page": 20,
   "pending_suggestions": 2
 }
 ```
+[V1.1] (DA-6, PI-02 AC 11, 15) `avg_unit_price` is the mean unit price of the item's prices in the unit and currency most of them are in, rounded half up to the cent, over the caller's receipts not deleted (`null` with none): the "N purchases · $X avg" of the Link items sheet and the split screen. Item detail carries it too.
 
 ### GET /api/items/{canonical_id}
 The list fields plus `aliases: [{id, alias}]` and `suggestions` (pending questions about this item).
@@ -436,7 +438,7 @@ Price observations for a canonical item, oldest first.
   "min_points": 2,
   "store_count": 2,
   "observations": [
-    { "receipt_id": "uuid", "date": "2026-03-01", "store_id": "uuid", "store_name": "FreshCo", "unit_price": 0.69, "quantity": 2.0, "unit_of_measure": "lb", "currency": "USD", "in_timeline": true }
+    { "receipt_id": "uuid", "line_item_id": "uuid", "line_name": "ORG BANANAS", "date": "2026-03-01", "store_id": "uuid", "store_name": "FreshCo", "unit_price": 0.69, "quantity": 2.0, "unit_of_measure": "lb", "currency": "USD", "in_timeline": true }
   ]
 }
 ```
@@ -452,6 +454,18 @@ Price observations for a canonical item, oldest first.
 
 ### POST /api/items/{canonical_id}/aliases/{alias_id}/split
 201 with the new item: the alias, its lines and their prices. 409 when it is the item's only alias.
+
+### POST /api/items/{canonical_id}/split
+[V1.1] (DA-6, PI-02 AC 10-14) Split by line.
+
+**Request:** `{ "splits": [{ "name": "Olive oil 3L", "line_item_ids": ["uuid"] }] }` (1 to 10 splits). A line is one of the item's on the caller's confirmed receipts that are not deleted: the `line_item_id`s of its prices. Any line can move, though its receipt name has other lines.
+
+**Response** `201 { "items": [<item detail>, ...] }`: the new items, in the order of `splits`, each with its lines and their prices (each line's observation moves with it, so history, comparison and alerts use the new grouping; nothing is copied). A receipt name all of whose lines went to one new item goes with them: its alias, and its lines on Recently Deleted receipts, so a restore and later scans join the new item. A name with lines left on the original, or spread over two new items, stays with the original. A new item's name may equal an existing item's (it is still a new item; the user can link them).
+
+Errors: `409` when the original would keep no line (also an item with one line, EC-PI 6); `422` for an empty name, an empty split, no split, a line that is not the item's, or one line in two splits; `404` for another user's item. The split locks the item before it reads or moves anything, the order merge and accept use (items first), so a split racing a merge of the item waits: the merge then takes what is left, or the split finds the item gone (404).
+
+### GET /api/items/{canonical_id}/link-candidates?q=
+[V1.1] (DA-6, PI-02 AC 15) The Link items sheet: `{ "suggested": [<item summary>], "items": [<item summary>] }`. `suggested` holds the item's pending suggestions (newest first), then up to 5 of the most similar other items by name or alias (fuzzy score ≥ 0.6, best first); `items` every other item with a price, most recently bought first (at most 500). `q` narrows both by name or alias, as `GET /api/items`. The item itself is never listed, and nothing is listed twice. Another user's item: 404.
 
 ### GET /api/items/suggestions
 Pending suggestions, newest first:

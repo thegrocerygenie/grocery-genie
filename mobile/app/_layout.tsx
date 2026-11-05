@@ -112,7 +112,14 @@ export default function RootLayout() {
               <Stack.Screen name="items/index" options={{ title: 'Items' }} />
               <Stack.Screen name="items/[id]" options={{ title: 'Item' }} />
               <Stack.Screen name="items/matches" options={{ title: 'Review Matches' }} />
-              <Stack.Screen name="items/merge" options={{ title: 'Combine' }} />
+              <Stack.Screen
+                name="items/merge"
+                options={{ title: 'Link items', presentation: 'modal' }}
+              />
+              <Stack.Screen
+                name="items/split"
+                options={{ title: 'Split', presentation: 'modal' }}
+              />
               <Stack.Screen
                 name="items/match"
                 options={{ title: 'Same item?', presentation: 'fullScreenModal' }}

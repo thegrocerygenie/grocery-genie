@@ -37,6 +37,8 @@ jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
 function point(date: string, price: number, store: string, inTimeline = true): PricePoint {
   return {
     receipt_id: `r-${date}`,
+    line_item_id: `l-${date}`,
+    line_name: 'Organic Bananas',
     date,
     store_id: `s-${store}`,
     store_name: store,
