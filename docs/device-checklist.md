@@ -125,6 +125,8 @@ The Simulator has no VoiceOver, and Accessibility Inspector doesn't count.
 
 Added 2026-11-04 for the V1.1 Definition of Done in [13-validation-strategy.md](prd/13-validation-strategy.md). The Simulator check of 2026-11-03 (`.planning/DEVICE-CHECK-2026-11-03.md`) passed the layouts below on an iPhone SE and a Pro Max, but not VoiceOver focus order, purchases, or real push.
 
+**Simulator pass, 2026-11-06** ([.planning/DEVICE-CHECK-2026-11-06.md](../.planning/DEVICE-CHECK-2026-11-06.md), `main` at `eecff9d`, iPhone SE Simulator, not a phone). It walked the items below against the design in light, dark and AX5, and rechecked BUG-1, 2, 3, 5, 6, 8 and 9 (all pass; BUG-6 routed in 4 of 5 cold starts). Read the items below as "the layout, data and flow passed on the Simulator; what is left is what a phone adds". Those leftovers are collected in "Device-only remainder" at the end of this file. Tick an item here only after the phone run.
+
 Setup for this section:
 - [ ] A build with `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` set, and the App Store Connect products and a Sandbox Apple Account. Without the key the paywall shows the App Store notice and hides Subscribe and Restore.
 - [ ] The backend has `GG_REVENUECAT_WEBHOOK_SECRET` and `GG_REVENUECAT_API_KEY`, and RevenueCat's webhook points at it.
@@ -185,6 +187,36 @@ Setup for this section:
 **Accessibility on each new screen:**
 - [ ] **VoiceOver** reads, in a logical order: Items, item detail (range chips with the selected one, "Avg · 30d" headline, chart summary, Alerts row, Compare stores), the Alerts screen (switches with their state, Mute until and its sheet), Review Matches, the "Same item?" prompt (Yes, merge / Keep as separate item / Skip / Cancel), Split (lines, name fields, Add another split), the Link items sheet (search, rows with their radio state, Link), the Price alerts list (rows, Threshold, Cooldown) and the Budget bell, Trend (bars, chips, Highlights), Settings → Alerts (threshold, muted rows with Until or Forever, Unmute), Settings → Categories, Export data (Range, Format, Includes switches, Export N receipts), Budget settings (rollover switches), the paywall, Settings → Premium, the Waitlist offer screen and the claim link screen, and Settings → Stores (merge, unmerge, the store picker). Every control reads as a button or switch with its label and state. (13 Accessibility)
 - [ ] **Dark mode** on each of those screens, the design-alignment ones too (the Alerts screen and its Mute until sheet, the "Same item?" prompt, Split, the Link items sheet, the Price alerts list, the item detail range chips and headline, Trend, Compare stores, Export data's options, the Waitlist offer and claim link screens): text, charts, the red and green percents and the store squares keep their contrast, and nothing is drawn black on black. (13 Accessibility)
+
+## Device-only remainder (after the 2026-11-06 Simulator pass)
+
+What the Simulator could not prove, so a phone must. The Simulator already passed the layouts, data and flows of §8 and BUG-1, 2, 3, 5, 8, 9 (details in [.planning/DEVICE-CHECK-2026-11-06.md](../.planning/DEVICE-CHECK-2026-11-06.md)). Do these in the device session.
+
+**Needs keys, products or a real service**
+- [ ] **Sandbox purchase, Restore, Free trial, Plan switch** (§8 Premium). Needs `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY`, the App Store Connect products and a Sandbox Apple Account. Without the key the paywall has no plan cards, Subscribe or Restore, so the paywall's purchase layout (plan cards, "Start 7-day free trial", the trial and price wording) has not been seen at all. Compare it with the design when the key is set.
+- [ ] **Webhook test event from the RevenueCat dashboard** against a deployed backend. The local backend already answers a signed `TEST` event with 200.
+- [ ] **A real push through Expo's service** to a device token: budget and price-change alerts arriving, the banner, and the tap. Needs the EAS project ID (`registerForPush` returns early without it) and a Celery worker with beat. The tap routing is already proven with `simctl push` (foreground, background, cold start).
+- [ ] **Waitlist claim from a delivered email.** Needs a waitlist entry and Resend delivery: tap the link on the phone and reach "Your free year is on", then tap it again. The invalid-link state and the "Check your inbox" state are proven.
+- [ ] **Priority OCR accuracy run** (§8 Priority OCR): `/validate-extraction` with `GG_LLM_API_KEY` and the premium model. Not a phone check, but it needs someone with the keys.
+
+**Needs the camera, the library or real time**
+- [ ] **Receipt quota prompt** as a free user at the monthly limit, by scanning (camera or import), and the Premium scan going through.
+- [ ] **Rollover's carried amount** on the dashboard ring, once a period has ended with money left. The switch saves; the carried text needs a month boundary.
+- [ ] **PDF report** opened from the share sheet (Quick Look or Files): monthly spend by category, top items and the receipt list, with an Includes switch off leaving its section out. The Simulator showed the share sheet and a ZIP, not the PDF, and its Includes taps did not register. Also run "No receipts in this range" (a range with no receipts disables Export) and the rule that the last Includes switch cannot be turned off, and save a file to Files.
+- [ ] **Free user's upgrade prompt on a mute switch** (turn a switch off on the Alerts screen), and the free Trend 6M, 1Y and All prompt with its button opening the paywall. The prompts for Compare stores, Categories and Export data were seen.
+- [ ] **"Not enough prices in this range"** on item detail, "Add another split" (3 items), a one-purchase item offering no Split, Cancel on "Same item?", renaming a category, and the Price alerts "No price alerts yet" state. Not reached on the Simulator with its data; cheap to run with the test data of this section.
+
+**Needs VoiceOver itself** (the Simulator checked the accessibility tree: every control has a label, and no control is unlabelled on any V1.1 screen)
+- [ ] **Swipe order and announcements** on each V1.1 screen listed under "Accessibility on each new screen", including: Trend's bars reading December to November (BUG-8; the tree order is right), the range chips naming the selected one, the Alerts switches reading their state after a change, the "Same item?" buttons, Split's lines, and the Link items sheet's radio state.
+- [ ] **Announcements after a change:** after Unmute, after "Yes, merge", after Save on Split, and the error messages ("Couldn't unmute…", "That didn't save…").
+- [ ] **Decorative symbols:** O3 and O8 in DEVICE-CHECK-2026-11-03 (icon names read before the text) are still open; check by ear.
+
+**Needs the phone's real hardware or OS**
+- [ ] **Touch targets on glass:** tap Trend's range chips on an SE (the Simulator's tree reported some at 40 pt; that reading was taken with other screens stacked underneath and was not confirmed). Header text buttons (Cancel, Save, Link, Rename, Skip) report about 20 pt frames, but iOS draws and hits a larger capsule; confirm by tapping.
+- [ ] **Dark mode contrast by eye** on a phone panel for the screens captured in dark on the Simulator (all passed on the Simulator). Black text on the brighter dark-mode green (the Review button and Yes, merge) is deliberate; check it reads.
+- [ ] **Dynamic Type AX5 on a phone** for the AX5 findings F3 to F6 in DEVICE-CHECK-2026-11-06 (Price alerts name truncation, mid-word breaks, clipped "Manage Subscription", Budget and Settings headers). Re-run after they are fixed.
+- [ ] **Airplane Mode** versions of the offline checks. The Simulator stood in with the backend stopped: unmute and merge fail cleanly, but only a phone shows the real network stack.
+- [ ] **Release build** warnings: no new ITMS warnings from the RevenueCat and document-scanner modules.
 
 ## After the session
 

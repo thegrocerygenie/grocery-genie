@@ -78,6 +78,17 @@ Fixed already: H1 and H2 (#20), H4 and M8 (#22, #29), H5, M1 and M2 (#21), and t
 - [x] **L8:** "Skip" and "Done" look cramped in the round header buttons. Fixed: every text header button has side padding, so iOS draws a capsule. Checked on Settings' Done; onboarding's Skip wasn't reached on the Simulator.
 - [x] **L9:** changing an item's quantity keeps the line total and silently changes the unit price. Fixed: the total stays what was paid, and the row shows the unit price ("Qty 2 · $0.65 each").
 
+## 4c. V1.1 Simulator-pass findings (2026-11-06)
+
+From [.planning/DEVICE-CHECK-2026-11-06.md](../.planning/DEVICE-CHECK-2026-11-06.md). None blocks a release.
+- [ ] **F1:** the paywall shows a "Premium" navigation header above its own close button, and the design has none. Set `headerShown: false` on the `paywall` route in `app/_layout.tsx`.
+- [ ] **F2:** Settings → Categories says "Custom categories require Premium." to a Premium user.
+- [ ] **F3:** at AX5 on the SE, the Price alerts list cuts the item name to "Wh ole…".
+- [ ] **F4:** at AX5, Stores, Categories and the paywall title break words mid-word.
+- [ ] **F5:** at AX5, the paywall's "Manage Subscription" label is clipped.
+- [ ] **F6:** at AX5, Budget settings' Cancel and Save collapse and its limit value is clipped, and Settings' Done overlaps its title.
+- [ ] **F7:** the Alerts switches use system green, the design shows brand green. Needs a design decision.
+
 ## 4b. MVP design alignment, round 2
 
 A comparison of the design (removed in `041f38f`, still in git) with `main` on 2026-10-28. It found:
