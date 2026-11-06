@@ -148,6 +148,17 @@ async def test_new_name_creates_a_canonical_item_with_that_alias(db_session):
     assert lines[0].match_method == MATCH_NEW
 
 
+async def test_a_linked_line_gives_its_item_its_first_unit(db_session):
+    _, [first] = await _match(db_session, "Flour")
+    _, [second] = await _match(db_session, "FLOUR", unit="kg")
+    _, [third] = await _match(db_session, "flour", unit="lb")
+
+    assert first.item_id == second.item_id == third.item_id
+    item = await db_session.get(CanonicalItem, first.item_id)
+    await db_session.refresh(item)
+    assert item.unit_of_measure == "kg"
+
+
 async def test_exact_alias_links_to_the_same_item(db_session):
     _, [first] = await _match(db_session, "ORG BANANAS")
     lines, [second] = await _match(db_session, "Org. Bananas")
