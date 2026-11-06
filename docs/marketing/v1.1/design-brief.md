@@ -99,7 +99,7 @@ Privacy line (use exactly this, here and in the FAQ):
 
 ## 7. Everything included (short labels, grouped)
 
-- **Prices:** Price history · Store comparison · Price alerts · Mute items or stores · Combine or split items
+- **Prices:** Price history · Store comparison · Price alerts · Mute items or stores · Merge or split items ("Same item?" Yes, merge / Keep as separate item / Skip)
 - **Budget:** 8 automatic categories · Per-category budgets · Budget month starts on your payday · Spending pace · 11 currencies · Weekly summary
 - **Scan:** Import photos and PDFs · Works offline · Manual entry · Duplicate-receipt warning · Catches big-ticket typos
 - **Account:** Restore deleted receipts for 30 days · Sign in with Apple · VoiceOver and Dynamic Type

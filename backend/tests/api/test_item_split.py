@@ -248,6 +248,38 @@ async def test_the_original_must_keep_a_line(client):
     assert (await client.get(f"/api/items/{item_id}")).json()["observation_count"] == 3
 
 
+async def test_a_new_name_may_match_an_existing_items_name(client):
+    """EC-PI 6: a split item's new name may match another item's name. It is
+    a new item all the same: the other keeps its prices and its name's
+    receipts, and the user can link the two (it leads "Suggested")."""
+    item_id, line_ids = await _olive_oil(client)
+    other = await _manual(client, "2026-03-02", ("Paprika", 3.49))
+    other_id = other["items"][0]["canonical_item_id"]
+    assert other_id != item_id
+    named = (await client.get(f"/api/items/{other_id}")).json()["canonical_name"]
+
+    resp = await _split(client, item_id, (named, [line_ids[2]]))
+
+    assert resp.status_code == 201, resp.text
+    [new_item] = resp.json()["items"]
+    assert new_item["id"] not in (item_id, other_id)
+    assert new_item["canonical_name"] == named
+    assert new_item["observation_count"] == 1
+    kept = (await client.get(f"/api/items/{other_id}")).json()
+    assert kept["canonical_name"] == named
+    assert kept["observation_count"] == 1
+    assert [a["alias"] for a in kept["aliases"]] == ["Paprika"]
+    later = await _manual(client, "2026-03-22", ("Paprika", 3.29))
+    assert later["items"][0]["canonical_item_id"] == other_id
+    links = (await client.get(f"/api/items/{new_item['id']}/link-candidates")).json()
+    assert links["suggested"][0]["id"] == other_id
+    linked = await client.post(
+        f"/api/items/{new_item['id']}/merge", json={"into_item_id": other_id}
+    )
+    assert linked.status_code == 200, linked.text
+    assert (await client.get(f"/api/items/{other_id}")).json()["observation_count"] == 3
+
+
 async def test_bad_splits_are_422(client):
     """AC 14: an empty name, an empty split, no split, a line that is not the
     item's, or one line twice."""

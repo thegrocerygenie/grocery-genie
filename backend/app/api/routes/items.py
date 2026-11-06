@@ -556,7 +556,11 @@ async def mute_item(
     AC 2); unmuting below is open to everyone."""
     until = body.until if body else None
     item = await _get_item(ItemMatchingService(db), user.id, item_id)
-    await PriceAlertService(db).mute_item(user.id, item.id, until)
+    try:
+        await PriceAlertService(db).mute_item(user.id, item.id, until)
+    except ItemNotFoundError:
+        # Merged away while this waited on the item's lock (DA-11).
+        raise HTTPException(status_code=404, detail=ITEM_NOT_FOUND) from None
     analytics.emit("price_alert_muted", mute_event("item", until), user.id)
     return Response(status_code=204)
 
@@ -569,5 +573,8 @@ async def unmute_item(
 ) -> Response:
     """Price change alerts for this item again. Idempotent."""
     item = await _get_item(ItemMatchingService(db), user.id, item_id)
-    await PriceAlertService(db).unmute_item(user.id, item.id)
+    try:
+        await PriceAlertService(db).unmute_item(user.id, item.id)
+    except ItemNotFoundError:
+        raise HTTPException(status_code=404, detail=ITEM_NOT_FOUND) from None
     return Response(status_code=204)

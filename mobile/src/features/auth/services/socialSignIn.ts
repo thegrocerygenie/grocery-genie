@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
-import { Platform } from 'react-native';
 
 // Expo Go doesn't ship the RNGoogleSignin native module, and even a
 // try/catch'd `require()` triggers a LogBox overlay because the package's
@@ -64,7 +63,6 @@ export function isGoogleSignInAvailable(): boolean {
 export function useAppleSignInAvailable(): boolean {
   const [available, setAvailable] = useState(false);
   useEffect(() => {
-    if (Platform.OS !== 'ios') return;
     let mounted = true;
     AppleAuthentication.isAvailableAsync()
       .then((ok) => {
@@ -93,7 +91,6 @@ function ensureGoogleConfigured(sdk: GoogleSdk) {
 }
 
 export async function runAppleSignIn(): Promise<AppleCredential | null> {
-  if (Platform.OS !== 'ios') return null;
   try {
     const isAvailable = await AppleAuthentication.isAvailableAsync();
     if (!isAvailable) return null;
@@ -120,7 +117,6 @@ export async function runAppleSignIn(): Promise<AppleCredential | null> {
  * no name or email. Null when the user cancels or Apple is unavailable.
  */
 export async function runAppleReauth(): Promise<string | null> {
-  if (Platform.OS !== 'ios') return null;
   try {
     if (!(await AppleAuthentication.isAvailableAsync())) return null;
     const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });

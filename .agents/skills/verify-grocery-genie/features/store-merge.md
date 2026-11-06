@@ -13,6 +13,7 @@
 - `store.merge-refused`: merging into its own group is 409; a store the user never shopped at is 404.
 - `store.merge-per-user`: another user who shops at both stores still sees two stores; the shared `stores` rows keep their names (no rename, no row joined).
 - `store.mute-merged`: a muted store merged into another mutes the merged group: a price change at the target sends no alert, and `muted_stores` lists the group once. Unmuting the group unmutes both.
+- `store.mute-regroup` (DA-11): Superstore muted forever, then merged into Loblaws; muting Loblaws for a week leaves one row, on Loblaws, with that end (`muted_stores` lists it once with it), and unmuting Loblaws leaves no row. A store mute or unmute takes the user's store-merge lock first, so one racing a merge acts on the group as the merge left it; the race is proven on Postgres by `backend/tests/services/test_store_mute_merge_concurrency.py`.
 - `store.alert-name`: a price alert from a merged store names the group's store.
 - `store.unmerge`: `DELETE /api/stores/{id}/merge` splits them again (204, idempotent), and the comparison is back to two stores.
 - `store.free`: the store list, normalization, receipt names and the history filter answer a free user (driven before `$G premium`); merge and unmerge are free too (`backend/tests/api/test_premium_gating.py::test_store_merge_is_free`). Comparison and mutes are Premium (D8).
@@ -66,6 +67,11 @@ lime "Loblaws" 2026-03-11 2.00 > /dev/null
 $G api GET '/api/notifications?per_page=100' | jq '[.items[] | select(.type=="price_change")] | length'   # 0
 $G api DELETE /api/stores/$lob/mute
 $G api GET /api/items/price-alert-settings | jq -c '.muted_stores'      # []
+# store.mute-regroup (fresh Premium user, receipts at Loblaws $L and Real Canadian Superstore $S)
+$G api POST /api/stores/$S/mute; $G api POST /api/stores/$S/merge '{"into_store_id":"$L"}'
+$G api POST /api/stores/$L/mute '{"until":"2026-11-13T12:00:00Z"}'
+$G sql "SELECT store_id, muted_until FROM price_alert_store_mutes"     # one row: $L, 2026-11-13 12:00
+$G api DELETE /api/stores/$L/mute; $G sql "SELECT count(*) FROM price_alert_store_mutes"   # 0
 # store.alert-name: a price change at the merged Superstore names Loblaws
 lime "REAL CANADIAN SUPERSTORE" 2026-03-12 2.50 > /dev/null
 $G api GET '/api/notifications?per_page=100' | jq -r '.items[] | select(.type=="price_change") | .body'   # "Limes at Loblaws: was ... avg, now ..."
@@ -84,7 +90,7 @@ $G api POST /api/stores/00000000-0000-0000-0000-0000000000ff/merge "{\"into_stor
 - The price alert cooldown is per item (7 days on the server clock), so the setup's Limes prices stay within 10% of each other (no alert yet), the mute check comes before the alert-name check, and the alert-name step is the first Limes alert. A setup price 10% off the running average alerts at once and uses up the cooldown, and the later checks then see that one alert (seen in run `20261104-045758`).
 - `$G sql` needs the docker shim first on `PATH` in a container without a Docker daemon, as `launch` does.
 - The user is free until `$G premium` (`signup` makes no Premium user), so the steps before it prove `store.free`; the merges after it run as Premium, and pytest proves them free.
-- Verified 2026-11-04 against Postgres 16 in debug mode (run `20261104-045939`; again with the end-only branch markers and per-receipt store names, run `20261104-052245`; with saved names and the "No." rule, run `20261104-055037`).
+- Verified 2026-11-04 against Postgres 16 in debug mode (run `20261104-045939`; again with the end-only branch markers and per-receipt store names, run `20261104-052245`; with saved names and the "No." rule, run `20261104-055037`). `store.mute-regroup` verified 2026-11-06, run `20261106-032045` (DA-11).
 - The filler stores (Chinese, Bar) buy Kiwis at one price, so they add no price alert.
 - A mute is recorded on the group's store: after `DELETE /api/stores/{id}/merge`, a mute set on the group stays with the group's store, one set before the merge stays with the merged store.
 - Run in full with `$G premium` before the first comparison (decision D8) on 2026-11-04: run `20261104-231707`.

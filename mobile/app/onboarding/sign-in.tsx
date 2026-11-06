@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -84,7 +83,7 @@ export default function SignInScreen() {
     <>
       <Stack.Screen options={{ title: '', headerBackTitle: 'Back' }} />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior="padding"
         style={{ flex: 1, backgroundColor: colors.iosBg }}
       >
         <ScrollView

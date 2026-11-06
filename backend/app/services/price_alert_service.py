@@ -44,6 +44,7 @@ from app.models.database import (
     Receipt,
     User,
 )
+from app.services.item_locks import ItemNotFoundError, lock_items
 from app.services.price_service import (
     LONG_WINDOW_DAYS,
     SHORT_WINDOW_DAYS,
@@ -116,6 +117,11 @@ def later_end(a: datetime | None, b: datetime | None) -> datetime | None:
     if a is None or b is None:
         return None
     return max(utc(a), utc(b))
+
+
+async def _lock_item(db: AsyncSession, item_id: uuid.UUID) -> None:
+    if item_id not in await lock_items(db, item_id):
+        raise ItemNotFoundError(item_id)
 
 
 def mute_event(scope: str, muted_until: datetime | None) -> dict:
@@ -208,7 +214,13 @@ class PriceAlertService:
         muted_until: datetime | None = None,
     ) -> None:
         """Mute until ``muted_until`` (None: forever). Muting again replaces
-        the time, an ended mute's too (PI-03 AC 11)."""
+        the time, an ended mute's too (PI-03 AC 11).
+
+        The item row is locked first (item_locks): a merge of the item
+        runs wholly before or after, so it moves this mute or keeps the
+        later end, never racing it on the unique key (DA-11). An item a
+        merge deleted meanwhile is ItemNotFoundError."""
+        await _lock_item(self.db, item_id)
         statement = _insert(self.db)(PriceAlertItemMute).values(
             id=uuid.uuid4(),
             user_id=user_id,
@@ -223,6 +235,8 @@ class PriceAlertService:
         )
 
     async def unmute_item(self, user_id: uuid.UUID, item_id: uuid.UUID) -> None:
+        """Idempotent. Locks the item first, as mute_item does."""
+        await _lock_item(self.db, item_id)
         await self.db.execute(
             delete(PriceAlertItemMute).where(
                 PriceAlertItemMute.user_id == user_id,
@@ -265,8 +279,11 @@ class PriceAlertService:
 
         Muting again replaces the time for the whole group: a mute recorded
         on another store of the group (one since merged into it) goes, so
-        the group has one end."""
+        the group has one end. The user's store groups are locked first
+        (StoreService.lock_groups, the store merge's lock), so a merge into
+        the group cannot leave a mute this replaced (DA-11)."""
         stores = StoreService(self.db)
+        await stores.lock_groups(user_id)
         await stores.check_shopped(user_id, store_id)
         group = (await stores.groups(user_id, [store_id]))[store_id]
         others = {
@@ -302,8 +319,11 @@ class PriceAlertService:
     async def unmute_store(self, user_id: uuid.UUID, store_id: uuid.UUID) -> None:
         """Delete the user's own mutes on the store's group, if any. No store
         check: the mute outlives the user's receipts from the store (deleted,
-        then purged), and settings still lists it, so it must stay removable."""
-        target = (await StoreService(self.db).groups(user_id, [store_id])).get(store_id)
+        then purged), and settings still lists it, so it must stay removable.
+        Locks the user's store groups first, as mute_store does."""
+        stores = StoreService(self.db)
+        await stores.lock_groups(user_id)
+        target = (await stores.groups(user_id, [store_id])).get(store_id)
         ids = {store_id}
         if target is not None:
             ids |= {
