@@ -67,7 +67,7 @@ sid=$($G api GET "/api/items/suggestions?receipt_id=$rid" | jq -r '.[0].id')
 $G api POST /api/items/suggestions/$sid/reject                               # 204
 $G api POST /api/items/suggestions/$sid/reject || true                       # 409: the prompt passes over it
 $G api GET "/api/items/suggestions?receipt_id=$rid"                          # []
-$G sql "SELECT event_name, properties->>'decision' FROM analytics_events WHERE event_name = 'item_match_resolved'"   # one row, rejected
+$G sql "SELECT event_name, properties->>'decision' FROM analytics_events WHERE event_name = 'item_match_resolved' AND user_id IN (SELECT id FROM users WHERE email LIKE 'prompt-%')"   # one row, rejected (the prompt user only; earlier users' decisions are theirs)
 $G signup promptother
 $G api GET "/api/items/suggestions?receipt_id=$rid" || true                  # 404
 $G api GET /api/items/suggestions                                            # []

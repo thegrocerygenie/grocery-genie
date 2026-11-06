@@ -20,3 +20,12 @@ Each line is a failure that happened, and the rule that came from it.
 - **Handoff approval takes time.** The commit-gate question for the handoff can wait while context grows; ask at 30%, hand off at 35%.
 - **Worktrees.** `.claude/worktrees/` goes in `.git/info/exclude` (local to each clone), or the stop hook complains about untracked files. Use detached worktrees for your own status-row commits: the agent's worktree may still hold the branch.
 - **Pushes.** `git push` once hung at negotiation for minutes: wrap it in `timeout 300`. `merge_pull_request` needs the full 40-character `expectedHeadSha`.
+
+# Lessons from the design-alignment run (V1.1, 2026-11-05/06)
+
+- **Main moves often from outside the loop.** Four merges landed on main during session 6 (follow-ups, an export fix, formal re-syncs). When main moves under a reviewed branch and the change touches code (not docs only), have the implementer merge it and rerun every gate (and the formal skill, which may move its sync) before the status row; the coordinator merges main itself only for docs.
+- **Transient push rejections.** GitHub once rejected an agent's push three times (`fatal error in commit_refs_rules`); the coordinator's retry, after the user's OK, went through at once. Review can start on the local commit meanwhile: worktrees share the object store, so the reviewer checks out the SHA.
+- **Re-review after nit fixes catches drift, not just nits.** The second pass on each task mapped the full lock order across all writers (user row, items in id order, suggestions, budgets, ledger). Ask for that map whenever a fix adds a lock.
+- **Race tests need lock waits, not sleeps.** A sleep-ordered concurrency test flaked about 1 in 70; polling `pg_stat_activity` in the test database for a session waiting on a lock (`tests/services/lock_waits.py`, bounded) made it deterministic.
+- **Journey queries must be scoped to their user.** An unscoped analytics query matched in isolation but counted earlier users' rows when journeys ran in order; the final verify agent caught it.
+- **Restarts.** Four container restarts in session 6; every report survived because the coordinator reran `setup-env.sh` at once and told the next agent in its message.
