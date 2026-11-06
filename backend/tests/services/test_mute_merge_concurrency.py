@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.models.database import CanonicalItem, PriceAlertItemMute
 from app.services.item_matching_service import ItemMatchingService, ItemNotFoundError
 from app.services.price_alert_service import PriceAlertService
+from tests.services.lock_waits import wait_for_lock_waiters
 from tests.services.test_item_matching import USER, _receipt
 
 pytestmark = pytest.mark.skipif(
@@ -177,8 +178,11 @@ async def test_a_mute_takes_its_item_lock_before_its_mute_row(db_engine, action)
             await action(PriceAlertService(db), source)
 
     task = asyncio.create_task(run())
-    await asyncio.sleep(HOLD)
-    waited = not task.done()
+    try:
+        await wait_for_lock_waiters(factory, 1, timeout=3)
+        waited = True
+    except TimeoutError:
+        waited = False
     await holder.commit()
     await holder.close()
     await asyncio.wait_for(task, timeout=10)

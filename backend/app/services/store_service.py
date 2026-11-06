@@ -372,11 +372,18 @@ class StoreService:
             alias.target_name = target.name
         await self.db.flush()
 
+    async def lock_groups(self, user_id: uuid.UUID) -> None:
+        """Hold the user's store groups still for this transaction: a store
+        mute or unmute (DA-11) reads a group, then writes its mute rows, and
+        a merge must not regroup the stores in between."""
+        await self._lock_user(user_id)
+
     async def _lock_user(self, user_id: uuid.UUID) -> None:
         """One merge or unmerge per user at a time, so two cannot interleave
-        into a loop (A into B while B goes into A). FOR NO KEY UPDATE, as in
-        category_service: it never blocks a row insert that references the
-        user. SQLite ignores the lock."""
+        into a loop (A into B while B goes into A), and none runs between a
+        store mute's read of a group and its write (lock_groups). FOR NO KEY
+        UPDATE, as in category_service: it never blocks a row insert that
+        references the user. SQLite ignores the lock."""
         await self.db.execute(
             select(User.id).where(User.id == user_id).with_for_update(key_share=True)
         )

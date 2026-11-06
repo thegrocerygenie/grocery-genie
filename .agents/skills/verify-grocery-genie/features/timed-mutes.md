@@ -49,4 +49,4 @@ $G sql "SELECT canonical_item_id, muted_until FROM price_alert_item_mutes"     #
 
 ## Verified
 
-2026-11-05 against Postgres 16 in debug mode, run `20261105-173004` (DA-7). `tm.merge` verified 2026-11-05, run `20261105-231524` (DA-11; no 500 in `server.log`).
+2026-11-05 against Postgres 16 in debug mode, run `20261105-173004` (DA-7). `tm.merge` verified 2026-11-05, run `20261105-231524` (DA-11; no 500 in `server.log`), and again 2026-11-06 with the route's 404 mapping, run `20261106-032045`).

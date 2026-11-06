@@ -568,6 +568,36 @@ async def test_another_users_item_cannot_be_muted_or_unmuted(client_user_b, db_s
     assert list(mutes) == [DEV_USER_ID]
 
 
+async def test_muting_an_item_merged_away_while_waiting_is_404(
+    client, db_session, monkeypatch
+):
+    """DA-11: a mute or unmute that waited on a merge's item lock finds the
+    item gone. The route answers 404, never a 500. The lock comes back empty
+    here as it does on Postgres once the merge commits (the race itself:
+    tests/services/test_mute_merge_concurrency.py)."""
+    from app.services import price_alert_service
+    from app.services.item_matching_service import ItemMatchingService
+    from tests.conftest import DEV_USER_ID
+    from tests.services.test_item_matching import _receipt
+
+    _, lines = await _receipt(db_session, "Limes", user_id=DEV_USER_ID)
+    await ItemMatchingService(db_session).match_line_items(DEV_USER_ID, lines)
+    item_id = lines[0].canonical_item_id
+    await db_session.flush()
+
+    async def merged_meanwhile(db, *item_ids):
+        return set()
+
+    monkeypatch.setattr(price_alert_service, "lock_items", merged_meanwhile)
+    for method in ("POST", "DELETE"):
+        try:
+            resp = await client.request(method, f"/api/items/{item_id}/mute")
+            status = resp.status_code
+        except Exception as error:  # the app's error, raised through the client
+            status = type(error).__name__
+        assert status == 404, method
+
+
 # --- Only a confirm alerts, and a failure never fails it --------------------
 
 

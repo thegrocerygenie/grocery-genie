@@ -279,8 +279,11 @@ class PriceAlertService:
 
         Muting again replaces the time for the whole group: a mute recorded
         on another store of the group (one since merged into it) goes, so
-        the group has one end."""
+        the group has one end. The user's store groups are locked first
+        (StoreService.lock_groups, the store merge's lock), so a merge into
+        the group cannot leave a mute this replaced (DA-11)."""
         stores = StoreService(self.db)
+        await stores.lock_groups(user_id)
         await stores.check_shopped(user_id, store_id)
         group = (await stores.groups(user_id, [store_id]))[store_id]
         others = {
@@ -316,8 +319,11 @@ class PriceAlertService:
     async def unmute_store(self, user_id: uuid.UUID, store_id: uuid.UUID) -> None:
         """Delete the user's own mutes on the store's group, if any. No store
         check: the mute outlives the user's receipts from the store (deleted,
-        then purged), and settings still lists it, so it must stay removable."""
-        target = (await StoreService(self.db).groups(user_id, [store_id])).get(store_id)
+        then purged), and settings still lists it, so it must stay removable.
+        Locks the user's store groups first, as mute_store does."""
+        stores = StoreService(self.db)
+        await stores.lock_groups(user_id)
+        target = (await stores.groups(user_id, [store_id])).get(store_id)
         ids = {store_id}
         if target is not None:
             ids |= {

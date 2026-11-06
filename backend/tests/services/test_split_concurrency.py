@@ -30,6 +30,7 @@ from app.services.item_matching_service import (
     SplitPart,
 )
 from app.services.price_service import PriceService
+from tests.services.lock_waits import wait_for_lock_waiters
 from tests.services.test_item_matching import USER, _receipt
 
 pytestmark = pytest.mark.skipif(
@@ -167,9 +168,9 @@ async def test_split_takes_its_item_lock_before_any_line(db_engine):
                 return "gone"
 
     merging = asyncio.create_task(merge())
-    await asyncio.sleep(0.3)  # the merge waits on the item
+    await wait_for_lock_waiters(factory, 1)  # the merge waits on the item
     splitting = asyncio.create_task(split())
-    await asyncio.sleep(0.3)  # the split waits too
+    await wait_for_lock_waiters(factory, 2)  # the split waits too, behind it
     await hold.commit()
     await hold.close()
 
