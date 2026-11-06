@@ -594,6 +594,8 @@ async def test_dashboard_12_month_trend_for_premium(
     await _add_receipt(db_session, date(2026, 3, 15), [(groceries, 30.0)])
     # The month before the window: in prior_average only.
     await _add_receipt(db_session, date(2025, 3, 31), [(groceries, 1200.0)])
+    # History from before the prior window, so it is compared (BC-04 AC 7).
+    await _add_receipt(db_session, date(2024, 3, 20), [(None, 5.0)])
 
     response = await client.get("/api/dashboard/spending?period=2026-03&months=12")
 
@@ -649,6 +651,8 @@ async def test_dashboard_1_month_trend_compares_with_the_month_before(
     groceries = await _category_id(db_session, "Groceries")
     await _add_receipt(db_session, date(2026, 2, 10), [(groceries, 80.0)])
     await _add_receipt(db_session, date(2026, 3, 10), [(groceries, 60.0)])
+    # History from before February, so it is compared (BC-04 AC 7).
+    await _add_receipt(db_session, date(2026, 1, 5), [(None, 7.0)])
 
     response = await client.get("/api/dashboard/spending?period=2026-03&months=1")
 
@@ -779,3 +783,57 @@ async def test_dashboard_names_the_current_period(
 
     assert past["current_period"] == "2026-09"
     assert now["current_period"] == now["period"] == "2026-09"
+
+
+# --- BC-04 AC 7: no change from the months before unless the user's history
+# covers them. Averaging 4 months of spend over 12 read "+196% YoY" for an
+# account that began inside the prior window (Simulator, 2026-11-05).
+
+
+@pytest.mark.asyncio
+async def test_dashboard_prior_average_is_zero_when_history_starts_inside_it(
+    client: AsyncClient, seeded_db, db_session, premium_user
+):
+    # The 12 months before Apr 2025 - Mar 2026 are Apr 2024 - Mar 2025; the
+    # first receipt is in Dec 2024, so 8 of them have no history at all.
+    await _add_receipt(db_session, date(2024, 12, 10), [(None, 400.0)])
+    await _add_receipt(db_session, date(2026, 3, 10), [(None, 400.0)])
+
+    response = await client.get("/api/dashboard/spending?period=2026-03&months=12")
+
+    assert response.json()["prior_average"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_dashboard_prior_average_counts_when_history_starts_with_it(
+    client: AsyncClient, seeded_db, db_session
+):
+    # Prior window Oct - Dec 2025, history from its first day.
+    await _add_receipt(db_session, date(2025, 10, 1), [(None, 90.0)])
+
+    response = await client.get("/api/dashboard/spending?period=2026-03")
+
+    assert response.json()["prior_average"] == 30.0
+
+
+@pytest.mark.asyncio
+async def test_dashboard_prior_average_follows_the_reset_day(
+    client: AsyncClient, seeded_db, db_session
+):
+    # Reset day 15: the prior window for 2026-03 is periods 2025-10 to 2025-12,
+    # from 2025-10-15. A first receipt on Dec 20 is inside it, so there is no
+    # full window to compare.
+    await client.post(
+        "/api/budgets",
+        json={
+            "category_id": None,
+            "amount": 500.0,
+            "period_type": "monthly",
+            "period_start": "2025-01-15",
+        },
+    )
+    await _add_receipt(db_session, date(2025, 12, 20), [(None, 90.0)])
+
+    response = await client.get("/api/dashboard/spending?period=2026-03")
+
+    assert response.json()["prior_average"] == 0.0

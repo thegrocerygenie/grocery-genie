@@ -36,7 +36,7 @@ function mockDashboard(months: number): DashboardData {
     trend: mockTrend(months),
     prior_average: 20,
     previous_period: '2026-10',
-    category_changes: [],
+    category_changes: [{ category_id: 'c1', name: 'Groceries', spent: 19, previous_spent: 77 }],
   };
 }
 
@@ -49,6 +49,18 @@ jest.mock('@/features/budget/hooks/useDashboard', () => ({
     refetch: jest.fn(),
   }),
 }));
+
+// React Native's iOS font scale at the default size and at AX5.
+const AX5_SCALE = 3.571;
+const mockWindow = { fontScale: 1 };
+jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
+  __esModule: true,
+  default: () => ({ width: 402, height: 874, scale: 3, fontScale: mockWindow.fontScale }),
+}));
+
+afterEach(() => {
+  mockWindow.fontScale = 1;
+});
 
 function flat(testID: string) {
   return StyleSheet.flatten(screen.getByTestId(testID).props.style) ?? {};
@@ -108,6 +120,27 @@ describe('Trend chips and Highlights at large text sizes (DA-10)', () => {
     const row = screen.getByLabelText(/^Highest: /);
     expect(StyleSheet.flatten(row.props.style).flexWrap).toBe('wrap');
     expect(screen.getByText('Highest').props.numberOfLines).toBeUndefined();
+  });
+});
+
+describe('Trend month rows at AX5 (Simulator, 2026-11-05)', () => {
+  // Side by side, the amount kept its width and the title broke mid-word:
+  // "Nove/mber spendi/ng". At accessibility sizes the title takes the whole
+  // row and the amount wraps under it, as Highlights rows do.
+  it('gives the total and each category title the whole row at AX5', () => {
+    mockWindow.fontScale = AX5_SCALE;
+    renderTrend();
+
+    expect(flat('trend-total-title').flexBasis).toBe('100%');
+    expect(flat('trend-category-title-c1').flexBasis).toBe('100%');
+    expect(flat('trend-category-row-c1').flexWrap).toBe('wrap');
+  });
+
+  it('keeps the amount beside the title at the default size', () => {
+    renderTrend();
+
+    expect(flat('trend-total-title').flexBasis).toBeUndefined();
+    expect(flat('trend-category-title-c1').flexBasis).toBeUndefined();
   });
 });
 

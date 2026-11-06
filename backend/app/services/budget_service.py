@@ -876,12 +876,9 @@ class BudgetService:
 
         return trend
 
-    async def _months_since_first_receipt(
-        self, user_id: uuid.UUID, period: str, start_day: int
-    ) -> int:
-        """How many periods run from the one holding the user's first counted
-        receipt (confirmed, not in Recently Deleted, in the budget currency)
-        through ``period``; 1 when there is none on or before ``period``."""
+    async def _first_receipt_date(self, user_id: uuid.UUID) -> date | None:
+        """Date of the user's first counted receipt: confirmed, not in
+        Recently Deleted, in the budget currency."""
         result = await self.db.execute(
             select(func.min(Receipt.date)).where(
                 Receipt.user_id == user_id,
@@ -890,7 +887,15 @@ class BudgetService:
                 in_budget_currency(user_id),
             )
         )
-        first_day = result.scalar_one_or_none()
+        return result.scalar_one_or_none()
+
+    async def _months_since_first_receipt(
+        self, user_id: uuid.UUID, period: str, start_day: int
+    ) -> int:
+        """How many periods run from the one holding the user's first counted
+        receipt (confirmed, not in Recently Deleted, in the budget currency)
+        through ``period``; 1 when there is none on or before ``period``."""
+        first_day = await self._first_receipt_date(user_id)
         if first_day is None:
             return 1
         first, _, _ = period_containing(first_day, start_day)
@@ -907,6 +912,9 @@ class BudgetService:
         The trend covers ``period`` and the ``months - 1`` before it, so the
         prior window is the ``months`` months before that. "All"
         (``months=None``) starts at the first receipt, so nothing is before it.
+        Also 0.0 when the first receipt is after the prior window starts
+        (BC-04 AC 7): months before an account's history are not months of no
+        spending, and counting them read "+196% YoY".
         """
         if months is None:
             return 0.0
@@ -918,6 +926,9 @@ class BudgetService:
             first = previous_period(first)
         start, _ = await self.get_period_dates(user_id, first)
         _, end = await self.get_period_dates(user_id, last)
+        first_day = await self._first_receipt_date(user_id)
+        if first_day is None or first_day > start:
+            return 0.0
         total = await self.get_total_spending(user_id, start, end)
         return round(total / months, 2)
 
