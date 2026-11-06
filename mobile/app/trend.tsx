@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type ColorValue,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
@@ -49,6 +50,7 @@ function changeColor(change: number): ColorValue {
 
 export default function TrendScreen() {
   const router = useRouter();
+  const axText = useWindowDimensions().fontScale >= fontScale.accessibility;
   const { selectedPeriod } = useBudgetStore();
   const currency = useBudgetCurrency();
   const money = (amount: number) => formatMoney(amount, currency, { decimals: 0 });
@@ -348,7 +350,10 @@ export default function TrendScreen() {
                 accessible
                 accessibilityLabel={TREND_STRINGS.monthSpendingLabel(period, money(current))}
               >
-                <Text style={[type.headline, styles.flexText]}>
+                <Text
+                  testID="trend-total-title"
+                  style={[type.headline, styles.flexText, axText && styles.fullRow]}
+                >
                   {TREND_STRINGS.monthSpending(period)}
                 </Text>
                 <Text style={styles.changeAmount}>{money(current)}</Text>
@@ -426,6 +431,7 @@ interface CategoryChangeRowProps {
 }
 
 function CategoryChangeRow({ change, previousPeriod }: CategoryChangeRowProps) {
+  const axText = useWindowDimensions().fontScale >= fontScale.accessibility;
   const currency = useBudgetCurrency();
   const money = (amount: number) => formatMoney(amount, currency, { decimals: 0 });
   const meta = getCategoryMetaByName(change.name);
@@ -446,7 +452,12 @@ function CategoryChangeRow({ change, previousPeriod }: CategoryChangeRowProps) {
         );
 
   return (
-    <View style={[styles.legendRow, styles.divider]} accessible accessibilityLabel={label}>
+    <View
+      testID={`trend-category-row-${change.category_id}`}
+      style={[styles.legendRow, styles.divider]}
+      accessible
+      accessibilityLabel={label}
+    >
       <View style={[styles.categoryIcon, { backgroundColor: meta.color }]}>
         <SymbolView
           name={meta.symbol as Parameters<typeof SymbolView>[0]['name']}
@@ -454,7 +465,12 @@ function CategoryChangeRow({ change, previousPeriod }: CategoryChangeRowProps) {
           tintColor={colors.onIconSquare}
         />
       </View>
-      <Text style={[type.body, styles.flexText]}>{change.name}</Text>
+      <Text
+        testID={`trend-category-title-${change.category_id}`}
+        style={[type.body, styles.flexText, axText && styles.fullRow]}
+      >
+        {change.name}
+      </Text>
       <View style={styles.changeValues}>
         <Text style={styles.changeAmount}>{money(change.spent)}</Text>
         <Text
@@ -476,6 +492,9 @@ const styles = StyleSheet.create({
   loading: { paddingTop: 80, alignItems: 'center' },
   centered: { textAlign: 'center' },
   flexText: { flex: 1, minWidth: 120 },
+  // At accessibility sizes a month row's title takes the whole row, so its
+  // amount wraps under it instead of squeezing the title mid-word.
+  fullRow: { flexBasis: '100%' },
 
   caption: {
     ...type.caption1,
@@ -658,6 +677,7 @@ const styles = StyleSheet.create({
   },
   legendRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,

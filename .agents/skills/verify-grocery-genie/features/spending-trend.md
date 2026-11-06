@@ -8,7 +8,7 @@ The Trend screen charts monthly spend ending at the selected month, with the ave
 - `trend-1` returns just `period` for a free user, with `prior_average` the month before.
 - `trend-current-period` names the period holding today in `current_period`, whichever `period` was asked for (the app tints that bar and leaves it out of Highlights' Lowest).
 - `trend-long-free` refuses `months=6`, `12` and `all` for a free user with `403`, `detail.code` `premium_required`, `detail.feature` `trend_12_months` (one feature id for every Premium range).
-- `trend-6`, `trend-12` return 6 and 12 months, oldest first, once RevenueCat's webhook has made the user Premium, with `prior_average` over as many months before.
+- `trend-6`, `trend-12` return 6 and 12 months, oldest first, once RevenueCat's webhook has made the user Premium, with `prior_average` over as many months before (`0.0` when the user's history starts inside them).
 - `trend-all` starts at the user's first receipt's period (another user's older receipt never counts), and `prior_average` is `0.0`.
 - `trend-bad-months` refuses any other `months` (`2`, `24`, `ALL`) with `422`.
 
@@ -40,7 +40,7 @@ $G api GET "$D&months=all" | jq -c .detail || true                # same
 $G api GET "$D&months=2" || true                                   # trend-bad-months: -> 422 (also 24, ALL)
 $G premium                                                         # {"status":"applied"} through the RevenueCat webhook
 $G api GET "$D&months=6" | jq -c '[[.trend[]|.spent], .prior_average]'
-# trend-6: [[0,30,0,0,10,14.77],3.33]                               (Apr-Sep 2025: 20 / 6)
+# trend-6: [[0,30,0,0,10,14.77],0.0]                                (Apr-Sep 2025 starts before the first receipt, 2025-06-10: no fair comparison, BC-04 AC 7)
 $G api GET "$D&months=12" | jq -c '{n:(.trend|length), first:.trend[0].period, last:.trend[-1].period}'
 # trend-12: {"n":12,"first":"2025-04","last":"2026-03"}
 $G api GET "$D&months=all" | jq -c '{n:(.trend|length), first:.trend[0].period, prior:.prior_average}'
@@ -52,5 +52,6 @@ $G api GET "$D&months=all" | jq -c '{n:(.trend|length), first:.trend[0].period, 
 - Run `trend-long-free` before `$G premium`: once the webhook grants Premium, the same user gets every range.
 - `signup` switches every later call to the new user, so the other user's receipt goes in first.
 - The app's own purchase (Apple's sheet, the RevenueCat SDK) cannot run here; the webhook is how the backend learns of it, so it is the real path for the API.
-- `prior_average` covers as many months as the trend, ending the month before the trend starts; for All it is `0.0`.
+- `prior_average` covers as many months as the trend, ending the month before the trend starts; for All it is `0.0`, and also when the user's first receipt is after that window starts (BC-04 AC 7), as for `trend-6` here.
 - Verified 2026-11-05 against Postgres 16 in debug mode for DA-10 (run `20261105-201426`).
+- BC-04 AC 7 follow-up (no change when history starts inside the prior window; `trend-6` now `0.0`): run `20261105-222832`.

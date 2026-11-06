@@ -246,7 +246,8 @@ class DashboardSpendingResponse(BaseModel):
     trend: list[DashboardTrendMonth]
     # Mean monthly spend over the same number of months before the trend
     # window, so the trend's average can be compared with it. 0.0 when there
-    # was none, and for "All" (nothing is before the first receipt).
+    # was none, for "All" (nothing is before the first receipt), and when the
+    # user's first receipt is after that window starts (BC-04 AC 7).
     prior_average: float = 0.0
     previous_period: str
     category_changes: list[DashboardCategoryChange]

@@ -340,6 +340,8 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | BC-FR | Trends | Trend readable at accessibility text sizes (BUG-2) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "wraps the month-over-month change under the total instead of off the screen (BUG-2)" | Pass |
 | BC-FR | Trends | Trend readable at accessibility text sizes | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "keeps each bar amount on one line, shrinking to fit its column" | Pass |
 | BC-FR | Trends | 12-month trend readable at accessibility text sizes (BUG-9) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "keeps the 12 one-letter labels to one line and a size that fits a narrow bar (BUG-9)" | Pass |
+| BC-FR | Trends | Month rows keep whole words at AX5 (Simulator 2026-11-05) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "gives the total and each category title the whole row at AX5" | Pass |
+| BC-FR | Trends | Month rows keep whole words at AX5 (Simulator 2026-11-05) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "keeps the amount beside the title at the default size" | Pass |
 | BC-FR | Trends | VoiceOver reads the bars in month order (BUG-8) | Component | `mobile/src/__tests__/trendLargeText.test.tsx` "gives every month column the same height, so VoiceOver reads them left to right" | Pass |
 | BC-FR | Rollover | Free user turning rollover on gets `403 premium_required` | Integration | `backend/tests/api/test_budget_rollover.py::test_free_user_turning_rollover_on_gets_premium_required` | Pass |
 | BC-FR | Rollover | Unspent budget does not roll over by default | Integration | `backend/tests/api/test_budget_rollover.py::test_rollover_is_off_by_default` | Pass |
@@ -981,6 +983,9 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | BC-04 | 7 | Headline N-month average with change (YoY for 1Y) | Component | `mobile/src/__tests__/trendRanges.test.tsx` "1Y charts every month and compares the year with the year before as YoY (AC 7)" | Pass |
 | BC-04 | 7 | Headline N-month average with change (YoY for 1Y) | Component | `mobile/src/__tests__/trendRanges.test.tsx` "1M compares the month with the month before (AC 7)" | Pass |
 | BC-04 | 7 | Headline N-month average with change (YoY for 1Y) | Component | `mobile/src/__tests__/trendRanges.test.tsx` "All shows every month since the first receipt and no change (AC 6, 7)" | Pass |
+| BC-04 | 7 | Headline N-month average with change (YoY for 1Y) | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_prior_average_is_zero_when_history_starts_inside_it` | Pass |
+| BC-04 | 7 | Headline N-month average with change (YoY for 1Y) | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_prior_average_counts_when_history_starts_with_it` | Pass |
+| BC-04 | 7 | Headline N-month average with change (YoY for 1Y) | Integration | `backend/tests/api/test_dashboard.py::test_dashboard_prior_average_follows_the_reset_day` | Pass |
 | BC-04 | 8 | Highlights: Highest, Lowest (no empty or current month), Trend (headline's change; halves for All) | Component | `mobile/src/__tests__/trendScreen.test.tsx` "names the highest and lowest month, and the trend with its percent" | Pass |
 | BC-04 | 8 | Highlights: Highest, Lowest (no empty or current month), Trend (headline's change; halves for All) | Component | `mobile/src/__tests__/trendScreen.test.tsx` "skips the current month, still in progress, for the lowest" | Pass |
 | BC-04 | 8 | Highlights: Highest, Lowest (no empty or current month), Trend (headline's change; halves for All) | Component | `mobile/src/__tests__/trendScreen.test.tsx` "says so when no finished month had spending to be the lowest" | Pass |
