@@ -204,7 +204,6 @@ What the Simulator could not prove, so a phone must. The Simulator already passe
 - [ ] **Rollover's carried amount** on the dashboard ring, once a period has ended with money left. The switch saves; the carried text needs a month boundary.
 - [ ] **PDF report** opened from the share sheet (Quick Look or Files): monthly spend by category, top items and the receipt list, with an Includes switch off leaving its section out. The Simulator showed the share sheet and a ZIP, not the PDF, and its Includes taps did not register. Also run "No receipts in this range" (a range with no receipts disables Export) and the rule that the last Includes switch cannot be turned off, and save a file to Files.
 - [ ] **Free user's upgrade prompt on a mute switch** (turn a switch off on the Alerts screen), and the free Trend 6M, 1Y and All prompt with its button opening the paywall. The prompts for Compare stores, Categories and Export data were seen.
-- [ ] **"Not enough prices in this range"** on item detail, "Add another split" (3 items), a one-purchase item offering no Split, Cancel on "Same item?", renaming a category, and the Price alerts "No price alerts yet" state. Not reached on the Simulator with its data; cheap to run with the test data of this section.
 
 **Needs VoiceOver itself** (the Simulator checked the accessibility tree: every control has a label, and no control is unlabelled on any V1.1 screen)
 - [ ] **Swipe order and announcements** on each V1.1 screen listed under "Accessibility on each new screen", including: Trend's bars reading December to November (BUG-8; the tree order is right), the range chips naming the selected one, the Alerts switches reading their state after a change, the "Same item?" buttons, Split's lines, and the Link items sheet's radio state.
@@ -212,11 +211,20 @@ What the Simulator could not prove, so a phone must. The Simulator already passe
 - [ ] **Decorative symbols:** O3 and O8 in DEVICE-CHECK-2026-11-03 (icon names read before the text) are still open; check by ear.
 
 **Needs the phone's real hardware or OS**
+- [ ] **BUG-6 cold start, repeated.** On the Simulator 4 of 5 cold-start push taps opened the item with Back to Budget; the first trial after a fresh sign-in opened Budget and did not route, and it did not repeat. On a phone, force-quit and tap a price-alert banner at least 5 times, including right after a fresh sign-in, and count the misses. A single miss reopens BUG-6.
 - [ ] **Touch targets on glass:** tap Trend's range chips on an SE (the Simulator's tree reported some at 40 pt; that reading was taken with other screens stacked underneath and was not confirmed). Header text buttons (Cancel, Save, Link, Rename, Skip) report about 20 pt frames, but iOS draws and hits a larger capsule; confirm by tapping.
 - [ ] **Dark mode contrast by eye** on a phone panel for the screens captured in dark on the Simulator (all passed on the Simulator). Black text on the brighter dark-mode green (the Review button and Yes, merge) is deliberate; check it reads.
 - [ ] **Dynamic Type AX5 on a phone** for the AX5 findings F3 to F6 in DEVICE-CHECK-2026-11-06 (Price alerts name truncation, mid-word breaks, clipped "Manage Subscription", Budget and Settings headers). Re-run after they are fixed.
 - [ ] **Airplane Mode** versions of the offline checks. The Simulator stood in with the backend stopped: unmute and merge fail cleanly, but only a phone shows the real network stack.
 - [ ] **Release build** warnings: no new ITMS warnings from the RevenueCat and document-scanner modules.
+
+## Simulator, not yet run (after the 2026-11-06 pass)
+
+These do not need a phone. Run them on a Simulator, not in the device session.
+- [ ] **iPhone 18 Pro Max pass.** Its Simulator held a stale build, so the 2026-11-06 pass covered only the SE. Rebuild or reload it, sign in, and repeat the §8 layouts in light, dark and AX5.
+- [ ] **"Not enough prices in this range"** on item detail, "Add another split" (3 items), a one-purchase item offering no Split, Cancel on "Same item?", renaming a category, and the Price alerts "No price alerts yet" state. The 2026-11-06 data did not reach them.
+- [ ] **The Budget bell.** Open Price alerts from the bell on the Budget dashboard, not by link: the design shows the tab bar, and a link-opened screen shows none.
+- [ ] **Settings → Alerts footer.** The checklist asks that the line under the threshold name the size of change that alerts. At 25% the footer read "Compared with your 30-day average…" with no percent; only the Price alerts list footer names it. Decide whether that is enough.
 
 ## After the session
 
