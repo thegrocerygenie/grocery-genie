@@ -164,13 +164,33 @@ class PriceService:
 
         Only a confirmed receipt has prices; a line without an item or with
         no quantity records none.
+
+        Each price goes on its line's item as it is now, read again here: a
+        split or merge may have moved the line since the caller loaded it. A
+        receipt edit locks its lines' items before it changes anything
+        (ItemMatchingService.lock_line_items), so no line moves again before
+        it commits. Locking them here instead, after the edit has written its
+        lines, would wait for an item while holding a line, against the lock
+        order: a deadlock with a split or merge.
         """
+        line_items = (
+            (
+                await self.db.execute(
+                    select(LineItem)
+                    .where(LineItem.receipt_id == receipt.id)
+                    .order_by(LineItem.position)
+                    .execution_options(populate_existing=True)
+                )
+            )
+            .scalars()
+            .all()
+        )
         await self.db.execute(
             delete(PriceObservation).where(PriceObservation.receipt_id == receipt.id)
         )
         if receipt.status != "confirmed":
             return
-        for line_item in receipt.line_items:
+        for line_item in line_items:
             quantity = Decimal(str(line_item.quantity or 0))
             if line_item.canonical_item_id is None or quantity <= 0:
                 continue

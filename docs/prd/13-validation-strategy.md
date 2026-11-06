@@ -243,8 +243,10 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-02 | 2 | A qualifier difference asks, never auto-links (BUG-4) | Unit | `backend/tests/services/test_item_matching.py::test_french_qualifiers_read_as_their_english_meaning` | Pass |
 | PI-02 | 2 | Same product written differently still auto-links | Unit | `backend/tests/services/test_item_matching.py::test_common_french_product_words_carry_no_qualifier` | Pass |
 | PI-02 | 3 | Manually link items | Integration | `backend/tests/api/test_items.py::test_merge_and_split_through_the_api` | Pass |
+| PI-02 | 3 | Manually link items | Integration | `backend/tests/services/test_receipt_edit_concurrency.py::test_an_edit_and_a_move_of_its_line_at_once` | Pass |
 | PI-02 | 3 | Manually link items | Component | `mobile/src/__tests__/priceHistory.test.tsx` "combines the item into another one and opens the result" | Pass |
 | PI-02 | 3 | Manually unlink items | Integration | `backend/tests/services/test_item_matching.py::test_split_moves_one_alias_with_its_lines_and_prices` | Pass |
+| PI-02 | 3 | Manually unlink items | Integration | `backend/tests/services/test_receipt_edit_concurrency.py::test_an_edit_and_an_unlink_of_its_line_at_once` | Pass |
 | PI-02 | 3 | Manually unlink items | Component | `mobile/src/__tests__/priceHistory.test.tsx` "splits a name off into its own item after confirming" | Pass |
 | PI-02 | 4 | Confirmed matches give a canonical name with aliases | Integration | `backend/tests/api/test_items.py::test_accepting_a_suggestion_merges_the_history` | Pass |
 | PI-02 | 4 | Confirmed matches give a canonical name with aliases | Integration | `backend/tests/api/test_items.py::test_rename_item` | Pass |
@@ -815,6 +817,10 @@ Design alignment rows (DA-0, 2026-11-04, decisions D6–D10, plan `.planning/PLA
 | PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_split_concurrency.py::test_a_split_and_a_merge_of_its_item_at_once` | Pass |
 | PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_split_concurrency.py::test_split_takes_its_item_lock_before_any_line` | Pass |
 | PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_split_concurrency.py::test_a_split_and_an_accept_of_its_item_at_once` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_receipt_edit_concurrency.py::test_a_confirm_waits_for_no_item_after_linking_its_lines` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_receipt_edit_concurrency.py::test_an_edit_and_a_move_of_its_line_at_once` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_receipt_edit_concurrency.py::test_an_edit_takes_its_item_locks_before_any_line` | Pass |
+| PI-02 | 13 | Save opens the new item; observations and whole names move with their lines | Integration | `backend/tests/services/test_receipt_edit_concurrency.py::test_an_edit_takes_the_user_lock_before_its_item_locks` | Pass |
 | PI-02 | 13 | A pending question goes with the line that raised it | Integration | `backend/tests/api/test_item_split.py::test_a_suggestion_moves_with_the_line_that_raised_it` | Pass |
 | PI-02 | 13 | A pending question goes with the line that raised it | Integration | `backend/tests/api/test_item_split.py::test_a_suggestion_whose_line_stayed_stays` | Pass |
 | PI-02 | 13 | A pending question goes with the line that raised it | Integration | `backend/tests/services/test_split_concurrency.py::test_a_split_moving_a_question_then_its_accept` | Pass |
