@@ -1,12 +1,20 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 
 import { PremiumUpgradePrompt } from '@/components/PremiumUpgradePrompt';
 import { categoryMeta } from '@/constants/categories';
-import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
+import { colors, fontScale, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { useMe } from '@/features/auth/hooks/useAuth';
 import {
   CategoryEditorSheet,
@@ -41,7 +49,8 @@ type Editing = { mode: 'create' } | { mode: 'edit'; category: CategoryResponse }
 /**
  * Settings → Categories (BC-05 AC 3, V11-P1; AC 5–8, DA-9), as the design's
  * "PI · Custom cats": "Built-in" first, each in its icon square; then
- * "Custom", in round icons, with a "New category" row and the Premium footer.
+ * "Custom", in round icons, with a "New category" row (a free user gets the
+ * upgrade prompt and the Premium footer instead).
  * Edit in the navigation bar renames or deletes custom categories; tapping one
  * changes its name, colour and icon. Adding and changing are Premium (D2):
  * after a lapse the categories stay, keep their colour and icon, and can still
@@ -69,6 +78,9 @@ export default function CategorySettingsScreen() {
     !isPremiumRequired(update.error);
   const atLimit = mine.length >= MAX_CUSTOM_CATEGORIES;
   const listEditing = editingList && mine.length > 0;
+  // At accessibility sizes a name beside its icon broke mid-word ("Househol d",
+  // F4): the icon goes above the name, which gets the row's full width.
+  const stacked = useWindowDimensions().fontScale >= fontScale.accessibility;
 
   const openPaywall = () => router.push('/paywall');
 
@@ -198,7 +210,8 @@ export default function CategorySettingsScreen() {
                 return (
                   <View
                     key={cat.id}
-                    style={[styles.row, i > 0 && styles.divider]}
+                    testID={`category-row-${cat.id}`}
+                    style={[styles.row, stacked && styles.rowStacked, i > 0 && styles.divider]}
                     accessible
                     accessibilityLabel={cat.name}
                   >
@@ -212,7 +225,7 @@ export default function CategorySettingsScreen() {
                         tintColor={colors.onIconSquare}
                       />
                     </View>
-                    <Text style={[type.body, styles.flex]}>{cat.name}</Text>
+                    <Text style={[type.body, !stacked && styles.flex]}>{cat.name}</Text>
                   </View>
                 );
               })}
@@ -247,26 +260,40 @@ export default function CategorySettingsScreen() {
                   ) : null}
                   <Pressable
                     onPress={() => onRow(cat)}
-                    style={({ pressed }) => [styles.row, styles.flex, pressed && styles.pressed]}
+                    testID={`category-row-${cat.id}`}
+                    style={({ pressed }) => [
+                      styles.row,
+                      styles.flex,
+                      stacked && styles.rowStacked,
+                      pressed && styles.pressed,
+                    ]}
                     accessibilityRole="button"
                     accessibilityLabel={`${cat.name}, ${
                       listEditing && premium ? S.rowRenameHint : S.rowOpenHint
                     }`}
                   >
-                    <View
-                      testID={`category-icon-${cat.id}`}
-                      style={[styles.icon, styles.round, { backgroundColor: meta.color }]}
-                    >
-                      <SymbolView
-                        name={meta.symbol as SymbolName}
-                        size={14}
-                        tintColor={colors.onIconSquare}
-                      />
+                    <View style={stacked ? styles.stackedTop : styles.inline}>
+                      <View
+                        testID={`category-icon-${cat.id}`}
+                        style={[styles.icon, styles.round, { backgroundColor: meta.color }]}
+                      >
+                        <SymbolView
+                          name={meta.symbol as SymbolName}
+                          size={14}
+                          tintColor={colors.onIconSquare}
+                        />
+                      </View>
+                      {stacked && !listEditing ? (
+                        <SymbolView name="chevron.right" size={13} tintColor={colors.iosLabel3} />
+                      ) : null}
                     </View>
-                    <Text style={[type.body, styles.flex, styles.customName]} numberOfLines={1}>
+                    <Text
+                      style={[type.body, !stacked && styles.flex, styles.customName]}
+                      numberOfLines={stacked ? undefined : 1}
+                    >
                       {cat.name}
                     </Text>
-                    {listEditing ? null : (
+                    {listEditing || stacked ? null : (
                       <SymbolView name="chevron.right" size={13} tintColor={colors.iosLabel3} />
                     )}
                   </Pressable>
@@ -310,7 +337,7 @@ export default function CategorySettingsScreen() {
               </View>
             )}
           </View>
-          <Text style={styles.note}>{S.customFooter}</Text>
+          {premium ? null : <Text style={styles.note}>{S.customFooter}</Text>}
           {premium && atLimit ? <Text style={styles.note}>{S.limitReached}</Text> : null}
           {!premium && mine.length > 0 ? <Text style={styles.note}>{S.lapsedNote}</Text> : null}
         </View>
@@ -385,6 +412,9 @@ const styles = StyleSheet.create({
   square: { borderRadius: 7 },
   round: { borderRadius: 14 },
   addIcon: { backgroundColor: colors.tintBg },
+  rowStacked: { flexDirection: 'column', alignItems: 'stretch', gap: spacing.xs },
+  stackedTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  inline: { flexDirection: 'row' },
   customName: { fontWeight: '600' },
   flex: { flex: 1 },
   secondary: { color: colors.iosLabel2 },

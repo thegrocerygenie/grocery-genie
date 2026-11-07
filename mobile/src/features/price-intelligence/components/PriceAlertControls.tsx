@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
+import { AppSwitch } from '@/components/AppSwitch';
 import { OptionSheet } from '@/components/OptionSheet';
 import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { isPremiumRequired } from '@/utils/premium';
@@ -127,6 +128,7 @@ export function PriceAlertControls({
             strong
             accessibilityLabel={MUTE_COPY.itemSwitchLabel(itemName)}
             on={itemOn}
+            saving={ITEM_KEY in saving}
             onChange={setItemAlerts}
           />
           {itemOn ? null : (
@@ -163,6 +165,7 @@ export function PriceAlertControls({
                   subtitle={!on && until ? MUTE_COPY.until(formatMuteEnd(until)) : undefined}
                   accessibilityLabel={MUTE_COPY.storeSwitchLabel(store.name)}
                   on={on}
+                  saving={store.id in saving}
                   onChange={(next) => setStoreAlerts(store.id, next)}
                 />
               );
@@ -196,6 +199,8 @@ interface ToggleRowProps {
   strong?: boolean;
   accessibilityLabel: string;
   on: boolean;
+  /** Its change is saving: the switch is disabled, so a second flip sends nothing (F8). */
+  saving: boolean;
   onChange: (on: boolean) => void;
   divider?: boolean;
 }
@@ -206,6 +211,7 @@ function ToggleRow({
   strong,
   accessibilityLabel,
   on,
+  saving,
   onChange,
   divider,
 }: ToggleRowProps) {
@@ -215,12 +221,12 @@ function ToggleRow({
         <Text style={[type.body, strong && styles.strong]}>{label}</Text>
         {subtitle ? <Text style={styles.caption}>{subtitle}</Text> : null}
       </View>
-      <Switch
+      <AppSwitch
         value={on}
         onValueChange={onChange}
-        trackColor={{ false: colors.iosFill1, true: colors.green }}
-        ios_backgroundColor={colors.iosFill1}
+        disabled={saving}
         accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ disabled: saving, busy: saving }}
       />
     </View>
   );

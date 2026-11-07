@@ -4,7 +4,7 @@ import Constants from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
-import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
+import { colors, fontScale, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { AiConsentSettingsSection } from '@/features/ai-consent/components/AiConsentSettingsSection';
 import { useMe, useSignOut } from '@/features/auth/hooks/useAuth';
 import { useBudgets } from '@/features/budget/hooks/useBudget';
@@ -139,8 +139,17 @@ export default function SettingsScreen() {
           title: 'Settings',
           headerLargeTitle: true,
           headerRight: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button">
-              <Text style={styles.headerBtn}>Done</Text>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Done"
+            >
+              {/* Capped as a native bar button is, so it never runs into the
+                  title at accessibility sizes (F6). */}
+              <Text style={styles.headerBtn} maxFontSizeMultiplier={fontScale.headerButtonMax}>
+                Done
+              </Text>
             </Pressable>
           ),
         }}

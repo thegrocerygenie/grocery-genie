@@ -3,13 +3,26 @@
  * It prefills saved limits, PATCHes the ones that changed, deletes a cleared
  * category limit, and only POSTs categories that had no budget.
  */
+import { StyleSheet } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 
 import BudgetSettingsScreen from '../../app/budget-settings';
+import { fontScale } from '@/constants/theme';
 import type { BudgetResponse } from '@/features/budget/types';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+
+// React Native's iOS font scale at the default size and at AX5 (iPhone SE).
+const AX5_SCALE = 3.571;
+const mockWindow = { fontScale: 1 };
+jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
+  __esModule: true,
+  default: () => ({ width: 375, height: 667, scale: 2, fontScale: mockWindow.fontScale }),
+}));
+afterEach(() => {
+  mockWindow.fontScale = 1;
+});
 
 const mockCreate = jest.fn().mockResolvedValue({});
 const mockUpdate = jest.fn().mockResolvedValue({});
@@ -197,5 +210,36 @@ describe('Budget settings edits budgets in place', () => {
     expect(mockCreate).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(mockDelete).not.toHaveBeenCalled();
+  });
+});
+
+// F6 (Simulator pass 2026-11-06): at AX5 the header's Cancel and Save
+// collapsed to "Cancel" and "…", and the Monthly limit value was clipped.
+describe('Budget settings at large text sizes (F6)', () => {
+  beforeEach(() => {
+    mockBudgets.data = [budget('b-all', null, 400, '2026-10-01')];
+  });
+
+  it('caps Cancel and Save at the size a native bar button stops growing', () => {
+    renderSettings();
+    expect(screen.getByText('Cancel').props.maxFontSizeMultiplier).toBe(fontScale.headerButtonMax);
+    expect(screen.getByText('Save').props.maxFontSizeMultiplier).toBe(fontScale.headerButtonMax);
+  });
+
+  it('keeps each limit beside its label at the default size', () => {
+    renderSettings();
+    const row = screen.getByTestId('budget-row-Monthly limit');
+    expect(StyleSheet.flatten(row.props.style).flexDirection).toBe('row');
+  });
+
+  it('puts each value under its label at AX5, so the amount is not clipped', () => {
+    mockWindow.fontScale = AX5_SCALE;
+    renderSettings();
+    for (const label of ['Monthly limit', 'Start day', 'Groceries']) {
+      const row = screen.getByTestId(`budget-row-${label}`);
+      expect(StyleSheet.flatten(row.props.style).flexDirection).toBe('column');
+    }
+    const amount = screen.getByLabelText('Monthly limit');
+    expect(StyleSheet.flatten(amount.props.style).textAlign).toBe('left');
   });
 });

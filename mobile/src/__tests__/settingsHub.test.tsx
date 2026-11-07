@@ -8,7 +8,7 @@ import { Stack, router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 
 import SettingsScreen from '../../app/settings/index';
-import { spacing } from '@/constants/theme';
+import { fontScale, spacing } from '@/constants/theme';
 import type { BudgetResponse } from '@/features/budget/types';
 import type { UserProfile } from '@/features/auth/types';
 
@@ -236,4 +236,11 @@ describe('Settings hub', () => {
       expect(style.minHeight).toBeGreaterThanOrEqual(44);
     },
   );
+});
+
+// F6 (Simulator pass 2026-11-06): at AX5 Done overlapped the Settings title.
+it('caps Done at the size a native bar button stops growing, and labels it', () => {
+  renderSettings();
+  expect(screen.getByText('Done').props.maxFontSizeMultiplier).toBe(fontScale.headerButtonMax);
+  expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
 });

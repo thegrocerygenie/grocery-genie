@@ -13,6 +13,17 @@ import type { StoreList } from '@/features/price-intelligence/types';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 
+// React Native's iOS font scale at the default size and at AX5 (iPhone SE).
+const AX5_SCALE = 3.571;
+const mockWindow = { fontScale: 1 };
+jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
+  __esModule: true,
+  default: () => ({ width: 375, height: 667, scale: 2, fontScale: mockWindow.fontScale }),
+}));
+afterEach(() => {
+  mockWindow.fontScale = 1;
+});
+
 const mockApi = {
   listStores: jest.fn(),
   mergeStore: jest.fn(),
@@ -49,9 +60,11 @@ function renderScreen() {
         const { Stack } = jest.requireActual('expo-router');
         return (
           <QueryClientProvider
-            client={new QueryClient({
-              defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-            })}
+            client={
+              new QueryClient({
+                defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+              })
+            }
           >
             <Stack />
           </QueryClientProvider>
@@ -81,7 +94,9 @@ it('merges one store into another the user picks', async () => {
   mockApi.mergeStore.mockResolvedValue(merged);
   renderScreen();
 
-  fireEvent.press(await screen.findByLabelText('Merge REAL CANADIAN SUPERSTORE into another store'));
+  fireEvent.press(
+    await screen.findByLabelText('Merge REAL CANADIAN SUPERSTORE into another store'),
+  );
   expect(screen.getByText('REAL CANADIAN SUPERSTORE is the same store as')).toBeTruthy();
   fireEvent.press(screen.getByLabelText('Merge REAL CANADIAN SUPERSTORE into Loblaws'));
 
@@ -148,9 +163,7 @@ it('scrolls the merge sheet when the user has many stores', async () => {
   const lists = screen.UNSAFE_getAllByType(FlatList);
   const sheet = lists.find((l) => l.props.testID === 'merge-sheet-list');
   expect(sheet?.props.data).toHaveLength(39);
-  expect(StyleSheet.flatten(sheet?.props.style)).toEqual(
-    expect.objectContaining({ flexGrow: 0 }),
-  );
+  expect(StyleSheet.flatten(sheet?.props.style)).toEqual(expect.objectContaining({ flexGrow: 0 }));
 });
 
 it('shows an empty state with no stores', async () => {
@@ -167,4 +180,29 @@ it('offers a retry when the stores fail to load', async () => {
   fireEvent.press(await screen.findByLabelText('Try again'));
 
   expect(await screen.findByText('Loblaws')).toBeTruthy();
+});
+
+// F4 (Simulator pass 2026-11-06): at AX5 the Merge button beside the name left
+// too little room, and words broke mid-word ("Cost co", "receip ts"). At
+// accessibility sizes the button goes under the name and count, which get the
+// row's full width. Jest has no layout engine; the Simulator recheck draws it.
+describe('Stores at large text sizes (F4)', () => {
+  it('keeps the name and Merge side by side at the default size', async () => {
+    mockApi.listStores.mockResolvedValue(twoStores);
+    renderScreen();
+    const row = await screen.findByTestId('store-row-s-lob');
+    expect(StyleSheet.flatten(row.props.style).flexDirection).toBe('row');
+  });
+
+  it('stacks Merge under the whole name and count at AX5', async () => {
+    mockWindow.fontScale = AX5_SCALE;
+    mockApi.listStores.mockResolvedValue(merged);
+    renderScreen();
+    const row = await screen.findByTestId('store-row-s-lob');
+    expect(StyleSheet.flatten(row.props.style).flexDirection).toBe('column');
+    expect(
+      StyleSheet.flatten(screen.getByTestId('store-row-s-rcss').props.style).flexDirection,
+    ).toBe('column');
+    expect(screen.getByText('Loblaws').props.numberOfLines).toBeUndefined();
+  });
 });

@@ -11,11 +11,12 @@ import { act, renderRouter, screen } from 'expo-router/testing-library';
 
 import * as RootLayoutModule from '../../app/_layout';
 import { useAuthStore } from '@/store/authStore';
+import { deliverTap, priceAlertTap, resetNative } from '@/testing/fakeNotifications';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('@/hooks/useSyncQueue', () => ({ useSyncQueue: () => undefined }));
 jest.mock('@/features/auth/hooks/useAuth', () => ({
-  useMe: () => ({ data: { needs_onboarding: false } }),
+  useMe: () => ({ data: { needs_onboarding: false }, isSuccess: true }),
 }));
 
 // A signed-in user: the keychain hands back a session on hydrate, as on launch.
@@ -26,18 +27,9 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn(async () => undefined),
 }));
 
-const mockLastResponse: { value: unknown } = { value: null };
-jest.mock('expo-notifications', () => ({
-  DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
-  setNotificationHandler: jest.fn(),
-  useLastNotificationResponse: () => mockLastResponse.value,
-  clearLastNotificationResponseAsync: jest.fn(async () => {
-    mockLastResponse.value = null;
-  }),
-  getPermissionsAsync: jest.fn(async () => ({ status: 'undetermined' })),
-  requestPermissionsAsync: jest.fn(async () => ({ status: 'denied' })),
-  getExpoPushTokenAsync: jest.fn(),
-}));
+jest.mock('expo-notifications', () =>
+  jest.requireActual('@/testing/fakeNotifications').fakeNotificationsModule(),
+);
 
 const mockMarkRead = jest.fn(async () => undefined);
 jest.mock('@/features/notifications/services/pushApi', () => ({
@@ -46,19 +38,6 @@ jest.mock('@/features/notifications/services/pushApi', () => ({
 }));
 
 const ITEM_ID = '7b0c6a52-2f1e-4a8e-9d7e-1f2a3b4c5d6e';
-
-function priceAlertTap() {
-  return {
-    actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
-    notification: {
-      request: {
-        content: {
-          data: { type: 'price_change', canonical_item_id: ITEM_ID, notification_id: 'n-1' },
-        },
-      },
-    },
-  };
-}
 
 function ItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -87,7 +66,7 @@ async function expectBackToBudget() {
 
 describe('Opening an item from a cold start (BUG-6)', () => {
   beforeEach(() => {
-    mockLastResponse.value = null;
+    resetNative();
     mockMarkRead.mockClear();
     useAuthStore.setState({ accessToken: null, hydrated: false });
   });
@@ -98,7 +77,7 @@ describe('Opening an item from a cold start (BUG-6)', () => {
     // Signed in already when the root layout first renders its stack: the tap
     // effect runs before React Navigation is ready, and pushing then throws.
     useAuthStore.setState({ accessToken: 'token', hydrated: true });
-    mockLastResponse.value = priceAlertTap();
+    deliverTap(priceAlertTap('tap-ready', ITEM_ID));
     launch('/');
 
     expect(await screen.findByText(`Item ${ITEM_ID}`)).toBeTruthy();
@@ -110,7 +89,7 @@ describe('Opening an item from a cold start (BUG-6)', () => {
     // built, and the stack is then made from the push alone. withAnchor makes
     // Expo Router load the root's initialRouteName, the tabs, under it.
     const push = jest.spyOn(router, 'push');
-    mockLastResponse.value = priceAlertTap();
+    deliverTap(priceAlertTap('tap-anchor', ITEM_ID));
     launch('/');
 
     expect(await screen.findByText(`Item ${ITEM_ID}`)).toBeTruthy();

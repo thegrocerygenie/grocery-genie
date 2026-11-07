@@ -4,6 +4,7 @@ import {
   SectionList,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   type StyleProp,
   type ViewStyle,
@@ -13,7 +14,7 @@ import { SymbolView } from 'expo-symbols';
 
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { OptionSheet } from '@/components/OptionSheet';
-import { colors, radii, spacing, type } from '@/constants/theme';
+import { colors, fontScale, radii, spacing, type } from '@/constants/theme';
 import { Sparkline } from '@/features/price-intelligence/components/Sparkline';
 import {
   PRICE_ALERTS_LIST_COPY as COPY,
@@ -167,6 +168,9 @@ function AlertRow({ row, first, last, onPress }: AlertRowProps) {
     row.detail,
     row.stockUp,
   );
+  // At accessibility sizes the name and percent do not fit side by side on an
+  // SE ("Wh ole…", F3): the percent goes under the whole name, as on Items.
+  const stacked = useWindowDimensions().fontScale >= fontScale.accessibility;
   return (
     <View style={[styles.card, first && styles.cardTop, last && styles.cardBottom]}>
       <Pressable
@@ -185,8 +189,11 @@ function AlertRow({ row, first, last, onPress }: AlertRowProps) {
           />
         </View>
         <View style={styles.alertText}>
-          <View style={styles.titleLine}>
-            <Text style={styles.itemName} numberOfLines={2}>
+          <View
+            style={[styles.titleLine, stacked && styles.titleStacked]}
+            testID={`price-alert-title-${row.id}`}
+          >
+            <Text style={styles.itemName} numberOfLines={stacked ? undefined : 2}>
               {row.itemName}
             </Text>
             <Text style={[styles.percent, up ? styles.up : styles.down]}>{row.percentText}</Text>
@@ -331,6 +338,7 @@ const styles = StyleSheet.create({
   arrowDown: { backgroundColor: colors.green },
   alertText: { flex: 1, minWidth: 0 },
   titleLine: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
+  titleStacked: { flexDirection: 'column', gap: 0 },
   itemName: { ...type.subheadline, fontWeight: '600', color: colors.iosLabel, flexShrink: 1 },
   percent: { ...type.subheadline, fontWeight: '600', fontVariant: ['tabular-nums'] },
   up: { color: colors.redText },

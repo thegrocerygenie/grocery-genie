@@ -6,6 +6,7 @@
  */
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { StyleSheet } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 
@@ -19,6 +20,14 @@ import type {
 } from '@/features/price-intelligence/types';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+
+// React Native's iOS font scale at the default size and at AX5 (iPhone SE).
+const AX5_SCALE = 3.571;
+const mockWindow = { fontScale: 1 };
+jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
+  __esModule: true,
+  default: () => ({ width: 375, height: 667, scale: 2, fontScale: mockWindow.fontScale }),
+}));
 jest.mock('expo-haptics', () => ({ selectionAsync: jest.fn() }));
 jest.mock('@/features/auth/hooks/useAuth', () => ({
   useMe: () => ({ data: { is_premium: true } }),
@@ -141,6 +150,10 @@ function open(path: string) {
   return view;
 }
 
+afterEach(() => {
+  mockWindow.fontScale = 1;
+});
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockApi.listPriceAlerts.mockResolvedValue([eggs, oil]);
@@ -254,5 +267,26 @@ describe('Price alerts Settings group (PI-03 AC 7, 8)', () => {
     await waitFor(() =>
       expect(mockApi.updatePriceAlertSettings).toHaveBeenCalledWith({ threshold_percent: 20 }),
     );
+  });
+});
+
+// F3 (Simulator pass 2026-11-06): at AX5 on the SE the item name was cut to
+// "Wh ole…" beside the percent. At accessibility sizes the percent goes under
+// the name, as the Items list does (BUG-3). Jest has no layout engine, so this
+// checks the props; the Simulator recheck draws it.
+describe('Price alerts list at large text sizes (F3)', () => {
+  it('keeps the name and percent on one line at the default size', async () => {
+    open('/price-alerts');
+    const line = await screen.findByTestId('price-alert-title-n-eggs');
+    expect(StyleSheet.flatten(line.props.style).flexDirection).toBe('row');
+    expect(screen.getByText('Eggs · dozen').props.numberOfLines).toBe(2);
+  });
+
+  it('puts the percent under the whole name at AX5', async () => {
+    mockWindow.fontScale = AX5_SCALE;
+    open('/price-alerts');
+    const line = await screen.findByTestId('price-alert-title-n-eggs');
+    expect(StyleSheet.flatten(line.props.style).flexDirection).toBe('column');
+    expect(screen.getByText('Eggs · dozen').props.numberOfLines).toBeUndefined();
   });
 });

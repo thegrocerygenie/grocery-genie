@@ -263,7 +263,9 @@ describe('the Alerts screen (PI-03 AC 10, 13)', () => {
     expect(screen.getByText(MUTE_COPY.storeNote)).toBeTruthy();
     expect(MUTE_COPY.storeNote).toMatch(/every item/);
     expect(
-      screen.getByText('You’ll still see price changes in the item detail — just no notifications.'),
+      screen.getByText(
+        'You’ll still see price changes in the item detail — just no notifications.',
+      ),
     ).toBeTruthy();
   });
 
@@ -429,5 +431,67 @@ describe('Settings → Alerts mutes (PI-03 AC 14)', () => {
     await waitFor(() => expect(screen.queryByLabelText('Unmute Organic Bananas')).toBeNull());
     expect(screen.queryByText(MUTE_COPY.unmuteFailed)).toBeNull();
     expect(screen.getByLabelText('Unmute Loblaws')).toBeTruthy();
+  });
+});
+
+// F8 (Simulator pass 2026-11-06): with the backend down a failed unmute took
+// about 6 s to say so, and Unmute could be tapped again meanwhile. While an
+// unmute saves, its control is disabled and shows that it is working.
+describe('An unmute in flight (F8)', () => {
+  function pending() {
+    let reject: (e: Error) => void = () => {};
+    const promise = new Promise<undefined>((_, r) => {
+      reject = r;
+    });
+    return { promise, fail: () => reject(new Error('offline')) };
+  }
+
+  it('Settings: Unmute is disabled with a spinner while saving, so a second tap sends nothing', async () => {
+    mockApi.getPriceAlertSettings.mockResolvedValue(
+      settings({
+        muted_items: [{ id: 'i-1', canonical_name: 'Organic Bananas', muted_until: WEEK_END }],
+      }),
+    );
+    const call = pending();
+    mockApi.unmuteItem.mockReturnValueOnce(call.promise);
+    open('/settings/notification-settings');
+
+    fireEvent.press(await screen.findByLabelText('Unmute Organic Bananas'));
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText('Unmute Organic Bananas').props.accessibilityState,
+      ).toMatchObject({ disabled: true, busy: true }),
+    );
+    expect(screen.getByTestId('unmute-spinner-item-i-1')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Unmute Organic Bananas'));
+    expect(mockApi.unmuteItem).toHaveBeenCalledTimes(1);
+
+    await act(async () => call.fail());
+    expect(await screen.findByText(MUTE_COPY.unmuteFailed)).toBeTruthy();
+    expect(screen.getByLabelText('Unmute Organic Bananas').props.accessibilityState).toMatchObject({
+      disabled: false,
+    });
+    expect(screen.queryByTestId('unmute-spinner-item-i-1')).toBeNull();
+  });
+
+  it('Alerts screen: a switch is disabled while its change saves, so a second flip sends nothing', async () => {
+    mockApi.getItem.mockResolvedValue(detail({ alerts_muted: true }));
+    const call = pending();
+    mockApi.unmuteItem.mockReturnValueOnce(call.promise);
+    open('/items/alerts?id=i-1');
+
+    const toggle = await screen.findByLabelText('Price alerts for Organic Bananas');
+    fireEvent(toggle, 'valueChange', true);
+    await waitFor(() =>
+      expect(screen.getByLabelText('Price alerts for Organic Bananas').props.disabled).toBe(true),
+    );
+    fireEvent(screen.getByLabelText('Price alerts for Organic Bananas'), 'valueChange', false);
+    expect(mockApi.unmuteItem).toHaveBeenCalledTimes(1);
+    expect(mockApi.muteItem).not.toHaveBeenCalled();
+
+    await act(async () => call.fail());
+    await waitFor(() =>
+      expect(screen.getByLabelText('Price alerts for Organic Bananas').props.disabled).toBe(false),
+    );
   });
 });
