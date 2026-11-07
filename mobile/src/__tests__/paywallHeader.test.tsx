@@ -17,7 +17,7 @@ import { useAuthStore } from '@/store/authStore';
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('@/hooks/useSyncQueue', () => ({ useSyncQueue: () => undefined }));
 jest.mock('@/features/auth/hooks/useAuth', () => ({
-  useMe: () => ({ data: { needs_onboarding: false } }),
+  useMe: () => ({ data: { needs_onboarding: false }, isSuccess: true }),
 }));
 jest.mock('expo-notifications', () =>
   jest.requireActual('@/testing/fakeNotifications').fakeNotificationsModule(),

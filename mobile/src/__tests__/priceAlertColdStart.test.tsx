@@ -16,7 +16,7 @@ import { deliverTap, priceAlertTap, resetNative } from '@/testing/fakeNotificati
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('@/hooks/useSyncQueue', () => ({ useSyncQueue: () => undefined }));
 jest.mock('@/features/auth/hooks/useAuth', () => ({
-  useMe: () => ({ data: { needs_onboarding: false } }),
+  useMe: () => ({ data: { needs_onboarding: false }, isSuccess: true }),
 }));
 
 // A signed-in user: the keychain hands back a session on hydrate, as on launch.

@@ -7,8 +7,8 @@ type AppSwitchProps = Omit<SwitchProps, 'trackColor' | 'ios_backgroundColor' | '
 
 /**
  * The app's switch: brand green when on, as the design draws it (F7), and the
- * system fill when off. The tint is #1F7A4A in light (5.4:1 on a white card)
- * and #34D17A in dark (9:1 on #1C1C1E), both past WCAG's 3:1 for controls, and
+ * system fill when off. The tint is #1F7A4A in light (5.33:1 on a white card)
+ * and #34D17A in dark (8.55:1 on #1C1C1E), both past WCAG's 3:1 for controls, and
  * it darkens or brightens with Increase Contrast. Use this, never a bare
  * Switch, so no screen drifts back to system green.
  */

@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { type Href, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 
+import { useMe } from '@/features/auth/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
 import { usePushStore } from '@/store/pushStore';
 import { parseNotificationTap } from '../notificationTap';
@@ -19,9 +20,6 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
-
-// Start holding taps as soon as the app's JS loads, before any screen mounts.
-captureTaps();
 
 const expoPushDeps: PushDeps = {
   getPermissionStatus: async () =>
@@ -66,18 +64,20 @@ function useNavigationReady(): boolean {
  *
  * A tap is opened only once the app can keep it on screen (BUG-6): the
  * session is read from the keychain and present, the root stack is ready, and
- * the user is out of onboarding. Opened earlier, sign-in's own replace with
- * the tabs, or the gate's redirect, would cover it, and the user lands on
- * Budget with the tap spent.
+ * the profile says onboarding is done and the user is off the onboarding
+ * screens. Opened earlier, the gate's needs_onboarding redirect would cover
+ * it, and the user lands in onboarding with the tap spent.
  */
 export function usePushNotifications(): void {
   const accessToken = useAuthStore((s) => s.accessToken);
-  const hydrated = useAuthStore((s) => s.hydrated);
   const setToken = usePushStore((s) => s.setToken);
   const router = useRouter();
   const navigationReady = useNavigationReady();
   const inOnboarding = useSegments()[0] === 'onboarding';
   const pending = usePendingTapStore((s) => s.pending);
+  const me = useMe(!!accessToken);
+  // Offline, the profile errors after its retries: open the tap then too.
+  const onboarded = me.isSuccess ? !me.data.needs_onboarding : me.isError;
 
   useEffect(() => {
     // Pick up a tap iOS stored before this mounted, if the listener missed it.
@@ -92,7 +92,7 @@ export function usePushNotifications(): void {
   }, [accessToken, setToken]);
 
   useEffect(() => {
-    if (!pending || !hydrated || !accessToken || !navigationReady || inOnboarding) return;
+    if (!pending || !accessToken || !onboarded || !navigationReady || inOnboarding) return;
     const response = takeTap();
     if (!response) return;
 
@@ -106,5 +106,5 @@ export function usePushNotifications(): void {
     // the stack gets its initialRouteName (the tabs) under the item, so Back
     // returns to Budget (BUG-6). Into a built stack this is a plain push.
     router.push(route as Href, { withAnchor: true });
-  }, [pending, hydrated, accessToken, navigationReady, inOnboarding, router]);
+  }, [pending, accessToken, onboarded, navigationReady, inOnboarding, router]);
 }

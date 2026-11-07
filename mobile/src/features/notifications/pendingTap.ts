@@ -1,6 +1,8 @@
 import * as Notifications from 'expo-notifications';
 import { create } from 'zustand';
 
+import { useAuthStore } from '@/store/authStore';
+
 /**
  * The push tap waiting to be opened (BUG-6).
  *
@@ -9,6 +11,8 @@ import { create } from 'zustand';
  * is on sign-in. The tap is held here, outside any screen, so a remount of the
  * root layout or the onboarding gate neither loses it nor sees it twice. Each
  * tap (by its iOS request identifier) is handed out at most once per launch.
+ * A tap belongs to the account it was sent to: one made while signed out is
+ * ignored, and signing out or another account signing in drops a held one.
  */
 interface PendingTapState {
   pending: Notifications.NotificationResponse | null;
@@ -28,24 +32,47 @@ export function offerTap(response: Notifications.NotificationResponse | null | u
   if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
   const id = tapId(response);
   if (taken.has(id)) return;
+  if (signedOut()) {
+    spend(id); // never opened later, even when the stored tap is read again
+    return;
+  }
   const { pending } = usePendingTapStore.getState();
   if (pending && tapId(pending) === id) return;
   usePendingTapStore.setState({ pending: response });
+}
+
+/** Mark a tap used for this launch, and clear the one iOS stored. */
+function spend(id: string): void {
+  taken.add(id);
+  try {
+    Notifications.clearLastNotificationResponse();
+  } catch {
+    // Not available on this platform; `taken` already stops a repeat.
+  }
 }
 
 /** Hand out the waiting tap, once; later offers of the same tap are ignored. */
 export function takeTap(): Notifications.NotificationResponse | null {
   const { pending } = usePendingTapStore.getState();
   if (!pending) return null;
-  taken.add(tapId(pending));
+  spend(tapId(pending));
   usePendingTapStore.setState({ pending: null });
-  try {
-    Notifications.clearLastNotificationResponse();
-  } catch {
-    // Not available on this platform; `taken` already stops a repeat.
-  }
   return pending;
 }
+
+function signedOut(): boolean {
+  const { hydrated, accessToken } = useAuthStore.getState();
+  return hydrated && !accessToken;
+}
+
+useAuthStore.subscribe((state, prev) => {
+  const switched = !!prev.userId && !!state.userId && prev.userId !== state.userId;
+  const { pending } = usePendingTapStore.getState();
+  if (pending && (signedOut() || switched)) {
+    spend(tapId(pending));
+    usePendingTapStore.setState({ pending: null });
+  }
+});
 
 let listening = false;
 

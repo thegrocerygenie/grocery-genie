@@ -160,19 +160,23 @@ describe('A push tap that launches the app (BUG-6)', () => {
     await expectBackToBudget();
   });
 
-  it('opens the item after a fresh sign-in, not under the sign-in redirect to the tabs', async () => {
+  it('drops a tap made while signed out, so whoever signs in next does not open it', async () => {
     useAuthStore.setState({ hydrated: true });
     launch('/onboarding/sign-in');
     deliverTap(priceAlertTap('tap-signin', 'item-signin'));
-    // Signed out: the tap waits.
     expect(itemPushes('item-signin')).toBe(0);
 
     fireEvent.press(await screen.findByLabelText('Sign in'));
 
     await settle();
-    expect(await screen.findByText('Item item-signin')).toBeTruthy();
-    expect(itemPushes('item-signin')).toBe(1);
-    await expectBackToBudget();
+    expect(itemPushes('item-signin')).toBe(0);
+    expect(mockMarkRead).not.toHaveBeenCalled();
+    expect(screen.getByText('Budget home')).toBeTruthy();
+
+    // A remount reads the tap iOS stored again: it stays dropped.
+    await act(async () => deliverTap(priceAlertTap('tap-signin', 'item-signin')));
+    await settle();
+    expect(itemPushes('item-signin')).toBe(0);
   });
 
   it('routes a tap once, even when the same response is handed over again', async () => {

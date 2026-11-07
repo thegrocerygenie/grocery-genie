@@ -24,7 +24,7 @@ jest.mock('@/features/notifications/hooks/usePushNotifications', () => ({
   usePushNotifications: () => undefined,
 }));
 jest.mock('@/features/auth/hooks/useAuth', () => ({
-  useMe: () => ({ data: { needs_onboarding: false } }),
+  useMe: () => ({ data: { needs_onboarding: false }, isSuccess: true }),
 }));
 
 function ThemeProbe() {
