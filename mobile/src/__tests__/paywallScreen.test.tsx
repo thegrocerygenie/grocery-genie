@@ -6,12 +6,13 @@
  * purchase alone.
  */
 import React from 'react';
-import { Linking } from 'react-native';
+import { Linking, StyleSheet } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 
 import PaywallScreen from '../../app/paywall';
+import { fontScale } from '@/constants/theme';
 import type { UserProfile } from '@/features/auth/types';
 import { useAuthStore } from '@/store/authStore';
 
@@ -317,5 +318,33 @@ describe('Paywall', () => {
 
     fireEvent.press(await screen.findByLabelText('Try Again'));
     expect(await screen.findByLabelText(TRIAL)).toBeTruthy();
+  });
+});
+
+// F4, F5 (Simulator pass 2026-11-06): at AX5 the title broke mid-word ("Premi
+// um") and "Manage Subscription" was clipped. React Native grows every text
+// style by the body factor (3.6x at AX5); UIKit grows Title 1 only to 58pt and
+// Headline to 53pt. Capped at UIKit's own AX5 sizes, each word fits a line.
+describe('Paywall at large text sizes (F4, F5)', () => {
+  it('grows the title no further than UIKit grows Title 1', async () => {
+    renderPaywall();
+    const title = await screen.findByRole('header', { name: 'Premium' });
+    expect(title.props.maxFontSizeMultiplier).toEqual(expect.any(Number));
+    expect(title.props.maxFontSizeMultiplier).toBe(fontScale.titleMax);
+  });
+
+  it('lets Manage Subscription wrap and grow inside its button', async () => {
+    mockFetchMe.mockResolvedValue(premiumProfile);
+    renderPaywall();
+    const label = await screen.findByText('Manage Subscription');
+    expect(label.props.numberOfLines).toBeUndefined();
+    expect(label.props.maxFontSizeMultiplier).toEqual(expect.any(Number));
+    expect(label.props.maxFontSizeMultiplier).toBe(fontScale.buttonLabelMax);
+    expect(StyleSheet.flatten(label.props.style).textAlign).toBe('center');
+    const button = StyleSheet.flatten(
+      screen.getByLabelText('Manage Subscription').props.style,
+    ) as Record<string, unknown>;
+    expect(button.height).toBeUndefined();
+    expect(button.paddingHorizontal).toBeGreaterThan(0);
   });
 });

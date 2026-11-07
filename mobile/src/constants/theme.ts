@@ -213,4 +213,10 @@ export const fontScale = {
   headerButtonMax: 1.3,
   // One letter under each of 12 bars on an iPhone SE (about 22pt a column).
   compactChartLabelMax: 1.5,
+  // React Native grows every text style by the body factor (3.6x at AX5).
+  // UIKit grows Title 1 from 28pt only to 58pt and Headline from 17pt to 53pt;
+  // past those a one-word title or a button word no longer fits an SE's line
+  // and breaks mid-word (F4, F5). Cap them where UIKit stops.
+  titleMax: 2.07,
+  buttonLabelMax: 3.1,
 } as const;

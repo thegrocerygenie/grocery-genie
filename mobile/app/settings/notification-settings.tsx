@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
+import { AppSwitch } from '@/components/AppSwitch';
 import { OptionSheet } from '@/components/OptionSheet';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useMe, useUpdatePreferences } from '@/features/auth/hooks/useAuth';
@@ -59,16 +60,28 @@ export default function NotificationSettingsScreen() {
       else next.delete(key);
       return next;
     });
-  const onUnmuteItem = (id: string) => {
-    const key = `item-${id}`;
+  // Rows whose unmute is saving, by key. A failure can take seconds to show
+  // (F8), so Unmute is disabled meanwhile and a second tap sends nothing.
+  const [unmuting, setUnmuting] = useState<ReadonlySet<string>>(new Set());
+  const markSaving = (key: string, saving: boolean) =>
+    setUnmuting((current) => {
+      const next = new Set(current);
+      if (saving) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  const startUnmute = (key: string, run: (callbacks: UnmuteCallbacks) => void) => {
+    if (unmuting.has(key)) return;
     markUnmute(key, false);
-    unmuteItem.mutate({ id, muted: false }, { onError: () => markUnmute(key, true) });
+    markSaving(key, true);
+    run({ onError: () => markUnmute(key, true), onSettled: () => markSaving(key, false) });
   };
-  const onUnmuteStore = (storeId: string) => {
-    const key = `store-${storeId}`;
-    markUnmute(key, false);
-    unmuteStore.mutate({ storeId, muted: false }, { onError: () => markUnmute(key, true) });
-  };
+  const onUnmuteItem = (id: string) =>
+    startUnmute(`item-${id}`, (callbacks) => unmuteItem.mutate({ id, muted: false }, callbacks));
+  const onUnmuteStore = (storeId: string) =>
+    startUnmute(`store-${storeId}`, (callbacks) =>
+      unmuteStore.mutate({ storeId, muted: false }, callbacks),
+    );
   const muteEnd = (until: string | null) =>
     until ? MUTE_COPY.until(formatMuteEnd(until)) : MUTE_COPY.forever;
   const priceAlertsOn = updatePriceAlerts.isPending
@@ -192,6 +205,8 @@ export default function NotificationSettingsScreen() {
                 name={item.canonical_name}
                 detail={`${PRICE_COPY.item} · ${muteEnd(item.muted_until)}`}
                 failed={unmuteFailed.has(`item-${item.id}`)}
+                saving={unmuting.has(`item-${item.id}`)}
+                testKey={`item-${item.id}`}
                 onPress={() => onUnmuteItem(item.id)}
               />
             ))}
@@ -201,6 +216,8 @@ export default function NotificationSettingsScreen() {
                 name={store.name}
                 detail={`${PRICE_COPY.store} · ${muteEnd(store.muted_until)}`}
                 failed={unmuteFailed.has(`store-${store.id}`)}
+                saving={unmuting.has(`store-${store.id}`)}
+                testKey={`store-${store.id}`}
                 onPress={() => onUnmuteStore(store.id)}
               />
             ))}
@@ -288,11 +305,9 @@ function ToggleRow({ label, on, onChange, accessibilityLabel }: ToggleRowProps) 
   return (
     <View style={styles.row}>
       <Text style={type.body}>{label}</Text>
-      <Switch
+      <AppSwitch
         value={on}
         onValueChange={onChange}
-        trackColor={{ false: colors.iosFill1, true: colors.green }}
-        ios_backgroundColor={colors.iosFill1}
         accessibilityLabel={accessibilityLabel ?? label}
       />
     </View>
@@ -325,16 +340,25 @@ function NavRow({ label, value, onPress }: NavRowProps) {
   );
 }
 
+interface UnmuteCallbacks {
+  onError: () => void;
+  onSettled: () => void;
+}
+
 interface UnmuteRowProps {
   name: string;
   /** "Item · Until Mar 27, 2026" or "Store · Forever", under the name (PI-03 AC 14). */
   detail: string;
   /** The last unmute failed: the row says so, and Unmute tries again. */
   failed: boolean;
+  /** The unmute is saving: Unmute is disabled and shows a spinner (F8). */
+  saving: boolean;
+  /** `item-<id>` or `store-<id>`, for the spinner's test id. */
+  testKey: string;
   onPress: () => void;
 }
 
-function UnmuteRow({ name, detail, failed, onPress }: UnmuteRowProps) {
+function UnmuteRow({ name, detail, failed, saving, testKey, onPress }: UnmuteRowProps) {
   return (
     <View style={styles.row}>
       <View style={styles.rowText}>
@@ -350,12 +374,18 @@ function UnmuteRow({ name, detail, failed, onPress }: UnmuteRowProps) {
       </View>
       <Pressable
         onPress={onPress}
+        disabled={saving}
         hitSlop={8}
         style={styles.inlineButton}
         accessibilityRole="button"
         accessibilityLabel={PRICE_COPY.unmuteLabel(name)}
+        accessibilityState={{ disabled: saving, busy: saving }}
       >
-        <Text style={styles.link}>{PRICE_COPY.unmute}</Text>
+        {saving ? (
+          <ActivityIndicator color={colors.tint} testID={`unmute-spinner-${testKey}`} />
+        ) : (
+          <Text style={styles.link}>{PRICE_COPY.unmute}</Text>
+        )}
       </Pressable>
     </View>
   );

@@ -1,7 +1,8 @@
 import React from 'react';
-import { Alert, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
+import { AppSwitch } from '@/components/AppSwitch';
 import { colors, radii, spacing, type } from '@/constants/theme';
 
 import { AI_CONSENT_SETTINGS_COPY as COPY } from '../constants';
@@ -46,12 +47,10 @@ export function AiConsentSettingsSection() {
             <SymbolView name="sparkles" size={14} tintColor="#fff" />
           </View>
           <Text style={[type.body, styles.title]}>{COPY.title}</Text>
-          <Switch
+          <AppSwitch
             value={granted}
             onValueChange={onValueChange}
             disabled={withdraw.isPending}
-            trackColor={{ false: colors.iosFill1, true: colors.green }}
-            ios_backgroundColor={colors.iosFill1}
             accessibilityLabel={COPY.title}
           />
         </View>

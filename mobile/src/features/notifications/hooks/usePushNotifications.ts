@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import { type Href, useNavigationContainerRef, useRouter } from 'expo-router';
+import { type Href, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 
 import { useAuthStore } from '@/store/authStore';
 import { usePushStore } from '@/store/pushStore';
 import { parseNotificationTap } from '../notificationTap';
+import { captureTaps, takeTap, usePendingTapStore } from '../pendingTap';
 import { registerForPush, type PermissionStatus, type PushDeps } from '../registerForPush';
 import { markNotificationRead, registerPushToken } from '../services/pushApi';
 
@@ -18,6 +19,9 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
+
+// Start holding taps as soon as the app's JS loads, before any screen mounts.
+captureTaps();
 
 const expoPushDeps: PushDeps = {
   getPermissionStatus: async () =>
@@ -59,13 +63,26 @@ function useNavigationReady(): boolean {
 /**
  * Registers this device for push after sign-in, and opens the right screen
  * when the user taps a push (including one that launched the app).
+ *
+ * A tap is opened only once the app can keep it on screen (BUG-6): the
+ * session is read from the keychain and present, the root stack is ready, and
+ * the user is out of onboarding. Opened earlier, sign-in's own replace with
+ * the tabs, or the gate's redirect, would cover it, and the user lands on
+ * Budget with the tap spent.
  */
 export function usePushNotifications(): void {
   const accessToken = useAuthStore((s) => s.accessToken);
+  const hydrated = useAuthStore((s) => s.hydrated);
   const setToken = usePushStore((s) => s.setToken);
   const router = useRouter();
   const navigationReady = useNavigationReady();
-  const lastResponse = Notifications.useLastNotificationResponse();
+  const inOnboarding = useSegments()[0] === 'onboarding';
+  const pending = usePendingTapStore((s) => s.pending);
+
+  useEffect(() => {
+    // Pick up a tap iOS stored before this mounted, if the listener missed it.
+    captureTaps();
+  }, []);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -75,11 +92,12 @@ export function usePushNotifications(): void {
   }, [accessToken, setToken]);
 
   useEffect(() => {
-    if (!lastResponse || !accessToken || !navigationReady) return;
-    if (lastResponse.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
+    if (!pending || !hydrated || !accessToken || !navigationReady || inOnboarding) return;
+    const response = takeTap();
+    if (!response) return;
 
     const { notificationId, route } = parseNotificationTap(
-      lastResponse.notification.request.content.data,
+      response.notification.request.content.data,
     );
     if (notificationId) {
       void markNotificationRead(notificationId, 'push').catch(() => undefined);
@@ -88,7 +106,5 @@ export function usePushNotifications(): void {
     // the stack gets its initialRouteName (the tabs) under the item, so Back
     // returns to Budget (BUG-6). Into a built stack this is a plain push.
     router.push(route as Href, { withAnchor: true });
-    // Handle each tap once, even if this hook remounts.
-    void Notifications.clearLastNotificationResponseAsync();
-  }, [lastResponse, accessToken, navigationReady, router]);
+  }, [pending, hydrated, accessToken, navigationReady, inOnboarding, router]);
 }

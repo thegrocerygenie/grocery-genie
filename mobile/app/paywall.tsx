@@ -12,7 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
-import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
+import { colors, fontScale, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { useMe } from '@/features/auth/hooks/useAuth';
 import {
   MANAGE_SUBSCRIPTIONS_URL,
@@ -103,7 +103,7 @@ export default function PaywallScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: S.screenTitle, headerShown: false }} />
+      <Stack.Screen options={{ title: S.screenTitle }} />
       <View style={styles.root}>
         <View style={styles.closeBar}>
           <Pressable
@@ -131,7 +131,11 @@ export default function PaywallScreen() {
                 tintColor={colors.onTint}
               />
             </View>
-            <Text style={styles.title} accessibilityRole="header">
+            <Text
+              style={styles.title}
+              accessibilityRole="header"
+              maxFontSizeMultiplier={fontScale.titleMax}
+            >
               {isPremium ? S.activeTitle : S.title}
             </Text>
             <Text style={[type.subheadline, styles.subtitle]}>
@@ -228,7 +232,9 @@ export default function PaywallScreen() {
               accessibilityRole="button"
               accessibilityLabel={S.manage}
             >
-              <Text style={styles.secondaryLabel}>{S.manage}</Text>
+              <Text style={styles.secondaryLabel} maxFontSizeMultiplier={fontScale.buttonLabelMax}>
+                {S.manage}
+              </Text>
             </Pressable>
           ) : selected && available ? (
             <Pressable
@@ -457,13 +463,14 @@ const styles = StyleSheet.create({
   secondaryButton: {
     minHeight: 50,
     paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
     borderRadius: radii.button,
     backgroundColor: colors.iosBg2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   secondaryPressed: { backgroundColor: colors.iosFill3 },
-  secondaryLabel: { ...type.headline, color: colors.tint },
+  secondaryLabel: { ...type.headline, color: colors.tint, textAlign: 'center' },
   footerLine: {
     flexDirection: 'row',
     justifyContent: 'center',

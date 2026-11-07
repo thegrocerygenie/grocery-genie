@@ -137,7 +137,10 @@ export default function RootLayout() {
                 name="recently-deleted"
                 options={{ title: 'Recently Deleted', presentation: 'modal' }}
               />
-              <Stack.Screen name="paywall" options={{ title: 'Premium', presentation: 'modal' }} />
+              <Stack.Screen
+                name="paywall"
+                options={{ title: 'Premium', presentation: 'modal', headerShown: false }}
+              />
             </Stack>
             {/* After the Stack: a tap that launched the app is routed on the first
                 run, and it must land on the mounted Stack, over the tabs. */}

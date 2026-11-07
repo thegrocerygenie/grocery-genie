@@ -1,9 +1,18 @@
 import React, { useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { Stack } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
-import { colors, radii, spacing, touchTarget, type } from '@/constants/theme';
+import { colors, fontScale, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { STORE_MERGE_COPY as COPY } from '@/features/price-intelligence/constants';
 import {
   useMergeStore,
@@ -87,11 +96,16 @@ interface StoreCardProps {
 }
 
 function StoreCard({ store, canMerge, onMerge, onUnmerge }: StoreCardProps) {
+  // At accessibility sizes Merge beside the name left it too little room, and
+  // words broke mid-word ("Cost co", F4): the button goes under the text.
+  const stacked = useWindowDimensions().fontScale >= fontScale.accessibility;
+  const rowStyle = [styles.row, stacked && styles.rowStacked];
+  const nameLines = stacked ? undefined : 2;
   return (
     <View style={styles.listCard}>
-      <View style={styles.row}>
-        <View style={styles.rowText}>
-          <Text style={type.body} numberOfLines={2}>
+      <View style={rowStyle} testID={`store-row-${store.id}`}>
+        <View style={[styles.rowText, stacked && styles.rowTextStacked]}>
+          <Text style={type.body} numberOfLines={nameLines}>
             {store.name}
           </Text>
           <Text style={styles.caption}>{COPY.receipts(store.receipt_count)}</Text>
@@ -109,9 +123,9 @@ function StoreCard({ store, canMerge, onMerge, onUnmerge }: StoreCardProps) {
         ) : null}
       </View>
       {store.merged_stores.map((m) => (
-        <View key={m.id} style={[styles.row, styles.rowDivider]}>
-          <View style={styles.rowText}>
-            <Text style={type.body} numberOfLines={2}>
+        <View key={m.id} style={[rowStyle, styles.rowDivider]} testID={`store-row-${m.id}`}>
+          <View style={[styles.rowText, stacked && styles.rowTextStacked]}>
+            <Text style={type.body} numberOfLines={nameLines}>
               {m.name}
             </Text>
             <Text style={styles.caption}>{COPY.mergedInto(store.name)}</Text>
@@ -262,7 +276,9 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.iosSeparator,
   },
+  rowStacked: { flexDirection: 'column', alignItems: 'flex-start', gap: 0 },
   rowText: { flex: 1, gap: spacing.xs / 2 },
+  rowTextStacked: { flex: 0, alignSelf: 'stretch' },
   caption: { ...type.footnote, color: colors.iosLabel2 },
   inlineButton: {
     ...touchTarget,

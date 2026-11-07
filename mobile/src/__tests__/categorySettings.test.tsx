@@ -5,7 +5,7 @@
  * user sees the upgrade prompt, never an error (D2).
  */
 import React from 'react';
-import { Alert, type AlertButton } from 'react-native';
+import { Alert, StyleSheet, type AlertButton } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 
 import CategorySettingsScreen from '../../app/settings/categories';
@@ -19,6 +19,17 @@ jest.mock('expo-symbols', () => {
     SymbolView: ({ name }: { name: string }) => <Text testID="symbol">{name}</Text>,
   };
 });
+// React Native's iOS font scale at the default size and at AX5 (iPhone SE).
+const AX5_SCALE = 3.571;
+const mockWindow = { fontScale: 1 };
+jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
+  __esModule: true,
+  default: () => ({ width: 375, height: 667, scale: 2, fontScale: mockWindow.fontScale }),
+}));
+afterEach(() => {
+  mockWindow.fontScale = 1;
+});
+
 jest.mock('expo-haptics', () => ({ selectionAsync: jest.fn(), notificationAsync: jest.fn() }));
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
@@ -104,23 +115,29 @@ function order(...texts: string[]): number[] {
 
 // --- AC 6: the design's layout ---
 
-it('lists Built-in first, then Custom with a New category row and the Premium footer', () => {
+it('lists Built-in first, then Custom with a New category row', () => {
   mockCategories = [...DEFAULTS, ...custom(1)];
   render(<CategorySettingsScreen />);
-  const [builtIn, groceries, customHeader, mine, newRow, footer] = order(
+  const [builtIn, groceries, customHeader, mine, newRow] = order(
     'Built-in',
     'Groceries',
     'Custom',
     'Custom 0',
     'New category',
-    'Custom categories require Premium.',
   );
   expect(builtIn).toBeGreaterThanOrEqual(0);
   expect(builtIn).toBeLessThan(groceries);
   expect(groceries).toBeLessThan(customHeader);
   expect(customHeader).toBeLessThan(mine);
   expect(mine).toBeLessThan(newRow);
-  expect(newRow).toBeLessThan(footer);
+});
+
+// F2 (Simulator pass 2026-11-06): the footer told Premium users they need Premium.
+it('does not tell a Premium user that custom categories require Premium', () => {
+  mockCategories = [...DEFAULTS, ...custom(1)];
+  render(<CategorySettingsScreen />);
+  expect(screen.getByText('New category')).toBeTruthy();
+  expect(screen.queryByText('Custom categories require Premium.')).toBeNull();
 });
 
 it('lists the built-in categories as read-only, each with its own icon square', () => {
@@ -344,4 +361,31 @@ it('a change refused with 403 premium_required turns the editor into the upgrade
   act(() => onError(new ApiError(403, { detail: { code: 'premium_required' } })));
   expect(alert).not.toHaveBeenCalled();
   expect(screen.getByText('Make it yours with Premium')).toBeTruthy();
+});
+
+// F4 (Simulator pass 2026-11-06): at AX5 "Household" broke mid-word beside its
+// icon. At accessibility sizes the icon goes above the name, so the name has
+// the row's full width. Jest has no layout engine; the Simulator draws it.
+describe('Categories at large text sizes (F4)', () => {
+  it('keeps the icon beside the name at the default size', () => {
+    mockCategories = [...DEFAULTS, ...custom(1)];
+    render(<CategorySettingsScreen />);
+    expect(
+      StyleSheet.flatten(screen.getByTestId('category-row-d-1').props.style).flexDirection,
+    ).toBe('row');
+    expect(screen.getByText('Custom 0').props.numberOfLines).toBe(1);
+  });
+
+  it('puts the icon above the whole name at AX5, built-in and custom', () => {
+    mockWindow.fontScale = AX5_SCALE;
+    mockCategories = [...DEFAULTS, ...custom(1)];
+    render(<CategorySettingsScreen />);
+    expect(
+      StyleSheet.flatten(screen.getByTestId('category-row-d-1').props.style).flexDirection,
+    ).toBe('column');
+    expect(
+      StyleSheet.flatten(screen.getByTestId('category-row-c-0').props.style).flexDirection,
+    ).toBe('column');
+    expect(screen.getByText('Custom 0').props.numberOfLines).toBeUndefined();
+  });
 });

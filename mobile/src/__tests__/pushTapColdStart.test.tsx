@@ -13,6 +13,7 @@ import { renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import RootLayout from '../../app/_layout';
 import type { UserProfile } from '@/features/auth/types';
 import { useAuthStore } from '@/store/authStore';
+import { deliverTap, priceAlertTap } from '@/testing/fakeNotifications';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('expo-secure-store', () => ({
@@ -23,33 +24,10 @@ jest.mock('expo-secure-store', () => ({
 }));
 jest.mock('@/hooks/useSyncQueue', () => ({ useSyncQueue: () => undefined }));
 
-// The tap that launched the app: a price alert for item abc.
-const mockLaunchResponse = {
-  actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
-  notification: {
-    request: {
-      identifier: 'push-1',
-      content: {
-        data: {
-          notification_id: 'n-1',
-          type: 'price_change',
-          url: '/items/abc',
-          canonical_item_id: 'abc',
-          store_id: 's-1',
-        },
-      },
-    },
-  },
-};
-jest.mock('expo-notifications', () => ({
-  DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
-  setNotificationHandler: jest.fn(),
-  useLastNotificationResponse: () => mockLaunchResponse,
-  clearLastNotificationResponseAsync: jest.fn().mockResolvedValue(undefined),
-  getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'undetermined' }),
-  requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'denied' }),
-  getExpoPushTokenAsync: jest.fn(),
-}));
+// The tap that launched the app: a price alert for item abc, held by iOS.
+jest.mock('expo-notifications', () =>
+  jest.requireActual('@/testing/fakeNotifications').fakeNotificationsModule(),
+);
 const mockMarkRead = jest.fn().mockResolvedValue(undefined);
 jest.mock('@/features/notifications/services/pushApi', () => ({
   markNotificationRead: (...args: unknown[]) => mockMarkRead(...args),
@@ -78,6 +56,7 @@ jest.mock('@/features/auth/services/authApi', () => ({
 
 it('opens the tapped item on top of the tabs when the tap launched the app', async () => {
   useAuthStore.setState({ hydrated: true, accessToken: 't', refreshToken: 't' });
+  deliverTap(priceAlertTap('push-1', 'abc'));
 
   renderRouter(
     {
@@ -91,5 +70,5 @@ it('opens the tapped item on top of the tabs when the tap launched the app', asy
 
   await waitFor(() => expect(screen.getByText('Item')).toBeTruthy());
   expect(router.canGoBack()).toBe(true);
-  expect(mockMarkRead).toHaveBeenCalledWith('n-1', 'push');
+  expect(mockMarkRead).toHaveBeenCalledWith('n-push-1', 'push');
 });

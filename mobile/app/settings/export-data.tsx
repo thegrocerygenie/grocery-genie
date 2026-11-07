@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   useWindowDimensions,
   View,
@@ -13,6 +12,7 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
+import { AppSwitch } from '@/components/AppSwitch';
 import { PremiumUpgradePrompt } from '@/components/PremiumUpgradePrompt';
 import { colors, fontScale, radii, spacing, touchTarget, type } from '@/constants/theme';
 import { useMe } from '@/features/auth/hooks/useAuth';
@@ -349,12 +349,10 @@ function ToggleRow({
   return (
     <View style={styles.row}>
       <Text style={[type.body, styles.rowText]}>{label}</Text>
-      <Switch
+      <AppSwitch
         value={on}
         onValueChange={onChange}
         disabled={disabled}
-        trackColor={{ false: colors.iosFill1, true: colors.green }}
-        ios_backgroundColor={colors.iosFill1}
         accessibilityLabel={label}
       />
     </View>

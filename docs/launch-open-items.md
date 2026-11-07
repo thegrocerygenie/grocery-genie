@@ -81,13 +81,14 @@ Fixed already: H1 and H2 (#20), H4 and M8 (#22, #29), H5, M1 and M2 (#21), and t
 ## 4c. V1.1 Simulator-pass findings (2026-11-06)
 
 From [.planning/DEVICE-CHECK-2026-11-06.md](../.planning/DEVICE-CHECK-2026-11-06.md). None blocks a release.
-- [ ] **F1:** the paywall shows a "Premium" navigation header above its own close button, and the design has none. Set `headerShown: false` on the `paywall` route in `app/_layout.tsx`.
-- [ ] **F2:** Settings → Categories says "Custom categories require Premium." to a Premium user.
-- [ ] **F3:** at AX5 on the SE, the Price alerts list cuts the item name to "Wh ole…".
-- [ ] **F4:** at AX5, Stores, Categories and the paywall title break words mid-word.
-- [ ] **F5:** at AX5, the paywall's "Manage Subscription" label is clipped.
-- [ ] **F6:** at AX5, Budget settings' Cancel and Save collapse and its limit value is clipped, and Settings' Done overlaps its title.
-- [ ] **F7:** the Alerts switches use system green, the design shows brand green. Needs a design decision.
+- [x] **F1:** the paywall shows a "Premium" navigation header above its own close button, and the design has none. Set `headerShown: false` on the `paywall` route in `app/_layout.tsx`. Fixed in code by DA-12 (PR to come): the route hides the header, and the screen no longer changes header visibility itself (the Metro remount warning).
+- [x] **F2:** Settings → Categories says "Custom categories require Premium." to a Premium user. Fixed in code by DA-12 (PR to come): only a free user sees it.
+- [x] **F3:** at AX5 on the SE, the Price alerts list cuts the item name to "Wh ole…". Fixed in code by DA-12 (PR to come): at accessibility sizes the percent goes under the whole name, as on Items (BUG-3); the Simulator recheck is still due.
+- [x] **F4:** at AX5, Stores, Categories and the paywall title break words mid-word. Fixed in code by DA-12 (PR to come): Stores put Merge under the name, Categories put the icon above the name, and the paywall title grows only as far as UIKit grows Title 1 (58 pt); the Simulator recheck is still due.
+- [x] **F5:** at AX5, the paywall's "Manage Subscription" label is clipped. Fixed in code by DA-12 (PR to come): the label wraps, centred, and grows only as far as UIKit grows Headline (53 pt); the Simulator recheck is still due.
+- [x] **F6:** at AX5, Budget settings' Cancel and Save collapse and its limit value is clipped, and Settings' Done overlaps its title. Fixed in code by DA-12 (PR to come): the header buttons are capped as native bar buttons are, and each Budget settings value goes under its label at accessibility sizes; the Simulator recheck is still due.
+- [x] **F7:** the Alerts switches use system green, the design shows brand green. Decided 2026-11-07: brand green everywhere. Fixed in code by DA-12 (PR to come): every switch is the shared `AppSwitch` (brand tint, 5.4:1 on a light card, 9:1 on a dark one, darker or brighter with Increase Contrast); the Simulator recheck in light, dark and Increase Contrast is still due.
+- [x] **F8:** a failed unmute takes about 6 s to say so, and Unmute can be tapped again meanwhile. Fixed in code by DA-12 (PR to come): while an unmute saves, Settings' Unmute is disabled with a spinner and the Alerts screen's switches are disabled, so a second tap sends nothing; the error shows as before. The Simulator recheck with the backend stopped is still due.
 
 ## 4b. MVP design alignment, round 2
 

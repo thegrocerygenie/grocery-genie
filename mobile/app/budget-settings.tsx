@@ -5,16 +5,17 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   type ColorValue,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
-import { colors, radii, spacing, type } from '@/constants/theme';
+import { AppSwitch } from '@/components/AppSwitch';
+import { colors, fontScale, radii, spacing, type } from '@/constants/theme';
 import { DEFAULT_CATEGORIES, categoryMeta } from '@/constants/categories';
 import { PremiumUpgradePrompt } from '@/components/PremiumUpgradePrompt';
 import { ROLLOVER_STRINGS } from '@/features/budget/content/rollover';
@@ -235,7 +236,9 @@ export default function BudgetSettingsScreen() {
               accessibilityRole="button"
               accessibilityLabel="Cancel"
             >
-              <Text style={styles.headerBtn}>Cancel</Text>
+              <Text style={styles.headerBtn} maxFontSizeMultiplier={fontScale.headerButtonMax}>
+                Cancel
+              </Text>
             </Pressable>
           ),
           headerRight: () => (
@@ -247,7 +250,10 @@ export default function BudgetSettingsScreen() {
               accessibilityLabel="Save"
               accessibilityState={{ disabled: isSaving }}
             >
-              <Text style={[styles.headerBtn, { fontWeight: '600' }, isSaving && { opacity: 0.4 }]}>
+              <Text
+                style={[styles.headerBtn, { fontWeight: '600' }, isSaving && { opacity: 0.4 }]}
+                maxFontSizeMultiplier={fontScale.headerButtonMax}
+              >
                 Save
               </Text>
             </Pressable>
@@ -356,6 +362,14 @@ function Section({ header, footer, children }: SectionProps) {
   );
 }
 
+/**
+ * At accessibility sizes a label and its value do not fit side by side, and
+ * the value was clipped ("Monthly limit", F6): the value goes under the label.
+ */
+function useStackedRows(): boolean {
+  return useWindowDimensions().fontScale >= fontScale.accessibility;
+}
+
 interface RowAmountInputProps {
   label: string;
   value: string;
@@ -367,15 +381,21 @@ interface RowAmountInputProps {
 function RowAmountInput({ label, value, onChangeText, placeholder }: RowAmountInputProps) {
   const [editing, setEditing] = useState(false);
   const currency = useBudgetCurrency();
+  const stacked = useStackedRows();
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, stacked && styles.rowStacked]} testID={`budget-row-${label}`}>
       <Text style={type.body}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         {editing && value ? (
           <Text style={[type.body, { color: colors.iosLabel }]}>{currencySymbol(currency)}</Text>
         ) : null}
         <TextInput
-          style={[type.body, styles.input, { color: colors.iosLabel }]}
+          style={[
+            type.body,
+            styles.input,
+            stacked && styles.inputStacked,
+            { color: colors.iosLabel },
+          ]}
           value={editing ? value : formatLimit(value, currency)}
           onFocus={() => setEditing(true)}
           onBlur={() => setEditing(false)}
@@ -401,11 +421,17 @@ interface RowNumericInputProps {
 // Shows "1st", not "1 1st": the raw number only while it is edited.
 function RowNumericInput({ label, value, onChangeText, format }: RowNumericInputProps) {
   const [editing, setEditing] = useState(false);
+  const stacked = useStackedRows();
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, stacked && styles.rowStacked]} testID={`budget-row-${label}`}>
       <Text style={type.body}>{label}</Text>
       <TextInput
-        style={[type.body, styles.input, { color: colors.iosLabel, minWidth: 30 }]}
+        style={[
+          type.body,
+          styles.input,
+          stacked && styles.inputStacked,
+          { color: colors.iosLabel, minWidth: 30 },
+        ]}
         value={editing ? value : format(value)}
         onFocus={() => setEditing(true)}
         onBlur={() => setEditing(false)}
@@ -429,11 +455,9 @@ function RowSwitch({ label, accessibilityLabel, value, onValueChange }: RowSwitc
   return (
     <View style={styles.row}>
       <Text style={[type.body, styles.rowLabel]}>{label}</Text>
-      <Switch
+      <AppSwitch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: colors.iosFill1, true: colors.green }}
-        ios_backgroundColor={colors.iosFill1}
         accessibilityLabel={accessibilityLabel}
       />
     </View>
@@ -450,22 +474,33 @@ interface RowCategoryInputProps {
 function RowCategoryInput({ cat, value, onChangeText, showDivider }: RowCategoryInputProps) {
   const [editing, setEditing] = useState(false);
   const currency = useBudgetCurrency();
+  const stacked = useStackedRows();
   return (
-    <View style={[styles.row, showDivider && styles.rowDivider]}>
-      <View style={[styles.catCircle, { backgroundColor: cat.color }]}>
-        <SymbolView
-          name={cat.symbol as Parameters<typeof SymbolView>[0]['name']}
-          size={13}
-          tintColor="#fff"
-        />
+    <View
+      style={[styles.row, stacked && styles.rowStacked, showDivider && styles.rowDivider]}
+      testID={`budget-row-${cat.name}`}
+    >
+      <View style={styles.catLabel}>
+        <View style={[styles.catCircle, { backgroundColor: cat.color }]}>
+          <SymbolView
+            name={cat.symbol as Parameters<typeof SymbolView>[0]['name']}
+            size={13}
+            tintColor="#fff"
+          />
+        </View>
+        <Text style={[type.body, { flex: 1 }]}>{cat.name}</Text>
       </View>
-      <Text style={[type.body, { flex: 1 }]}>{cat.name}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         {editing && value ? (
           <Text style={[type.body, { color: colors.iosLabel2 }]}>{currencySymbol(currency)}</Text>
         ) : null}
         <TextInput
-          style={[type.body, styles.input, { color: colors.iosLabel2, minWidth: 60 }]}
+          style={[
+            type.body,
+            styles.input,
+            stacked && styles.inputStacked,
+            { color: colors.iosLabel2, minWidth: 60 },
+          ]}
           value={editing ? value : formatCategoryLimit(value, currency)}
           onFocus={() => setEditing(true)}
           onBlur={() => setEditing(false)}
@@ -513,7 +548,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 11,
   },
+  rowStacked: { flexDirection: 'column', alignItems: 'stretch', gap: spacing.xs },
   rowLabel: { flex: 1 },
+  catLabel: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1, flexGrow: 1 },
   rowDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.iosSeparator,
@@ -529,6 +566,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     minWidth: 80,
   },
+  inputStacked: { textAlign: 'left', flex: 1 },
 
   catCircle: {
     width: 26,
