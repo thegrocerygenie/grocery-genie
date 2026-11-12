@@ -120,10 +120,12 @@ One-time setup, in the Cloudflare dashboard (Workers & Pages → Create → Page
 1. Pick this repo. Set **Root directory** to `marketing`, **Build command** to `npm run build`, and **Build output directory** to `dist`. Production branch: `main`.
 2. Under **Settings → Variables and Secrets**, add for Production (and Preview, if you want the form to work on preview URLs):
    - Secrets: `RESEND_API_KEY`, `RESEND_AUDIENCE_ID`.
-   - Variables: `ALLOWED_ORIGIN=https://grocerygenie.app`, `NODE_VERSION=20` or later, and `WAITLIST_FROM` if you send the welcome email.
+   - Variables: `ALLOWED_ORIGIN=https://grocerygenie.app`, and `WAITLIST_FROM` if you send the welcome email.
    - Build variables: `PUBLIC_LAUNCH_STATE` and `PUBLIC_APP_STORE_ID` (they're baked in at build time, so change them and redeploy).
 3. **Custom domains:** add `grocerygenie.app` (and `www.grocerygenie.app`, redirected to the apex). If the domain's DNS is already on Cloudflare, it adds the records itself.
 4. **Security → WAF → Rate limiting rules** on the zone: limit `POST /api/waitlist` per IP (for example 10 requests per minute, then block). The in-memory limiter in `api/_handler.js` counts per running copy of the function, so it doesn't hold up on its own.
+
+The build uses the Node version in `.node-version` (24). Astro needs 22.23.4 or later, so don't set `NODE_VERSION` lower than that.
 
 After that, every push to `main` deploys, and every other branch gets a preview URL.
 
@@ -144,7 +146,7 @@ npm run build && npx wrangler pages dev
 
 - **Netlify (fallback):** `netlify deploy --prod`. `netlify.toml` builds to `dist/` and routes `/api/waitlist` to the function; headers come from `public/_headers`.
 - **Vercel:** `vercel --prod`. `vercel.json` sets the build, headers and caching, and `api/waitlist.js` serves `/api/waitlist`. Vercel's free Hobby plan is non-commercial only, so this needs Pro.
-- **Self-hosted (Node 20+):** `npm run build && RESEND_API_KEY=… RESEND_AUDIENCE_ID=… node server.js`.
+- **Self-hosted (Node 22.23.4+):** `npm run build && RESEND_API_KEY=… RESEND_AUDIENCE_ID=… node server.js`.
 
 If you change a header, change `public/_headers` and `vercel.json` together.
 
