@@ -224,6 +224,7 @@ These do not need a phone. Run them on a Simulator, not in the device session.
 - [ ] **iPhone 18 Pro Max pass.** Its Simulator held a stale build, so the 2026-11-06 pass covered only the SE. Rebuild or reload it, sign in, and repeat the §8 layouts in light, dark and AX5.
 - [ ] **"Not enough prices in this range"** on item detail, "Add another split" (3 items), a one-purchase item offering no Split, Cancel on "Same item?", renaming a category, and the Price alerts "No price alerts yet" state. The 2026-11-06 data did not reach them.
 - [ ] **The Budget bell.** Open Price alerts from the bell on the Budget dashboard, not by link: the design shows the tab bar, and a link-opened screen shows none.
+- [ ] **Offline cold-start push tap (DA-14).** Signed in and onboarded, open the app once online, then quit it, turn on airplane mode (Simulator: Network Link Conditioner "100% Loss", or the Mac offline) and tap a price-alert push: the item opens within about a second, not after ~7 s, with Back to Budget. Repeat for a user who has not finished onboarding (quit on the budget step): offline, the item opens only after ~7 s; back online, the app moves to onboarding, and after Finish the item opens once more (not Budget).
 - [ ] **Settings → Alerts footer.** The checklist asks that the line under the threshold name the size of change that alerts. At 25% the footer read "Compared with your 30-day average…" with no percent; only the Price alerts list footer names it. Decide whether that is enough.
 
 ## After the session

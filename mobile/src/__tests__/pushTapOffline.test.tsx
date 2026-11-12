@@ -6,6 +6,10 @@
  * in. These tests pin that path: the tap is not lost, it opens once, it does
  * not open over onboarding when a retry gets through, and signing out while
  * the request is still retrying drops it.
+ *
+ * These launches have no onboarding state remembered on the device (DA-14),
+ * so the tap still waits for the profile. pushTapOnboardingCache.test.tsx
+ * covers the remembered state.
  */
 import React from 'react';
 import { Pressable, Text } from 'react-native';
@@ -15,6 +19,7 @@ import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-librar
 
 import RootLayout from '../../app/_layout';
 import type { UserProfile } from '@/features/auth/types';
+import { usePendingTapStore } from '@/features/notifications/pendingTap';
 import { useAuthStore } from '@/store/authStore';
 import { deliverTap, priceAlertTap, resetNative } from '@/testing/fakeNotifications';
 
@@ -150,7 +155,14 @@ describe('A launch tap while offline (BUG-6 review, DA-13)', () => {
     expect(await screen.findByText('Item item-off')).toBeTruthy();
     expect(itemPushes('item-off')).toBe(1);
     expect(router.canGoBack()).toBe(true);
+    // Opened means handed over: nothing is still held to open again.
+    expect(usePendingTapStore.getState().pending).toBeNull();
 
+    // Back online, the profile confirms onboarding is done: no second push.
+    mockFetchMe.mockImplementation(async () => profile(false));
+    await act(async () => {
+      await client?.refetchQueries({ queryKey: ['auth', 'me'] });
+    });
     await advance(10_000);
     expect(itemPushes('item-off')).toBe(1);
   });

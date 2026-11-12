@@ -11,6 +11,7 @@ import { APP_FONTS } from '@/constants/fonts';
 import { colors, navigationTheme } from '@/constants/theme';
 import { useMe } from '@/features/auth/hooks/useAuth';
 import { usePushNotifications } from '@/features/notifications/hooks/usePushNotifications';
+import { settleOnboarding } from '@/features/notifications/pendingTap';
 import { useSyncQueue } from '@/hooks/useSyncQueue';
 import { RouteTracker } from '@/components/RouteTracker';
 import { useAuthStore } from '@/store/authStore';
@@ -37,15 +38,26 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
   const accessToken = useAuthStore((s) => s.accessToken);
   const hydrated = useAuthStore((s) => s.hydrated);
   const hydrate = useAuthStore((s) => s.hydrate);
+  const rememberOnboarding = useAuthStore((s) => s.rememberOnboarding);
   const segments = useSegments();
   const inOnboarding = segments[0] === 'onboarding';
   const me = useMe(!!accessToken);
+  const needsOnboarding = me.data?.needs_onboarding;
 
   useEffect(() => {
     if (!hydrated) {
       void hydrate();
     }
   }, [hydrated, hydrate]);
+
+  // Keep each profile's answer on the device for the next cold start, and
+  // settle a push tap opened before it (DA-14). Here, not in the push hook:
+  // the gate stays mounted while its redirect to onboarding replaces the app.
+  useEffect(() => {
+    if (needsOnboarding === undefined) return;
+    void rememberOnboarding(needsOnboarding);
+    settleOnboarding(needsOnboarding);
+  }, [needsOnboarding, rememberOnboarding]);
 
   if (!hydrated) {
     return <View style={{ flex: 1, backgroundColor: colors.iosBg }} />;

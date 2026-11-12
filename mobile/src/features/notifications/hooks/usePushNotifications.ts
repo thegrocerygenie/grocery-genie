@@ -4,7 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { type Href, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 
 import { useMe } from '@/features/auth/hooks/useAuth';
-import { useAuthStore } from '@/store/authStore';
+import { cachedNeedsOnboarding, useAuthStore } from '@/store/authStore';
 import { usePushStore } from '@/store/pushStore';
 import { parseNotificationTap } from '../notificationTap';
 import { captureTaps, takeTap, usePendingTapStore } from '../pendingTap';
@@ -67,6 +67,13 @@ function useNavigationReady(): boolean {
  * the profile says onboarding is done and the user is off the onboarding
  * screens. Opened earlier, the gate's needs_onboarding redirect would cover
  * it, and the user lands in onboarding with the tap spent.
+ *
+ * Before the profile loads, the onboarding state the device remembers for
+ * this account answers instead (DA-14), so an onboarded user's tap opens at
+ * once offline rather than after the ~7 s of profile retries. With nothing
+ * remembered (or onboarding remembered as due), the tap waits for the
+ * profile, and opens if it gives up. A tap
+ * opened on either guess is settled by the next profile (`settleOnboarding`).
  */
 export function usePushNotifications(): void {
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -75,9 +82,12 @@ export function usePushNotifications(): void {
   const navigationReady = useNavigationReady();
   const inOnboarding = useSegments()[0] === 'onboarding';
   const pending = usePendingTapStore((s) => s.pending);
+  const remembered = useAuthStore(cachedNeedsOnboarding);
   const me = useMe(!!accessToken);
-  // Offline, the profile errors after its retries: open the tap then too.
-  const onboarded = me.isSuccess ? !me.data.needs_onboarding : me.isError;
+  // The profile decides. Before it loads, a remembered "done" opens the tap
+  // at once; otherwise the tap waits until the profile request gives up.
+  const confirmed = me.data !== undefined;
+  const onboarded = confirmed ? !me.data.needs_onboarding : remembered === false || me.isError;
 
   useEffect(() => {
     // Pick up a tap iOS stored before this mounted, if the listener missed it.
@@ -93,7 +103,7 @@ export function usePushNotifications(): void {
 
   useEffect(() => {
     if (!pending || !accessToken || !onboarded || !navigationReady || inOnboarding) return;
-    const response = takeTap();
+    const response = takeTap(confirmed);
     if (!response) return;
 
     const { notificationId, route } = parseNotificationTap(
@@ -106,5 +116,5 @@ export function usePushNotifications(): void {
     // the stack gets its initialRouteName (the tabs) under the item, so Back
     // returns to Budget (BUG-6). Into a built stack this is a plain push.
     router.push(route as Href, { withAnchor: true });
-  }, [pending, accessToken, onboarded, navigationReady, inOnboarding, router]);
+  }, [pending, accessToken, onboarded, confirmed, navigationReady, inOnboarding, router]);
 }
