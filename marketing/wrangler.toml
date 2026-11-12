@@ -15,3 +15,16 @@ keep_vars = true
 directory = "./dist"
 binding = "ASSETS"
 run_worker_first = ["/api/*"]
+
+# Workers Logs and traces. Only /api/* runs the Worker, so only waitlist
+# requests are logged; static page requests aren't.
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
+[observability.traces]
+enabled = false
+head_sampling_rate = 1
+persist = true
