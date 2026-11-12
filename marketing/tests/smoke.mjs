@@ -134,6 +134,72 @@ test('accepts v5 slot sources (mid, final) in welcome email tag', async () => {
   }
 });
 
+// --------------- Cloudflare Pages Functions entry ---------------
+
+const cf = await import('../functions/api/waitlist.js');
+
+function cfContext(body, { headers = {}, env = {} } = {}) {
+  const request = new Request('https://grocerygenie.app/api/waitlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
+  return { request, env };
+}
+
+test('cloudflare: POST joins the waitlist with env from the context', async () => {
+  const calls = [];
+  await withFetch(async (url, init) => {
+    calls.push({ url, init });
+    return new Response(JSON.stringify({ id: 'c' }), { status: 201 });
+  }, async () => {
+    const res = await cf.onRequestPost(cfContext(
+      { email: 'CF@B.co', source: 'hero' },
+      {
+        headers: { 'CF-Connecting-IP': '11.0.0.1' },
+        env: { RESEND_API_KEY: 'x', RESEND_AUDIENCE_ID: 'aud-cf', ALLOWED_ORIGIN: 'https://grocerygenie.app' },
+      },
+    ));
+    assert(res.status === 200, `status ${res.status}, want 200`);
+    const body = await res.json();
+    assert(body.ok === true && body.already === false, 'ok body');
+    assert(calls.length === 1 && calls[0].url.endsWith('/audiences/aud-cf/contacts'), 'used the context env');
+    assert(res.headers.get('Access-Control-Allow-Origin') === 'https://grocerygenie.app', 'CORS origin from env');
+    assert(res.headers.get('Cache-Control') === 'no-store', 'no-store');
+    assert(res.headers.get('Content-Type') === 'application/json', 'json content type');
+  });
+});
+
+test('cloudflare: rate limits by CF-Connecting-IP', async () => {
+  await withFetch(async () => new Response(JSON.stringify({ id: 'x' }), { status: 201 }), async () => {
+    const env = { RESEND_API_KEY: 'x', RESEND_AUDIENCE_ID: 'y' };
+    let res;
+    for (let i = 0; i < 8; i++) {
+      res = await cf.onRequestPost(cfContext({ email: `cf${i}@b.co` }, { headers: { 'CF-Connecting-IP': '11.0.0.2' }, env }));
+    }
+    assert(res.status === 429, `status ${res.status}, want 429`);
+  });
+});
+
+test('cloudflare: bad JSON is a 400, not a crash', async () => {
+  const res = await cf.onRequestPost(cfContext('{not json', { env: { RESEND_API_KEY: 'x', RESEND_AUDIENCE_ID: 'y' } }));
+  assert(res.status === 400, `status ${res.status}, want 400`);
+});
+
+test('cloudflare: oversized body is rejected with 413', async () => {
+  const res = await cf.onRequestPost(cfContext({ email: 'a@b.co', pad: 'x'.repeat(5000) }, { env: { RESEND_API_KEY: 'x', RESEND_AUDIENCE_ID: 'y' } }));
+  assert(res.status === 413, `status ${res.status}, want 413`);
+});
+
+test('cloudflare: OPTIONS preflight is 204 with CORS, other methods 405', async () => {
+  const pre = await cf.onRequestOptions({ request: new Request('https://x/api/waitlist', { method: 'OPTIONS' }), env: {} });
+  assert(pre.status === 204, `preflight ${pre.status}`);
+  assert(pre.headers.get('Access-Control-Allow-Origin') === '*', 'default origin *');
+  assert(/POST/.test(pre.headers.get('Access-Control-Allow-Methods')), 'allows POST');
+  const get = await cf.onRequest({ request: new Request('https://x/api/waitlist'), env: {} });
+  assert(get.status === 405 && get.headers.get('Allow') === 'POST', `GET ${get.status}`);
+});
+
 // --------------- run + report ---------------
 
 const out = [];
