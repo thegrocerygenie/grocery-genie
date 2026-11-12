@@ -3,7 +3,7 @@
 # Static files come from dist/ (npm run build) and cost nothing to serve;
 # only /api/* runs worker/index.js.
 # Secrets are set in the dashboard or with `npx wrangler secret put NAME`, never here.
-name = "grocery-genie"
+name = "grocery-genie-marketing"
 main = "worker/index.js"
 compatibility_date = "2026-11-01"
 

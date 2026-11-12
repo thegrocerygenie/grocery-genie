@@ -109,7 +109,7 @@ The waitlist POST body also includes `headline`, `path`, `referrer` and UTM tags
 
 ## Deploy
 
-Production runs on **Cloudflare Workers with static assets** (decision #21 in `docs/marketing/decisions.md`). The Worker is named `grocery-genie`.
+Production runs on **Cloudflare Workers with static assets** (decision #21 in `docs/marketing/decisions.md`). The Worker is named `grocery-genie-marketing`.
 
 ### Cloudflare Workers (production)
 
@@ -117,7 +117,7 @@ Production runs on **Cloudflare Workers with static assets** (decision #21 in `d
 
 One-time setup, in the Cloudflare dashboard (Workers & Pages → Create application → Import a repository):
 
-1. Pick this repo. **Project name** must match `name` in `wrangler.toml` (`grocery-genie`). **Build command:** `npm run build`. **Deploy command:** `npx wrangler deploy`. **Path** (under Advanced settings): `/marketing/`.
+1. Pick this repo. **Project name** must match `name` in `wrangler.toml` (`grocery-genie-marketing`). **Build command:** `npm run build`. **Deploy command:** `npx wrangler deploy`. **Path** (under Advanced settings): `/marketing/`.
 2. Under the Worker's **Settings**:
    - **Build → Variables and secrets** (used only while `npm run build` runs): `PUBLIC_LAUNCH_STATE` and `PUBLIC_APP_STORE_ID`. They're baked into the page, so change them and redeploy.
    - **Variables and Secrets** (used by the Worker at runtime): secrets `RESEND_API_KEY` and `RESEND_AUDIENCE_ID`; plain-text variables `ALLOWED_ORIGIN=https://grocerygenie.app`, and `WAITLIST_FROM` if you send the welcome email. `keep_vars = true` in `wrangler.toml` stops each deploy from deleting the plain-text variables.
