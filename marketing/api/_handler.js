@@ -3,7 +3,8 @@
 // Outputs: { status, body }   — body is a plain object, callers JSON.stringify it.
 //
 // Wired up by:
-//   /api/waitlist.js              (Vercel / Cloudflare Pages Functions)
+//   /api/waitlist.js              (Vercel)
+//   /functions/api/waitlist.js    (Cloudflare Pages)
 //   /netlify/functions/waitlist.js (Netlify)
 //   /server.js                    (self-hosted Node)
 //

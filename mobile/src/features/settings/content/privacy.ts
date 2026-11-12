@@ -23,7 +23,7 @@ export const PRIVACY_POLICY: {
 } = {
   reviewed: false,
   effective: 'October 27, 2026',
-  updated: 'November 4, 2026',
+  updated: 'November 11, 2026',
   sections: [
     {
       heading: 'Who we are',
@@ -52,6 +52,7 @@ export const PRIVACY_POLICY: {
       paragraphs: [
         'These companies process data for us, only to provide the service, under terms that require them to protect it at least as well as this policy does:',
         'Hetzner runs our servers, and Supabase hosts our database.',
+        'Cloudflare hosts our website and its waitlist form: if you join the waitlist, your email address and IP address pass through Cloudflare on their way to Resend.',
         'Anthropic (Claude) reads receipt photos and item names to extract the details and suggest categories. We send them only after you allow it: the app asks before your first scan or import. You can turn this off at any time in Settings → Read receipts with AI; scans and imports then stop, and you can still enter receipts manually. Under its commercial terms, Anthropic does not use this data to train its models.',
         'Expo and Apple deliver push notifications: your device’s notification token and the alert text, which can include spending amounts.',
         'Resend sends account emails, such as verification, password reset and email change, and keeps our waitlist.',

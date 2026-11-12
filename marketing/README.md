@@ -5,7 +5,7 @@ The landing page for Grocery Genie, built from the Claude Design handoff **"Groc
 - **Astro** with static output. Every section is plain HTML/CSS at build time.
 - **React** for the phone mockups. They render to static HTML; only the hero animation (`HeroMoment`) hydrates on the client.
 - A small client script (`src/scripts/site.ts`) handles the waitlist form, analytics events, "What's next" votes and the sticky-nav rule.
-- The **Resend-backed waitlist API** in `api/` is unchanged in shape and runs on Vercel, Netlify or the bundled Node server.
+- The **Resend-backed waitlist API** in `api/` is unchanged in shape and runs on Cloudflare Pages (production), Netlify, Vercel or the bundled Node server.
 
 ## What's here
 
@@ -23,8 +23,10 @@ marketing/
 │       ├── tokens-v2.css          # app design tokens (Apple-lens v2)
 │       └── site.css               # page styles, ported 1:1 from the v5 design
 ├── public/                        # favicon, app icons, OG card, manifest, robots, sitemap, badges/
-├── api/                           # waitlist handler (+ Vercel / Cloudflare entry)
+├── api/                           # waitlist handler (+ Vercel entry)
+├── functions/api/waitlist.js      # Cloudflare Pages entry for the waitlist handler
 ├── netlify/functions/             # Netlify entry for the waitlist handler
+├── wrangler.toml                  # Cloudflare Pages project config
 ├── server.js                      # Node server: serves dist/ and /api/waitlist
 ├── scripts/render-icons.mjs       # renders PNG icons + OG card from their SVGs
 └── tests/
@@ -107,9 +109,44 @@ The waitlist POST body also includes `headline`, `path`, `referrer` and UTM tags
 
 ## Deploy
 
-- **Vercel:** `vercel --prod`. `vercel.json` sets the Astro build (`dist/`), security headers and caching. `api/waitlist.js` is served at `/api/waitlist`.
-- **Netlify:** `netlify deploy --prod`. `netlify.toml` builds to `dist/` and routes `/api/waitlist` to the function.
+Production runs on **Cloudflare Pages** (decision #21 in `docs/marketing/decisions.md`).
+
+### Cloudflare Pages (production)
+
+`functions/api/waitlist.js` serves `/api/waitlist`, and `public/_headers` sets the security and caching headers. Both ship with the build, so no routing rules are needed.
+
+One-time setup, in the Cloudflare dashboard (Workers & Pages → Create → Pages → Connect to Git):
+
+1. Pick this repo. Set **Root directory** to `marketing`, **Build command** to `npm run build`, and **Build output directory** to `dist`. Production branch: `main`.
+2. Under **Settings → Variables and Secrets**, add for Production (and Preview, if you want the form to work on preview URLs):
+   - Secrets: `RESEND_API_KEY`, `RESEND_AUDIENCE_ID`.
+   - Variables: `ALLOWED_ORIGIN=https://grocerygenie.app`, `NODE_VERSION=20` or later, and `WAITLIST_FROM` if you send the welcome email.
+   - Build variables: `PUBLIC_LAUNCH_STATE` and `PUBLIC_APP_STORE_ID` (they're baked in at build time, so change them and redeploy).
+3. **Custom domains:** add `grocerygenie.app` (and `www.grocerygenie.app`, redirected to the apex). If the domain's DNS is already on Cloudflare, it adds the records itself.
+4. **Security → WAF → Rate limiting rules** on the zone: limit `POST /api/waitlist` per IP (for example 10 requests per minute, then block). The in-memory limiter in `api/_handler.js` counts per running copy of the function, so it doesn't hold up on its own.
+
+After that, every push to `main` deploys, and every other branch gets a preview URL.
+
+From the CLI instead of Git:
+
+```bash
+npm run build && npx wrangler pages deploy
+npx wrangler pages secret put RESEND_API_KEY
+```
+
+Run the Cloudflare runtime locally (page + `/api/waitlist`). Wrangler reads secrets from `.dev.vars`, or from `.env` when there is no `.dev.vars`. With the real Resend keys in `.env`, a test sign-up joins the real waitlist and can send the welcome email, so point it at a test audience first:
+
+```bash
+npm run build && npx wrangler pages dev
+```
+
+### Other hosts
+
+- **Netlify (fallback):** `netlify deploy --prod`. `netlify.toml` builds to `dist/` and routes `/api/waitlist` to the function; headers come from `public/_headers`.
+- **Vercel:** `vercel --prod`. `vercel.json` sets the build, headers and caching, and `api/waitlist.js` serves `/api/waitlist`. Vercel's free Hobby plan is non-commercial only, so this needs Pro.
 - **Self-hosted (Node 20+):** `npm run build && RESEND_API_KEY=… RESEND_AUDIENCE_ID=… node server.js`.
+
+If you change a header, change `public/_headers` and `vercel.json` together.
 
 ## Tests
 

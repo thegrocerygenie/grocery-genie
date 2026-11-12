@@ -156,7 +156,7 @@ Still open:
   - the thresholds (`config.py:93-99`);
   - the comparison minimum (`price_service.py:31`);
   - the paywall copy (`mobile/src/features/premium/content/premium.ts:13,37,46`).
-- **Privacy wording:** `privacy.ts` (`reviewed: false`, updated November 4, 2026). The Anthropic terms stand as checked on 2026-11-03 (decision #8).
+- **Privacy wording:** `privacy.ts` (`reviewed: false`, updated November 11, 2026). The Anthropic terms stand as checked on 2026-11-03 (decision #8).
 - **Device checks still open:**
   - real APNs push (budget and price alerts, weekly summary);
   - document scanner;

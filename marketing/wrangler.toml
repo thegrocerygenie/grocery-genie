@@ -1,0 +1,6 @@
+# Cloudflare Pages project. Static files come from dist/ (npm run build);
+# functions/api/waitlist.js serves /api/waitlist. Secrets are set in the
+# dashboard or with `npx wrangler pages secret put NAME`, never here.
+name = "grocery-genie-marketing"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-11-01"

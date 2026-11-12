@@ -39,7 +39,7 @@ Not launch-ready. Three items will likely get the app rejected by App Store revi
 
 Two more items are close to blockers:
 
-- The sign-up screen's "Terms" and "Privacy Policy" are styled text with no press handler (`mobile/app/onboarding/sign-up.tsx:202-205`). No Terms document exists. 5.1.1(i) also needs a public policy URL for App Store Connect. The marketing site (`marketing/`, Vercel) can host it.
+- The sign-up screen's "Terms" and "Privacy Policy" are styled text with no press handler (`mobile/app/onboarding/sign-up.tsx:202-205`). No Terms document exists. 5.1.1(i) also needs a public policy URL for App Store Connect. The marketing site (`marketing/`, on Cloudflare Pages since 2026-11-11) can host it.
 - The in-app policy still shows "Draft · pending legal review" (`reviewed: false`).
 
 ## Claim check
