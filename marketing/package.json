@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Grocery Genie marketing site — Astro (static output) with React islands and a Resend-backed waitlist API.",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.23.4"
   },
   "scripts": {
     "dev": "astro dev",
