@@ -5,7 +5,7 @@ The landing page for Grocery Genie, built from the Claude Design handoff **"Groc
 - **Astro** with static output. Every section is plain HTML/CSS at build time.
 - **React** for the phone mockups. They render to static HTML; only the hero animation (`HeroMoment`) hydrates on the client.
 - A small client script (`src/scripts/site.ts`) handles the waitlist form, analytics events, "What's next" votes and the sticky-nav rule.
-- The **Resend-backed waitlist API** in `api/` is unchanged in shape and runs on Cloudflare Pages (production), Netlify, Vercel or the bundled Node server.
+- The **Resend-backed waitlist API** in `api/` is unchanged in shape and runs on Cloudflare Workers (production), Netlify, Vercel or the bundled Node server.
 
 ## What's here
 
@@ -24,9 +24,9 @@ marketing/
 │       └── site.css               # page styles, ported 1:1 from the v5 design
 ├── public/                        # favicon, app icons, OG card, manifest, robots, sitemap, badges/
 ├── api/                           # waitlist handler (+ Vercel entry)
-├── functions/api/waitlist.js      # Cloudflare Pages entry for the waitlist handler
+├── worker/index.js                # Cloudflare Worker: /api/waitlist, then static assets
 ├── netlify/functions/             # Netlify entry for the waitlist handler
-├── wrangler.toml                  # Cloudflare Pages project config
+├── wrangler.toml                  # Cloudflare Worker config (name, assets, routing)
 ├── server.js                      # Node server: serves dist/ and /api/waitlist
 ├── scripts/render-icons.mjs       # renders PNG icons + OG card from their SVGs
 └── tests/
@@ -109,42 +109,43 @@ The waitlist POST body also includes `headline`, `path`, `referrer` and UTM tags
 
 ## Deploy
 
-Production runs on **Cloudflare Pages** (decision #21 in `docs/marketing/decisions.md`).
+Production runs on **Cloudflare Workers with static assets** (decision #21 in `docs/marketing/decisions.md`). The Worker is named `grocery-genie-marketing`.
 
-### Cloudflare Pages (production)
+### Cloudflare Workers (production)
 
-`functions/api/waitlist.js` serves `/api/waitlist`, and `public/_headers` sets the security and caching headers. Both ship with the build, so no routing rules are needed.
+`wrangler.toml` serves `dist/` as static assets and sends only `/api/*` to `worker/index.js`, which handles `/api/waitlist`. Static requests never run the script, so they cost nothing. `public/_headers` sets the security and caching headers on static files; the Worker sets its own headers on API responses.
 
-One-time setup, in the Cloudflare dashboard (Workers & Pages → Create → Pages → Connect to Git):
+One-time setup, in the Cloudflare dashboard (Workers & Pages → Create application → Import a repository):
 
-1. Pick this repo. Set **Root directory** to `marketing`, **Build command** to `npm run build`, and **Build output directory** to `dist`. Production branch: `main`.
-2. Under **Settings → Variables and Secrets**, add for Production (and Preview, if you want the form to work on preview URLs):
-   - Secrets: `RESEND_API_KEY`, `RESEND_AUDIENCE_ID`.
-   - Variables: `ALLOWED_ORIGIN=https://grocerygenie.app`, `NODE_VERSION=20` or later, and `WAITLIST_FROM` if you send the welcome email.
-   - Build variables: `PUBLIC_LAUNCH_STATE` and `PUBLIC_APP_STORE_ID` (they're baked in at build time, so change them and redeploy).
-3. **Custom domains:** add `grocerygenie.app` (and `www.grocerygenie.app`, redirected to the apex). If the domain's DNS is already on Cloudflare, it adds the records itself.
-4. **Security → WAF → Rate limiting rules** on the zone: limit `POST /api/waitlist` per IP (for example 10 requests per minute, then block). The in-memory limiter in `api/_handler.js` counts per running copy of the function, so it doesn't hold up on its own.
+1. Pick this repo. **Project name** must match `name` in `wrangler.toml` (`grocery-genie-marketing`). **Build command:** `npm run build`. **Deploy command:** `npx wrangler deploy`. **Path** (under Advanced settings): `/marketing/`.
+2. Under the Worker's **Settings**:
+   - **Build → Variables and secrets** (used only while `npm run build` runs): `PUBLIC_LAUNCH_STATE` and `PUBLIC_APP_STORE_ID`. They're baked into the page, so change them and redeploy.
+   - **Variables and Secrets** (used by the Worker at runtime): secrets `RESEND_API_KEY` and `RESEND_AUDIENCE_ID`; plain-text variables `ALLOWED_ORIGIN=https://grocerygenie.app`, and `WAITLIST_FROM` if you send the welcome email. `keep_vars = true` in `wrangler.toml` stops each deploy from deleting the plain-text variables.
+3. **Domains & Routes:** add `grocerygenie.app` as a custom domain (and `www.grocerygenie.app`, redirected to the apex). The domain's DNS must be on Cloudflare.
+4. **Security → WAF → Rate limiting rules** on the zone: limit `POST /api/waitlist` per IP (for example 10 requests per minute, then block). The in-memory limiter in `api/_handler.js` counts per running copy of the Worker, so it doesn't hold up on its own.
 
-After that, every push to `main` deploys, and every other branch gets a preview URL.
+The build uses the Node version in `.node-version` (24). Astro needs 22.23.4 or later, so don't set `NODE_VERSION` lower than that.
+
+After that, every push to `main` builds and deploys. With preview builds on, other branches get a preview URL.
 
 From the CLI instead of Git:
 
 ```bash
-npm run build && npx wrangler pages deploy
-npx wrangler pages secret put RESEND_API_KEY
+npm run build && npx wrangler deploy
+npx wrangler secret put RESEND_API_KEY
 ```
 
-Run the Cloudflare runtime locally (page + `/api/waitlist`). Wrangler reads secrets from `.dev.vars`, or from `.env` when there is no `.dev.vars`. With the real Resend keys in `.env`, a test sign-up joins the real waitlist and can send the welcome email, so point it at a test audience first:
+Run the Worker locally (page + `/api/waitlist`). Wrangler reads secrets from `.dev.vars`, or from `.env` when there is no `.dev.vars`. With the real Resend keys in `.env`, a test sign-up joins the real waitlist and can send the welcome email, so put test values in `.dev.vars` first:
 
 ```bash
-npm run build && npx wrangler pages dev
+npm run build && npx wrangler dev
 ```
 
 ### Other hosts
 
 - **Netlify (fallback):** `netlify deploy --prod`. `netlify.toml` builds to `dist/` and routes `/api/waitlist` to the function; headers come from `public/_headers`.
 - **Vercel:** `vercel --prod`. `vercel.json` sets the build, headers and caching, and `api/waitlist.js` serves `/api/waitlist`. Vercel's free Hobby plan is non-commercial only, so this needs Pro.
-- **Self-hosted (Node 20+):** `npm run build && RESEND_API_KEY=… RESEND_AUDIENCE_ID=… node server.js`.
+- **Self-hosted (Node 22.23.4+):** `npm run build && RESEND_API_KEY=… RESEND_AUDIENCE_ID=… node server.js`.
 
 If you change a header, change `public/_headers` and `vercel.json` together.
 

@@ -1,4 +1,4 @@
-// Vercel handler (Node req/res). Cloudflare Pages uses functions/api/waitlist.js.
+// Vercel handler (Node req/res). Cloudflare uses worker/index.js.
 // Expects POST application/json: { email, source }
 // Returns 200 { ok: true, already: boolean } | 4xx { error } | 5xx { error }
 

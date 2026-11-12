@@ -1,6 +1,17 @@
-# Cloudflare Pages project. Static files come from dist/ (npm run build);
-# functions/api/waitlist.js serves /api/waitlist. Secrets are set in the
-# dashboard or with `npx wrangler pages secret put NAME`, never here.
+# Cloudflare Worker for the marketing site (Workers with static assets).
+# `name` must match the Worker's name in the dashboard, or Workers Builds fails.
+# Static files come from dist/ (npm run build) and cost nothing to serve;
+# only /api/* runs worker/index.js.
+# Secrets are set in the dashboard or with `npx wrangler secret put NAME`, never here.
 name = "grocery-genie-marketing"
-pages_build_output_dir = "dist"
+main = "worker/index.js"
 compatibility_date = "2026-11-01"
+
+# Keep the runtime variables set in the dashboard (ALLOWED_ORIGIN, WAITLIST_FROM)
+# when a deploy runs. Without this, `wrangler deploy` deletes them.
+keep_vars = true
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]

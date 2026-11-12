@@ -1,4 +1,4 @@
-# Response headers for Cloudflare Pages and Netlify (both read this file).
+# Response headers for Cloudflare Workers static assets and Netlify (both read this file).
 # vercel.json holds the same rules for Vercel. Change both together.
 
 /*

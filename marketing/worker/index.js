@@ -1,10 +1,10 @@
-// Cloudflare Pages Functions entry for the waitlist handler: served at /api/waitlist.
-// Pages routes by file path, so this file needs no redirect rule.
-// Env vars (RESEND_API_KEY, RESEND_AUDIENCE_ID, ALLOWED_ORIGIN, ...) come from
-// context.env, set in the Pages project settings. There is no process.env here.
-// Pages calls onRequestPost / onRequestOptions for those methods and onRequest for the rest.
+// Cloudflare Worker for the marketing site.
+// wrangler.toml serves dist/ as static assets and sends only /api/* here
+// (run_worker_first), so page and asset requests never run this script.
+// Env vars (RESEND_API_KEY, RESEND_AUDIENCE_ID, ALLOWED_ORIGIN, ...) are the
+// Worker's runtime variables and secrets. There is no process.env here.
 
-import { handleWaitlistJoin } from '../../api/_handler.js';
+import { handleWaitlistJoin } from '../api/_handler.js';
 
 const MAX_BODY_BYTES = 4096;
 
@@ -26,11 +26,14 @@ function json(status, body, env, extra = {}) {
   });
 }
 
-export async function onRequestOptions({ env }) {
-  return new Response(null, { status: 204, headers: corsHeaders(env) });
-}
+async function waitlist(request, env) {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders(env) });
+  }
+  if (request.method !== 'POST') {
+    return json(405, { error: 'Method not allowed' }, env, { Allow: 'POST' });
+  }
 
-export async function onRequestPost({ request, env }) {
   const raw = await request.text();
   if (raw.length > MAX_BODY_BYTES) {
     return json(413, { error: 'Request too large.' }, env);
@@ -56,6 +59,12 @@ export async function onRequestPost({ request, env }) {
   return json(result.status, result.body, env);
 }
 
-export async function onRequest({ env }) {
-  return json(405, { error: 'Method not allowed' }, env, { Allow: 'POST' });
-}
+export default {
+  async fetch(request, env) {
+    const { pathname } = new URL(request.url);
+    if (pathname === '/api/waitlist') {
+      return waitlist(request, env);
+    }
+    return env.ASSETS.fetch(request);
+  },
+};

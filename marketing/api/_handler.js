@@ -4,7 +4,7 @@
 //
 // Wired up by:
 //   /api/waitlist.js              (Vercel)
-//   /functions/api/waitlist.js    (Cloudflare Pages)
+//   /worker/index.js              (Cloudflare Workers)
 //   /netlify/functions/waitlist.js (Netlify)
 //   /server.js                    (self-hosted Node)
 //
