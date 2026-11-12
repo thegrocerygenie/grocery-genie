@@ -89,7 +89,7 @@ describe('Privacy policy', () => {
     expect(text()).toMatch(/Resend sends account emails[^.]*and keeps our waitlist/);
   });
 
-  // The marketing site runs on Cloudflare Pages: waitlist emails and visitor IP
+  // The marketing site runs on Cloudflare Workers: waitlist emails and visitor IP
   // addresses pass through it on the way to Resend, so the policy names it.
   it('names Cloudflare as the host of the website and the waitlist form', () => {
     expect(text()).toMatch(/Cloudflare hosts our website[^.]*waitlist/);

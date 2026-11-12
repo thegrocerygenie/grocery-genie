@@ -9,5 +9,5 @@
   status = 200
   force = true
 
-# Response headers live in public/_headers, which Netlify and Cloudflare Pages both read.
+# Response headers live in public/_headers, which Netlify and Cloudflare both read.
 # The waitlist function sets Cache-Control: no-store itself.
