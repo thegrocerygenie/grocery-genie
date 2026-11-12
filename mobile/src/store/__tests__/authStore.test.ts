@@ -77,6 +77,8 @@ describe('the last known onboarding state (DA-14)', () => {
     await useAuthStore.getState().clear();
 
     expect(keychain.has(KEY)).toBe(false);
+    expect(useAuthStore.getState().onboarding).toBeNull();
+    expect(cachedNeedsOnboarding(useAuthStore.getState())).toBeNull();
     await relaunch();
     expect(useAuthStore.getState().onboarding).toBeNull();
   });
@@ -118,5 +120,48 @@ describe('the last known onboarding state (DA-14)', () => {
     useAuthStore.setState({ accessToken: 'not-a-jwt' });
     await useAuthStore.getState().rememberOnboarding(false);
     expect(keychain.has(KEY)).toBe(false);
+  });
+
+  it('does not stop sign-in when the keychain fails', async () => {
+    jest
+      .mocked(SecureStore.getItemAsync)
+      .mockImplementation(async (key: string) =>
+        key === KEY
+          ? Promise.reject(new Error('keychain unavailable'))
+          : (keychain.get(key) ?? null),
+      );
+    jest.mocked(SecureStore.setItemAsync).mockImplementation(async (key: string, value: string) => {
+      if (key === KEY) throw new Error('keychain unavailable');
+      keychain.set(key, value);
+    });
+    jest.mocked(SecureStore.deleteItemAsync).mockImplementation(async (key: string) => {
+      if (key === KEY) throw new Error('keychain unavailable');
+      keychain.delete(key);
+    });
+    try {
+      await relaunch();
+      await useAuthStore.getState().setSession({ accessToken: tokenFor('u-a'), refreshToken: 'r' });
+      await expect(useAuthStore.getState().rememberOnboarding(false)).resolves.toBeUndefined();
+      expect(useAuthStore.getState().accessToken).toBe(tokenFor('u-a'));
+      expect(keychain.get('gg.auth.access')).toBe(tokenFor('u-a'));
+
+      // Next launch: nothing could be read back, so the app falls back to waiting.
+      await relaunch();
+      expect(useAuthStore.getState().accessToken).toBe(tokenFor('u-a'));
+      expect(cachedNeedsOnboarding(useAuthStore.getState())).toBeNull();
+      await expect(useAuthStore.getState().clear()).resolves.toBeUndefined();
+    } finally {
+      jest
+        .mocked(SecureStore.getItemAsync)
+        .mockImplementation(async (key: string) => keychain.get(key) ?? null);
+      jest
+        .mocked(SecureStore.setItemAsync)
+        .mockImplementation(async (key: string, value: string) => {
+          keychain.set(key, value);
+        });
+      jest.mocked(SecureStore.deleteItemAsync).mockImplementation(async (key: string) => {
+        keychain.delete(key);
+      });
+    }
   });
 });

@@ -229,6 +229,41 @@ describe('A launch tap with the onboarding state kept on the device (DA-14)', ()
     expect(itemPushes('item-b')).toBe(1);
   });
 
+  it('falls back to waiting for the profile when the keychain cannot keep the state', async () => {
+    storedSession('u-1', { userId: 'u-1', needsOnboarding: false });
+    const unavailable = () => Promise.reject(new Error('keychain unavailable'));
+    jest
+      .mocked(SecureStore.getItemAsync)
+      .mockImplementation(async (key: string) =>
+        key === ONBOARDING_KEY ? unavailable() : (keychain.get(key) ?? null),
+      );
+    jest
+      .mocked(SecureStore.setItemAsync)
+      .mockImplementation(async (key: string, value: string) =>
+        key === ONBOARDING_KEY ? unavailable() : void keychain.set(key, value),
+      );
+    try {
+      mockFetchMe.mockImplementation(offline);
+      deliverTap(priceAlertTap('tap-kc', 'item-kc'));
+      launch();
+
+      // Signed in from the keychain, but nothing remembered: today's wait.
+      await advance(6_500);
+      expect(useAuthStore.getState().accessToken).toBe(tokenFor('u-1'));
+      expect(itemPushes('item-kc')).toBe(0);
+      await advance(1_500);
+      expect(await screen.findByText('Item item-kc')).toBeTruthy();
+      expect(itemPushes('item-kc')).toBe(1);
+    } finally {
+      jest
+        .mocked(SecureStore.getItemAsync)
+        .mockImplementation(async (key: string) => keychain.get(key) ?? null);
+      jest
+        .mocked(SecureStore.setItemAsync)
+        .mockImplementation(async (key: string, value: string) => void keychain.set(key, value));
+    }
+  });
+
   it('opens the item after onboarding when a stale "done" turns out to be due', async () => {
     storedSession('u-1', { userId: 'u-1', needsOnboarding: false });
     mockFetchMe.mockImplementationOnce(offline).mockImplementation(async () => profile(true));
