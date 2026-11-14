@@ -13,9 +13,15 @@ The landing page for Grocery Genie, built from the Claude Design handoff **"Groc
 marketing/
 ├── src/
 │   ├── pages/index.astro          # the page (all sections, in design order)
+│   ├── pages/privacy.astro        # /privacy: the app's privacy.ts, rendered at build time
+│   ├── pages/support.astro        # /support: help, data requests, account deletion
+│   ├── layouts/DocPage.astro      # nav + one text column + footer, for /privacy and /support
+│   ├── legal.ts                   # re-exports PRIVACY_POLICY and PRIVACY_EMAIL from ../mobile
 │   ├── config.ts                  # launch state, App Store ID, headlines, lists, privacy line
 │   ├── components/
 │   │   ├── CtaSlot.astro          # hero / mid / final CTA: waitlist form (A) or App Store badge + QR (B)
+│   │   ├── SiteHead.astro         # <head> metadata shared by every page (title, canonical, OG)
+│   │   ├── SiteFooter.astro       # footer shared by every page
 │   │   ├── Wordmark.astro         # Leaf Drop mark + "grocerygenie"
 │   │   └── mocks/                 # phone mockups (React); HeroMoment is the animated hero
 │   ├── scripts/site.ts            # waitlist submit, events, votes, nav
@@ -31,8 +37,23 @@ marketing/
 ├── scripts/render-icons.mjs       # renders PNG icons + OG card from their SVGs
 └── tests/
     ├── smoke.mjs                  # waitlist handler tests (no network)
-    └── page.mjs                   # built-page checks against the brief's copy rules
+    ├── page.mjs                   # built-page checks against the brief's copy rules
+    └── legal-pages.mjs            # /privacy matches privacy.ts; /support, footer and sitemap checks
 ```
+
+## Privacy and support pages
+
+`/privacy` (`src/pages/privacy.astro`) is the App Store privacy policy URL, and `/support` (`src/pages/support.astro`) is the support URL. Both use `src/layouts/DocPage.astro`, the shared `SiteHead` and `SiteFooter`, and `src/styles/doc.css`.
+
+**The privacy text has one source: the app.** `/privacy` imports `PRIVACY_POLICY` from `mobile/src/features/settings/content/privacy.ts` at build time (through `src/legal.ts`), so the site always shows what Settings → Privacy shows, draft banner included while `reviewed` is `false`. Edit the text there, never in `marketing/`. How it works:
+
+- The build reads `../mobile`, so it needs the whole repo checked out, not `marketing/` alone. Cloudflare Workers Builds (Path `/marketing/`), Netlify and Vercel all clone the whole repo. If `../mobile` is missing, the build fails on the import.
+- `privacy.ts` imports `@/constants/links` (the app's path alias). `mobile-sources.mjs` maps exactly that specifier for Vite (`astro.config.mjs`), and `tsconfig.json` maps it for `astro check`. Any other `@/...` or React Native import added to `privacy.ts` fails the build on purpose: map it in `mobile-sources.mjs` only if it's plain TypeScript.
+- `vite.tsconfig` points at this folder's `tsconfig.json`, because `mobile/tsconfig.json` extends `expo/tsconfig.base`, which isn't installed when only the site's dependencies are.
+- `tests/legal-pages.mjs` loads `privacy.ts` straight from `../mobile` and checks that every heading and paragraph, the dates and the draft notice are on the built page.
+- **A change to `privacy.ts` must redeploy the site.** If the Cloudflare Worker has build watch paths set, include `mobile/src/features/settings/content/privacy.ts` and `mobile/src/constants/links.ts`.
+
+`/support` states only what the app does today. Its steps come from the Settings screens named in the page's header comment; update the page when those screens change.
 
 ## Run locally
 
@@ -152,15 +173,15 @@ If you change a header, change `public/_headers` and `vercel.json` together.
 ## Tests
 
 ```bash
-npm test             # handler smoke tests + build + built-page checks
+npm test             # handler smoke tests + build + built-page checks (page.mjs, legal-pages.mjs)
 npm run check        # astro check (types)
 ```
 
 `tests/page.mjs` enforces the brief's copy rules on the built page: the privacy line word for word, no on-device or "never shared" claims, no "unlimited", no speed or accuracy figures, no paid-tier prices, and the right CTAs for the launch state. Run it for both states:
 
 ```bash
-npm run build && node tests/page.mjs
-PUBLIC_LAUNCH_STATE=b npm run build && node tests/page.mjs
+npm run build && npm run test:pages
+PUBLIC_LAUNCH_STATE=b npm run build && npm run test:pages
 ```
 
 ## Icons and social card
