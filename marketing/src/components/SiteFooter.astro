@@ -1,0 +1,22 @@
+---
+// Footer shared by every page. On the homepage the section links are in-page anchors;
+// elsewhere they point back to the homepage.
+import Wordmark from './Wordmark.astro';
+
+interface Props {
+  home?: boolean;
+}
+const { home = false } = Astro.props;
+const base = home ? '' : '/';
+---
+
+<footer>
+  <div>
+    <Wordmark href={home ? undefined : '/'} />
+    <p>Grocery budgets that start with a receipt. Built by a small team.</p>
+  </div>
+  <nav aria-label="Footer">
+    <a href={`${base}#features`}>Features</a><a href={`${base}#faq`}>FAQ</a><a href="/privacy">Privacy policy</a><a href="/support">Support</a>
+  </nav>
+</footer>
+<div class="legal">© 2026 Grocery Genie</div>
