@@ -195,7 +195,7 @@ Follow-ups:
 - Mailboxes: `privacy@`, `support@` and `hello@` set up as Cloudflare Email Routing forwards (reported done 2026-11-14). Send one test message to each before the privacy policy goes live.
 - Sending stays on Resend for now: the marketing Worker and the backend both call Resend, and the waitlist itself is a Resend audience that the free-year matching syncs. Cloudflare Email Sending (beta, Workers Paid) could replace Resend for transactional mail later; it would not replace the audience.
 - The backend's transactional sender (`GG_RESEND_FROM`: sign-up verification, password reset) still defaults to a Resend test address; choose its production value with the email setup.
-- Set SPF, DKIM and DMARC for `grocerygenie.app` and verify the domain in Resend before setting `WAITLIST_FROM`.
+- Sending domain: verified in Resend and `WAITLIST_FROM` set on the marketing Worker (reported done 2026-11-14). Public DNS checked the same day: DKIM at `resend._domainkey`, bounce MX and SPF at `send.`, DMARC `p=none` with Cloudflare reports; a test send showed SPF, DKIM and DMARC passing (reported). Still to do: set `GG_RESEND_FROM` when the backend is deployed, and move DMARC to `p=quarantine` after 2–4 weeks of clean reports.
 - Verify a Search Console **Domain property** for `grocerygenie.app`.
 - Optional, later: if bulk email volume grows, move newsletters to a sending subdomain (for example `updates.`) so marketing reputation stays separate from operational mail. Users never need to see it.
 - The blog should be built as static pages under `/blog` using the same build and `sitemap.xml`.
