@@ -178,7 +178,7 @@ Keyword volumes are still unvalidated: web search could not return exact-phrase 
 | Waitlist form | Origin has its own Worker-based waitlist. A bug in the old `app.js` (messages never shown) no longer applies. A real end-to-end signup against Resend was never tested by me. |
 | en-CA metadata | Drafted in `docs/aso-metadata.md`. |
 | Public privacy, support (and Terms) pages | **Open.** Not on `origin/main`. Earlier AI-drafted HTML pages were not ported: they were written against an older site and could contradict `privacy.ts` and the pending legal review. |
-| Contact addresses | Origin uses `privacy@grocerygenie.app` (`mobile/src/constants/links.ts`). Section 13 proposes `support@` and `hello@`. Decide and make them consistent. |
+| Contact addresses | Decided 2026-11-14 (section 13): `privacy@` for privacy and data requests (already in the app), `support@` for help, `hello@` as the waitlist and launch sender. |
 
 ## 13. Domain layout (decided 2026-11-14)
 
@@ -186,11 +186,14 @@ Everything lives on the root domain, `grocerygenie.app`:
 
 - Marketing site (Cloudflare, per marketing decision #21), legal pages and support.
 - Blog at `grocerygenie.app/blog`. Chosen over a subdomain so blog links and rankings strengthen the same domain as the feature pages (Google can treat a subdomain as a partly separate site).
-- Email: user-facing address is `support@grocerygenie.app` (support, privacy and deletion requests, and the footer Contact link). `hello@grocerygenie.app` is the sender for waitlist and launch emails.
+- Email (decided 2026-11-14):
+  - `privacy@grocerygenie.app`: privacy questions, data and deletion requests. Already used in the app (`mobile/src/constants/links.ts`); the public privacy page uses it too.
+  - `support@grocerygenie.app`: help and bug reports. The App Store support URL page and the site footer point here.
+  - `hello@grocerygenie.app`: sender for waitlist and launch emails (`WAITLIST_FROM` on the marketing Worker). Replies should reach a monitored inbox.
 
 Follow-ups:
-- Reconcile with the app: it already points privacy requests at `privacy@grocerygenie.app`. Either add `support@` alongside it or use one address.
-- Confirm the `support@` and `hello@` mailboxes exist and are monitored before the privacy policy goes live; the policy promises a response to deletion requests within 30 days.
+- Confirm the `privacy@`, `support@` and `hello@` mailboxes exist and are monitored before the privacy policy goes live.
+- The backend's transactional sender (`GG_RESEND_FROM`: sign-up verification, password reset) still defaults to a Resend test address; choose its production value with the email setup.
 - Set SPF, DKIM and DMARC for `grocerygenie.app` and verify the domain in Resend before setting `WAITLIST_FROM`.
 - Verify a Search Console **Domain property** for `grocerygenie.app`.
 - Optional, later: if bulk email volume grows, move newsletters to a sending subdomain (for example `updates.`) so marketing reputation stays separate from operational mail. Users never need to see it.
