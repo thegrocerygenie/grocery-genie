@@ -192,7 +192,8 @@ Everything lives on the root domain, `grocerygenie.app`:
   - `hello@grocerygenie.app`: sender for waitlist and launch emails (`WAITLIST_FROM` on the marketing Worker). Replies should reach a monitored inbox.
 
 Follow-ups:
-- Confirm the `privacy@`, `support@` and `hello@` mailboxes exist and are monitored before the privacy policy goes live.
+- Mailboxes: `privacy@`, `support@` and `hello@` set up as Cloudflare Email Routing forwards (reported done 2026-11-14). Send one test message to each before the privacy policy goes live.
+- Sending stays on Resend for now: the marketing Worker and the backend both call Resend, and the waitlist itself is a Resend audience that the free-year matching syncs. Cloudflare Email Sending (beta, Workers Paid) could replace Resend for transactional mail later; it would not replace the audience.
 - The backend's transactional sender (`GG_RESEND_FROM`: sign-up verification, password reset) still defaults to a Resend test address; choose its production value with the email setup.
 - Set SPF, DKIM and DMARC for `grocerygenie.app` and verify the domain in Resend before setting `WAITLIST_FROM`.
 - Verify a Search Console **Domain property** for `grocerygenie.app`.
