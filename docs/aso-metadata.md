@@ -8,7 +8,7 @@ Limits: name 30, subtitle 30, keywords 100 (comma-separated, no spaces, no repea
 |---|---|---|
 | Name (30/30) | Grocery Genie: Receipt Scanner | Grocery Genie: Receipt Scanner |
 | Subtitle (25/30) | Budget & spending tracker | Budget & spending tracker |
-| Keywords | `expense,groceries,food,money,scan,shopping,save,cash,organizer,ai,family,bill,cost,categories,ocr` (97/100) | same as en-US |
+| Keywords | `expense,groceries,food,money,scan,shopping,save,cash,organizer,ai,family,bill,cost,categories,price` (99/100) | same as en-US |
 
 Revised 2026-11-14 from Google Keyword Planner data (`docs/seo-strategy.md`, section 3). Previous draft: name "Grocery Genie: Receipt Budget", subtitle "Scan receipts, track spending". Nobody searches "receipt budget".
 
@@ -20,16 +20,21 @@ Why these words:
   - `save`, `money`: "grocery apps to save money", the top grocery query in Canada.
   - `organizer`: "receipt organizer app", "receipt scanner and organizer" (100–1K US).
   - `family`, `cost`, `bill`: budget-size searches ("grocery budget for family of 4", "average grocery bill").
-  - `ai`, `ocr`: "ai receipt scanner", "ocr receipt scanner". The app does read receipts with AI, so both are accurate.
+  - `price`: "grocery price comparison app" (1K–10K US, 100–1K CA) and "grocery price tracker" (100–1K US). Price history and price alerts ship in the launch build (decided 2026-11-14). They are free under marketing decision #19. Store comparison is not named anywhere until DA-1 ships its Premium gate.
+  - `ai`: "ai receipt scanner". The app reads receipts with AI.
   - `scan`: "scan receipts", which also completes "scan receipts budget app".
   - `cash`: cash receipts that bank feeds miss.
-- **Left out:** "price" (see the next note), "list" and "calculator" (the app has neither a grocery list nor a calculator), "household" (sharing is V1.5), "app" (Apple adds it), and singular/plural duplicates such as "receipts".
-- **"price":** "grocery price comparison app" is 1K–10K in the US. If the launch build includes price history, swap `ocr` for `price` (99/100). Store comparison wording must follow marketing decision #19.
+- **Left out:**
+  - `ocr` ("ocr receipt scanner"): there was room for it or `price`, not both, and `price` matches what the app does.
+  - "list" and "calculator": the app has neither a grocery list nor a calculator.
+  - "household": sharing is V1.5.
+  - "app": Apple adds it.
+  - Singular and plural duplicates, such as "receipts".
 
 Notes:
 - Spelling differences between US and Canadian English are negligible for this product ("budget", "groceries"), so the en-CA listing uses the same text. It differs by screenshots and description examples. The old en-CA "CAD" keyword was dropped: there is no evidence anyone searches for it.
 - **No store or competitor brand names in metadata** (Loblaws, Walmart, Mint, YNAB, etc.). Apple rejects trademarks you don't own. Use brand names on the website only, in honest comparison content.
-- No keywords for features that are not in the submitted build (flyers, meal planning; price tracking until it ships). Misleading metadata is a rejection and review-score risk.
+- No keywords for features that are not in the submitted build (flyers, meal planning, household sharing). If price history is pulled from the launch build, swap `price` back to `ocr`. Misleading metadata is a rejection and review-score risk.
 - Do not repeat words already in the name or subtitle ("grocery", "genie", "receipt", "scanner", "budget", "spending", "tracker"): Apple already indexes them. After launch, check ranks with an ASO tool and swap out keywords that bring no impressions.
 - Show CAD amounts in the en-CA screenshots (for example "$187.40" at a Canadian store) so the listing looks native. Use placeholder store names, not real brands.
 - French (fr-CA) is a possible later localization for Quebec. The app has a language setting, so check what it supports before promising it.
@@ -38,12 +43,13 @@ Notes:
 
 > Scan a grocery receipt and see exactly where your money went. Grocery Genie reads every line, sorts it into spending categories, and shows your monthly budget at a glance, with alerts before you overspend and a short summary each week.
 
-Do not mention price history, household sharing, pantry or meal planning until those ship.
+Price history and price alerts ship at launch and may be mentioned. Do not name store comparison (marketing decision #19), household sharing, pantry or meal planning until those ship.
 
 ## Before submission
 
 - [x] Replace the keywords after real keyword data is available (Keyword Planner, 2026-11-14).
-- [ ] Decide `ocr` or `price` in the keyword field (depends on whether price history is in the launch build).
+- [x] `price` rather than `ocr` in the keyword field: price history and price alerts ship in the launch build (decided 2026-11-14).
+- [ ] Confirm that price history and price alerts are on in the build you submit. If not, swap `price` back to `ocr`.
 - [ ] Privacy policy URL: `https://grocerygenie.app/privacy`. Support URL: `https://grocerygenie.app/support`.
 - [ ] App Privacy ("nutrition label") answers must match the in-app policy (`privacy.ts`) and the table in `docs/legal/privacy-review-2026-10-27.md`.
 - [x] In-app account deletion exists on `origin/main`. Verify on a device before submission (see `docs/device-checklist.md`).

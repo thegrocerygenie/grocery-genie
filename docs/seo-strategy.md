@@ -39,7 +39,7 @@ Lead with the MVP promise: **"Scan a grocery receipt, see where your money went.
 | Alternatives | "mint alternative", "apps like mint", "best mint alternative", "ynab alternative", "apps like fetch rewards" (100–1K US each) | Comparison | MVP | Real demand for comparison pages on the website only (no brand names in App Store metadata). "alternatives to mint mobile" is the phone carrier; exclude it. |
 | Item-level spending | "grocery spending by category" (under 10), "track grocery spending", "grocery expense tracker" (10–100) | Informational | MVP | Little search demand. Keep it as the message, not as a target query. |
 | Cash tracking | "track cash spending" (10–100, high ad competition) | Informational | MVP | Too small for a landing page; one blog post. |
-| Price tracking | "grocery price comparison app" (1K–10K / 100–1K); "grocery price tracker" (100–1K US); "grocery inflation tracker" (under 10) | Mixed | V1.1 | Large demand. Use it only once price history ships in the App Store build; store comparison wording follows marketing decision #19. |
+| Price tracking | "grocery price comparison app" (1K–10K / 100–1K); "grocery price tracker" (100–1K US); "grocery inflation tracker" (under 10) | Mixed | V1.1 | Large demand. Price history and price alerts ship in the launch build (decided 2026-11-14), so `price` is in the App Store keywords. Store comparison is not named until marketing decision #19 allows it. |
 | Household | "shared grocery budget couples" | Mixed | V1.5 | Not measured. |
 | Meal/pantry | "use up groceries", "reduce food waste app" | Informational | V2.0 | Not measured. |
 
@@ -180,7 +180,7 @@ Keyword volumes were measured with Google Keyword Planner on 2026-11-14 (section
 
 | Item | Status |
 |---|---|
-| Keyword volumes | Done 2026-11-14: Keyword Planner ranges for US and Canada are in section 3. The App Store name, subtitle and keywords were revised from them (`docs/aso-metadata.md`). Open: whether the launch build includes price history, which decides whether "price" goes in the keywords. |
+| Keyword volumes | Done 2026-11-14: Keyword Planner ranges for US and Canada are in section 3. The App Store name, subtitle and keywords were revised from them (`docs/aso-metadata.md`). Price history ships at launch, so `price` is in the keywords. |
 | Privacy FAQ claim ("delete account from Settings") | Now true: in-app account deletion exists on `origin/main` (`DELETE /api/users/me`, `account_service.py`, which also revokes the Sign in with Apple grant by re-authenticating). Not re-verified in this pass. |
 | Soft-delete purge and Celery registration | Already on `origin/main` (`purge_tasks.py`, task modules in `include=`). Not re-verified here. An earlier local version of this work was dropped as redundant. |
 | Waitlist form | Origin has its own Worker-based waitlist. A bug in the old `app.js` (messages never shown) no longer applies. A real end-to-end signup against Resend was never tested by me. |
