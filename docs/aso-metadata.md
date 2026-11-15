@@ -50,7 +50,7 @@ Price history and price alerts ship at launch and may be mentioned. Do not name 
 - [x] Replace the keywords after real keyword data is available (Keyword Planner, 2026-11-14).
 - [x] `price` rather than `ocr` in the keyword field: price history and price alerts ship in the launch build (decided 2026-11-14).
 - [ ] Confirm that price history and price alerts are on in the build you submit. If not, swap `price` back to `ocr`.
-- [ ] Privacy policy URL: `https://grocerygenie.app/privacy`. Support URL: `https://grocerygenie.app/support`.
+- [ ] Privacy policy URL: `https://grocerygenie.app/privacy`. Support URL: `https://grocerygenie.app/support`. Both are live (2026-11-14). The privacy page shows a draft banner until legal sign-off; enter both in App Store Connect after that.
 - [ ] App Privacy ("nutrition label") answers must match the in-app policy (`privacy.ts`) and the table in `docs/legal/privacy-review-2026-10-27.md`.
 - [x] In-app account deletion exists on `origin/main`. Verify on a device before submission (see `docs/device-checklist.md`).
 - [ ] Sign in with Apple: `account_service.revoke_sign_in_grants` revokes the grant after the user re-authenticates with Apple. Confirm on a real Apple ID that the app disappears from Settings > Apple ID > Sign in with Apple after deletion.
