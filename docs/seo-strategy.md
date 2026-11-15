@@ -30,30 +30,39 @@ Three channels, in priority order:
 
 Lead with the MVP promise: **"Scan a grocery receipt, see where your money went."** Pantry/meal/price themes become content seeds only when their phase ships (see section 8).
 
-| Cluster | Example queries | Intent | Phase fit |
-|---|---|---|---|
-| Receipt scanning | "receipt scanner app", "scan grocery receipts", "receipt tracker iphone" | Transactional | MVP |
-| Grocery budgeting | "grocery budget app", "track grocery spending", "how much should I spend on groceries" | Mixed | MVP |
-| Item-level spending | "what did I buy at [store]", "grocery spending by category" | Informational | MVP |
-| Alternatives | "Mint alternative", "YNAB vs receipt tracking", "Fetch rewards alternative without ads" | Comparison | MVP |
-| Cash tracking | "track cash spending groceries" (bank feeds miss cash) | Informational | MVP |
-| Price tracking | "grocery price tracker", "price history by store" | Mixed | V1.1 |
-| Household | "shared grocery budget couples" | Mixed | V1.5 |
-| Meal/pantry | "use up groceries", "reduce food waste app" | Informational | V2.0 |
+| Cluster | Measured queries (US / CA monthly Google searches) | Intent | Phase fit | Verdict |
+|---|---|---|---|---|
+| Receipt scanning | "receipt scanner app", "receipt scanner", "receipt app" (1K–10K / 100–1K each) | Transactional | MVP | Biggest demand. Put "Receipt Scanner" in the App Store name. Much of it is rewards ("scan receipts for money") or business ("receipt scanner for small business", QuickBooks); our pages should say plainly that this is for personal grocery budgets. |
+| Grocery budgeting | "grocery budget" (1K–10K / 100–1K); "grocery budget app", "monthly grocery budget", "grocery budget for 2", "grocery budget for family of 4", "how much should i spend on groceries", "average grocery bill" (100–1K US each) | Mixed, mostly informational | MVP | Best web cluster: calculator, landing page and the first blog posts. |
+| Saving on groceries | "grocery apps to save money" (100–1K in both); "best grocery apps for saving money" (100–1K US, rising year over year) | Commercial | MVP | The strongest grocery query in Canada. Use only honest framing (see where the money goes), never promised savings. |
+| Generic trackers | "expense tracker app", "spending tracker app" (1K–10K / 100–1K) | Transactional | MVP | Large but crowded in the App Store. Worth words in the subtitle and keywords; no dedicated page. |
+| Alternatives | "mint alternative", "apps like mint", "best mint alternative", "ynab alternative", "apps like fetch rewards" (100–1K US each) | Comparison | MVP | Real demand for comparison pages on the website only (no brand names in App Store metadata). "alternatives to mint mobile" is the phone carrier; exclude it. |
+| Item-level spending | "grocery spending by category" (under 10), "track grocery spending", "grocery expense tracker" (10–100) | Informational | MVP | Little search demand. Keep it as the message, not as a target query. |
+| Cash tracking | "track cash spending" (10–100, high ad competition) | Informational | MVP | Too small for a landing page; one blog post. |
+| Price tracking | "grocery price comparison app" (1K–10K / 100–1K); "grocery price tracker" (100–1K US); "grocery inflation tracker" (under 10) | Mixed | V1.1 | Large demand. Use it only once price history ships in the App Store build; store comparison wording follows marketing decision #19. |
+| Household | "shared grocery budget couples" | Mixed | V1.5 | Not measured. |
+| Meal/pantry | "use up groceries", "reduce food waste app" | Informational | V2.0 | Not measured. |
 
-Validate volumes and difficulty before committing (Ahrefs, Semrush, or the free Google Keyword Planner plus Search Console data after launch). The queries above are hypotheses, not measured volumes.
+**Source:** Google Keyword Planner, historical metrics for November 2025 to October 2026, English, Google Search, exported 2026-11-14. US and Canada were pulled separately (37 seed phrases each), plus the "Discover new keywords" ideas list for 4 seeds per country. The raw exports are not in the repo.
+
+How to read the numbers:
+- The account runs no campaign, so Google reports only ranges: 10–100, 100–1K, 1K–10K. Treat them as order of magnitude only.
+- Google merges close variants. Phrases with identical bid ranges, for example "grocery budget app", "budget grocery app" and "grocery store budget app", are one bucket. Don't add them up.
+- Canada is roughly a tenth of the US on every term, so web content targets US queries. en-CA wins come from the App Store listing, not from search.
+- Google search demand stands in for App Store demand; it is not the same thing. **After launch, check real App Store rankings** (App Store Connect search sources plus an ASO tool) and replace keywords that bring no impressions. The task is on the "After launch" checklist in `docs/aso-metadata.md`; the target is in section 9.
+- The cost-per-click columns are in CAD (the account's currency). "receipt tracker app" (up to $36.63) and the business receipt terms bid highest, which confirms that those searchers are businesses.
 
 Differentiator to repeat everywhere: bank feeds show "$187 at Loblaws", we show what was in the basket. Bank-feed apps (Mint, YNAB, Copilot) can't do that. Rewards apps (Fetch, Receipt Hog) don't give you budget intelligence.
 
 ## 4. Channel 1 — App Store Optimization
 
-- **Title (30 chars):** `Grocery Genie: Receipt Budget` (or similar; put the highest-value keyword in the title).
-- **Subtitle (30 chars):** `Scan receipts, track spending`
-- **Keyword field (100 chars):** comma-separated, no spaces, no repeats of title/subtitle words, e.g. `grocery,budget,receipt,scanner,expense,tracker,shopping,food,spending,money`. Never use competitor brand names (rejection risk).
+- **Title (30 chars):** `Grocery Genie: Receipt Scanner`. "Receipt scanner" is the highest-volume query we can honestly claim (section 3).
+- **Subtitle (30 chars):** `Budget & spending tracker`. Apple combines words across fields, so this covers "grocery budget", "spending tracker" and "budget tracker" too.
+- **Keyword field (100 chars):** the current draft and its reasoning are in `docs/aso-metadata.md`. Comma-separated, no spaces, no repeats of title or subtitle words. Never use competitor brand names (rejection risk).
 - **Screenshots:** first 3 carry the message: scan → itemized review → budget dashboard. Caption each with a keyword-bearing benefit.
 - **Description:** conversion copy, not ranking (Apple doesn't index it). Lead with the item-level hook.
 - **Ratings:** prompt for a review after a user's 3rd confirmed receipt and after a "budget on track" moment. Never on first launch.
-- **Custom Product Pages:** one per cluster (receipt scanner, grocery budget, cash tracking) so paid/social/web links land on matching screenshots.
+- **Custom Product Pages:** one per cluster (receipt scanner, grocery budget, saving on groceries) so paid/social/web links land on matching screenshots.
 - **Iterate:** change metadata every 4–6 weeks, one variable at a time; track keyword rank with App Store Connect + a tracker (AppFollow, Sensor Tower, or free tiers).
 - **Localization:** the product handles multi-language receipts. Add Canadian English (CA), UK, and Australia metadata early, since spelling and store names differ ("groceries", "Loblaws", "Tesco", "Woolworths") and competition is lower than en-US.
 
@@ -66,10 +75,9 @@ Move from one page to a small, indexable site. The site is already Astro with st
 | URL | Purpose | Primary query |
 |---|---|---|
 | `/` | Homepage, rewritten around receipt → budget | brand + "grocery receipt budget app" |
-| `/receipt-scanner` | Feature landing page | "receipt scanner app" |
-| `/grocery-budget-app` | Feature landing page | "grocery budget app" |
-| `/track-cash-spending` | Niche landing page | "track cash spending" |
-| `/vs/mint-alternative`, `/vs/ynab` | Comparison pages, honest and specific | "[brand] alternative" |
+| `/receipt-scanner` | Feature landing page | "receipt scanner app" (1K–10K US) |
+| `/grocery-budget-app` | Feature landing page; also targets "grocery apps to save money" | "grocery budget app", "grocery budget" |
+| `/vs/mint-alternative`, `/vs/ynab` | Comparison pages, honest and specific | "mint alternative", "ynab alternative" (100–1K US each) |
 | `/privacy`, `/terms`, `/support` | Required by App Store; also trust signals | — |
 | `/blog/...` | See below | long-tail |
 
@@ -87,7 +95,7 @@ These earn links and capture high-intent traffic before anyone installs.
 
 Start with 2 posts/week for 8 weeks, then 1/week. Each post targets one query, includes an original angle, and links to one feature page.
 
-Starter list:
+Starter list (posts 1 and 6 target 100–1K US queries each; post 5 replaces the dropped `/track-cash-spending` page):
 1. How much should a family of four spend on groceries? (by country, current year)
 2. Why bank apps can't tell you what you spent on groceries
 3. How to track grocery spending without a spreadsheet
@@ -166,13 +174,13 @@ Review monthly; kill content that gets no impressions after 90 days or merge it 
 | 4 | Content capacity | AI-drafted from briefs, human fact-check and edit before publishing. Pace: 1–2 posts/week. |
 | 5 | Publishing anonymized aggregate data | No, not at launch. Parked in `docs/ideas/aggregate-spending-insights.md`. Revisit post-launch with legal input (PIPEDA/GDPR). Drop the "original data" link-bait in section 5.2 for now; use the free tools and editorial content instead. |
 
-Keyword volumes are still unvalidated: web search could not return exact-phrase monthly volumes. Export Google Keyword Planner (or Ahrefs/Semrush) data for the section 3 clusters and add it here.
+Keyword volumes were measured with Google Keyword Planner on 2026-11-14 (section 3).
 
 ## 12. Status of follow-ups (2026-11-14, after reconciling with `origin/main`)
 
 | Item | Status |
 |---|---|
-| Keyword volumes | Blocked: needs a Keyword Planner / Ahrefs / Semrush export. Web search cannot return exact-phrase volumes. |
+| Keyword volumes | Done 2026-11-14: Keyword Planner ranges for US and Canada are in section 3. The App Store name, subtitle and keywords were revised from them (`docs/aso-metadata.md`). Open: whether the launch build includes price history, which decides whether "price" goes in the keywords. |
 | Privacy FAQ claim ("delete account from Settings") | Now true: in-app account deletion exists on `origin/main` (`DELETE /api/users/me`, `account_service.py`, which also revokes the Sign in with Apple grant by re-authenticating). Not re-verified in this pass. |
 | Soft-delete purge and Celery registration | Already on `origin/main` (`purge_tasks.py`, task modules in `include=`). Not re-verified here. An earlier local version of this work was dropped as redundant. |
 | Waitlist form | Origin has its own Worker-based waitlist. A bug in the old `app.js` (messages never shown) no longer applies. A real end-to-end signup against Resend was never tested by me. |
