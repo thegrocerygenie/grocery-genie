@@ -15,7 +15,8 @@
     "check": "astro check",
     "build:icons": "node scripts/render-icons.mjs",
     "test:smoke": "node tests/smoke.mjs",
-    "test": "npm run test:smoke && npm run build && node tests/page.mjs"
+    "test:pages": "node tests/page.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/legal-pages.mjs",
+    "test": "npm run test:smoke && npm run build && npm run test:pages"
   },
   "dependencies": {
     "@astrojs/react": "^7.1.2",

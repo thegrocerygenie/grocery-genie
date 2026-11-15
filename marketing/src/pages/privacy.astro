@@ -1,0 +1,26 @@
+---
+// The public privacy policy (App Store Connect privacy URL). The text comes from the app's
+// privacy.ts at build time, so this page and Settings → Privacy always say the same thing.
+import DocPage from '../layouts/DocPage.astro';
+import { DRAFT_NOTICE, PRIVACY_POLICY } from '../legal';
+
+const TITLE = 'Privacy policy — Grocery Genie';
+const DESCRIPTION =
+  'How the Grocery Genie iPhone app collects, uses and keeps your data, who processes it, and how to delete your account.';
+---
+
+<DocPage title={TITLE} description={DESCRIPTION} path="/privacy">
+  <div class="label">Legal</div>
+  <h1>Privacy policy</h1>
+  {!PRIVACY_POLICY.reviewed && <p class="doc-draft" role="note">{DRAFT_NOTICE}</p>}
+  <p class="doc-meta">Effective {PRIVACY_POLICY.effective} · Last updated {PRIVACY_POLICY.updated}</p>
+  <p class="doc-meta">This is the same policy the app shows in Settings → Privacy.</p>
+  {
+    PRIVACY_POLICY.sections.map((section) => (
+      <section>
+        <h2>{section.heading}</h2>
+        {section.paragraphs.map((p) => <p>{p}</p>)}
+      </section>
+    ))
+  }
+</DocPage>

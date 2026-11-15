@@ -1,0 +1,50 @@
+---
+// Shared <head> metadata: title, description, canonical, Open Graph, Twitter, icons and fonts.
+// Page-specific extras (smart banner, JSON-LD) go in the default slot.
+interface Props {
+  title: string;
+  description: string;
+  /** Path of this page on the site, with a leading slash ('/', '/privacy'). */
+  path: string;
+}
+const { title, description, path } = Astro.props;
+const SITE = 'https://grocerygenie.app';
+const url = `${SITE}${path}`;
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="color-scheme" content="light" />
+<meta name="theme-color" content="#F0EEE9" />
+<title>{title}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={url} />
+<meta name="robots" content="index, follow, max-image-preview:large" />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Grocery Genie" />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={url} />
+<meta property="og:image" content={`${SITE}/og-image.png`} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Grocery Genie — a receipt turning into categorized items and an updated budget" />
+<meta property="og:locale" content="en_US" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={`${SITE}/og-image.png`} />
+
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="alternate icon" type="image/png" href="/favicon-32.png" sizes="32x32" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/site.webmanifest" />
+<slot />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link
+  href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Bricolage+Grotesque:opsz,wght@12..96,800&display=swap"
+  rel="stylesheet"
+/>

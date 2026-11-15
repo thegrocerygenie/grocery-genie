@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import '../styles/tokens-v2.css';
 import '../styles/site.css';
 import CtaSlot from '../components/CtaSlot.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import SiteHead from '../components/SiteHead.astro';
 import Wordmark from '../components/Wordmark.astro';
 import HeroMoment from '../components/mocks/HeroMoment';
 import MockScan from '../components/mocks/MockScan';
@@ -25,42 +27,9 @@ const icon = (name: string) => readFileSync(join(iconDir, `${name}.svg`), 'utf8'
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <meta name="color-scheme" content="light" />
-    <meta name="theme-color" content="#F0EEE9" />
-    <title>{TITLE}</title>
-    <meta name="description" content={DESCRIPTION} />
-    <link rel="canonical" href={`${SITE}/`} />
-    <meta name="robots" content="index, follow, max-image-preview:large" />
-
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Grocery Genie" />
-    <meta property="og:title" content={TITLE} />
-    <meta property="og:description" content={DESCRIPTION} />
-    <meta property="og:url" content={`${SITE}/`} />
-    <meta property="og:image" content={`${SITE}/og-image.png`} />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Grocery Genie — a receipt turning into categorized items and an updated budget" />
-    <meta property="og:locale" content="en_US" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content={TITLE} />
-    <meta name="twitter:description" content={DESCRIPTION} />
-    <meta name="twitter:image" content={`${SITE}/og-image.png`} />
-
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="alternate icon" type="image/png" href="/favicon-32.png" sizes="32x32" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/site.webmanifest" />
-    {!A && <meta name="apple-itunes-app" content={`app-id=${APP_ID}`} />}
-
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Bricolage+Grotesque:opsz,wght@12..96,800&display=swap"
-      rel="stylesheet"
-    />
+    <SiteHead title={TITLE} description={DESCRIPTION} path="/">
+      {!A && <meta name="apple-itunes-app" content={`app-id=${APP_ID}`} />}
+    </SiteHead>
 
     <script type="application/ld+json" set:html={JSON.stringify({
       '@context': 'https://schema.org',
@@ -279,14 +248,7 @@ const icon = (name: string) => readFileSync(join(iconDir, `${name}.svg`), 'utf8'
         {A && <div class="vote-hint">Tap the one you want most. It helps us decide what to build first.</div>}
       </section>
 
-      <footer>
-        <div>
-          <Wordmark />
-          <p>Grocery budgets that start with a receipt. Built by a small team.</p>
-        </div>
-        <nav aria-label="Footer"><a href="#features">Features</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a></nav>
-      </footer>
-      <div class="legal">© 2026 Grocery Genie</div>
+      <SiteFooter home />
     </main>
 
     <template id="joined-tpl"><div class="joined" role="status"><strong>You're in.</strong> We'll email you once, at launch.</div></template>

@@ -61,8 +61,13 @@ async function serveStatic(req, res) {
     try { stats = await stat(target); } catch { stats = null; }
   }
 
+  // Clean URLs, as the hosts serve them: /privacy → dist/privacy.html.
+  if ((!stats || !stats.isFile()) && !extname(target)) {
+    const html = `${target}.html`;
+    try { stats = await stat(html); target = html; } catch { /* falls through to 404 */ }
+  }
+
   if (!stats || !stats.isFile()) {
-    // Try serving the SPA root for unknown paths (so /privacy etc. fall through to 404).
     res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
     return res.end('<!doctype html><meta charset="utf-8"><title>404</title><h1>Not found</h1>');
   }

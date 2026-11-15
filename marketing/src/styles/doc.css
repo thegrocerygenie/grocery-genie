@@ -1,0 +1,14 @@
+/* Text pages (/privacy, /support), on top of site.css. One readable column. */
+.doc{max-width:720px;padding:56px 0 24px}
+.doc h1{font-size:64px;margin:0 0 20px}
+.doc h2{font-size:32px;line-height:1.15;margin:48px 0 12px}
+.doc p,.doc li{font-size:17px;line-height:1.65;color:var(--ink);margin:0 0 14px;text-wrap:pretty;overflow-wrap:anywhere}
+.doc ol{margin:0 0 14px;padding-left:24px}
+.doc li{margin:0 0 6px}
+.doc a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.doc a:hover{color:var(--accent-pressed)}
+.doc .doc-meta{font-size:14px;color:var(--ink-2);margin:0 0 6px}
+.doc .lede{margin:0 0 8px}
+/* The app's draft banner (PrivacyPolicy.tsx): orange tint, darker text for contrast on the web. */
+.doc .doc-draft{display:inline-block;margin:0 0 16px;padding:8px 14px;border-radius:8px;background:rgba(255,149,0,0.14);color:#8A4B00;font-size:14px;font-weight:600}
+@media (max-width:960px){.doc{padding:28px 0 8px}.doc h1{font-size:44px}.doc h2{font-size:28px;margin-top:40px}}

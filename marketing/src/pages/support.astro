@@ -1,0 +1,56 @@
+---
+// The public support page (App Store Connect support URL). Every step below matches the app's
+// screens: Settings opens from the gear on the Budget tab (app/(tabs)/(budget)/index.tsx);
+// Delete account is the last button in Settings (app/settings/index.tsx) and its screen and
+// confirmation are in app/settings/delete-account.tsx; Recently deleted is app/recently-deleted.tsx.
+// Update this page when those screens change.
+import DocPage from '../layouts/DocPage.astro';
+import { PRIVACY_EMAIL, SUPPORT_EMAIL } from '../legal';
+
+const TITLE = 'Support — Grocery Genie';
+const DESCRIPTION =
+  'How to get help with the Grocery Genie iPhone app, make a privacy or data request, and delete your account.';
+---
+
+<DocPage title={TITLE} description={DESCRIPTION} path="/support">
+  <div class="label">Support</div>
+  <h1>How can we help?</h1>
+
+  <section>
+    <h2>Get help</h2>
+    <p>Email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.</p>
+    <p>
+      In the app, Settings → Help &amp; feedback answers common questions and has a Send feedback button. To open
+      Settings, tap the gear at the top right of the Budget tab.
+    </p>
+  </section>
+
+  <section>
+    <h2>Privacy and data requests</h2>
+    <p>
+      To get a copy of your data, or for any other request about it, email <a href={`mailto:${PRIVACY_EMAIL}`}
+        >{PRIVACY_EMAIL}</a
+      >. We reply within 30 days.
+    </p>
+    <p>Read our <a href="/privacy">privacy policy</a>. It's the same policy the app shows in Settings → Privacy.</p>
+  </section>
+
+  <section>
+    <h2>Delete your account</h2>
+    <p>You can delete your account from inside the app:</p>
+    <ol>
+      <li>Open Settings: tap the gear at the top right of the Budget tab.</li>
+      <li>Scroll to the bottom and tap Delete account.</li>
+      <li>The next screen lists what is erased. Tap Delete account, then tap Delete account again to confirm.</li>
+    </ol>
+    <p>
+      Deletion happens right away and can't be undone. Receipts still waiting to upload on that phone are removed too.
+      If you use Sign in with Apple, you'll confirm with Apple, and Grocery Genie's access to your Apple ID is removed.
+    </p>
+  </section>
+
+  <section>
+    <h2>Deleted something by mistake?</h2>
+    <p>Receipts and budgets you delete stay in Settings → Recently deleted for 30 days. Find it there and tap Restore.</p>
+  </section>
+</DocPage>

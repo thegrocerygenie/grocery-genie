@@ -1,0 +1,46 @@
+---
+// Layout for the text pages (/privacy, /support): the site's head, nav and footer around a
+// single readable column. No client script: these pages are static text.
+import '../styles/site.css';
+import '../styles/doc.css';
+import SiteHead from '../components/SiteHead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import Wordmark from '../components/Wordmark.astro';
+import { APP_STORE_URL, LAUNCH_STATE } from '../config';
+
+interface Props {
+  title: string;
+  description: string;
+  path: string;
+}
+const { title, description, path } = Astro.props;
+const A = LAUNCH_STATE === 'a';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <SiteHead title={title} description={description} path={path} />
+  </head>
+  <body data-state={LAUNCH_STATE}>
+    <div class="nav-wrap">
+      <div class="nav">
+        <Wordmark href="/" />
+        {
+          A ? (
+            <a class="nav-cta" href="/#join">Get early access</a>
+          ) : (
+            <a class="nav-cta" href={APP_STORE_URL}>Download</a>
+          )
+        }
+      </div>
+    </div>
+
+    <main class="page">
+      <article class="doc">
+        <slot />
+      </article>
+      <SiteFooter />
+    </main>
+  </body>
+</html>

@@ -35,6 +35,9 @@ check(/up to 20 receipts a month/.test(text), 'free-tier limit stated in the FAQ
 check(/Coming later/.test(text), 'later-phase features sit under "Coming later"');
 check(/<h1 id="headline">/.test(html), 'hero headline has the A/B/C hook');
 check(/gg_hl_variant/.test(html), 'sticky headline variant script is inline in the page');
+const footer = /<footer>([\s\S]*?)<\/footer>/.exec(html)?.[1] ?? '';
+check(/<a href="\/privacy">Privacy policy<\/a>/.test(footer), 'footer links to the privacy policy (/privacy)');
+check(/<a href="\/support">Support<\/a>/.test(footer), 'footer links to /support');
 
 const state = /<body[^>]*data-state="(a|b)"/.exec(html)?.[1];
 check(Boolean(state), `body carries the launch state (${state})`);
