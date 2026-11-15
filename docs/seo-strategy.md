@@ -10,8 +10,8 @@ Gaps that still matter:
 
 | Gap | Why it matters |
 |---|---|
-| **One indexable URL.** `sitemap.xml` lists `/` only, with no `lastmod`. | A single page can't rank for more than a handful of queries. |
-| **No public privacy policy URL.** The policy lives in the app (`mobile/src/features/settings/content/privacy.ts`); `docs/launch-open-items.md` §1 lists the public URL as open. No Terms document exists (deliberately dropped), and there is no support page. | App Store Connect requires a privacy URL and a support URL; they are also trust signals. |
+| **Three indexable URLs.** `sitemap.xml` lists `/`, `/privacy` and `/support` with `lastmod`, but only `/` targets search queries. | One marketing page can't rank for more than a handful of queries. |
+| **Privacy policy still a draft.** `/privacy` and `/support` are live (PR #154, 2026-11-14). `/privacy` is built from the app's `privacy.ts` and shows "Draft · pending legal review" until counsel signs off (`docs/launch-open-items.md` §1). No Terms document exists (deliberately dropped). | App Store Connect requires a privacy URL and a support URL; they are also trust signals. |
 | **Thin structured data.** `SoftwareApplication` only: no `Organization`, `WebSite` or `FAQPage`, although the page has a real FAQ. | FAQ rich results and entity clarity. |
 | **No App Store presence in the plan.** See `docs/aso-metadata.md`. | For a mobile app, ASO is the main organic channel. |
 | **No content or tools** (`/blog`, feature pages, free tools). | Long-tail queries and links. |
@@ -109,7 +109,7 @@ Starter list (posts 1 and 6 target 100–1K US queries each; post 5 replaces the
 
 ## 6. Channel 3 — Technical and entity SEO
 
-Do these once, in this order. Status on `origin/main`: step 1 is done; step 2 has `SoftwareApplication` only; step 4 has a one-URL sitemap without `lastmod`.
+Do these once, in this order. Status on `origin/main`: step 1 is done; step 2 has `SoftwareApplication` only; step 4's sitemap lists the three live pages with `lastmod`, maintained by hand in `marketing/public/sitemap.xml`. Generate it from the page set once there are more pages.
 
 1. Rewrite `<title>`, meta description, OG tags, H1 around the MVP promise; use a real status (Q4 2026 today; switch to "Now on the App Store" at launch).
 2. Expand JSON-LD: `Organization`, `WebSite`, `MobileApplication` (category `FinanceApplication` or `LifestyleApplication`, `operatingSystem: iOS`, `offers` price 0), `FAQPage` on pages that have real FAQs, `BreadcrumbList` on subpages. Add `aggregateRating` only when real reviews exist; fake ratings are a manual-action risk.
@@ -185,7 +185,7 @@ Keyword volumes were measured with Google Keyword Planner on 2026-11-14 (section
 | Soft-delete purge and Celery registration | Already on `origin/main` (`purge_tasks.py`, task modules in `include=`). Not re-verified here. An earlier local version of this work was dropped as redundant. |
 | Waitlist form | Origin has its own Worker-based waitlist. A bug in the old `app.js` (messages never shown) no longer applies. A real end-to-end signup against Resend was never tested by me. |
 | en-CA metadata | Drafted in `docs/aso-metadata.md`. |
-| Public privacy, support (and Terms) pages | **Open.** Not on `origin/main`. Earlier AI-drafted HTML pages were not ported: they were written against an older site and could contradict `privacy.ts` and the pending legal review. |
+| Public privacy and support pages | Live 2026-11-14 (PR #154) at `/privacy` and `/support`. Checked in Chrome after the deploy. `/privacy` is built from `privacy.ts` and stays a draft until legal sign-off. Terms: none (deliberately dropped; the lawyer brief asks whether we need them). |
 | Contact addresses | Decided 2026-11-14 (section 13): `privacy@` for privacy and data requests (already in the app), `support@` for help, `hello@` as the waitlist and launch sender. |
 
 ## 13. Domain layout (decided 2026-11-14)
