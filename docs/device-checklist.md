@@ -13,11 +13,11 @@ Items the Simulator already passed are not repeated here. The Simulator notes in
 
 The build:
 - [ ] Run `make install-mobile`. It applies the patches (react-native-screens for H3, `@expo/cli` for Xcode 27). Without it, a native build ships without the H3 fix.
-- [ ] Make a development build, not Expo Go. Expo Go can't load the react-native-screens patch, has no remote push, and hides the Google Sign-In button. Run `npx expo prebuild --clean`, then build with Xcode and code signing for the phone. There is no `eas.json` yet, so EAS can't make the build.
+- [ ] Make a development build, not Expo Go. Expo Go can't load the react-native-screens patch, has no remote push, and hides the Google Sign-In button. Run `npx expo prebuild --clean`, then build with Xcode and code signing for the phone. `mobile/eas.json` has a `development-device` profile, but EAS can't build until `eas init` links the project (launch-open-items §1).
 - [ ] Build from `dc3bb2c` or later, so the build has PR 39 (the picker after AI consent).
 
 The backend the phone talks to:
-- [ ] Set `EXPO_PUBLIC_API_URL` to an address the phone can reach: the Mac's LAN IP with `--host 0.0.0.0`, or a deployed staging API.
+- [ ] Set `EXPO_PUBLIC_API_URL` to an address the phone can reach: the Mac's LAN IP with `--host 0.0.0.0` (see "Local backend" below), or a deployed staging API.
 - [ ] Apple Sign In needs real keys: `GG_APPLE_TEAM_ID`, `GG_APPLE_KEY_ID`, `GG_APPLE_CLIENT_ID`, `GG_APPLE_PRIVATE_KEY`.
 - [ ] Push needs a Celery worker and beat running (`deliver-pending-pushes`), and `GG_EXPO_PUSH_ACCESS_TOKEN` if the Expo project has enhanced push security on.
 - [ ] Decide on the extractor. `GG_DEBUG=true` uses the mock extractor, which returns the same receipt for every photo. That's enough for the flow checks, but not for blur calibration or reading real receipts.
@@ -26,6 +26,34 @@ The phone:
 - [ ] Signed in to an Apple Account. The "other Apple ID" check needs a second Apple Account on the device.
 - [ ] Network Link Conditioner installed (Settings → Developer) for the "Apple unreachable" check.
 - [ ] 20–30 paper receipts for blur calibration.
+
+### Local backend
+
+The session doesn't need a deployed backend. The phone can use the API running on the Mac.
+
+Why plain HTTP works: the generated `Info.plist` sets `NSAllowsLocalNetworking`, so iOS allows HTTP to a LAN IP without HTTPS.
+
+Setup:
+- [ ] Put the phone and the Mac on the same Wi-Fi. Guest and office networks often stop devices from reaching each other.
+- [ ] Start Postgres, Redis and LiteLLM with `make db-up`, then run `make backend-migrate`.
+- [ ] Start the API with `make backend-dev`. It listens on `0.0.0.0:8001`. With `GG_DEBUG` off (the real extractor), it runs the production startup checks (`production_safety_errors` in `backend/app/core/config.py`). For example, it needs a non-default `GG_JWT_SECRET`, and either `GG_RESEND_API_KEY` or `GG_EMAIL_DELIVERY=off`. Read the error it prints and set what it names.
+- [ ] For push and alerts, also run `make backend-worker` and `make backend-beat`.
+- [ ] If the macOS firewall is on, allow incoming connections for Python.
+- [ ] Find the Mac's IP with `ipconfig getifaddr en0`, then build with `EXPO_PUBLIC_API_URL=http://<that IP>:8001`.
+  - Don't use `localhost`: on the phone it means the phone.
+  - A Release build bakes the URL into the bundle, so a new IP means a new build. A DHCP reservation on the router keeps the IP fixed.
+- [ ] On first launch, tap **Allow** when iOS asks to find devices on the local network. If you deny it, every request fails with no error. To undo a denial, use Settings → Privacy & Security → Local Network.
+- [ ] Check the connection: open `http://<that IP>:8001/health` in Safari on the phone. It should answer with JSON.
+
+What works against the local backend. The backend only calls these services outbound:
+- Sign in with Apple and Google, and Apple revoke on account deletion. These need the `GG_APPLE_*` keys in the local backend env.
+- Push, through Expo's push service. It needs the EAS project ID and APNs credentials in Expo, wherever the backend runs.
+- Emails, with `GG_RESEND_API_KEY` set. Their links use the app's own scheme (`grocerygenie://`), so a link tapped on the phone opens the app without reaching the Mac.
+- Sandbox purchases and Restore: after a purchase, the app asks the backend to read the subscriber from RevenueCat's REST API (`GG_REVENUECAT_API_KEY`).
+
+What needs a public URL: RevenueCat's webhook, which has to call the backend. That covers the dashboard's "Send test event" and the renewal, cancellation and expiry events. A tunnel to the Mac is enough: run `cloudflared tunnel --url http://localhost:8001`, or use ngrok, then point the webhook at `<tunnel URL>/api/webhooks/revenuecat`. The tunnel URL changes on every run, so update the webhook each time.
+
+Airplane Mode cuts the Wi-Fi to the Mac as well. That's what the offline checks want.
 
 ## 1. Build and sign-in
 
