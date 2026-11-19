@@ -128,6 +128,13 @@ Do these once, in this order. Status on `origin/main`: step 1 is done; step 2 ha
    - On 2026-11-17, before the rule, www and plain HTTP both returned 200 with the full site.
    - When creating the rule, Cloudflare warns that www "may not be proxied". Ignore the warning and deploy: www is a Worker custom domain, so its DNS record is a Worker record rather than a proxied A or CNAME. Its traffic is proxied all the same. Don't create a new DNS record for www: it would conflict with the custom domain's record.
    - Keep `www.grocerygenie.app` on the Worker's custom domains: the rule runs before the Worker, and the hostname still needs DNS and a certificate.
+   - **Other domains we own** redirect to the apex with a 301, keeping the path and query string. Checked 2026-11-19 in Chrome and with curl: http and https, apex and www, 12 combinations in all.
+     - `usegrocerygenie.com`, `mygrocerygenie.com` and `grocerygenieai.com`: bought at Namecheap, DNS on Cloudflare (free zones).
+     - Each zone has `AAAA @ 100::` and `AAAA www 100::`, both proxied. These placeholder records only let Cloudflare see the traffic; nothing is served from them.
+     - One Redirect Rule per zone: all incoming requests, `concat("https://grocerygenie.app", http.request.uri.path)`, 301, query string kept. The rule covers every hostname in the zone, so www needs no rule of its own. Always Use HTTPS is on.
+     - Delete the A and CNAME records Cloudflare imports from the registrar (they point at Namecheap's parking page) before adding the placeholders.
+     - Email: both still have Namecheap's forwarding records (MX and a `~all` SPF). If nobody needs mail there, replace them with `v=spf1 -all`, a `_dmarc` record `v=DMARC1; p=reject` and a null MX, so the domains can't be spoofed.
+     - Add any future domain the same way.
    - Why it matters beyond SEO: the headline A/B test (`marketing/src/config.ts`) stores each visitor's headline per hostname. Now that every visitor lands on one hostname, each one sees one headline and is counted once.
    - The workers.dev URLs (production and `*-` preview) also serve the site. Their canonical points at the apex, so they're harmless for search. Turn off the production workers.dev route (Worker → Domains) if nobody uses it.
 
