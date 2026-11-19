@@ -18,6 +18,13 @@ run_worker_first = ["/api/*"]
 
 # Workers Logs and traces. Only /api/* runs the Worker, so only waitlist
 # requests are logged; static page requests aren't.
+# Branch builds run `wrangler preview` (Worker Previews), which requires this
+# block. It is empty on purpose: a Preview inherits none of the production
+# vars or secrets, so a Preview's waitlist has no Resend key or audience and
+# answers "temporarily unavailable". Test sign-ups never reach the real list.
+# Add [previews.vars] only with Preview-safe values, never the production ones.
+[previews]
+
 [observability.logs]
 enabled = true
 head_sampling_rate = 1
