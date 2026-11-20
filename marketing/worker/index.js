@@ -1,6 +1,9 @@
 // Cloudflare Worker for the marketing site.
-// wrangler.toml serves dist/ as static assets and sends only /api/* here
-// (run_worker_first), so page and asset requests never run this script.
+// wrangler.toml serves dist/ as static assets. A request runs this script when
+// its path starts with /api/ (run_worker_first) or when no file in dist/
+// matches it, such as a bot probing /wp-admin/. Pages and assets that exist
+// never run it. Anything that isn't /api/waitlist goes back to the assets,
+// which answer 404 for a missing file.
 // Env vars (RESEND_API_KEY, RESEND_AUDIENCE_ID, ALLOWED_ORIGIN, ...) are the
 // Worker's runtime variables and secrets. There is no process.env here.
 
