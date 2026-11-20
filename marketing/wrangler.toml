@@ -1,7 +1,8 @@
 # Cloudflare Worker for the marketing site (Workers with static assets).
 # `name` must match the Worker's name in the dashboard, or Workers Builds fails.
-# Static files come from dist/ (npm run build) and cost nothing to serve;
-# only /api/* runs worker/index.js.
+# Static files come from dist/ (npm run build) and cost nothing to serve.
+# worker/index.js runs for /api/* and for paths with no file in dist/ (bot
+# probes like /wp-admin/ among them); those get a 404.
 # Secrets are set in the dashboard or with `npx wrangler secret put NAME`, never here.
 name = "grocery-genie-marketing"
 main = "worker/index.js"
@@ -16,8 +17,6 @@ directory = "./dist"
 binding = "ASSETS"
 run_worker_first = ["/api/*"]
 
-# Workers Logs and traces. Only /api/* runs the Worker, so only waitlist
-# requests are logged; static page requests aren't.
 # Branch builds run `wrangler preview` (Worker Previews), which requires this
 # block. It is empty on purpose: a Preview inherits none of the production
 # vars or secrets, so a Preview's waitlist has no Resend key or audience and
@@ -25,6 +24,8 @@ run_worker_first = ["/api/*"]
 # Add [previews.vars] only with Preview-safe values, never the production ones.
 [previews]
 
+# Workers Logs and traces. Only requests that run the Worker are logged:
+# /api/* and paths with no file in dist/. Pages that exist aren't.
 [observability.logs]
 enabled = true
 head_sampling_rate = 1
