@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +18,7 @@ import { GoogleMark } from '@/components/GoogleMark';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { PASSWORD_MIN_LENGTH } from '@/features/auth/constants';
 import { useAppleSignIn, useGoogleSignIn, useSignUp } from '@/features/auth/hooks/useAuth';
+import { TERMS_OF_USE_URL } from '@/features/premium/content/premium';
 import { ApiError } from '@/services/api';
 import {
   isGoogleSignInAvailable,
@@ -24,6 +26,9 @@ import {
   runGoogleSignIn,
   useAppleSignInAvailable,
 } from '@/features/auth/services/socialSignIn';
+
+// The legal links are 16pt lines: 14pt above and below brings each to 44pt (HIG).
+const LEGAL_LINK_SLOP = { top: 14, bottom: 14, left: 6, right: 6 };
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -194,17 +199,31 @@ export default function SignUpScreen() {
             <Text style={styles.primaryBtnLabel}>Create account</Text>
           </Pressable>
 
-          <Pressable
-            onPress={() => router.push('/onboarding/privacy')}
-            hitSlop={{ top: 14, bottom: 14 }}
-            accessibilityRole="link"
-            accessibilityLabel="Privacy Policy"
-            accessibilityHint="Opens the privacy policy"
-          >
-            <Text style={styles.legal}>
-              By continuing you agree to the <Text style={styles.legalLink}>Privacy Policy</Text>.
-            </Text>
-          </Pressable>
+          {/* Each link is its own Pressable: a link nested in Text can't reach 44pt. */}
+          <View style={styles.legalRow}>
+            <Text style={styles.legal}>By continuing you agree to the</Text>
+            <Pressable
+              onPress={() => void Linking.openURL(TERMS_OF_USE_URL)}
+              hitSlop={LEGAL_LINK_SLOP}
+              accessibilityRole="link"
+              accessibilityLabel="Terms of Use"
+              accessibilityHint="Opens Apple's standard licence agreement in Safari"
+            >
+              <Text style={[styles.legal, styles.legalLink]}>Terms</Text>
+            </Pressable>
+            <Text style={styles.legal}>and</Text>
+            <Pressable
+              onPress={() => router.push('/onboarding/privacy')}
+              hitSlop={LEGAL_LINK_SLOP}
+              accessibilityRole="link"
+              accessibilityLabel="Privacy Policy"
+              accessibilityHint="Opens the privacy policy"
+            >
+              <Text style={styles.legal}>
+                <Text style={styles.legalLink}>Privacy Policy</Text>.
+              </Text>
+            </Pressable>
+          </View>
 
           <View style={{ flex: 1 }} />
 
@@ -346,6 +365,9 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   legalLink: { color: colors.tint },
+  // Spaces between the pieces come from the gap (a space at 11pt), not from the strings:
+  // a space at the edge of a separate Text renders wider than one inside a line.
+  legalRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', columnGap: 3 },
 
   footerRow: {
     flexDirection: 'row',
