@@ -1,15 +1,16 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import Constants from 'expo-constants';
 import { Stack } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 
+import { APP_ICON } from '@/constants/brand';
 import { colors, radii, spacing, type } from '@/constants/theme';
 
 /** Settings → About: what the app is and which version is installed. */
 export default function AboutScreen() {
   const version = Constants.expoConfig?.version;
   const build = Constants.expoConfig?.ios?.buildNumber;
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
 
   return (
     <>
@@ -19,9 +20,14 @@ export default function AboutScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
       >
-        <View style={styles.appIcon} accessibilityElementsHidden importantForAccessibility="no">
-          <SymbolView name="cart.fill" size={36} tintColor="#fff" />
-        </View>
+        {/* The home-screen icon, in the same appearance iOS shows it. */}
+        <Image
+          source={APP_ICON[scheme]}
+          style={styles.appIcon}
+          testID="about-app-icon"
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        />
         <Text style={styles.name} accessibilityRole="header">
           Grocery Genie
         </Text>
@@ -47,15 +53,7 @@ export default function AboutScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.iosBg },
   content: { padding: spacing.lg, alignItems: 'center', gap: spacing.sm, paddingTop: spacing.xl },
-  appIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 18,
-    backgroundColor: colors.tint,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
+  appIcon: { width: 72, height: 72, borderRadius: 18, marginBottom: spacing.sm },
   name: { ...type.title2 },
   tagline: {
     ...type.subheadline,
