@@ -6,12 +6,13 @@
 import { Stack } from 'expo-router';
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 import type { ComponentType } from 'react';
-import { StyleSheet } from 'react-native';
+import { Linking, StyleSheet } from 'react-native';
 
 import OnboardingPrivacyScreen from '../../app/onboarding/privacy';
 import ResetPasswordScreen from '../../app/onboarding/reset-password';
 import SignInScreen from '../../app/onboarding/sign-in';
 import SignUpScreen from '../../app/onboarding/sign-up';
+import { TERMS_OF_USE_URL } from '@/features/premium/content/premium';
 import { PRIVACY_POLICY } from '@/features/settings/content/privacy';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
@@ -184,9 +185,18 @@ describe('sign-up privacy policy link', () => {
     expect(screen.getByText(PRIVACY_POLICY.sections[0].heading)).toBeTruthy();
   });
 
-  it('does not mention Terms, which do not exist yet', () => {
+  // No Grocery Genie Terms document exists, so "Terms" is Apple's standard EULA,
+  // as on the paywall (lawyer brief 2026-11-14, item 9, may replace it).
+  it("opens the Terms of Use, Apple's standard EULA, from the footer", () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     openSignUp();
 
-    expect(screen.queryByText(/Terms/)).toBeNull();
+    // Design copy: "By continuing you agree to the Terms and Privacy Policy."
+    expect(screen.getByText('Terms')).toBeTruthy();
+    expect(screen.getByText(/agree to the/)).toBeTruthy();
+    fireEvent.press(screen.getByRole('link', { name: 'Terms of Use' }));
+
+    expect(open).toHaveBeenCalledWith(TERMS_OF_USE_URL);
+    open.mockRestore();
   });
 });
