@@ -13,6 +13,7 @@ import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { WORDMARK_FONT } from '@/constants/fonts';
+import { GoogleMark } from '@/components/GoogleMark';
 import { colors, radii, spacing, type } from '@/constants/theme';
 import { useAppleSignIn, useGoogleSignIn, useSignIn } from '@/features/auth/hooks/useAuth';
 import { ApiError } from '@/services/api';
@@ -82,10 +83,7 @@ export default function SignInScreen() {
   return (
     <>
       <Stack.Screen options={{ title: '', headerBackTitle: 'Back' }} />
-      <KeyboardAvoidingView
-        behavior="padding"
-        style={{ flex: 1, backgroundColor: colors.iosBg }}
-      >
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: colors.iosBg }}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
@@ -208,9 +206,7 @@ export default function SignInScreen() {
               accessibilityRole="button"
               accessibilityLabel="Continue with Google"
             >
-              <View style={styles.googleGlyph}>
-                <Text style={styles.googleGlyphText}>G</Text>
-              </View>
+              <GoogleMark />
               <Text style={styles.googleBtnLabel}>Continue with Google</Text>
             </Pressable>
           )}
@@ -369,19 +365,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flexShrink: 1,
     textAlign: 'center',
-  },
-  googleGlyph: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff', // fixed: Google's mark sits on white in both appearances
-  },
-  googleGlyphText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#4285F4',
   },
 
   linkRight: { ...type.footnote, color: colors.tint, fontWeight: '500' },
