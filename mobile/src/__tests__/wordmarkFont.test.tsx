@@ -1,6 +1,6 @@
 /**
- * Design tokens: Instrument Serif for the launch wordmark and the auth
- * headings. The family the styles name must be the one the app loads, or iOS
+ * Design tokens: Instrument Serif for the auth headings (the Welcome screen
+ * shows the Leaf Drop wordmark image instead). The family the styles name must be the one the app loads, or iOS
  * silently falls back to the system font.
  */
 import React from 'react';
@@ -37,7 +37,6 @@ describe('wordmark font', () => {
   });
 
   it.each([
-    ['onboarding/index', 'Grocery Genie'],
     ['onboarding/sign-in', 'Welcome back'],
     ['onboarding/sign-up', 'Create account'],
   ])('%s sets "%s" in Instrument Serif', (route, text) => {

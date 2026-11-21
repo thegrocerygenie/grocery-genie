@@ -7,7 +7,7 @@
 import { Stack } from 'expo-router';
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 import type { ComponentType } from 'react';
-import { StyleSheet, type TextStyle } from 'react-native';
+import { StyleSheet, useColorScheme, type TextStyle } from 'react-native';
 import { render } from '@testing-library/react-native';
 
 import OnboardingBudget from '../../app/onboarding/budget';
@@ -88,10 +88,30 @@ describe('ring center label', () => {
 });
 
 describe('Welcome', () => {
-  // In dark mode the tint is bright green, and content on it is black.
-  it('draws the cart glyph in the on-tint color', () => {
+  // The hero is the home-screen app icon and the Leaf Drop wordmark, in the current appearance.
+  afterEach(() => jest.mocked(useColorScheme).mockReturnValue('light'));
+
+  it.each([
+    [
+      'light',
+      require('../../assets/brand/app-icon-light.png'),
+      require('../../assets/brand/wordmark-light.png'),
+    ],
+    [
+      'dark',
+      require('../../assets/brand/app-icon-dark.png'),
+      require('../../assets/brand/wordmark-dark.png'),
+    ],
+  ] as const)('shows the Leaf Drop app icon and wordmark for %s mode', (scheme, icon, word) => {
+    jest.mocked(useColorScheme).mockReturnValue(scheme);
     open('index', OnboardingWelcome, '/');
-    expect(screen.getByTestId('symbol-cart.fill').props.tintColor).toBe(colors.onTint);
+    expect(screen.getByLabelText('Grocery Genie logo').props.source).toEqual(icon);
+    expect(screen.queryByTestId('symbol-cart.fill')).toBeNull();
+    // VoiceOver reads the wordmark image as the screen's heading.
+    const wordmark = screen.getByRole('header', { name: 'Grocery Genie' });
+    expect(wordmark.props.source).toEqual(word);
+    // Both sides set: a required image's own 1883 × 295 size would otherwise win.
+    expect(style(wordmark)).toMatchObject({ width: 240, height: (240 * 295) / 1883 });
   });
 
   it('sets the tagline at 15pt, 6pt under the wordmark', () => {

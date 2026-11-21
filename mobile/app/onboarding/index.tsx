@@ -1,14 +1,12 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { WORDMARK_FONT } from '@/constants/fonts';
+import { APP_ICON, BRAND_INK, WORDMARK, WORDMARK_ASPECT } from '@/constants/brand';
 import { colors, radii, spacing, type } from '@/constants/theme';
 
-// "Grocery" is one word, so past twice its size the wordmark breaks mid-word.
-const WORDMARK_MAX_FONT_SCALE = 2;
+const WORDMARK_WIDTH = 240;
 
 export default function OnboardingWelcome() {
   // Padding the hero by the top inset on both sides keeps it centred at the
@@ -16,6 +14,7 @@ export default function OnboardingWelcome() {
   // text makes the screen scroll.
   const heroPad = { paddingVertical: useSafeAreaInsets().top };
   const router = useRouter();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
@@ -25,14 +24,27 @@ export default function OnboardingWelcome() {
         alwaysBounceVertical={false}
       >
         <View style={[styles.heroWrap, heroPad]}>
-          <View style={styles.appIcon}>
-            <SymbolView name="cart.fill" size={44} tintColor={colors.onTint} />
+          {/* The home-screen icon, in the same appearance iOS shows it. */}
+          <View style={styles.appIconShadow}>
+            <Image
+              source={APP_ICON[scheme]}
+              style={styles.appIcon}
+              accessibilityRole="image"
+              accessibilityLabel="Grocery Genie logo"
+            />
           </View>
           <View>
-            <Text style={styles.wordmark} maxFontSizeMultiplier={WORDMARK_MAX_FONT_SCALE}>
-              Grocery Genie
+            <Image
+              source={WORDMARK[scheme]}
+              style={styles.wordmark}
+              resizeMode="contain"
+              accessible
+              accessibilityRole="header"
+              accessibilityLabel="Grocery Genie"
+            />
+            <Text style={styles.tagline}>
+              Snap a receipt, watch your grocery budget take shape.
             </Text>
-            <Text style={styles.tagline}>Snap a receipt, watch your grocery budget take shape.</Text>
           </View>
         </View>
         <View style={styles.ctaStack}>
@@ -71,25 +83,21 @@ const styles = StyleSheet.create({
     gap: 20,
     paddingHorizontal: spacing.xl,
   },
-  appIcon: {
-    width: 88,
-    height: 88,
+  // The shadow sits on a wrapper: the image clips to its corners, which would clip a shadow too.
+  appIconShadow: {
     borderRadius: 22,
-    backgroundColor: colors.tint,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.tint,
+    shadowColor: BRAND_INK,
     shadowOpacity: 0.25,
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 12 },
-    elevation: 8,
   },
+  appIcon: { width: 88, height: 88, borderRadius: 22 },
+  // 240pt wide: about the width the 38pt serif name took, so the hero keeps its balance.
+  // Height is explicit: a required image's own 1883 × 295 size overrides aspectRatio.
   wordmark: {
-    color: colors.iosLabel,
-    fontSize: 38,
-    letterSpacing: -0.7,
-    fontFamily: WORDMARK_FONT,
-    textAlign: 'center',
+    width: WORDMARK_WIDTH,
+    height: WORDMARK_WIDTH / WORDMARK_ASPECT,
+    alignSelf: 'center',
   },
   tagline: {
     ...type.subheadline,

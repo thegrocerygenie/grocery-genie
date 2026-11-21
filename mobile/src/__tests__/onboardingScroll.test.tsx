@@ -76,11 +76,7 @@ function expectAllScroll(texts: (string | RegExp)[]) {
 
 describe('onboarding content sits in a scroll container', () => {
   it.each([
-    [
-      'index',
-      OnboardingWelcome,
-      ['Grocery Genie', /Snap a receipt/, 'Get Started', 'I already have an account'],
-    ],
+    ['index', OnboardingWelcome, [/Snap a receipt/, 'Get Started', 'I already have an account']],
     ['camera', OnboardingCamera, ['Allow Camera Access', /uses the camera/, 'Continue', 'Not now']],
     [
       'budget',
@@ -162,12 +158,11 @@ describe('Set Budget caps text that cannot wrap', () => {
   });
 });
 
-// "Grocery" is one word: at AX5 the wordmark outgrows the screen width and
-// breaks mid-word ("Grocer / y"), so it stops growing at twice its size.
-it('welcome wordmark has a font scale cap', () => {
+// The wordmark is an image of fixed width, so large text cannot push it off screen.
+it('welcome wordmark scrolls with the rest of the hero', () => {
   open('index', OnboardingWelcome, '/');
 
-  expect(screen.getByText('Grocery Genie').props.maxFontSizeMultiplier).toBe(2);
+  expect(inScrollView(screen.getByRole('header', { name: 'Grocery Genie' }))).toBe(true);
 });
 
 // The resend timer sits in a row beside its clock icon. Without flexShrink the
