@@ -4,18 +4,17 @@
     "slug": "grocery-genie",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/brand/app-icon-light.png",
     "userInterfaceStyle": "automatic",
     "platforms": ["ios"],
     "scheme": "grocerygenie",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.grocerygenie.app",
+      "icon": {
+        "light": "./assets/brand/app-icon-light.png",
+        "dark": "./assets/brand/app-icon-dark.png"
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "Grocery Genie uses the camera to scan receipts.",
         "NSPhotoLibraryUsageDescription": "Grocery Genie accesses your photo library to import receipt images."
@@ -59,6 +58,18 @@
         }
       ],
       "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/brand/logo-mark-light.png",
+          "imageWidth": 120,
+          "backgroundColor": "#FBF8F1",
+          "dark": {
+            "image": "./assets/brand/logo-mark-dark.png",
+            "backgroundColor": "#1B1A15"
+          }
+        }
+      ],
       "./plugins/withPodsMinDeploymentTarget",
       "./plugins/withDocumentScannerNoLocation",
       "./plugins/ios-scene-lifecycle",

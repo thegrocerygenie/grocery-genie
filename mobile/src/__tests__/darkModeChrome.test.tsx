@@ -2,12 +2,12 @@
  * Dark mode chrome: native stack headers (receipt detail, Review, sign-in,
  * pushed Settings screens) take their colors from the React Navigation theme.
  * With no theme they stay light in dark mode, and the light status bar is
- * white on a white header. The Welcome wordmark must also follow the label
- * color, or it is black on black.
+ * white on a white header. The Welcome wordmark must also switch to its dark
+ * export, or it is black on black.
  */
 import React from 'react';
 // React Native's jest setup mocks useColorScheme to return 'light'.
-import { StyleSheet, Text, useColorScheme } from 'react-native';
+import { Text, useColorScheme } from 'react-native';
 import { useTheme } from '@react-navigation/native';
 import { screen } from '@testing-library/react-native';
 import { Slot } from 'expo-router';
@@ -15,7 +15,7 @@ import { renderRouter } from 'expo-router/testing-library';
 
 import RootLayout from '../../app/_layout';
 import Welcome from '../../app/onboarding';
-import { colors, navigationTheme, TINT_HEX } from '@/constants/theme';
+import { navigationTheme, TINT_HEX } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
@@ -96,13 +96,16 @@ describe('root layout theme', () => {
 });
 
 describe('Welcome wordmark', () => {
-  it('uses the label color so it shows in dark mode', async () => {
+  afterEach(() => jest.mocked(useColorScheme).mockReturnValue('light'));
+
+  it('uses the dark export in dark mode', async () => {
+    jest.mocked(useColorScheme).mockReturnValue('dark');
     renderRouter(
       { _layout: RootLayout, ...otherRoutes, 'onboarding/index': Welcome },
       { initialUrl: '/onboarding' },
     );
 
-    const style = StyleSheet.flatten((await screen.findByText('Grocery Genie')).props.style);
-    expect(style.color).toEqual(colors.iosLabel);
+    const wordmark = await screen.findByRole('header', { name: 'Grocery Genie' });
+    expect(wordmark.props.source).toEqual(require('../../assets/brand/wordmark-dark.png'));
   });
 });
